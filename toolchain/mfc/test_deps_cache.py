@@ -172,3 +172,20 @@ def test_a_damaged_entry_is_replaced_by_the_next_save(tmp_path):
     assert "saved" in _sh(a, cache, "deps_cache_save").stdout
     assert lib.read_text() == "lapack-bytes" and "hit" in _sh(b, cache, "deps_cache_restore").stdout
     assert [p.name for p in cache.iterdir()] == [_entries(cache)[0].name], "leftovers in the cache folder"
+
+
+def test_a_copy_that_fails_publishes_nothing(tmp_path):
+    """An entry with a library missing would pass its own completeness check: the census is taken from what was copied."""
+    cache = tmp_path / "cache"
+    a, b = _workspace(tmp_path, "a"), _workspace(tmp_path, "b")
+    _populate(a, {**DEP_FILES, "install/silo/lib/libsilo.a": "silo", "staging/silo/install_manifest.txt": "libsilo.a\n"})
+    unreadable = a / "build" / "install" / "lapack" / "lib64" / "liblapack.a"
+    unreadable.chmod(0)
+    try:
+        saved = _sh(a, cache, "deps_cache_save")
+    finally:
+        unreadable.chmod(0o644)
+    assert saved.returncode == 0 and "not saved" in saved.stdout, saved.stdout + saved.stderr
+    assert not _entries(cache), "a partial entry was published"
+    assert not list(cache.iterdir()), "the failed save left files behind"
+    assert "miss" in _sh(b, cache, "deps_cache_restore").stdout

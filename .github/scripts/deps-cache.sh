@@ -86,23 +86,26 @@ deps_cache_save() {
     fi
 
     local tmp="$deps_cache_dir/.tmp.$deps_cache_key.$$.$(hostname -s)"
+    # Every step exits on failure explicitly: `set -e` is ignored in a subshell
+    # that is an `if` condition, and a copy that failed half-way would otherwise be
+    # counted, marked complete and published.
     if (
-        set -e
         umask 002
-        mkdir -p "$tmp/staging" "$tmp/install"
+        mkdir -p "$tmp/staging" "$tmp/install" || exit 1
         for name in "${deps[@]}"; do
-            mkdir "$tmp/staging/$name"
-            cp -p build/staging/"$name"/install_manifest*.txt "$tmp/staging/$name/"
-            [ ! -f "build/staging/$name/CMakeCache.txt" ] || cp -p "build/staging/$name/CMakeCache.txt" "$tmp/staging/$name/"
-            [ ! -d "build/install/$name" ] || cp -a "build/install/$name" "$tmp/install/"
+            mkdir "$tmp/staging/$name" || exit 1
+            cp -p build/staging/"$name"/install_manifest*.txt "$tmp/staging/$name/" || exit 1
+            [ ! -f "build/staging/$name/CMakeCache.txt" ] || cp -p "build/staging/$name/CMakeCache.txt" "$tmp/staging/$name/" || exit 1
+            [ ! -d "build/install/$name" ] || cp -a "build/install/$name" "$tmp/install/" || exit 1
         done
-        _deps_cache_census "$tmp" > "$tmp/.complete"
+        _deps_cache_census "$tmp" > "$tmp/.complete" || exit 1
         # A damaged entry would otherwise block its key for good.
         if [ -e "$deps_cache_entry" ] && ! _deps_cache_valid "$deps_cache_entry"; then
-            mv -T "$deps_cache_entry" "$tmp.damaged" && rm -rf "$tmp.damaged"
+            mv -T "$deps_cache_entry" "$tmp.damaged" || exit 1
+            rm -rf "$tmp.damaged"
         fi
         # rename(2) refuses a non-empty target, so the first job to publish a key wins
-        mv -T "$tmp" "$deps_cache_entry"
+        mv -T "$tmp" "$deps_cache_entry" || exit 1
     ) 2> /dev/null; then
         echo "deps cache: saved ($deps_cache_key): ${deps[*]}"
     else
