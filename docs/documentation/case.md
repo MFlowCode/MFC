@@ -772,7 +772,7 @@ It must lie in (0, 2) for the preconditioner to stay symmetric positive definite
   - `1` (default): partial densities and volume fractions, which keeps density on the isentrope of its pressure.
   - `2`: also momentum.
 
-- `prof_woods_modulus` uses the Wood's modulus rather than the frozen modulus sum(alpha_k K_k).
+- `proj_woods_modulus` uses the Wood's modulus rather than the frozen modulus sum(alpha_k K_k).
 
 - `proj_max_acfl` caps the projection time step, with `cfl_adap_dt` or `cfl_const_dt`, at this multiple of the explicit acoustic one. With the default, 0, only the advective limit applies, so these modes need a positive value or a body force to bound `dt` for fluid at rest. With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` per step (1.1 when `ramp_ratio` is unset).
 
