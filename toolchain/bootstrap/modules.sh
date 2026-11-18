@@ -248,9 +248,11 @@ if [ "$u_c" '==' 'famd' ] || [ "$u_c" '==' 'tamd' ]; then
 
     # AFAR >= 23.2: no mpich3.4a2, hipfort moved under lib/llvm.
     # AFAR >= 24.3: hipfort is per-compiler, under lib/llvm/{include,lib}/fortran/flang.
-    export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich4.3.1"
+    # AFAR >= 24.4: no bundled MPICH modules (set AFAR_MPICH_INCDIR to the include dir of MPICH 4.3.1 built with
+    # that amdflang); hipfort library is under lib/llvm/lib64.
+    export CRAY_MPICH_INC="-I${AFAR_MPICH_INCDIR:-${OLCF_AFAR_ROOT}/include/mpich4.3.1}"
     export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/lib/llvm/include/fortran/flang/hipfort/amdgcn -I${OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
-    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
+    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib64/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
     export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
