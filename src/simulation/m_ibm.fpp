@@ -80,7 +80,8 @@ module m_ibm
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
         & s_write_ib_surface, s_ib_flux_wall_prepare, s_update_ib_temperatures, s_ibm_alloc_fine, s_ibm_setup_fine, &
         & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, s_ibm_note_fine_memory, &
-        & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, s_add_swept_cells
+        & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, &
+        & s_add_swept_cells, f_ib_mass_bank, ib_mass_res
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -347,8 +348,13 @@ contains
         end if
         if (ib_mass_relax > 0) then
             @:ALLOCATE(ib_mass_res(2, num_gbl_ibs), ib_shell_mass(1, num_gbl_ibs))
+            ! The bank of each body, from the restart record of the rank that owns it (zeros elsewhere), shared by all ranks
             ib_mass_res = 0._wp
             ib_shell_mass = 0._wp
+            do i = 1, num_local_ibs
+                ib_mass_res(1, patch_ib(i)%gbl_patch_id) = patch_ib(i)%mass_bank
+            end do
+            call s_mpi_allreduce_vectors_sum(ib_mass_res, ib_mass_res, 2, num_gbl_ibs)
             $:GPU_UPDATE(device='[ib_mass_res, ib_shell_mass]')
             @:ALLOCATE(ib_shell%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(ib_shell)
@@ -1290,6 +1296,17 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_update_ib_temperatures
+
+    !> The ib_mass_relax bank of global IB g (0 without ib_mass_relax), for the restart record. Reads the host copy.
+    impure function f_ib_mass_bank(g) result(bank)
+
+        integer, intent(in) :: g
+        real(wp)            :: bank
+
+        bank = 0._wp
+        if (ib_mass_relax > 0) bank = ib_mass_res(1, g)
+
+    end function f_ib_mass_bank
 
     !> ib_mass_relax: take this step's release of each body's bank (s_update_ib_temperatures) out of the gas within ib_shell_width
     !! cells of the body, scaling the partial densities, momentum, energy and species of those cells by one factor (velocity,
