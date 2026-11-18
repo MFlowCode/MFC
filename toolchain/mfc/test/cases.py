@@ -1500,6 +1500,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_ib(1)%slip": "F",
                         "patch_ib(1)%moving_ibm": 2,
                         "patch_ib(1)%mass": 1.0,
+                        "ib_mass_relax": 0,  # the mass account is not in the restart files
                     },
                     restart_check=True,
                 )
