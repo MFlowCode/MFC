@@ -245,10 +245,10 @@ contains
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
-        ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, dx, dy, ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end]')
+        ! GPU routines require updated cell centers and boundaries
+        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, x_cb, y_cb, dx, dy, ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, ib_bc_z%beg, ib_bc_z%end]')
+            $:GPU_UPDATE(device='[z_cc, z_cb, dz, ib_bc_z%beg, ib_bc_z%end]')
         end if
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs), glb_bounds]')
 
