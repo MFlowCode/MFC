@@ -5616,6 +5616,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "ib_wall_order=2", {"amr_max_grid_size": 32, "ib_wall_order": 2}))
         # body options that act through the ghost-point update shared by the fine blocks
         cases.append(define_case_d(stack, "slip", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T"}))
+        # ghost-state options of the slip and viscous walls, both checked with ./mfc.sh amr_check
+        cases.append(define_case_d(stack, "slip -> ib_slip_ccst", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T", "ib_slip_ccst": "T"}))
+        cases.append(define_case_d(stack, "ib_smooth_contact", {"amr_max_grid_size": 32, "ib_smooth_contact": "T", "viscous": "T", "fluid_pp(1)%Re(1)": 1000.0}))
         cases.append(define_case_d(stack, "ib_second_order_vel", {"amr_max_grid_size": 32, "ib_second_order_vel": "T", "ib_ip_min_dist": 1.5}))
         cases.append(define_case_d(stack, "many_ib_patch_parallelism", {"amr_max_grid_size": 32, "many_ib_patch_parallelism": "T"}))
         # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
