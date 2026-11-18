@@ -5180,6 +5180,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2, restart_check=True, honor_io_keys=True, kind="smoke"))
         stack.pop()
         stack.pop()
+        # nothing tagged (#2222): the block retracts to the dormant seed block at the domain center, and restarts from it
+        stack.push("AMR -> 1D -> nothing tagged", {**amr_1d_base, "amr_regrid_int": 2, "amr_tag_eps": 1.0e6, "amr_buf": 2})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
+        stack.pop()
 
         # 1D MHD + RMHD: div(B) is identically zero in 1D, so By/Bz reflux as ordinary scalars.
         # Brio-Wu with HLLD, plus a relativistic variant.
