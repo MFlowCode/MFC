@@ -111,7 +111,8 @@ def load(filepath: str) -> Pack:
 
         arr = line.split(" ")
 
-        entries.append(PackEntry(filepath=arr[0], doubles=[float(d) for d in arr[1:]]))
+        # an empty entry (a rank's header-only Lagrangian file) is the path and a trailing space
+        entries.append(PackEntry(filepath=arr[0], doubles=[float(d) for d in arr[1:] if d]))
 
     return Pack(entries)
 
