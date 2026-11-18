@@ -11,6 +11,7 @@
 # Sites:    frontier  phoenix
 # Common:   check-runners  list-runners  move-runner  rebalance-runners
 #           restart-all  restart-runner  stop-runner  dedupe-runners  rerun-failed
+#           watchdog
 # Frontier: make-runner  deploy-runners
 # Phoenix:  create-runner
 #
@@ -18,6 +19,7 @@
 #   bash misc/runners/runner.sh frontier check-runners
 #   bash misc/runners/runner.sh phoenix list-runners
 #   APPLY=1 bash misc/runners/runner.sh frontier rebalance-runners
+#   APPLY=1 bash misc/runners/runner.sh phoenix watchdog 600
 #   bash misc/runners/runner.sh frontier restart-runner login01 /path/to/runner
 #   bash misc/runners/runner.sh frontier make-runner 23 login01
 #   bash misc/runners/runner.sh phoenix create-runner phoenix-11 login-phoenix-gnr-2
@@ -49,7 +51,7 @@ if [ -f "$MISC_DIR/common/$CMD.sh" ]; then
 fi
 
 echo "ERROR: Unknown command '$CMD' for site '$SITE'." >&2
-echo "Common:   check-runners list-runners move-runner rebalance-runners restart-all restart-runner stop-runner dedupe-runners rerun-failed" >&2
+echo "Common:   check-runners list-runners move-runner rebalance-runners restart-all restart-runner stop-runner dedupe-runners rerun-failed watchdog" >&2
 echo "Frontier: make-runner deploy-runners" >&2
 echo "Phoenix:  create-runner" >&2
 exit 1

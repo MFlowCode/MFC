@@ -23,6 +23,7 @@ module m_riemann_solver_hllc
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
     use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
+    use m_ibm, only: ib_markers, ib_wall_src, ib_wall_theta, ibw_e, ibw_u, ibw_a
 
     implicit none
 
@@ -84,7 +85,7 @@ contains
             real(wp)                             :: s_L, s_R, s_M, s_P, s_S
             real(wp)                             :: xi_L, xi_R        !< Left and right wave speeds functions
             real(wp)                             :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
-            real(wp)                             :: xi_M, xi_P
+            real(wp)                             :: xi_M, xi_P, xi_tan
             real(wp)                             :: xi_MP, xi_PP
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
                 real(wp), dimension(3) :: R0_L, R0_R
@@ -112,6 +113,9 @@ contains
             real(wp)               :: alpha_K_star, alpha_rho_K_star, p_isen_L, p_isen_R, e_K_star
             real(wp)               :: pres_SL, pres_SR, Ms_L, Ms_R
             real(wp)               :: pcorr          !< low Mach number correction
+            logical                :: ib_fw          !< ib_flux_wall: a face between a fluid cell and a body's cell
+            integer                :: fw_o           !< its body cell's offset from the face's left cell (0 or 1)
+            real(wp)               :: fw_a, fw_m     !< signed share of the wall rates, their mass flux
             integer                :: i, j, k, l, q  !< Generic loop iterators
             !> host copy of Re_size; amdflang reads the declare-target original stale cross-TU
             integer :: Re_size_loc1, Re_size_loc2
@@ -872,9 +876,10 @@ contains
                             #:set _hllc_s2 = ['pi_inf_R', 'qv_R', 'alpha_L_sum', 'alpha_R_sum', 'E_L', 'E_R', 'MW_L', 'MW_R', &
                                 & 'R_gas_L', 'R_gas_R', 'Cp_L', 'Cp_R', 'Cv_L', 'Cv_R', 'c_sum_Yi_Phi']
                             #:set _hllc_s3 = ['Gamm_L', 'Gamm_R', 'Y_L', 'Y_R', 'H_L', 'H_R', 'qv_avg', 'rho_avg', 'gamma_avg', &
-                                & 'H_avg', 'c_L', 'c_R', 'c_avg', 's_P', 's_M', 'xi_P', 'xi_M', 'xi_L']
+                                & 'H_avg', 'c_L', 'c_R', 'c_avg', 's_P', 's_M', 'xi_P', 'xi_M', 'xi_tan', 'xi_L']
                             #:set _hllc_s4 = ['xi_R', 'xi_L_m1', 'xi_R_m1', 'Ms_L', 'Ms_R', 'pres_SL', 'pres_SR', 's_L', 's_R', &
                                 & 's_S', 'vel_avg_rms', 'pcorr']
+                            #:set _hllc_s5 = ['ib_fw', 'fw_o', 'fw_a', 'fw_m']
                             #:set _hllc_a1 = ['vel_L', 'vel_R', 'Re_L', 'Re_R', 'alpha_L', 'alpha_R', 'alpha_rho_L', 'alpha_rho_R', &
                                 & 'alpha_lim_L', 'alpha_lim_R']
                             #:set _hllc_a2 = ['Ys_L', 'Ys_R', 'Xs_L', 'Xs_R', 'Gamma_iL', 'Gamma_iR', 'Cp_iL', 'Cp_iR', 'R_species', &
@@ -894,11 +899,11 @@ contains
                             #:set _hllc_e6 = ['a_R_ref', 'a_ref', 'du_t', 'dtau_nt', 'du_t2', 'dtau_nt2', 'sensor_ptot', 'sensor_vt', &
                                 & 'sensor_tnt', 'sensor_combined', 'idx_phys']
                             #:if HYPO
-                                #:set _hllc_priv = '[' + ', '.join(_hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4 + _hllc_e1 + _hllc_e2 &
-                                                                   & + _hllc_e3 + _hllc_e4 + _hllc_e5 + _hllc_e6) + ']'
+                                #:set _hllc_priv = '[' + ', '.join(_hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4 + _hllc_s5 + _hllc_e1 &
+                                                                   & + _hllc_e2 + _hllc_e3 + _hllc_e4 + _hllc_e5 + _hllc_e6) + ']'
                                 #:set _hllc_arr = '[' + ', '.join(_hllc_a1 + _hllc_a2 + _hllc_ea) + ']'
                             #:else
-                                #:set _hllc_priv = '[' + ', '.join(_hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4) + ']'
+                                #:set _hllc_priv = '[' + ', '.join(_hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4 + _hllc_s5) + ']'
                                 #:set _hllc_arr = '[' + ', '.join(_hllc_a1 + _hllc_a2) + ']'
                             #:endif
                             ! Identical calls on purpose: offload kernels are named by the .fpp line of their GPU_PARALLEL_LOOP, so
@@ -1396,6 +1401,15 @@ contains
                                                            & *s_M*xi_L_m1) + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) &
                                                            & *s_P*xi_R_m1)
                                         end do
+                                        if (ib_smooth_contact) then
+                                            xi_tan = f_contact_weight(s_S, max(c_L, c_R))
+                                            $:GPU_LOOP(parallelism='[seq]')
+                                            do i = 2, num_dims
+                                                vel_src_rsx_vf(${SF('')}$, &
+                                                               & dir_idx(i)) = xi_tan*vel_L(dir_idx(i)) + (1._wp - xi_tan) &
+                                                               & *vel_R(dir_idx(i))
+                                            end do
+                                        end if
 
                                         ! COLOR FUNCTION FLUX
                                         if (surface_tension) then
@@ -1419,6 +1433,43 @@ contains
                                                 flux_src_rsx_vf(${SF('')}$, i) = 0.0_wp
                                             end do
                                         end if
+
+                                        ! ib_flux_wall: at a face between fluid and a flux-wall body the species, mass and energy
+                                        ! fluxes are the body cell's wall rates (s_ibm_correct_state) times its area share and the
+                                        ! fluid cell's positivity factor, signed into the gas; the momentum flux keeps the pressure
+                                        ! terms and replaces what the Riemann mass flux carried with the wall's blowing gas
+                                        #:if not HYPO
+                                            ib_fw = .false.
+                                            if (ib_flux_wall) then
+                                                if ((ib_markers%sf(${SF('')}$) == 0) .neqv. (ib_markers%sf(${SF(' + 1')}$) == 0)) &
+                                                    & then
+                                                    fw_o = merge(0, 1, ib_markers%sf(${SF('')}$) /= 0)
+                                                    ib_fw = ib_wall_src(ibw_a)%sf(${SF(' + fw_o')}$) > 0._wp
+                                                end if
+                                            end if
+                                            if (ib_fw) then
+                                                fw_a = real(1 - 2*fw_o, &
+                                                            & wp)*ib_wall_src(ibw_a)%sf(${SF(' + fw_o')}$) &
+                                                            & *ib_wall_theta%sf(${SF(' + 1 - fw_o')}$)
+                                                fw_m = 0._wp
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do i = 1, num_species
+                                                    flux_rsx_vf(${SF('')}$, &
+                                                                & eqn_idx%species%beg + i - 1) &
+                                                                & = fw_a*ib_wall_src(i)%sf(${SF(' + fw_o')}$)
+                                                    fw_m = fw_m + flux_rsx_vf(${SF('')}$, eqn_idx%species%beg + i - 1)
+                                                end do
+                                                flux_rsx_vf(${SF('')}$, eqn_idx%cont%beg) = fw_m
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do i = 1, num_dims
+                                                    flux_rsx_vf(${SF('')}$, &
+                                                                & eqn_idx%cont%end + i) = dir_flg(i)*(xi_M*pres_L + xi_P*pres_R &
+                                                                & + (s_M/s_L)*(s_P/s_R)*pcorr) + fw_m*ib_wall_src(ibw_u + i &
+                                                                & - 1)%sf(${SF(' + fw_o')}$)
+                                                end do
+                                                flux_rsx_vf(${SF('')}$, eqn_idx%E) = fw_a*ib_wall_src(ibw_e)%sf(${SF(' + fw_o')}$)
+                                            end if
+                                        #:endif
 
                                         #:if HYPO
                                             ! HLLC-ADC blending for hypoelasticity

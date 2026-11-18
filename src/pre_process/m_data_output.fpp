@@ -22,7 +22,7 @@ module m_data_output
     use m_boundary_io
     use m_thermochem, only: species_names
     use m_helper
-    use m_constants, only: model_eqns_5eq, precision_single
+    use m_constants, only: model_eqns_5eq, precision_single, ib_state_nfields
 
     implicit none
 
@@ -782,21 +782,15 @@ contains
 
     contains
 
-        !> Writes one 20-field IB state record, prefixed by its global id under file_per_process.
+        !> Writes one IB state record, prefixed by its global id under file_per_process.
         subroutine s_write_ib_state_record(ib_patch, gbl_id)
 
             type(ib_patch_parameters), intent(in) :: ib_patch
             integer, intent(in)                   :: gbl_id
-            real(wp), dimension(20)               :: ib_buf
+            real(wp), dimension(ib_state_nfields) :: ib_buf
 
-            ib_buf = 0._wp
-            ib_buf(8:10) = ib_patch%vel
-            ib_buf(11:13) = ib_patch%angular_vel
-            ib_buf(14:16) = ib_patch%angles
-            ib_buf(17) = ib_patch%x_centroid
-            ib_buf(18) = ib_patch%y_centroid
-            ib_buf(19) = ib_patch%z_centroid
-            ib_buf(20) = ib_patch%radius
+            call s_pack_ib_state(ib_patch, 0._wp, ib_buf)
+            ib_buf(2:7) = 0._wp  ! no force or torque before the first step
 
             if (file_per_process) write (file_unit) gbl_id
             write (file_unit) ib_buf

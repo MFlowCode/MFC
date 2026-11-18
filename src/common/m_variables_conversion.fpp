@@ -28,7 +28,8 @@ module m_variables_conversion
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
-        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, &
+        & qvps, enforce_density_floor_vc
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -43,7 +44,10 @@ module m_variables_conversion
     integer :: lagrange_beta_index_vc = 0
     $:GPU_DECLARE(create='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
-    real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
+    real(wp), allocatable, dimension(:,:,:), public :: rho_sf  !< Scalar density function
+    !> post_process's AMR overlay converts fine blocks larger than the coarse rank grid these caches span; it sets this around those
+    !! conversions (the caches are coarse-grid derived fields only)
+    logical, public                                 :: skip_mixture_store = .false.
     real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
     real(wp), allocatable, dimension(:,:,:), public :: pi_inf_sf  !< Scalar liquid stiffness function
 
@@ -140,7 +144,7 @@ contains
         qv = 0._wp  ! keep this value nil for now. For future adjustment
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(i, j, k) = rho
             gamma_sf(i, j, k) = gamma
             pi_inf_sf(i, j, k) = pi_inf
@@ -173,7 +177,7 @@ contains
         call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K, G_K, G)
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(k, l, r) = rho
             gamma_sf(k, l, r) = gamma
             pi_inf_sf(k, l, r) = pi_inf
@@ -181,8 +185,10 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
-    !> Host- and device-callable conversion kernel for species and mixture variables.
-    subroutine s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, G)
+    !> Host- and device-callable conversion kernel for species and mixture variables. Device callers pass host copies of Re_size
+    !! (amdflang reads the module variable stale cross-TU); absent, the module variable is used.
+    subroutine s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, G, &
+        & Re_size_loc1, Re_size_loc2)
 
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_kernel', parallelism='[seq]', cray_noinline=True)
 
@@ -196,8 +202,9 @@ contains
         #:endif
         real(wp), optional, dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out)               :: G_K
+        integer, optional, intent(in)                 :: Re_size_loc1, Re_size_loc2
         real(wp)                                      :: alpha_K_sum
-        integer                                       :: i, j  !< Generic loop iterators
+        integer                                       :: i, j, n_Re  !< Generic loop iterators, Re_size(i)
 
         rho_K = 0._wp
         gamma_K = 0._wp
@@ -231,9 +238,15 @@ contains
             do i = 1, 2
                 Re_K(i) = dflt_real
 
-                if (Re_size(i) > 0) Re_K(i) = 0._wp
+                if (present(Re_size_loc1)) then
+                    n_Re = merge(Re_size_loc1, Re_size_loc2, i == 1)
+                else
+                    n_Re = Re_size(i)
+                end if
 
-                do j = 1, Re_size(i)
+                if (n_Re > 0) Re_K(i) = 0._wp
+
+                do j = 1, n_Re
                     Re_K(i) = alpha_K(Re_idx(i, j))/Res_vc(i, j) + Re_K(i)
                 end do
 
@@ -416,10 +429,13 @@ contains
         real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
         real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
         integer                :: iter                     !< Newton-Raphson iteration counter
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_K, alpha_rho_K, Re_K, nRtmp, rhoYks, B]', private='[rho_K, gamma_K, &
                             & pi_inf_K, qv_K, dyn_pres_K, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, &
-                            & m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter]')
+                            & m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter]', firstprivate='[Re_size_loc1, Re_size_loc2]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -431,10 +447,10 @@ contains
                     ! Device regions call the device-compiled scalar kernel directly.
                     if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K, G_K, Gs_vc)
+                            & Re_K, G_K, Gs_vc, Re_size_loc1, Re_size_loc2)
                     else
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K)
+                            & Re_K, Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
                     end if
 #else
                     ! Host execution uses the wrapper, which also stores requested diagnostics.
@@ -658,8 +674,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, &
-                                       & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_K, &
-                                       & any(i == shear_indices))/gamma_K
+                                       & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_K, ${IS_SHEAR('i')}$)/gamma_K
                         end do
                     end if
 
@@ -905,7 +920,7 @@ contains
                                 q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
                                           & l)**2._wp)/max(4._wp*G, verysmall)
                                 ! Double for shear stresses
-                                if (any(i == shear_indices)) then
+                                if (${IS_SHEAR('i')}$) then
                                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
                                               & l)**2._wp)/max(4._wp*G, verysmall)
                                 end if
@@ -975,10 +990,13 @@ contains
         real(wp)                             :: blkmod1_K, blkmod2_K, K_K
         real(wp)                             :: T_K, mix_mol_weight, R_gas
         integer                              :: i, j, k, l  !< Generic loop iterators
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         $:GPU_UPDATE(device='[is1b, is2b, is3b, is1e, is2e, is3e]')
 
@@ -986,7 +1004,7 @@ contains
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K]', private='[rho_K, vel_K_sum, &
                             & pres_K, E_K, gamma_K, pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', &
-                            & copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
+                            & copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]', firstprivate='[Re_size_loc1, Re_size_loc2]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1014,10 +1032,10 @@ contains
                     pres_K = qK_prim_vf(j, k, l, eqn_idx%E)
                     if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K, G_K, Gs_vc)
+                            & Re_K, G_K, Gs_vc, Re_size_loc1, Re_size_loc2)
                     else
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K)
+                            & Re_K, Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
                     end if
 
                     ! Computing the energy from the pressure
@@ -1242,7 +1260,7 @@ contains
 
         E_e = 0._wp
         do s = eqn_idx%stress%beg, eqn_idx%stress%end
-            E_e = E_e + f_elastic_energy(real(q_cons_vf(s)%sf(j, k, l), wp)/rho, G, any(s == shear_indices))
+            E_e = E_e + f_elastic_energy(real(q_cons_vf(s)%sf(j, k, l), wp)/rho, G, ${IS_SHEAR('s')}$)
         end do
 
     end function f_hypoelastic_energy

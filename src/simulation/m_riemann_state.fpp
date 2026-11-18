@@ -11,7 +11,7 @@ module m_riemann_state
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: verysmall
+    use m_constants, only: verysmall, contact_ramp, sgm_eps
     use m_hb_function
 
     implicit none
@@ -118,6 +118,18 @@ contains
         end if
 
     end function f_low_Mach_pcorr_hll
+
+    !> Weight on the left state of the contact-upwinded tangential interface velocity: the step sign(s_S) smoothed to a linear ramp
+    !! of half-width contact_ramp*c, so a face with s_S at round-off averages the two sides rather than picking one.
+    pure function f_contact_weight(s_S, c) result(w)
+
+        $:GPU_ROUTINE(function_name='f_contact_weight', parallelism='[seq]', cray_inline=True)
+        real(wp), intent(in) :: s_S, c
+        real(wp)             :: w
+
+        w = min(max(5.e-1_wp + 5.e-1_wp*s_S/max(contact_ramp*c, sgm_eps), 0._wp), 1._wp)
+
+    end function f_contact_weight
 
     !> The same correction for the HLLC flux, where the star state supplies the pressure jump directly and the correction scales
     !! with the mass flux through the acoustic waves instead. Zero unless low_Mach == 1.
@@ -327,6 +339,10 @@ contains
         $:GPU_UPDATE(device='[isx, isy, isz]')
         ! for stuff in different modules
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
+
+        ! An AMR fine frame's edges are block faces inside the domain, whose ghost states come from the coarse fill: the bc = -4
+        ! extrapolation below belongs to the domain boundary, which the coarse grid handles
+        if (amr_in_fine_advance) return
 
         ! Population of Buffers in x-direction
         if (norm_dir == 1) then
@@ -1278,14 +1294,14 @@ contains
             if (G_L > verysmall) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 ! Double for shear stresses
-                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
+                if (${IS_SHEAR('eqn_idx%stress%beg - 1 + i')}$) then
                     E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 end if
             end if
             if (G_R > verysmall) then
                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses
-                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
+                if (${IS_SHEAR('eqn_idx%stress%beg - 1 + i')}$) then
                     E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 end if
             end if
