@@ -83,7 +83,6 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
         "SHELL:-h static" "SHELL:-h keepfiles"
         "SHELL:-h acc_model=auto_async_none"
         "SHELL: -h acc_model=no_fast_addr"
-        "SHELL: -h list=adm"
         "SHELL: -munsafe-fp-atomics" # Not unsafe for operations we do
     )
 

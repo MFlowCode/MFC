@@ -173,6 +173,7 @@ DESCRIPTIONS = {
     "ib_wall_order": "Immersed-boundary wall treatment: 1 default ghost fill (default), 2 two-probe quadratic wall-normal ghost velocity at no-slip walls",
     "ib_smooth_contact": "Blend the left and right HLLC tangential interface velocity across the contact wave in the viscous work next to an immersed body",
     "ib_visc_compact": "Compact velocity gradients on the viscous faces next to an immersed body when weno_Re_flux is on",
+    "ib_uncover_fill": "A cell a moving immersed boundary uncovers takes the mean density, species and pressure of its fluid neighbours instead of its stale ghost state (off by default)",
     "ib_ip_interp": "Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud weights over 3x3(x3) cells",
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
