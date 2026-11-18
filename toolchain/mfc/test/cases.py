@@ -5169,7 +5169,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Brio-Wu with HLLD, plus a relativistic variant.
         mhd_1d_base = {
             **amr_1d_base,
-            "m": 200,
+            # 200 cells, so the patch edge at x = 0.5 is a cell face: with 201 a cell centre sat on it, and which patch
+            # claimed that cell depended on the rank count
+            "m": 199,
             "dt": 1.0e-3,
             "t_step_stop": 20,
             "t_step_save": 20,
