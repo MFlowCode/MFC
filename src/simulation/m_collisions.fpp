@@ -251,7 +251,7 @@ contains
 
     end subroutine s_apply_wall_collision_forces_soft_sphere
 
-    !> Triangular index (0-based) of the unordered pair a < b, both in 1 ... num_local_ibs_max
+    !> Triangular index (0-based) of the unordered pair a < b, both in 1 to num_local_ibs_max
     pure function f_pair_bit_index(a, b) result(idx)
 
         $:GPU_ROUTINE(parallelism='[seq]')
