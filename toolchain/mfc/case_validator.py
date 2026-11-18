@@ -428,6 +428,8 @@ AMR_VETTED_FLAGS = (
     "riemann_hypo_ADC",
     "ib",
     "ib_second_order_vel",
+    "ib_slip_ccst",
+    "ib_smooth_contact",
     "many_ib_patch_parallelism",
     "patch_ib(*)%slip",
     "igr",

@@ -111,7 +111,8 @@ def load(filepath: str) -> Pack:
 
         arr = line.split(" ")
 
-        entries.append(PackEntry(filepath=arr[0], doubles=[float(d) for d in arr[1:]]))
+        # an empty entry (a rank's header-only Lagrangian file) is the path and a trailing space
+        entries.append(PackEntry(filepath=arr[0], doubles=[float(d) for d in arr[1:] if d]))
 
     return Pack(entries)
 
@@ -132,9 +133,9 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
 
         try:
             if "lag_bubble" in short_filepath or "lag_particle" in short_filepath:
-                lines = content.splitlines()
-                content = "\n".join(lines[1:])  # Skip the first line
-                doubles = _extract_doubles(content)
+                # Skip the header line; a rank that owns no bubble writes nothing else
+                content = "\n".join(content.splitlines()[1:])
+                doubles = _extract_doubles(content) if content.strip() else []
             elif any(name in short_filepath for name in ("probe", "integral", "ib_forces", "ib_surface", "ib_heat")):
                 # Probe, integral, IB-force, IB-surface and IB-heat output are multi-column records, not
                 # spatial fields: each column is a distinct physical quantity (probe: rho,
