@@ -22,6 +22,12 @@ build_opts="$gpu_opts"
 source .github/scripts/clean-build.sh
 clean_build
 
+# Reuse the dependencies another job already built for this compiler, these
+# modules and these pinned versions; the toolchain then skips them below.
+source .github/scripts/deps-cache.sh
+deps_cache_init "$cluster_name" "$build_opts"
+deps_cache_restore
+
 source .github/scripts/retry-build.sh
 
 # Frontier's dependency install happens here, on the login node -- so a failed
@@ -37,6 +43,7 @@ deps_rc=${PIPESTATUS[0]}
 if [ "$deps_rc" -ne 0 ]; then
     exit 1
 fi
+deps_cache_save
 
 # syscheck too: it links in seconds, and building it here leaves the concurrent
 # compute-node build variants (common/build.sh) nothing to race over installing.

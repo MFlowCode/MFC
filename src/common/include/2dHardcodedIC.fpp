@@ -447,8 +447,9 @@
         ! Applied on the burned patch; cells AHEAD of the wavy interface are reset to the fresh
         ! reactant state (patch 1), giving a finite-amplitude flame front for a shock to wrinkle
         ! (Richtmyer-Meshkov). a(2) = mean interface x, a(3) = amplitude, a(4) = transverse wavenumber.
-        d = patch_icpp(patch_id)%a(2) + patch_icpp(patch_id)%a(3)*sin(2._wp*pi*patch_icpp(patch_id)%a(4)*y_cc(j)/(y_domain%end &
-                       & - y_domain%beg))
+        ! y_domain_glb: after decomposition y_domain is this rank's sub-domain
+        d = patch_icpp(patch_id)%a(2) + patch_icpp(patch_id)%a(3)*sin(2._wp*pi*patch_icpp(patch_id)%a(4)*y_cc(j) &
+                       & /(y_domain_glb%end - y_domain_glb%beg))
         if (x_cc(i) > d) then
             q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = patch_icpp(1)%alpha_rho(1)
             q_prim_vf(eqn_idx%E)%sf(i, j, 0) = patch_icpp(1)%pres
@@ -557,8 +558,9 @@
         do blob_i = 1, blob_n
             blob_cx = mod(0.5_wp + real(blob_i, wp)*0.6180339887498949_wp + blob_seed*0.7548776662466927_wp, 1._wp)
             blob_cy = mod(0.5_wp + real(blob_i, wp)*0.3819660112501051_wp + blob_seed*0.5698402909980532_wp, 1._wp)
-            blob_cx = x_domain%beg + blob_cx*(x_domain%end - x_domain%beg)
-            blob_cy = y_domain%beg + blob_cy*(y_domain%end - y_domain%beg)
+            ! the global domain: after decomposition x/y_domain are this rank's sub-domain, which stamped a full set per rank
+            blob_cx = x_domain_glb%beg + blob_cx*(x_domain_glb%end - x_domain_glb%beg)
+            blob_cy = y_domain_glb%beg + blob_cy*(y_domain_glb%end - y_domain_glb%beg)
             blob_d2 = (x_cc(i) - blob_cx)**2 + (y_cc(j) - blob_cy)**2
             if (blob_d2 <= blob_r*blob_r) then
                 q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = blob_amp

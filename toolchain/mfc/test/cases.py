@@ -2478,6 +2478,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             synth_amr = {**synth, "amr": "T", **synth_blk, "amr_regrid_int": 0, "amr_max_grid_size": 13}
             cases.append(define_case_d(stack, "synthetic_turbulence -> AMR", synth_amr))
             cases.append(define_case_d(stack, "synthetic_turbulence -> AMR -> subcycle", {**synth_amr, "amr_subcycle": "T"}))
+            # two ranks need 50 cells in x (25 per rank for WENO5); the block straddles the seam at x index 25. The finer x
+            # spacing needs half the dt for the fine cells' CFL limit.
+            synth_np2 = {**synth_amr, "m": 49, "dt": synth_amr["dt"] / 2, "amr_block_beg(1)": 18, "amr_block_end(1)": 31}
+            cases.append(define_case_d(stack, "synthetic_turbulence -> AMR -> 2 MPI Ranks", synth_np2, ppn=2))
 
     def alter_mixlayer_perturb(dimInfo):
         if len(dimInfo[0]) == 3:
@@ -2563,9 +2567,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for relax_model in [5] + ([6] if ndims <= 2 else []):
             for num_fluids in ([2] if ndims == 1 or relax_model == 5 else []) + [3]:
                 for model_eqns in [3, 2]:
-                    # 2D pTg (model 6) costs ~5 ms per cell and step, and more as the interfaces develop: 50x40 for 50 steps
-                    # took 16 min on CI, so it runs on the smallest WENO5 grid for 10 steps
-                    pc_size = {"m": 24, "n": 24, "t_step_stop": 10, "t_step_save": 10} if ndims == 2 and relax_model == 6 else {}
+                    # pTg (model 6) costs ~5 ms per cell and step on CPU and far more on GPUs (the iterative solve): 2D 50x40 for
+                    # 50 steps took 16 min on CI, so it runs on the smallest WENO5 grid; 1D took 7 min per test (14 with AMR) on
+                    # CCE GPUs. Both run 10 steps.
+                    pc_size = {"t_step_stop": 10, "t_step_save": 10} if relax_model == 6 else {}
+                    if ndims == 2 and relax_model == 6:
+                        pc_size.update({"m": 24, "n": 24})
                     stack.push(
                         f"Phase Change model {relax_model} -> {num_fluids} Fluid(s) -> model equation -> {model_eqns}",
                         {
@@ -2928,7 +2935,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0, "amr_max_grid_size": 64})
                         cases.append(define_case_d(stack, "", {}))
                         if adap_dt == "F":
-                            cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
+                            regrid = {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}
+                            cases.append(define_case_d(stack, "dynamic regrid", regrid))
+                            # the one bubble lives on one rank; the other writes header-only Lagrangian files
+                            cases.append(define_case_d(stack, "dynamic regrid -> 2 MPI Ranks", regrid, ppn=2))
                         stack.pop()
 
                     # Regression guard for issue #1706: the Lagrange bubble initial gas
@@ -5677,6 +5687,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "ib_wall_order=2", {"amr_max_grid_size": 32, "ib_wall_order": 2}))
         # body options that act through the ghost-point update shared by the fine blocks
         cases.append(define_case_d(stack, "slip", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T"}))
+        # ghost-state options of the slip and viscous walls, both checked with ./mfc.sh amr_check
+        cases.append(define_case_d(stack, "slip -> ib_slip_ccst", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T", "ib_slip_ccst": "T"}))
+        cases.append(define_case_d(stack, "ib_smooth_contact", {"amr_max_grid_size": 32, "ib_smooth_contact": "T", "viscous": "T", "fluid_pp(1)%Re(1)": 1000.0}))
         cases.append(define_case_d(stack, "ib_second_order_vel", {"amr_max_grid_size": 32, "ib_second_order_vel": "T", "ib_ip_min_dist": 1.5}))
         cases.append(define_case_d(stack, "many_ib_patch_parallelism", {"amr_max_grid_size": 32, "many_ib_patch_parallelism": "T"}))
         # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
@@ -6082,7 +6095,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
         # the same regrid across the seam with subcycling (time-interpolated ghosts, registers) and the quartic's wider gathers
-        np2_variants = (("subcycle", {"amr_subcycle": "T"}), ("quartic prolongation", {"amr_prolong": 2}), ("subcycle -> quartic prolongation", {"amr_subcycle": "T", "amr_prolong": 2}))
+        np2_variants = (
+            ("subcycle", {"amr_subcycle": "T"}),
+            ("quartic prolongation", {"amr_prolong": 2}),
+            ("subcycle -> quartic prolongation", {"amr_subcycle": "T", "amr_prolong": 2}),
+            # viscous fluxes reflux across the seam too; the 1D viscous tests cannot split
+            ("viscous", {"viscous": "T", "fluid_pp(1)%Re(1)": 100.0}),
+        )
         for label, mods in np2_variants:
             cases.append(define_case_d(stack, label, {"amr_max_grid_size": 16, **mods}, ppn=2))
         stack.pop()
@@ -6231,6 +6250,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
+        # the recursive subcycle driver through regrids that create and move level-2 blocks on both ranks
+        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}, ppn=2))
         stack.pop()
 
         # 3D pinned cap above a rank's coarse extent, np=4: guards the y/z-axis widening of the borrowed solver scratch (m/n/p_alloc).
