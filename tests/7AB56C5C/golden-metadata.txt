@@ -1,12 +1,12 @@
-This file was created on 2026-11-17 17:16:13.788774.
+This file was created on 2026-11-18 10:44:05.345761.
 
 mfc.sh:
 
-    Invocation: test --no-gpu --generate --only ED46E394 7AB56C5C -j 16
+    Invocation: test --no-gpu --generate --only 7AB56C5C -j 16
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        7a1950f342b8f46bcf9c1ed85b04eef5b30f26f4 on allMachProjectionCore (dirty)
+    Git:        b133c39c5af8fbc245cc3693e2364c1d4ab94bd7 on allMachProjectionCore (dirty)
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -15,10 +15,10 @@ pre_process:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -74,7 +74,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -83,10 +83,10 @@ syscheck:
         C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
         Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -126,7 +126,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      32%
+    CPU(s) scaling MHz:                      61%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00

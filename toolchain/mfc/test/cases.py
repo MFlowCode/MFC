@@ -590,7 +590,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # with the Dirichlet inflow and pressure outlet on 2 ranks
             physics = {**gravity, **viscous_mods, **conduction, **capillary, **SHARP_IC, "int_comp": 2, **adap}
             cases.append(define_case_d(stack, ["model_eqns=3", "Viscous", "Gravity", "Conduction", "capillary=T", "int_comp=2", "cfl_adap_dt=T"], {**six, **physics}))
-            boundaries = {**inflow, **capillary, "surface_tension_model": 2}
+            boundaries = {**inflow, **capillary, **SHARP_IC, "surface_tension_model": 2}
             cases.append(define_case_d(stack, ["model_eqns=3", "Dirichlet inflow", "capillary=T", "surface_tension_model=2", "2 MPI Ranks"], {**six, **boundaries}, ppn=2))
         stack.pop()
 
