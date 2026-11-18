@@ -1116,6 +1116,14 @@ class CaseValidator:
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and not (ib and self.get("viscous", "F") == "T"), "ib_visc_compact requires ib and viscous")
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("weno_Re_flux", "F") != "T", "ib_visc_compact requires weno_Re_flux")
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "ib_visc_compact requires Cartesian coordinates")
+        ib_slip_ccst = self.get("ib_slip_ccst", "F") == "T"
+        self.prohibit(ib_slip_ccst and not ib, "ib_slip_ccst requires ib to be enabled")
+        self.prohibit(ib_slip_ccst and self.get("model_eqns", 2) != 2, "ib_slip_ccst requires model_eqns = 2")
+        self.prohibit(ib_slip_ccst and self.get("chemistry", "F") == "T", "ib_slip_ccst is not supported with chemistry")
+        self.prohibit(ib_slip_ccst and self.get("bubbles_euler", "F") == "T", "ib_slip_ccst is not supported with bubbles_euler")
+        self.prohibit(ib_slip_ccst and ib_second_order_vel, "ib_slip_ccst sets the slip ghost velocity itself; it does not combine with ib_second_order_vel")
+        blowing = any((self.get(f"patch_ib({i})%v_blow", 0.0) or 0.0) > 0 for i in range(1, (num_ibs or 0) + 1))
+        self.prohibit(ib_slip_ccst and blowing, "ib_slip_ccst does not combine with a blowing patch_ib (v_blow)")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
