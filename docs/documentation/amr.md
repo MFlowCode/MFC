@@ -19,8 +19,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 ## Algorithm {#amr-algorithm}
 
 - **Tagging and clustering.** A coarse cell is tagged when its normalized density jump exceeds `amr_tag_eps`
-  (`amr_tag_abs = T` uses the absolute jump instead). Tags are clustered by Berger-Rigoutsos bisection into boxes
-  that reach `amr_cluster_eff` tag efficiency, are at least `amr_blocking_factor` cells wide, are padded by `amr_buf`
+  (`amr_tag_abs = T` uses the absolute jump instead). `amr_tag_var` tags on the volume fraction of fluid 1 or the
+  velocity magnitude instead of the density, for interfaces and shear layers with no density jump. Tags are clustered
+  by Berger-Rigoutsos bisection into boxes that reach `amr_cluster_eff` tag efficiency, are at least `amr_blocking_factor` cells wide, are padded by `amr_buf`
   cells and are capped at `amr_max_grid_size` cells per dimension. Levels nest properly (a level-2 box lies inside one
   level-1 box).
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
@@ -97,7 +98,8 @@ Full descriptions: @ref case.
 | `amr_block_beg(i)`, `amr_block_end(i)` | 0 | Initial block, level-0 cell indices (inclusive) |
 | `amr_regrid_int` | 0 | Steps between regrids; 0 keeps the initial block |
 | `amr_tag_eps` | 0.1 | Tagging threshold on the normalized density jump (> 0 with regrid) |
-| `amr_tag_abs` | F | Tag on the absolute density jump; `amr_tag_eps` is then a density |
+| `amr_tag_abs` | F | Tag on the absolute jump; `amr_tag_eps` then has the units of the tagged variable |
+| `amr_tag_var` | 1 | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`) |
 | `amr_buf` | 3 | Padding around tagged cells, coarse cells (>= 1 with regrid) |
 | `amr_cluster_eff` | 0.7 | Minimum tag efficiency of a clustered box |
 | `amr_blocking_factor` | 4 | Minimum box width, coarse cells |
@@ -136,9 +138,9 @@ See `examples/2D_amr_droplet` for a complete case.
   only grow); a missing fine-level file aborts the restart.
 - **Nesting.** A level-2 block must lie inside one level-1 block; the run aborts otherwise (reduce
   `amr_max_grid_size`).
-- **Regrid.** When no cell is tagged, regrid keeps the current blocks, so refinement does not retract until something is
-  tagged again. Level-2 and deeper blocks are re-prolonged from their parent at every regrid (only level-1 data is
-  carried over), so frequent regrids cost accuracy at those levels.
+- **Regrid.** When no cell is tagged, regrid replaces the hierarchy with one small dormant level-1 block (one coarse cell
+  at the domain center, padded by `amr_buf`), since the solver needs at least one block. At every level, the part of a
+  new block that an old block of the same level covered keeps the old data; the rest is prolonged from the parent.
 - **Output.** Field output is at level-0 resolution with the fine solution restricted into it; post_process with
   `amr = T` overlays the blocks as separate SILO domains. Each save also writes `D/amr_levels.<step>.dat`: one line per
   refined level with its fine cell count and the mean of `|q|` over its cells for each conserved variable.
