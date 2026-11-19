@@ -22,6 +22,10 @@ module m_chemistry
     type(int_bounds_info) :: isc1, isc2, isc3
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
 
+    !> Largest species loss rate (1/s) of the explicit reaction source since last reset: a bound on the Jacobian spectral radius
+    real(wp)            :: chem_loss_max = 0._wp
+    real(wp), parameter :: y_floor_stiff = 1.e-16_wp
+
 contains
 
     !> Compute mixture viscosities for left and right states and invert them for use as reciprocal Reynolds numbers.
@@ -140,20 +144,23 @@ contains
     end subroutine s_compute_T_from_primitives
 
     !> Add chemical reaction source terms to the species transport RHS using net production rates.
-    subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
+    subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds, track_stiff)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), intent(inout)                      :: q_T_sf
+        type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_qp, q_prim_qp
-        type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
-        integer                                                :: x, y, z
-        integer                                                :: eqn
-        real(wp)                                               :: T
-        real(wp)                                               :: rho, omega_m
-        real(wp), dimension(${NUM_SPECIES}$)                   :: Ys
-        real(wp), dimension(${NUM_SPECIES}$)                   :: omega
+        type(int_bounds_info), dimension(1:3), intent(in) :: bounds
+        logical, intent(in) :: track_stiff  !< also record the max species loss rate (chem_loss_max)
+        integer :: x, y, z
+        integer :: eqn
+        real(wp) :: T
+        real(wp) :: rho, omega_m, loss_max
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys
+        real(wp), dimension(${NUM_SPECIES}$) :: omega, ddot
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
+        loss_max = 0._wp
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, ddot, eqn, T, rho, omega_m]', reduction='[[loss_max]]', &
+                            & reductionOp='[MAX]', copyin='[bounds, track_stiff]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -165,7 +172,17 @@ contains
                     rho = q_cons_qp(eqn_idx%cont%end)%sf(x, y, z)
                     T = q_T_sf%sf(x, y, z)
 
-                    call get_net_production_rates(rho, T, Ys, omega)
+                    if (track_stiff) then
+                        call get_creation_destruction_rates(rho, T, Ys, omega, ddot)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = 1, num_species
+                            ! pseudo-first-order loss rate of species eqn: bounds the Jacobian spectral radius
+                            loss_max = max(loss_max, molecular_weights(eqn)*ddot(eqn)/(rho*max(Ys(eqn), y_floor_stiff)))
+                            omega(eqn) = omega(eqn) - ddot(eqn)
+                        end do
+                    else
+                        call get_net_production_rates(rho, T, Ys, omega)
+                    end if
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do eqn = eqn_idx%species%beg, eqn_idx%species%end
@@ -176,6 +193,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        chem_loss_max = max(chem_loss_max, loss_max)
 
     end subroutine s_compute_chemistry_reaction_flux
 
@@ -349,7 +367,7 @@ contains
     end function f_qss_alpha
 
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
-    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_flat, irx, iry, irz, q_T_sf, ib_marks, wall_a, use_wall)
+    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_flat, irx, iry, irz, q_T_sf, ib_marks, wall_a, ib_mode)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_qp
         !> Flat (x, y, z, var) source-flux buffer; a plain-array dummy because src/common cannot `use m_riemann_state`.
@@ -357,18 +375,20 @@ contains
         type(int_bounds_info), intent(in)                  :: irx, iry, irz
         integer, intent(in)                                :: idir
         type(scalar_field), intent(in)                     :: q_T_sf
-        !> Wall area share of each body cell (use_wall, ib_flux_wall): those faces carry the wall's own rates in the Riemann flux,
-        !! so diffusion keeps only conduction there. Only the use_wall kernels name ib_marks and wall_a; the others are the original
-        !! kernels, so these may be unallocated
+        !> ib_mode 0: no immersed body. 1: q_T_sf holds the mirrored conduction temperature in body cells (m_ibm), which supply only
+        !! the face temperature difference, so their properties use the cell's own state temperature p W/(rho R). 2: also the
+        !! reacting-wall area share of each body cell (ib_flux_wall, wall_a): those faces carry the surface rates in the Riemann
+        !! flux, so diffusion keeps only conduction there. A kernel names ib_marks (and wall_a) only in the modes that use them, so
+        !! they may be unallocated otherwise
         type(integer_field), intent(in)      :: ib_marks
         type(scalar_field), intent(in)       :: wall_a
-        logical, intent(in)                  :: use_wall
+        integer, intent(in)                  :: ib_mode
         real(wp), dimension(${NUM_SPECIES}$) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
         real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
         real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
         real(wp), dimension(${NUM_SPECIES}$) :: Mass_Diffu_Flux, dYk_dxi
         real(wp)                             :: Mass_Diffu_Energy
-        real(wp)                             :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
+        real(wp)                             :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, Tp_L, Tp_R
         real(wp)                             :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
         real(wp)                             :: Cp_L, Cp_R
         real(wp)                             :: diffusivity_L, diffusivity_R, diffusivity_cell
@@ -392,15 +412,13 @@ contains
                         & 'mass_diffusivities_mixavg2', 'mass_diffusivities_mixavg_Cell', 'h_l', 'h_r', 'Xs_cell', &
                         & 'h_k', 'dXk_dxi', 'Mass_Diffu_Flux', 'Mass_Diffu_Energy', 'MW_L', 'MW_R', 'MW_cell', 'T_L', &
                         & 'T_R', 'P_L', 'P_R', 'rho_L', 'rho_R', 'rho_cell', 'rho_Vic', 'lambda_L', 'lambda_R', 'lambda_Cell', &
-                        & 'dT_dxi', 'grid_spacing', 'Y_up', 'Y_dn', 'Y_up2', 'dY_up', 'dY_dn', 'Y_sum']
+                        & 'dT_dxi', 'grid_spacing', 'Y_up', 'Y_dn', 'Y_up2', 'dY_up', 'dY_dn', 'Y_sum', 'Tp_L', 'Tp_R']
                 #:set _diff_priv1 = '[' + ', '.join(_diff_names1) + ']'
-                #:for WALL in [False, True]
-                    if (${'' if WALL else '.not. '}$use_wall) then
-                        #:if WALL
-                            $:GPU_PARALLEL_LOOP(collapse=3, private=_diff_priv1, copyin='[offsets]')
-                        #:else
-                            $:GPU_PARALLEL_LOOP(collapse=3, private=_diff_priv1, copyin='[offsets]')
-                        #:endif
+                #:for MODE in [0, 1, 2]
+                    #:set MARKS = MODE > 0
+                    #:set WALL = MODE == 2
+                    if (ib_mode == ${MODE}$) then
+                        $:GPU_PARALLEL_LOOP(collapse=3, private=_diff_priv1, copyin='[offsets]')
                         do z = isc3%beg, isc3%end
                             do y = isc2%beg, isc2%end
                                 do x = isc1%beg, isc1%end
@@ -436,15 +454,26 @@ contains
                                     rho_cell = 0.5_wp*(rho_L + rho_R)
                                     dT_dxi = (T_R - T_L)/grid_spacing
 
+                                    ! Temperature the properties are evaluated at: q_T_sf's, except in a body cell (see ib_mode)
+                                    Tp_L = T_L
+                                    Tp_R = T_R
+                                    #:if MARKS
+                                        call get_mixture_molecular_weight(Ys_L, MW_L)
+                                        call get_mixture_molecular_weight(Ys_R, MW_R)
+                                        Tp_L = f_property_temperature(T_L, P_L, MW_L, rho_L, ib_marks, x, y, z)
+                                        Tp_R = f_property_temperature(T_R, P_R, MW_R, rho_R, ib_marks, x + offsets(1), &
+                                                                      & y + offsets(2), z + offsets(3))
+                                    #:endif
+
                                     ! Transport state and species enthalpies [J/kg] of each side
-                                    call get_mixavg_transport_state(P_L, T_L, Ys_L, MW_L, Xs_L, mass_diffusivities_mixavg1, &
+                                    call get_mixavg_transport_state(P_L, Tp_L, Ys_L, MW_L, Xs_L, mass_diffusivities_mixavg1, &
                                                                     & lambda_L)
-                                    call get_mixavg_transport_state(P_R, T_R, Ys_R, MW_R, Xs_R, mass_diffusivities_mixavg2, &
+                                    call get_mixavg_transport_state(P_R, Tp_R, Ys_R, MW_R, Xs_R, mass_diffusivities_mixavg2, &
                                                                     & lambda_R)
                                     MW_cell = 0.5_wp*(MW_L + MW_R)
 
-                                    call get_species_enthalpies_mass(T_L, h_l)
-                                    call get_species_enthalpies_mass(T_R, h_r)
+                                    call get_species_enthalpies_mass(Tp_L, h_l)
+                                    call get_species_enthalpies_mass(Tp_R, h_r)
 
                                     ! Calculate species properties and gradients
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -551,15 +580,13 @@ contains
                 #:set _diff_names2 = ['x', 'y', 'z', 'i', 'eqn', 'Ys_L', 'Ys_R', 'Ys_cell', 'dYk_dxi', 'Mass_Diffu_Flux', 'grid_spacing', &
                         & 'MW_L', 'MW_R', 'MW_cell', 'P_L', 'P_R', 'rho_L', 'rho_R', 'rho_cell', 'T_L', 'T_R', 'Cp_L', &
                         & 'Cp_R', 'hmix_L', 'hmix_R', 'dh_dxi', 'lambda_L', 'lambda_R', 'lambda_Cell', 'diffusivity_L', &
-                        & 'diffusivity_R', 'diffusivity_cell', 'Mass_Diffu_Energy']
+                        & 'diffusivity_R', 'diffusivity_cell', 'Mass_Diffu_Energy', 'Tp_L', 'Tp_R']
                 #:set _diff_priv2 = '[' + ', '.join(_diff_names2) + ']'
-                #:for WALL in [False, True]
-                    if (${'' if WALL else '.not. '}$use_wall) then
-                        #:if WALL
-                            $:GPU_PARALLEL_LOOP(collapse=3, private=_diff_priv2, copyin='[offsets]')
-                        #:else
-                            $:GPU_PARALLEL_LOOP(collapse=3, private=_diff_priv2, copyin='[offsets]')
-                        #:endif
+                #:for MODE in [0, 1, 2]
+                    #:set MARKS = MODE > 0
+                    #:set WALL = MODE == 2
+                    if (ib_mode == ${MODE}$) then
+                        $:GPU_PARALLEL_LOOP(collapse=3, private=_diff_priv2, copyin='[offsets]')
                         do z = isc3%beg, isc3%end
                             do y = isc2%beg, isc2%end
                                 do x = isc1%beg, isc1%end
@@ -599,15 +626,24 @@ contains
 
                                     rho_cell = 0.5_wp*(rho_L + rho_R)
 
-                                    call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
-                                    call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
-                                    call get_mixture_enthalpy_mass(T_L, Ys_L, hmix_L)
-                                    call get_mixture_enthalpy_mass(T_R, Ys_R, hmix_R)
-                                    dh_dxi = (hmix_R - hmix_L)/grid_spacing
+                                    ! As in model 1; the enthalpy is continued linearly from the properties' temperature to q_T_sf's
+                                    Tp_L = T_L
+                                    Tp_R = T_R
+                                    #:if MARKS
+                                        Tp_L = f_property_temperature(T_L, P_L, MW_L, rho_L, ib_marks, x, y, z)
+                                        Tp_R = f_property_temperature(T_R, P_R, MW_R, rho_R, ib_marks, x + offsets(1), &
+                                                                      & y + offsets(2), z + offsets(3))
+                                    #:endif
+
+                                    call get_mixture_specific_heat_cp_mass(Tp_L, Ys_L, Cp_L)
+                                    call get_mixture_specific_heat_cp_mass(Tp_R, Ys_R, Cp_R)
+                                    call get_mixture_enthalpy_mass(Tp_L, Ys_L, hmix_L)
+                                    call get_mixture_enthalpy_mass(Tp_R, Ys_R, hmix_R)
+                                    dh_dxi = (hmix_R + Cp_R*(T_R - Tp_R) - hmix_L - Cp_L*(T_L - Tp_L))/grid_spacing
 
                                     ! Get transport properties
-                                    call get_mixture_thermal_conductivity_mixavg(T_L, Ys_L, lambda_L)
-                                    call get_mixture_thermal_conductivity_mixavg(T_R, Ys_R, lambda_R)
+                                    call get_mixture_thermal_conductivity_mixavg(Tp_L, Ys_L, lambda_L)
+                                    call get_mixture_thermal_conductivity_mixavg(Tp_R, Ys_R, lambda_R)
 
                                     ! Calculate species properties and gradients
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -657,6 +693,22 @@ contains
         end if
 
     end subroutine s_compute_chemistry_diffusion_flux
+
+    !> Temperature the diffusion properties of cell (x, y, z) are evaluated at: q_T_sf's value T, except in an immersed-body cell,
+    !! where T is the conduction temperature (m_ibm) and the cell's own state temperature p W/(rho R) is used
+    function f_property_temperature(T, P, MW, rho, ib_marks, x, y, z) result(Tp)
+
+        $:GPU_ROUTINE(function_name='f_property_temperature', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)            :: T, P, MW, rho
+        type(integer_field), intent(in) :: ib_marks
+        integer, intent(in)             :: x, y, z
+        real(wp)                        :: Tp
+
+        Tp = T
+        if (ib_marks%sf(x, y, z) /= 0) Tp = P*MW/(rho*gas_constant)
+
+    end function f_property_temperature
 
     !> Whether the face between cell (x, y, z) and its neighbour at + offsets is a flux-wall face (ib_flux_wall): one side is an
     !! immersed-body cell with a wall area share

@@ -51,13 +51,17 @@ esac
 case "$cluster" in
     phoenix)
         compiler_flag="p"
-        account="gts-sbryngelson3"
         job_prefix="shb"
-        qos="embers"
+        # Every job type uses the charged 'inferno' QOS. Under the free,
+        # preemptible 'embers' QOS jobs queued for hours behind every charged
+        # job and could be preempted mid-run; benchmarks were the last to move
+        # and were the check that kept finished PRs waiting.
+        account="gts-coc-coda20"
+        qos="inferno"
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
         # Combined build+test needs build headroom on top of the test budget;
-        # kept modest to still backfill under 'embers'.
+        # kept modest so it still backfills.
         buildtest_time="03:30:00"
         bench_time="04:00:00"
         gpu_partition_dynamic=true

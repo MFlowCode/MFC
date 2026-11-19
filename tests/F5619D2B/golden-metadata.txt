@@ -1,10 +1,44 @@
-This file was created on 2026-11-17 10:42:52.064190.
+This file was created on 2026-11-19 12:57:31.977028.
 
 mfc.sh:
 
     Invocation: test -o AMR --generate -j 8
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        60434e0bbc8f22a5eccfce97aec0723c112a3f55 on AMR2269 (dirty)
+    Git:        1d432ec4837ebbad673151a497a3ebbbdab5c73b on AMR2269 (dirty)
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.31.3 on ipsec-10-2-193-29.vpn.gatech.edu
+    
+        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/benwilfong/Documents/software/MFC-Wilfong/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 syscheck:
 
@@ -33,25 +67,25 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+post_process:
 
     CMake Configuration:
     
-        CMake v3.31.3 on ipsec-10-2-193-29.vpn.gatech.edu
+        CMake v3.31.3 on ipsec-10-2-65-189.vpn.gatech.edu
     
         C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
-        POST_PROCESS  : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -101,9 +135,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

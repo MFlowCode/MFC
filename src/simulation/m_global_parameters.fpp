@@ -661,6 +661,7 @@ contains
         amr_regrid_int = 0
         amr_tag_eps = 0.1_wp
         amr_tag_abs = .false.
+        amr_tag_var = 1
         amr_place_owner = .false.
         amr_buf = 3
         amr_snap = 0
@@ -685,11 +686,13 @@ contains
         ib_second_order_vel = .false.
         ib_ip_min_dist = 0._wp
         ib_flux_wall = .false.
+        ib_slip_ccst = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
-        ib_mass_relax = 0
+        ib_mass_relax = -1
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
+        ib_uncover_fill = .false.
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
@@ -883,6 +886,7 @@ contains
             patch_ib(i)%v_blow = 0._wp
             patch_ib(i)%inj_species = 0
             patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%mass_bank = 0._wp
             patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement

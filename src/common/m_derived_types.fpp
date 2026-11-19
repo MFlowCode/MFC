@@ -415,6 +415,7 @@ module m_derived_types
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB
         !> Last step's gasification rate and face mass out [kg/s], and fluid heat in [W] (ib_heat_wrt; per unit depth in 2D)
         real(wp)                 :: mdot, mdot_face, qdot
+        real(wp)                 :: mass_bank         !< ib_mass_relax bank read from a restart; only s_read_ib_restart_data sets it
         real(wp), dimension(1:3) :: vel
         real(wp), dimension(1:3) :: step_vel          !< velocity array used to store intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: angular_vel
@@ -581,6 +582,8 @@ module m_derived_types
         integer, dimension(3)        :: ip_stencil     !< Lower corner of the interpolation stencil (ib_ip_width cells wide)
         real(wp), dimension(3, 3, 3) :: interp_coeffs  !< Interpolation coefficients of the image point, from ip_stencil
         logical                      :: interp_valid   !< .false. if every image point stencil cell lies inside an IB
+        real(wp)                     :: T_cond         !< Temperature the wall conduction sees (chemistry); T_cond_unset = none
+        real(wp)                     :: T_save         !< The ghost's own temperature while T_cond stands in for it
         integer                      :: ib_patch_id    !< ID of the IB Patch the ghost point is part of
         real(wp)                     :: levelset
         real(wp), dimension(1:3)     :: levelset_norm

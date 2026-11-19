@@ -17,9 +17,9 @@ module m_euler_lagrange
     implicit none
 
     private
-    public :: s_locate_cell, s_get_cell, f_lag_entity_in_physical_domain, s_get_char_vol, s_get_lag_restart_point, &
-        & s_set_lag_comm_coords, s_count_lag_entities_glb, s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, &
-        & f_lag_rk_stage, f_lag_entity_in_wall, s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
+    public :: s_get_cell, f_lag_entity_in_physical_domain, s_get_char_vol, s_get_lag_restart_point, s_set_lag_comm_coords, &
+        & s_count_lag_entities_glb, s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, f_lag_rk_stage, &
+        & f_lag_entity_in_wall, s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
 
     !> Fornberg first-derivative weights at each cell center along x, y and z, one field per stencil point
     type(scalar_field), dimension(:), allocatable :: weights_x_grad, weights_y_grad, weights_z_grad
@@ -80,42 +80,6 @@ contains
         if (proc_rank == 0 .and. n_glb == 0) call s_mpi_abort('No Lagrangian entities in the domain. Check ' // trim(path))
 
     end subroutine s_count_lag_entities_glb
-
-    !> Locate the cell holding pos by bisection on the cell boundaries, and its computational coordinates scoord (cell index plus
-    !! the fraction of the cell width). Positions beyond the buffer region clamp to its edge cell.
-    subroutine s_locate_cell(pos, cell, scoord)
-
-        $:GPU_ROUTINE(function_name='s_locate_cell',parallelism='[seq]', cray_inline=True)
-
-        real(wp), dimension(3), intent(in)  :: pos
-        real(wp), dimension(3), intent(out) :: scoord
-        integer, dimension(3), intent(out)  :: cell
-        integer                             :: lo, hi, mid
-
-        cell(3) = 0
-        #:for D, CB, N in [(1, 'x_cb', 'm'), (2, 'y_cb', 'n'), (3, 'z_cb', 'p')]
-            if (${D}$ < 3 .or. num_dims == 3) then
-                ! Smallest cell in the buffered range whose right boundary exceeds pos
-                lo = -buff_size; hi = ${N}$ + buff_size
-                do while (lo < hi)
-                    mid = lo + (hi - lo)/2
-                    if (pos(${D}$) >= ${CB}$(mid)) then
-                        lo = mid + 1
-                    else
-                        hi = mid
-                    end if
-                end do
-                cell(${D}$) = lo
-            end if
-        #:endfor
-
-        ! Cell 0 starts at the domain boundary, so the center of cell i is at scoord = i + 1/2
-        scoord(1) = cell(1) + (pos(1) - x_cb(cell(1) - 1))/dx(cell(1))
-        scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
-        scoord(3) = 0._wp
-        if (num_dims == 3) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
-
-    end subroutine s_locate_cell
 
     !> Convert computational (real) cell coordinates to integer cell indices
     subroutine s_get_cell(s_cell, get_cell)

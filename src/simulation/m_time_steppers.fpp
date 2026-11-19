@@ -36,6 +36,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_registers, only: s_amr_set_rk_table
 
     implicit none
 
@@ -52,6 +53,9 @@ module m_time_steppers
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
+    !> Max dt*(species loss rate) of the explicit reaction source over the run
+    real(wp), private :: chem_stiff_max = 0._wp
+    logical, private  :: chem_stiff_warned = .false.
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
@@ -450,6 +454,7 @@ contains
                 rk_coef(3,:) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
             $:GPU_UPDATE(device='[rk_coef, stor]')
+            if (amr) call s_amr_set_rk_table(rk_coef)
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -592,11 +597,14 @@ contains
                 if (moving_immersed_boundary_flag) then
                     if (.not. amr) call s_advance_ib_pose(s, t_step)
                     call s_update_mib(num_ibs)
-                    if (ib_mass_relax > 0) then  ! book the cells this placement covered or uncovered before the ghost correction
+                    ! the cells this placement covered or uncovered, before the ghost correction
+                    if (ib_exchange .or. ib_uncover_fill) then
                         a_w = 1._wp
                         do q = s + 1, nstage
                             a_w = a_w*rk_coef(q, 1)/rk_coef(q, 4)
                         end do
+                        if (ib_uncover_fill) call s_fill_uncovered_cells(q_cons_ts(1)%vf, q_cons_ts(merge(stor, 1, &
+                            & nstage > 1))%vf, q_prim_vf)
                         call s_add_swept_cells(q_cons_ts(1)%vf, q_cons_ts(merge(stor, 1, nstage > 1))%vf, a_w, dt)
                     end if
                 end if
@@ -636,6 +644,7 @@ contains
         end if
 
         if (chemistry) call s_report_species_cleanup(t_step)
+        call s_report_chem_stiffness(t_step)
 
         ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
         ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
@@ -657,7 +666,7 @@ contains
             else if (ib_state_wrt) then
                 call s_compute_ib_forces()
             end if
-            if (ib_exchange) call s_update_ib_temperatures(dt)
+            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
             if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
         end if
 
@@ -870,21 +879,40 @@ contains
     end subroutine s_compute_dt
 
     !> AMR with a fixed dt: abort if dt exceeds the finest level's inviscid limit (ICFL = 1, as s_write_run_time_information).
-    impure subroutine s_amr_check_fixed_dt()
+    !! reach: test every cell as if refined to amr_max_level, which a regrid may do later, and warn instead of aborting.
+    impure subroutine s_amr_check_fixed_dt(reach)
 
-        real(wp), dimension(5) :: dt_cand
-        real(wp)               :: cfl_save
-        character(len=256)     :: msg
+        logical, intent(in), optional :: reach
+        real(wp), dimension(5)        :: dt_cand
+        real(wp)                      :: cfl_save
+        real(wp), allocatable         :: rf_save(:,:,:)
+        logical                       :: all_fine
+        character(len=256)            :: msg
 
         ! the cell state and signal speed behind the candidates are the non-relativistic ones
 
         if (cfl_dt .or. .not. amr .or. relativity) return
+        all_fine = .false.; if (present(reach)) all_fine = reach
+        if (all_fine) then
+            rf_save = amr_cfl_rf; amr_cfl_rf = real(amr_ref_ratio**amr_max_level, wp)
+            $:GPU_UPDATE(device='[amr_cfl_rf]')
+        end if
         cfl_save = cfl_target; cfl_target = 1._wp
         $:GPU_UPDATE(device='[cfl_target]')
         call s_compute_dt(dt_cand)
         cfl_target = cfl_save
         $:GPU_UPDATE(device='[cfl_target]')
+        if (all_fine) then
+            amr_cfl_rf = rf_save
+            $:GPU_UPDATE(device='[amr_cfl_rf]')
+        end if
         if (dt <= dt_cand(1)) return
+        if (all_fine) then
+            if (proc_rank == 0) print '(A,ES11.4,A,I0,A,ES11.4,A)', ' [amr] WARNING: dt = ', dt, &
+                & ' exceeds the inviscid CFL limit if a regrid refines the fastest cells to level ', amr_max_level, &
+                & ' (largest stable dt ', dt_cand(1), '); the run would then abort at that regrid.'
+            return
+        end if
         write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
                & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', dt_cand(1), &
                & '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
@@ -1072,6 +1100,54 @@ contains
 
     end subroutine s_time_step_cycling
 
+    !> Explicit reaction source (reaction_substeps = 0): warn once, with step and time, when dt*(max species loss rate), the
+    !! stiffness estimate of the reaction Jacobian, exceeds the real-axis stability limit of the RK scheme.
+    impure subroutine s_report_chem_stiffness(t_step)
+
+        integer, intent(in) :: t_step
+        real(wp)            :: x_loc, x_glb
+
+        if (.not. f_chem_stiffness_tracked()) return
+        x_loc = dt*chem_loss_max
+        chem_loss_max = 0._wp
+        chem_stiff_max = max(chem_stiff_max, x_loc)
+        if (chem_stiff_warned) return
+        call s_mpi_allreduce_max(x_loc, x_glb)
+        if (x_glb <= f_chem_stiffness_limit()) return
+        chem_stiff_warned = .true.
+        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,F4.2,A)', &
+            & 'WARNING: explicit chemistry is outside its stability limit at step ', t_step, ' (t = ', mytime, &
+            & ' s): dt*|lambda_max| >= ', x_glb, ' vs ', f_chem_stiffness_limit(), &
+            & '. Set chem_params%reaction_substeps > 0 or reduce dt.'
+
+    end subroutine s_report_chem_stiffness
+
+    !> End-of-run line with the largest dt*|lambda_max| of the explicit reaction source seen on any rank
+    impure subroutine s_report_chem_stiffness_summary()
+
+        real(wp) :: x_glb
+
+        if (.not. f_chem_stiffness_tracked()) return
+        call s_mpi_allreduce_max(chem_stiff_max, x_glb)
+        if (proc_rank == 0) print '(A,ES10.3,A,F4.2,A)', 'Explicit chemistry: max dt*|lambda_max| = ', x_glb, &
+            & ' (stability limit ', f_chem_stiffness_limit(), ')'
+
+    end subroutine s_report_chem_stiffness_summary
+
+    !> True when run_time_info is on and the reaction source is advanced explicitly inside the RK stages
+    logical function f_chem_stiffness_tracked()
+
+        f_chem_stiffness_tracked = run_time_info .and. chemistry .and. chem_params%reactions &
+            & .and. chem_params%reaction_substeps == 0
+
+    end function f_chem_stiffness_tracked
+
+    !> Real-axis stability limit of the SSP-RK scheme (RK3 2.51, RK1 and RK2 2)
+    real(wp) function f_chem_stiffness_limit()
+        f_chem_stiffness_limit = merge(2.51_wp, 2._wp, time_stepper == time_stepper_rk3)
+
+    end function f_chem_stiffness_limit
+
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_time_steppers_module
 
@@ -1182,6 +1258,8 @@ contains
         end do
 
         @:DEALLOCATE(rhs_vf)
+
+        call s_report_chem_stiffness_summary()
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

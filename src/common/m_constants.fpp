@@ -23,14 +23,16 @@ module m_constants
     !! wall temperature outside it.
     real(wp), parameter :: T_surface_min = 200._wp
     real(wp), parameter :: T_surface_max = 5000._wp
+    real(wp), parameter :: T_cond_unset = -huge(1._wp)  !< ghost_point%T_cond of a ghost whose conduction uses its own T
 
     !> Half-width of the contact-speed ramp, as a fraction of the sound speed, over which the HLLC tangential interface velocity
     !! blends between the left and right states (ib_smooth_contact)
     real(wp), parameter :: contact_ramp = 1.e-2_wp
 
     !> Reals per IB in restart_data/ib_state: time, force(3), torque(3), vel(3), angular_vel(3), angles(3), centroid(3), radius,
-    !! Twall. Twall carries a thermal_bc = 3 body's evolving temperature across a restart.
-    integer, parameter :: ib_state_nfields = 21
+    !! Twall, ib_mass_relax bank. Twall carries a thermal_bc = 3 body's evolving temperature across a restart; the bank is the
+    !! body's unreturned gas mass (ib_mass_res(1), identical on every rank).
+    integer, parameter :: ib_state_nfields = 22
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils

@@ -30,7 +30,7 @@ from ..packer import tol as packtol
 from ..params.namelist_parser import get_fortran_constants
 from ..printer import cons
 from ..state import ARG
-from .case import TestCase
+from .case import TEST_TIMEOUT_SECONDS, TestCase
 from .cases import list_cases
 
 nFAIL = 0
@@ -47,9 +47,6 @@ test_start_time = None  # Track overall test duration
 MIN_CASES_BEFORE_ABORT = 20
 FAILURE_RATE_THRESHOLD = 0.3
 
-# Per-test timeout (1 hour)
-TEST_TIMEOUT_SECONDS = 3600
-
 # Global abort flag for thread-safe early termination
 # This flag is set when the failure rate exceeds the threshold, signaling
 # all worker threads to exit gracefully. This avoids raising exceptions
@@ -63,7 +60,7 @@ class TestTimeoutError(MFCException):
 
 # ib_state_*.dat record layout (s_pack_ib_state in src/common/m_helper.fpp): ib_state_nfields reals per IB,
 # with x/y/z_centroid at fields 17:19.
-_NFIELDS_PER_IB = get_fortran_constants().get("ib_state_nfields", 21)  # the constant is missing when src/ is unavailable
+_NFIELDS_PER_IB = get_fortran_constants().get("ib_state_nfields", 22)  # the constant is missing when src/ is unavailable
 _CENTROID_SLICE = slice(16, 19)
 
 

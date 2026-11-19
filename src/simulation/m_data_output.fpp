@@ -34,7 +34,7 @@ module m_data_output
         & s_write_run_time_information, s_write_data_files, s_write_serial_data_files, s_write_parallel_data_files, &
         & s_write_ib_data_file, s_write_probe_files, s_write_ib_state_file, s_write_ib_history, s_close_ib_history, &
         & s_close_run_time_information_file, s_close_probe_files, s_finalize_data_output_module, s_initialize_lag_output, &
-        & s_write_lag_particle_evol_if_due, s_write_lag_step_output, s_write_lag_save_data
+        & s_write_lag_particle_evol_if_due, s_write_lag_step_output, s_write_lag_save_data, s_create_D_dir
 
     !> @name ICFL, VCFL, CCFL, TCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -1191,7 +1191,7 @@ contains
             write (file_unit) num_local_ibs
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, f_ib_mass_bank(patch_ib(ib_idx)%gbl_patch_id))
 
                 write (file_unit) patch_ib(ib_idx)%gbl_patch_id
                 write (file_unit) ib_buf
@@ -1218,7 +1218,7 @@ contains
 
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, f_ib_mass_bank(patch_ib(ib_idx)%gbl_patch_id))
 
                 ! Global IB index determines position in file
                 disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(ib_state_nfields, MPI_OFFSET_KIND)*WP_MOK
@@ -1249,7 +1249,7 @@ contains
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
 
         do i = 1, num_ibs
-            call s_pack_ib_state(patch_ib(i), mytime, ib_buf)
+            call s_pack_ib_state(patch_ib(i), mytime, ib_buf, f_ib_mass_bank(patch_ib(i)%gbl_patch_id))
 
             write (file_unit) ib_buf
         end do
@@ -1447,6 +1447,9 @@ contains
         integer, intent(in) :: time_step
 
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+        if (ib_mass_relax > 0) then
+            $:GPU_UPDATE(host='[ib_mass_res]')
+        end if
 
         if (parallel_io) then
             call s_write_parallel_ib_state(time_step)

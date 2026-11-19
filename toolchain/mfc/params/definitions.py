@@ -403,7 +403,7 @@ CONSTRAINTS = {
     "ib_neighborhood_radius": {"min": 0},
     "face_bound": {"choices": [0, 1], "value_labels": {0: "off", 1: "positivity bound on face states"}},
     "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
-    "ib_mass_relax": {"min": 0},
+    "ib_mass_relax": {"min": -1},
     "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
@@ -716,11 +716,13 @@ def _load():
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
     _r("ib_flux_wall", LOG, {"ib"})
+    _r("ib_slip_ccst", LOG, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
     _r("ib_mass_relax", INT, {"ib"})
     _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
+    _r("ib_uncover_fill", LOG, {"ib"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -745,6 +747,7 @@ def _load():
     _r("amr_regrid_int", INT)
     _r("amr_tag_eps", REAL)
     _r("amr_tag_abs", LOG)
+    _r("amr_tag_var", INT)
     _r("amr_place_owner", LOG)
     _r("amr_buf", INT)
     _r("amr_snap", INT)
@@ -1573,11 +1576,13 @@ _nv(
     "ib_second_order_vel",
     "ib_ip_min_dist",
     "ib_flux_wall",
+    "ib_slip_ccst",
     "ib_ip_interp",
     "ib_wall_order",
     "ib_mass_relax",
     "ib_smooth_contact",
     "ib_visc_compact",
+    "ib_uncover_fill",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
@@ -1588,6 +1593,7 @@ _nv(
     "amr_regrid_int",
     "amr_tag_eps",
     "amr_tag_abs",
+    "amr_tag_var",
     "amr_place_owner",
     "amr_buf",
     "amr_snap",
