@@ -178,7 +178,7 @@ contains
 
     end subroutine s_write_amr_restart
 
-    !> Write D/amr_levels.<t_step>.dat: per refined level, its fine cell count and the sum of |q| over its cells for each equation.
+    !> Write D/amr_levels.<t_step>.dat: per refined level, its fine cell count and the mean of |q| over its cells for each equation.
     !! Puts fine-level data under the golden comparison; the level-0 output only sees it restricted.
     impure subroutine s_amr_write_level_sums(t_step)
 
@@ -198,6 +198,10 @@ contains
             end do
         end do
         call s_mpi_allreduce_vectors_sum(sums, sums, sys_size + 1, amr_max_level)
+        ! means, not sums: per-cell differences within a golden tolerance would add up past it in a sum
+        do l = 1, amr_max_level
+            sums(2:,l) = sums(2:,l)/max(sums(1, l), 1._wp)
+        end do
         call s_create_D_dir()
         if (proc_rank /= 0) return
 
