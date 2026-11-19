@@ -42,6 +42,19 @@ _CONVERGENCE_1D_PERIOD_SCHEMES = [
     ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [64, 128]),
     ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [64, 128]),
 ]
+# AMR, WENO5, one 2:1 block over the central half, period mode on one rank. The coarse/fine interface, not the scheme,
+# sets the order: the measured rate is 2.5-2.6 for a static block with either ghost fill (the quartic fill lowers the
+# error about 5x), lock-step or subcycled. With the blocks following the wave the rate is about 2 (linear) and above 4
+# (quartic), less regular because the regrid interval is fixed in steps.
+_AMR_ARGS = ["--order", "5", "--cfl", "0.02", "--amr"]
+_CONVERGENCE_1D_AMR_SCHEMES = [
+    ("AMR -> static linear", _AMR_ARGS, 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> static quartic", _AMR_ARGS + ["--amr-prolong", "2"], 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> subcycle linear", _AMR_ARGS + ["--amr-subcycle"], 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> subcycle quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-subcycle"], 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> regrid linear", _AMR_ARGS + ["--amr-regrid", "10"], 2.0, 0.3, [64, 128, 256]),
+    ("AMR -> regrid quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-regrid", "10"], 3.5, 0.5, [64, 128, 256]),
+]
 
 _CONVERGENCE_2D_SCHEMES = [
     ("WENO5", ["--order", "5", "--cfl", "0.02"], 5, 0.3, [32, 64, 96]),
@@ -94,7 +107,7 @@ _CONVERGENCE_TEMPORAL_SCHEMES = [
 def add_convergence_cases(cases):
     num_ranks = 4
 
-    def _h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift):
+    def _h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift, ranks):
         return ConvergenceSpec(
             runner=run_h_sweep,
             case_path=case_path,
@@ -105,12 +118,13 @@ def add_convergence_cases(cases):
             resolutions=resolutions,
             ndim=ndim,
             cell_shift=cell_shift,
-            num_ranks=num_ranks,  # ignored by run_h_sweep when cell_shift > 0
+            num_ranks=ranks,  # ignored by run_h_sweep when cell_shift > 0
         )
 
     advection_groups = [
         (_CONVERGENCE_1D_SCHEMES, "1D", "examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, 1, 1),
         (_CONVERGENCE_1D_PERIOD_SCHEMES, "1D", "examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, 0, num_ranks),
+        (_CONVERGENCE_1D_AMR_SCHEMES, "1D", "examples/1D_euler_convergence/case.py", 1, _CONS_VARS_1D, 0, 1),
         (_CONVERGENCE_2D_SCHEMES, "2D", "examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, 1, 1),
         (_CONVERGENCE_2D_PERIOD_SCHEMES, "2D", "examples/2D_advection_convergence/case.py", 2, _CONS_VARS_2D, 0, num_ranks),
         (_CONVERGENCE_3D_SCHEMES, "3D", "examples/3D_advection_convergence/case.py", 3, _CONS_VARS_3D, 1, 1),
@@ -120,7 +134,7 @@ def add_convergence_cases(cases):
             cases.append(
                 define_convergence_case(
                     f"Convergence -> {dim_label} -> {label}",
-                    spec=_h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift),
+                    spec=_h_sweep(case_path, ndim, cons_vars, extra_args, expected, tol, resolutions, cell_shift, ppn),
                     ppn=ppn,
                 )
             )

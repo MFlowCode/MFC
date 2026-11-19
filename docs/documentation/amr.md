@@ -45,7 +45,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 
 Conservation across coarse/fine faces holds to round-off for single- and multi-fluid, viscous and chemistry cases, and
 a uniform state stays uniform with regrid on. Interiors keep the WENO order; the coarse/fine ghost fill is second
-order (linear) or higher (quartic). Results do not depend on message timing, and agree across rank counts to round-off
+order (linear) or higher (quartic). For a smooth wave crossing a static block, the measured global rate is about 2.5 with
+either fill (the quartic fill lowers the error about 5x), against 5 for WENO5 on a uniform grid; the
+`Convergence -> 1D -> AMR` tests track it. Results do not depend on message timing, and agree across rank counts to round-off
 when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the block size cap, and therefore the box set, depends
 on the decomposition).
 
