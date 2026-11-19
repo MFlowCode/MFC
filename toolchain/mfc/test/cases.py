@@ -3972,6 +3972,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_stl_test",
                 # Registered below at the resolution where the hot-wall NaN appears; the 25-cell cap would not reach it.
                 "3D_ibm_hot_rod",
+                # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
+                "2D_mibm_constant_acceleration",
+                "3D_mibm_wall_collision",
             ]
             if path in casesToSkip:
                 continue
@@ -4532,6 +4535,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-9,
         )
     )
+
+    # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2. The golden holds the ib_forces.dat history
+    # (velocity and centroid, printed to 9 digits) and the cons fields. The kinematics are deterministic (round-off 1e-13 on GNU), so
+    # 1e-10 leaves room for another compiler's round-off without hiding a wrong stage weight (a 1e-3 position error). Provisional:
+    # tighten once CI shows the cross-compiler spread (see the hot-rod case below).
+    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Constant Acceleration", "examples/2D_mibm_constant_acceleration/case.py", mods={"parallel_io": "F"}, override_tol=1e-10))
+
+    # Soft-sphere wall collision (collision_model = 1): normal impact at e = 0.8 and a 30 degree impact with friction that sticks.
+    # The contact adds a force that switches on at a step, so a compiler that moves it by one step changes the rebound by order 1e-2;
+    # 1e-6 passes round-off and still fails that. Provisional, to be tightened once CI shows the cross-compiler spread.
+    for label, args in (("Normal", []), ("Sticking Friction", ["--angle", "30", "--e", "0.98", "--mu", "0.092"])):
+        cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
