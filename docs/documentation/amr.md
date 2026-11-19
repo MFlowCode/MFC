@@ -36,8 +36,8 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   limit. With a CFL-based time step (`cfl_adap_dt`, `cfl_const_dt`) each coarse cell's limit is that of the finest cell
   covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
   aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
-  largest stable `dt`. With regrid on, start-up also warns if `dt` would exceed that limit were the fastest cells
-  refined to `amr_max_level`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  largest stable `dt`. With regrid on, start-up also aborts if `dt` would exceed that limit were the fastest cells
+  refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
   cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
