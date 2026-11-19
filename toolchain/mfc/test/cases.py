@@ -238,6 +238,11 @@ def make_3d_box_patches(
     return d
 
 
+def qbmm_mods(dimInfo):
+    """QBMM on: 3D runs 5 steps (25^3 x 50 steps took 5 min on CI); 1D and 2D keep the full 50 and cover the bubble physics."""
+    return {"qbmm": "T", **({"t_step_stop": 5, "t_step_save": 5} if len(dimInfo[0]) == 3 else {})}
+
+
 def get_bc_mods(bc: int, dimInfo):
     params = {}
     for dimCmp in dimInfo[0]:
@@ -612,13 +617,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
                 cases.append(define_case_d(stack, "", {}))
                 cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
+                cases.append(define_case_d(stack, "igr_pres_lim", {"igr_pres_lim": "T"}))
                 stack.pop()
 
             stack.pop()
 
         stack.pop()
 
-    def alter_muscl():
+    def alter_muscl(dimInfo):
+        # a static block across the initial discontinuities; 1D also regrids
+        amr_box = {1: {1: (25, 174)}, 2: {1: (6, 30), 2: (6, 25)}, 3: {1: (6, 17), 2: (6, 17), 3: (6, 17)}}[len(dimInfo[0])]
+        amr_blk = {"amr": "T", "amr_max_grid_size": 64, **{f"amr_block_{e}({d})": v[i] for d, v in amr_box.items() for i, e in enumerate(("beg", "end"))}}
         for muscl_order in [1, 2]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
 
@@ -629,6 +638,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 for muscl_lim in [1, 2, 3, 4, 5]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
                 stack.pop()
+                cases.append(define_case_d(stack, "muscl_lim=1 -> AMR", {"muscl_lim": 1, **amr_blk, "amr_regrid_int": 0}))
+                if len(dimInfo[0]) == 1:
+                    cases.append(define_case_d(stack, "muscl_lim=4 -> AMR -> dynamic regrid", {"muscl_lim": 4, **amr_blk, "amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
+            elif len(dimInfo[0]) == 1:
+                cases.append(define_case_d(stack, "AMR", {**amr_blk, "amr_regrid_int": 0}))
             stack.pop()
 
     def alter_eos():
@@ -1545,6 +1559,73 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     restart_check=True,
                 )
             )
+            # ib_mass_relax: the gas a moving body creates through its faces and swept cells is banked and taken out of the cells
+            # within two cells of it. The slow circle moves 0.125 dx and every cell centre stays 0.066 dx or more from its surface,
+            # so only the face-flux part of the account is exercised; the fast one crosses cells, so the swept-cell booking is too.
+            for label, vel in (("", 0.1), (" swept cells", 1.0)):
+                cases.append(
+                    define_case_d(
+                        stack,
+                        f"IBM -> Moving Circle -> ib_mass_relax{label}",
+                        {
+                            "ib": "T",
+                            "num_ibs": 1,
+                            "fd_order": 2,
+                            "n": 49,
+                            "ib_mass_relax": 5,
+                            "patch_ib(1)%geometry": 2,
+                            "patch_ib(1)%x_centroid": 0.508,
+                            "patch_ib(1)%y_centroid": 0.51,
+                            "patch_ib(1)%radius": 0.175,
+                            "patch_ib(1)%slip": "F",
+                            "patch_ib(1)%moving_ibm": 1,
+                            "patch_ib(1)%vel(1)": vel,
+                        },
+                        # The bank (unreturned gas mass, relaxed over ib_mass_relax steps) is restarted from the IB state record
+                        restart_check=True,
+                    )
+                )
+            # ib_uncover_fill: a cell the fast circle uncovers takes the mean state of its fluid neighbours
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Moving Circle -> ib_uncover_fill",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "ib_uncover_fill": "T",
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.508,
+                        "patch_ib(1)%y_centroid": 0.51,
+                        "patch_ib(1)%radius": 0.175,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%vel(1)": 1.0,
+                    },
+                )
+            )
+            # ib_mass_relax = 1 returns a fixed slip wall's ghost-layer intake in the step it occurs
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Fixed Circle -> Slip -> ib_mass_relax",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "ib_mass_relax": 1,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.15,
+                        "patch_ib(1)%slip": "T",
+                        "patch_ib(1)%moving_ibm": 0,
+                    },
+                )
+            )
 
         if len(dimInfo[0]) == 2 and not viscous:
             # A body force acts on a two-way body only: the force recorded for a fixed body is the fluid's, whether or not it
@@ -1653,26 +1734,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         },
                     )
                 )
-            # Fluid at 100 m/s sliding round a fixed slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Slip Circle -> Cross Flow",
-                    {
-                        "ib": "T",
-                        "num_ibs": 1,
-                        "fd_order": 2,
-                        "n": 49,
-                        "patch_ib(1)%geometry": 2,
-                        "patch_ib(1)%x_centroid": 0.5,
-                        "patch_ib(1)%y_centroid": 0.5,
-                        "patch_ib(1)%radius": 0.2,
-                        "patch_ib(1)%slip": "T",
-                        "patch_ib(1)%moving_ibm": 0,
-                        **{**quiescent, **{f"patch_icpp({i})%vel(1)": 100.0 for i in (1, 2, 3)}},
-                    },
-                )
-            )
+            # Fluid at 100 m/s sliding round a slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R. The ccst
+            # variants add ib_slip_ccst (isentropic ghost density, total-enthalpy tangential speed) with the TSC image points it needs
+            # for its accuracy, on a fixed circle and on one moving at a prescribed 40 m/s
+            slip_cross = {
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "n": 49,
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.2,
+                "patch_ib(1)%slip": "T",
+                "patch_ib(1)%moving_ibm": 0,
+                **{**quiescent, **{f"patch_icpp({i})%vel(1)": 100.0 for i in (1, 2, 3)}},
+            }
+            ccst = {"ib_ip_interp": 2, "ib_slip_ccst": "T"}
+            moving = {"patch_ib(1)%moving_ibm": 1, "patch_ib(1)%vel(1)": 40.0}
+            for name, extra in (("Cross Flow", {}), ("Cross Flow -> ib_slip_ccst", ccst), ("Moving -> ib_slip_ccst", {**moving, **ccst})):
+                cases.append(define_case_d(stack, f"IBM -> Slip Circle -> {name}", {**slip_cross, **extra}))
 
         # many_ib_patch_parallelism marks one thread per (patch, bounding-box cell): bodies of different size, one straddling
         # each periodic face and moving across it
@@ -2098,7 +2179,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "low_Mach=1", {"low_Mach": 1}))
             cases.append(define_case_d(stack, "low_Mach=2", {"low_Mach": 2}))
 
-            stack.push("QBMM", {"qbmm": "T"})
+            stack.push("QBMM", qbmm_mods(dimInfo))
             cases.append(define_case_d(stack, "", {}))
 
             stack.push("Non-polytropic", {"polytropic": "F"})
@@ -2357,6 +2438,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
             )
             cases.append(define_case_d(stack, "", {}))
+            # a static block over the force's support: the fine post-RK hook recomputes the source from the block's own coordinates
+            amr_block = {"amr_block_beg(1)": 6, "amr_block_end(1)": 30, "amr_block_beg(2)": 6, "amr_block_end(2)": 25}
+            cases.append(define_case_d(stack, "AMR", {"amr": "T", **amr_block, "amr_regrid_int": 0, "amr_max_grid_size": 64}))
             stack.pop()
 
             # Mean pressure gradient: constant in x, bulk-mass-flux controller in y
@@ -2378,62 +2462,66 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # assembly + application. Single precision needs a looser tolerance (see
         # compute_tolerance): roundoff-driven divergence reaches ~1e-3 by t_step 3.
         if len(dimInfo[0]) == 3:
-            cases.append(
-                define_case_d(
-                    stack,
-                    "synthetic_turbulence",
-                    {
-                        "m": 24,
-                        "n": 24,
-                        "p": 24,
-                        "dt": 1e-2,
-                        "t_step_stop": 3,
-                        "t_step_save": 3,
-                        "num_fluids": 1,
-                        "x_domain%beg": 0.0,
-                        "x_domain%end": 1.0,
-                        "y_domain%beg": 0.0,
-                        "y_domain%end": 1.0,
-                        "z_domain%beg": 0.0,
-                        "z_domain%end": 1.0,
-                        "bc_x%beg": -1,
-                        "bc_x%end": -1,
-                        "bc_y%beg": -1,
-                        "bc_y%end": -1,
-                        "bc_z%beg": -1,
-                        "bc_z%end": -1,
-                        # Keep the base's three box-tiling patches (all active, vel=0) but set
-                        # them to a single uniform quiescent state, so the IC has no
-                        # discontinuity -- the forcing alone drives the field.
-                        "patch_icpp(1)%pres": 1.0,
-                        "patch_icpp(1)%alpha_rho(1)": 1.0,
-                        "patch_icpp(1)%alpha(1)": 1.0,
-                        "patch_icpp(2)%pres": 1.0,
-                        "patch_icpp(2)%alpha_rho(1)": 1.0,
-                        "patch_icpp(2)%alpha(1)": 1.0,
-                        "patch_icpp(3)%pres": 1.0,
-                        "patch_icpp(3)%alpha_rho(1)": 1.0,
-                        "patch_icpp(3)%alpha(1)": 1.0,
-                        "synthetic_turbulence": "T",
-                        "synth_seed": 1,
-                        "synth_n_shells": 2,
-                        "synth_U_inf": 1.0,
-                        "num_turbulent_sources": 1,
-                        "synth_k_shell(1)": 2 * math.pi / 0.5,
-                        "synth_k_shell(2)": 2 * math.pi / 0.25,
-                        "synth_amp_shell(1)": 0.02,
-                        "synth_amp_shell(2)": 0.01,
-                        "synth_n_waves_per_shell(1)": 2,
-                        "synth_n_waves_per_shell(2)": 3,
-                        "turb_pos(1,1)": 0.5,
-                        "turb_pos(1,2)": 0.5,
-                        "turb_pos(1,3)": 0.5,
-                        "synth_L(1,1)": 4.0,
-                        "synth_L(1,2)": 4.0,
-                        "synth_L(1,3)": 4.0,
-                    },
-                )
-            )
+            synth = {
+                "m": 24,
+                "n": 24,
+                "p": 24,
+                "dt": 1e-2,
+                "t_step_stop": 3,
+                "t_step_save": 3,
+                "num_fluids": 1,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "z_domain%beg": 0.0,
+                "z_domain%end": 1.0,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -1,
+                "bc_y%end": -1,
+                "bc_z%beg": -1,
+                "bc_z%end": -1,
+                # Keep the base's three box-tiling patches (all active, vel=0) but set
+                # them to a single uniform quiescent state, so the IC has no
+                # discontinuity -- the forcing alone drives the field.
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(3)%alpha_rho(1)": 1.0,
+                "patch_icpp(3)%alpha(1)": 1.0,
+                "synthetic_turbulence": "T",
+                "synth_seed": 1,
+                "synth_n_shells": 2,
+                "synth_U_inf": 1.0,
+                "num_turbulent_sources": 1,
+                "synth_k_shell(1)": 2 * math.pi / 0.5,
+                "synth_k_shell(2)": 2 * math.pi / 0.25,
+                "synth_amp_shell(1)": 0.02,
+                "synth_amp_shell(2)": 0.01,
+                "synth_n_waves_per_shell(1)": 2,
+                "synth_n_waves_per_shell(2)": 3,
+                "turb_pos(1,1)": 0.5,
+                "turb_pos(1,2)": 0.5,
+                "turb_pos(1,3)": 0.5,
+                "synth_L(1,1)": 4.0,
+                "synth_L(1,2)": 4.0,
+                "synth_L(1,3)": 4.0,
+            }
+            cases.append(define_case_d(stack, "synthetic_turbulence", synth))
+            # a static block inside the forcing zone: the fine post-RK hook evaluates the forcing on the block's own grid and state
+            synth_blk = {f"amr_block_{e}({d})": v for d in (1, 2, 3) for e, v in (("beg", 6), ("end", 17))}
+            synth_amr = {**synth, "amr": "T", **synth_blk, "amr_regrid_int": 0, "amr_max_grid_size": 13}
+            cases.append(define_case_d(stack, "synthetic_turbulence -> AMR", synth_amr))
+            cases.append(define_case_d(stack, "synthetic_turbulence -> AMR -> subcycle", {**synth_amr, "amr_subcycle": "T"}))
+            # two ranks need 50 cells in x (25 per rank for WENO5); the block straddles the seam at x index 25. The finer x
+            # spacing needs half the dt for the fine cells' CFL limit.
+            synth_np2 = {**synth_amr, "m": 49, "dt": synth_amr["dt"] / 2, "amr_block_beg(1)": 18, "amr_block_end(1)": 31}
+            cases.append(define_case_d(stack, "synthetic_turbulence -> AMR -> 2 MPI Ranks", synth_np2, ppn=2))
 
     def alter_mixlayer_perturb(dimInfo):
         if len(dimInfo[0]) == 3:
@@ -2519,9 +2607,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for relax_model in [5] + ([6] if ndims <= 2 else []):
             for num_fluids in ([2] if ndims == 1 or relax_model == 5 else []) + [3]:
                 for model_eqns in [3, 2]:
+                    # pTg (model 6) costs ~5 ms per cell and step on CPU and far more on GPUs (the iterative solve): 2D 50x40 for
+                    # 50 steps took 16 min on CI, so it runs on the smallest WENO5 grid; 1D took 7 min per test (14 with AMR) on
+                    # CCE GPUs. Both run 10 steps.
+                    pc_size = {"t_step_stop": 10, "t_step_save": 10} if relax_model == 6 else {}
+                    if ndims == 2 and relax_model == 6:
+                        pc_size.update({"m": 24, "n": 24})
                     stack.push(
                         f"Phase Change model {relax_model} -> {num_fluids} Fluid(s) -> model equation -> {model_eqns}",
                         {
+                            **pc_size,
                             "relax": "T",
                             "relax_model": relax_model,
                             "model_eqns": model_eqns,
@@ -2614,6 +2709,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                     cases.append(define_case_d(stack, "", {}))
 
+                    # AMR: the fine blocks are relaxed at the end of the step too, then restricted
+                    if ndims == 1 and num_fluids == 2:
+                        amr_blk = {"amr": "T", "mpp_lim": "T", "amr_block_beg(1)": 25, "amr_block_end(1)": 174, "amr_max_grid_size": 64}
+                        cases.append(define_case_d(stack, "AMR", {**amr_blk, "amr_regrid_int": 0}))
+                        if relax_model == 6 and model_eqns == 2:
+                            cases.append(define_case_d(stack, "AMR -> dynamic regrid", {**amr_blk, "amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
+                    elif ndims == 2 and num_fluids == 3 and relax_model == 6 and model_eqns == 2:
+                        amr_blk = {f"amr_block_{e}({d})": v for d, e, v in ((1, "beg", 6), (1, "end", 17), (2, "beg", 6), (2, "end", 17))}
+                        # NVHPC differs from the amdflang golden by 1.1e-10 in a near-zero transverse momentum (iterative pTg solve)
+                        cases.append(define_case_d(stack, "AMR", {"amr": "T", "mpp_lim": "T", **amr_blk, "amr_regrid_int": 0, "amr_max_grid_size": 16}, override_tol=1e-8))
+
                     stack.pop()
                     stack.pop()
 
@@ -2678,7 +2784,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.push("", {"polytropic": "T", "bubble_model": 2})
             cases.append(define_case_d(stack, "nb=1", {"nb": 1}))
 
-            stack.push("QBMM", {"qbmm": "T"})
+            stack.push("QBMM", qbmm_mods(dimInfo))
             cases.append(define_case_d(stack, "", {}))
 
             stack.push("bubble_model=3", {"bubble_model": 3})
@@ -2865,10 +2971,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "", {}))
                     # AMR block clear of the bubble cloud; EL alphas prolong without the sum-to-one closure.
                     # Known: post-detected NaN on the NVHPC 24.1/24.3 compat lanes only (non-gating).
-                    if len(dimInfo[0]) == 2 and adap_dt == "F" and couplingMethod == 2:
+                    if len(dimInfo[0]) == 2 and couplingMethod == 2:
                         stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0, "amr_max_grid_size": 64})
                         cases.append(define_case_d(stack, "", {}))
-                        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
+                        if adap_dt == "F":
+                            regrid = {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}
+                            cases.append(define_case_d(stack, "dynamic regrid", regrid))
+                            # the one bubble lives on one rank; the other writes header-only Lagrangian files
+                            cases.append(define_case_d(stack, "dynamic regrid -> 2 MPI Ranks", regrid, ppn=2))
                         stack.pop()
 
                     # Regression guard for issue #1706: the Lagrange bubble initial gas
@@ -3714,7 +3824,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_bcs(dimInfo)
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
-            alter_muscl()
+            alter_muscl(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
@@ -3738,6 +3848,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def foreach_example():
+        # Each example runs about 50 steps or fewer. Fixed dt: a step cap, default 50; 2D pTg phase change costs ~5 ms per cell
+        # and step (see alter_phasechange). CFL mode stops on physical time, which the step cap never reaches; these decks took
+        # 1800 to 6800 steps, so they run the fraction of t_stop that takes about 50.
+        example_steps = {"2D_phasechange_bubble": 10}
+        example_t_stop = {"2D_herschel_bulkley_poiseuille_nn": 0.01, "2D_ibm_reacting_surface": 0.04, "2D_poiseuille_thickening_nn": 0.03, "2D_richtmyer_meshkov": 0.01}
         for path in os.listdir(common.MFC_EXAMPLE_DIRPATH):
             if path == "scaling":
                 continue
@@ -3911,7 +4026,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if not os.path.isfile(case_path):
                 continue
 
-            def modify_example_case(case: dict):
+            # bound as defaults now: the functor runs after the loop
+            def modify_example_case(case: dict, steps: int = example_steps.get(path, 50), t_frac: float = example_t_stop.get(path, 1.0)):
                 case["parallel_io"] = "F"
                 case["file_per_process"] = "F"
                 # Lagrangian Silo output needs parallel_io and is written by post_process, which this suite does not run
@@ -3921,10 +4037,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if case.get("particles_lagrange") == "T" and "t_stop" in case:
                     case["t_stop"] = min(case["t_stop"], 5.0e-5)
                     case["t_save"] = case["t_stop"]
+                elif t_frac < 1.0:
+                    case["t_stop"] *= t_frac
+                    case["t_save"] = case["t_stop"]
                 if "t_step_stop" in case and case["t_step_stop"] >= 50:
                     case["t_step_start"] = 0
-                    case["t_step_stop"] = 50
-                    case["t_step_save"] = 50
+                    case["t_step_stop"] = steps
+                    case["t_step_save"] = case["t_step_stop"]
 
                 if case.get("recon_type") == 2:
                     for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT"):
@@ -4341,6 +4460,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # the burn source is part of the shared RHS, so a fine block burns at the same rate as the base grid
+        cases.append(define_case_d(stack, "AMR", {"amr": "T", "amr_block_beg(1)": 30, "amr_block_end(1)": 69, "amr_regrid_int": 0, "amr_max_grid_size": 64, "mpp_lim": "T"}))
         # A Mie-Gruneisen reactant burning to JWL products: the two families share qv as the energy zero, and the
         # Arrhenius factor reads the reactant temperature from its own reference curve.
         mg_to_jwl = {
@@ -4427,13 +4548,35 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # The ignition kernel next to the injecting grain is too stiff for the explicit RK3 reaction source at the flow dt of a coarse
+        # grid (dt * |lambda_max| ~ 6 to 26 at 1500 to 2000 K). The Example integrates the reactions by operator splitting; without
+        # it (chem_params%reaction_substeps = 0) this case aborts with VCFL = Inf at step ~35. A 1500 K oxidizer ignites at once, so
+        # the 60 steps cover the ignition and stay short of the point past which GPU vendors drift apart (~step 80 from 1200 K).
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> IBM -> Injecting Body -> Coarse Ignition",
+                "examples/2D_ibm_burning_grain/case.py",
+                ["--res", "0.2", "--T0", "1500"],
+                mods={"dt": 3.84e-7, "t_step_stop": 60, "t_step_save": 60, "parallel_io": "F"},
+                override_tol=1e-3,
+            )
+        )
+
     ibm_burn_rate_cases()
 
     # A hot-wall finite cylinder goes NaN near its caps from step ~245 without face_bound (WENO face temperature past T_surface_max).
-    # 1e-3 as for the Vieille case above: 300 steps of IBM + chemistry differ by ~1e-5 between NVHPC/A100 and amdflang/MI300A.
-    # The run sits near the blow-up that face_bound prevents, so cap-rim cells are compiler-sensitive: the golden is from NVHPC (A100) and
-    # agrees with amdflang to 1e-5, but gfortran differs by up to 24% in the energy of a few rim cells. The test checks that the run completes.
-    cases.append(define_case_f("3D -> Chemistry -> IBM -> Hot Rod -> Face Bound", "examples/3D_ibm_hot_rod/case.py", mods={"parallel_io": "F"}, override_tol=1.0))
+    # Run only 6 steps of a 4500 K wall in a tilted stream: face_bound already limits faces there (the state differs from face_bound = 0
+    # by ~2e-4) and the field is still smooth, so compilers agree to ~2e-13 (override_tol 1e-9 leaves margin for Intel and Cray). The 300-step run is chaotic at the cap rims (gfortran
+    # differs from NVHPC by up to 24% there), and with an axis-aligned stream CPU and GPU differ by ~1e-4 in the transverse momentum.
+    cases.append(
+        define_case_f(
+            "3D -> Chemistry -> IBM -> Hot Rod -> Face Bound",
+            "examples/3D_ibm_hot_rod/case.py",
+            args=["--cells_per_D", "7", "--steps", "6", "--Twall", "4500", "--tilt", "0.2"],
+            mods={"parallel_io": "F"},
+            override_tol=1e-9,
+        )
+    )
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
@@ -4504,6 +4647,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-6,
         )
     )
+    # Slip wall in reacting flow (no ib_slip_ccst: the option is refused with chemistry): the ghost pressure of the wall carries the
+    # curvature term and the composition and temperature of the ghost follow it; the test harness asserts 0 <= Y <= 1.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Slip Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%surface_reaction": 0, "patch_ib(1)%slip": "T"},
+            override_tol=1e-6,
+        )
+    )
     cases.append(
         define_case_f(
             "2D -> Chemistry -> IBM Inert Surface -> Flux Wall -> Closed Box",
@@ -4526,6 +4679,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-6,
         )
     )
+
+    # ib_heat_wrt on a prescribed-translating body: the heat in the body frame, with the cells the body sweeps booked at every
+    # Runge-Kutta placement (s_add_swept_cells); with ib_mass_relax the same cells also feed the mass bank.
+    for label, extra in (("", {}), (" -> ib_mass_relax", {"ib_mass_relax": 5}), (" -> ib_uncover_fill", {"ib_uncover_fill": "T"})):
+        cases.append(
+            define_case_f(
+                f"2D -> Chemistry -> IBM Reacting Surface -> Moving Heat Output{label}",
+                "examples/2D_ibm_reacting_surface/case.py",
+                mods={
+                    "m": 24,
+                    "n": 24,
+                    "parallel_io": "F",
+                    "t_stop": 2.0e-5,
+                    "t_save": 2.0e-5,
+                    "ib_heat_wrt": "T",
+                    "patch_ib(1)%moving_ibm": 1,
+                    "patch_ib(1)%vel(1)": 5.0,
+                    **extra,
+                },
+                override_tol=1e-6,
+            )
+        )
 
     # thermal_bc = 3 on the same example and mechanism, at the Example grid cap (~16 steps to 2e-5 s). rho*c = 1e4 J/m^3/K,
     # far below graphite's, so the wall temperature moves by a few K within the test; ib_surface_wrt and ib_heat_wrt exercise the
@@ -5060,6 +5235,39 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
+        # SSP-RK1 and RK2: the reflux weights and stage times come from the scheme's coefficients (s_amr_set_rk_table)
+        for ts in (1, 2):
+            cases.append(define_case_d(stack, f"time_stepper={ts}", {"time_stepper": ts}))
+        cases.append(define_case_d(stack, "time_stepper=2 -> subcycle", {"time_stepper": 2, "amr_subcycle": "T"}))
+        # quartic at the foot of a steep monotone front (a 100:1 density contact carried at u = 10, Mach 3 in the dense gas): the
+        # children must stay within the coarse averages; an undershoot there is positive, so the admissibility fallback does not
+        # catch it
+        cases.append(
+            define_case_d(
+                stack,
+                "quartic prolongation -> hypersonic contact",
+                {
+                    "amr_prolong": 2,
+                    "dt": 1.0e-4,  # ICFL 0.53 on the fine level
+                    "t_step_stop": 120,
+                    "t_step_save": 120,
+                    **{f"patch_icpp({i})%vel(1)": 10.0 for i in (1, 2, 3)},
+                    **{f"patch_icpp({i})%pres": 700.0 for i in (1, 2, 3)},
+                    "patch_icpp(1)%alpha_rho(1)": 1.0,
+                    "patch_icpp(2)%alpha_rho(1)": 100.0,
+                    "patch_icpp(3)%alpha_rho(1)": 1.0,
+                },
+                override_tol=1.0e-10,  # NVHPC and amdflang differ by 1.3e-12 relative here
+            )
+        )
+        # Riemann-extrapolation boundaries (bc = -4): the fine frames skip the boundary's edge-state copy, the coarse grid applies it
+        cases.append(define_case_d(stack, "bc=-4", {"bc_x%beg": -4, "bc_x%end": -4}))
+        # CFL-based dt: limited by the finest cell over each coarse cell, so it follows the blocks through the regrids
+        cfl = {"cfl_target": 0.8, "n_start": 0, "t_save": 0.1, "t_stop": 0.1}
+        cases.append(define_case_d(stack, "cfl_adap_dt", {"cfl_adap_dt": "T", **cfl}))
+        cases.append(define_case_d(stack, "cfl_adap_dt -> subcycle", {"cfl_adap_dt": "T", "amr_subcycle": "T", **cfl}))
+        # dt is fixed from the initial state, whose wave speeds are ~1.4x lower than the developed flow's
+        cases.append(define_case_d(stack, "cfl_const_dt", {"cfl_const_dt": "T", **cfl, "cfl_target": 0.4}))
         # Block cap pinned small so one rank outgrows the flat store's initial 8 slots mid-read: the reader must push each
         # block to the device and never push the host mirror back. Invisible on CPU; exists for the GPU gate.
         stack.push("store growth", {"amr_max_grid_size": 4, "amr_max_blocks": 32})
@@ -5139,6 +5347,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # reconstruction and Riemann switches that leave the block coupling untouched; each matches the uniform fine-grid run
+        # to roundoff in the block interior (./mfc.sh amr_check)
+        amr_two_fluid = {"num_fluids": 2, "mpp_lim": "T", "fluid_pp(2)%gamma": 1.5, "fluid_pp(2)%pi_inf": 0.0}
+        for i, (a1, rho) in enumerate([(1 - 1e-6, 1.0), (1 - 1e-6, 0.5), (1e-6, 0.125)], start=1):
+            amr_two_fluid.update(
+                {
+                    f"patch_icpp({i})%alpha(1)": a1,
+                    f"patch_icpp({i})%alpha(2)": 1 - a1,
+                    f"patch_icpp({i})%alpha_rho(1)": a1 * rho,
+                    f"patch_icpp({i})%alpha_rho(2)": (1 - a1) * rho,
+                }
+            )
+        stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
+        cases.append(define_case_d(stack, "teno", {"teno": "T", "teno_CT": 1.0e-6}))
+        cases.append(define_case_d(stack, "wenoz", {"wenoz": "T"}))
+        cases.append(define_case_d(stack, "null_weights", {"null_weights": "T"}))
+        cases.append(define_case_d(stack, "hll_u_interface", {"riemann_solver": 1, "hll_u_interface": "T"}))
+        cases.append(define_case_d(stack, "alt_soundspeed", {**amr_two_fluid, "alt_soundspeed": "T"}))
+        stack.pop()
+
         # 3D static block: 26^3 base (WENO5 floor), slabs along z, 12^3 fine block at coarse indices 6..17 per axis
         amr_3d_base = {
             "m": 25,
@@ -5193,6 +5421,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # restart_check: the only 3D AMR restart coverage (the reader validates fine extent per axis)
         stack.push("AMR -> 3D -> static block", {**amr_3d_base, "amr_regrid_int": 0})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))
+        cases.append(define_case_d(stack, "bc=-4", {"amr_max_grid_size": 13, **{f"bc_{d}%{e}": -4 for d in "xyz" for e in ("beg", "end")}}))
         stack.pop()
 
         # 3D dynamic regrid: the only 3D tagger/clusterer/regrid coverage. Density-gradient tags fire on both z-interfaces,
@@ -5292,6 +5521,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "hypo_hll_interface_rhs", {"hypo_hll_interface_rhs": "T"}))
+        cases.append(define_case_d(stack, "riemann_hypo_ADC", {"riemann_solver": 2, "riemann_hypo_ADC": "T"}))
         # continuum damage on hypoelasticity: cell-local source
         stack.push("cont_damage", {"cont_damage": "T", "tau_star": 0.0, "cont_damage_s": 2.0, "alpha_bar": 1e-4})
         cases.append(define_case_d(stack, "", {}))
@@ -5325,6 +5556,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         # override_tol 1e-8 (both cases): intel -O3 drifts past the 1e-12 default
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, override_tol=1.0e-8))
+        cases.append(define_case_d(stack, "dipole", {"amr_max_grid_size": 32, "acoustic(1)%dipole": "T"}, override_tol=1.0e-8))
         # dynamic regrid chasing the emitted wave; tags are suppressed over the source support so it stays coarse
         stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, override_tol=1.0e-8))
@@ -5346,6 +5578,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # power-law viscosity: the shear rate comes from the fine block's own velocity gradients
+        nn = {"non_newtonian": "T", "tau0": 0.0, "K": 1.0e-2, "nn": 0.5, "mu_max": 1.0e-2, "mu_min": 1.0e-6, "hb_m": 1000.0}
+        cases.append(define_case_d(stack, "non_newtonian", {f"fluid_pp(1)%{k}": v for k, v in nn.items()}))
         stack.pop()
 
         # multi-block: density interfaces at x=0.25 and 0.75 (~32 coarse cells apart, > buff_size + 2*amr_buf), so
@@ -5482,6 +5717,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
+        # fine-grid force (the coarse faces under the block are skipped)
+        cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))
         # TSC image points (ib_ip_interp = 2): the 3x3 stencil reads solid ghost cells and the fine block's halo. Quiescent at a
         # realistic pressure, the exact solution is the initial state.
         cases.append(define_case_d(stack, "ib_ip_interp=2", {"amr_max_grid_size": 32, "ib_ip_interp": 2}))
@@ -5491,6 +5729,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "spinning", {"amr_max_grid_size": 32, "patch_ib(1)%moving_ibm": 1, "patch_ib(1)%angular_vel(3)": 300.0, **tsc_rest}))
         # Quadratic wall-normal ghost velocity (ib_wall_order = 2): two TSC probes up to two fine cells off the no-slip wall
         cases.append(define_case_d(stack, "ib_wall_order=2", {"amr_max_grid_size": 32, "ib_wall_order": 2}))
+        # body options that act through the ghost-point update shared by the fine blocks
+        cases.append(define_case_d(stack, "slip", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T"}))
+        # ghost-state options of the slip and viscous walls, both checked with ./mfc.sh amr_check
+        cases.append(define_case_d(stack, "slip -> ib_slip_ccst", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T", "ib_slip_ccst": "T"}))
+        cases.append(define_case_d(stack, "ib_smooth_contact", {"amr_max_grid_size": 32, "ib_smooth_contact": "T", "viscous": "T", "fluid_pp(1)%Re(1)": 1000.0}))
+        cases.append(define_case_d(stack, "ib_second_order_vel", {"amr_max_grid_size": 32, "ib_second_order_vel": "T", "ib_ip_min_dist": 1.5}))
+        cases.append(define_case_d(stack, "many_ib_patch_parallelism", {"amr_max_grid_size": 32, "many_ib_patch_parallelism": "T"}))
         # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
         stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2, "t_step_stop": 20, "t_step_save": 20})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
@@ -5893,6 +6138,23 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2},
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        # the same regrid across the seam with subcycling (time-interpolated ghosts, registers) and the quartic's wider gathers
+        np2_variants = (
+            ("subcycle", {"amr_subcycle": "T"}),
+            ("quartic prolongation", {"amr_prolong": 2}),
+            ("subcycle -> quartic prolongation", {"amr_subcycle": "T", "amr_prolong": 2}),
+            # viscous fluxes reflux across the seam too; the 1D viscous tests cannot split
+            ("viscous", {"viscous": "T", "fluid_pp(1)%Re(1)": 100.0}),
+        )
+        for label, mods in np2_variants:
+            cases.append(define_case_d(stack, label, {"amr_max_grid_size": 16, **mods}, ppn=2))
+        stack.pop()
+        # the recursive subcycle driver on a two-level hierarchy tiled over both ranks
+        stack.push(
+            "AMR -> 2D -> multi-level static np=2 -> subcycle",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16, "amr_subcycle": "T"},
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
         stack.pop()
         # owner-aware placement (amr_place_owner) of the same two cases: owners move, results must not
         stack.push(
@@ -6032,6 +6294,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
+        # the recursive subcycle driver through regrids that create and move level-2 blocks on both ranks
+        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}, ppn=2))
         stack.pop()
 
         # 3D pinned cap above a rank's coarse extent, np=4: guards the y/z-axis widening of the borrowed solver scratch (m/n/p_alloc).
@@ -6113,6 +6377,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {
                 **amr_1d_base,
                 "m": 255,
+                "dt": 2.5e-4,  # the level-3 cells are 8x finer: amr_1d_base's dt exceeds their ICFL = 1 limit
                 "amr_block_beg(1)": 64,
                 "amr_block_end(1)": 191,
                 "amr_regrid_int": 2,

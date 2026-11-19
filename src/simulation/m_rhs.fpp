@@ -811,8 +811,12 @@ contains
                     end if
 
                     ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
-                    ! this direction's faces. AMR: coarse faces only; a fine pass would restart the sum on its block.
-                    if (.not. amr_in_fine_advance) call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf)
+                    ! this direction's faces, on every AMR level with that level's markers.
+                    if (amr_in_fine_advance) then
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                    else
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                    end if
 
                     ! Bubble dynamics source terms
                     if (bubbles_euler) then
@@ -866,7 +870,11 @@ contains
                 call s_compute_advection_source_term(id, rhs_hatR_vf, q_cons_qp, q_prim_qp, .false.)
                 call nvtxEndRange
                 ! flux_rsx_vf holds the hat_L set and flux_hatR_rsx_vf the hat_R set, each the RHS's at its own faces
-                if (.not. amr_in_fine_advance) call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf)
+                if (amr_in_fine_advance) then
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                else
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                end if
             end do
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
@@ -964,7 +972,7 @@ contains
         if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps == 0) then
             call nvtxStartRange("RHS-CHEM-REACTIONS")
             ! needs cons_copy_all
-            call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+            call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint, run_time_info)
             call nvtxEndRange
         end if
 

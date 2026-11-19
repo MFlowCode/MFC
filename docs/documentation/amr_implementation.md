@@ -31,7 +31,8 @@ Each module may `use` only those above it; `m_amr` re-exports the chain, so call
 | `m_amr_nest` | Child nesting for levels above 1, and the shared tag sensor |
 | `m_amr_restart` | Hierarchy checkpoint (serial and MPI-IO) |
 | `m_amr_stage` | Hooks called by `s_tvd_rk`: stage begin, fine stage, subcycled fine step, end-of-step fold |
-| `m_phase_timing` | `rank_time_wrt` phase brackets and report |
+| `m_phase_timing` | `rank_time_wrt` phase brackets, AMR memory table and report |
+| `m_stage_hooks` | the post-RK hook lists shared by the coarse stage and the fine blocks |
 
 ## Index spaces
 
@@ -114,6 +115,24 @@ same transfer list from replicated metadata, so no handshake is needed, and mess
 not depend on posting order. Waves: coarse halo, level-1 and parent fill waves, seam halo, reflux faces, restriction and
 level>=2 register waves, regrid migration. With `amr_device_pack` the fill waves pack and unpack in one fused kernel
 per family. Regrid adds a few collectives (tag reductions, the box list, owners).
+
+## Checking a feature {#amr-check}
+
+A block cell that the block's edges cannot reach during a run advances exactly as the same cell of a uniform fine grid,
+so the two runs must agree there to roundoff. `./mfc.sh amr_check case.py` tests this: it runs the case with one static
+block (the case's `amr_block_beg`/`amr_block_end`, else the central half of the domain) and on a uniform grid at the
+block's resolution, averages the fine run onto the block's cells and prints the largest relative difference by distance
+from the block edge. The core is the cells farther from every edge than one reconstruction stencil per Runge-Kutta stage
+and step; the check passes when the core differs by less than `--tol` (default `1e-8`).
+
+The case needs a fixed `dt`, `t_step_start = 0`, and an initial condition that survives interpolation from the coarse
+grid: piecewise-constant patches whose faces lie on coarse cell faces, with part of the flow inside the core. The command
+reports when either the initial data differs or the core never changes. The two runs are made in `amr_check/amr` and
+`amr_check/fine` under the case directory; parameters naming a file there are passed as absolute paths, but input files
+the solver opens by a fixed relative name (e.g. `input/lag_bubbles.dat`) are not carried over. Options after `--` go to
+`./mfc.sh run`.
+
+A switch joins `AMR_VETTED_FLAGS` once a case that uses it passes this check and an AMR test covers it.
 
 ## Instrumentation
 

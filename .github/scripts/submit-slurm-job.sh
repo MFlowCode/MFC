@@ -51,13 +51,23 @@ esac
 case "$cluster" in
     phoenix)
         compiler_flag="p"
-        account="gts-sbryngelson3"
         job_prefix="shb"
-        qos="embers"
+        # Benchmarks stay on the free, preemptible 'embers' QOS: they run on
+        # every PR and most are superseded before they start. Tests and case
+        # optimization run on master (or by label) only; under 'embers' they
+        # queued 11-12 h behind every charged job and could be preempted
+        # mid-run, so they use the charged 'inferno' QOS.
+        if [ "$job_type" = "bench" ]; then
+            account="gts-sbryngelson3"
+            qos="embers"
+        else
+            account="gts-coc-coda20"
+            qos="inferno"
+        fi
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
         # Combined build+test needs build headroom on top of the test budget;
-        # kept modest to still backfill under 'embers'.
+        # kept modest so it still backfills.
         buildtest_time="03:30:00"
         bench_time="04:00:00"
         gpu_partition_dynamic=true

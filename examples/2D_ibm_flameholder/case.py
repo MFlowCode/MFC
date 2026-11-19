@@ -94,6 +94,8 @@ case = {
     "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
+    # Operator-split alpha-QSS reactions: the H2/O2 ignition kernel is too stiff for the explicit RK3 source at coarse --res
+    "chem_params%reaction_substeps": 4,
     "cantera_file": ctfile,
     "chem_wrt_T": "T",
     # Immersed boundary: solid cylinder that injects H2 off its surface

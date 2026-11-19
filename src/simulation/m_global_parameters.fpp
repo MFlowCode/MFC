@@ -365,6 +365,12 @@ module m_global_parameters
     !> Per-slot mirrors (allocated 1:amr_max_blocks by m_amr): region box, rank intersection and ownership flag of every block.
     !! s_set_amr_fine_geometry writes the current slot's entry; s_amr_select_slot copies a slot's entry into the working mirrors.
     integer, allocatable :: amr_region_lo_all(:,:), amr_region_hi_all(:,:)
+    !> Spacing ratio of the finest cell over each coarse cell (1 where uncovered), and the powers of it by which that cell's
+    !! inviscid, diffusive and capillary CFL numbers exceed the coarse cell's (a subcycled level also takes dt/ratio). Rebuilt by
+    !! s_amr_build_cfl_map whenever the block set changes.
+    real(wp), allocatable :: amr_cfl_rf(:,:,:)
+    real(wp)              :: amr_cfl_pow(3) = 0._wp
+    $:GPU_DECLARE(create='[amr_cfl_rf]')
     integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
     logical, allocatable :: amr_owns_all(:)
     !> Refinement level of each active block (1..amr_max_level) and the deepest level populated. A level-l block refines a
@@ -402,6 +408,13 @@ module m_global_parameters
     real(wp), parameter :: amr_bat_pad = 0.1_wp
     integer             :: amr_bat_mext(3, amr_bat_max) = 0, amr_bat_off(3, amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_mext, amr_bat_off]')
+    !> For the IB face forces on a fine frame: each batch member's origin minus the leader's (members read the leader's coordinate
+    !! arrays), and the boxes of the frame's cells that a finer level covers (lo(1:3), hi(1:3) in the frame's indices), where the
+    !! finer level takes the faces. The coarse frame uses the cell map amr_cfl_rf instead.
+    real(wp)             :: amr_bat_xsh(3, amr_bat_max) = 0._wp
+    integer              :: amr_cov_n = 0
+    integer, allocatable :: amr_cov_box(:,:)
+    $:GPU_DECLARE(create='[amr_bat_xsh, amr_cov_box]')
 
 contains
 
@@ -686,10 +699,13 @@ contains
         ib_second_order_vel = .false.
         ib_ip_min_dist = 0._wp
         ib_flux_wall = .false.
+        ib_slip_ccst = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
+        ib_mass_relax = 0
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
+        ib_uncover_fill = .false.
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
@@ -884,6 +900,7 @@ contains
             patch_ib(i)%v_blow = 0._wp
             patch_ib(i)%inj_species = 0
             patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%mass_bank = 0._wp
             patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement

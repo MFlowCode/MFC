@@ -25,12 +25,17 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   level-1 box).
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
   linear interpolation (`amr_prolong = 1`) or conservative quartic interpolation (`amr_prolong = 2`). The quartic fill
-  falls back to limited linear wherever it would give non-positive density or internal energy. Volume fractions are
+  falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (so a
+  monotone profile stays monotone; only at a local extremum is the range widened), and wherever it would give
+  non-positive density or internal energy. Volume fractions are
   renormalized to sum to one and species mass fractions to `sum(Y) = 1, Y >= 0`. A block that survives a regrid
   keeps its own fine solution.
 - **Advance.** Lock-step (default): every level takes each step at `dt`, so `dt` must satisfy the finest level's CFL
-  limit. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost cells
-  interpolated in time; `dt` is the level-0 step.
+  limit. With a CFL-based time step (`cfl_adap_dt`, `cfl_const_dt`) each coarse cell's limit is that of the finest cell
+  covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
+  aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
+  largest stable `dt`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
   covered coarse cell is then set to the average of its fine children.
@@ -56,11 +61,13 @@ last dimension, one solver call per batch; this is why AMR needs a uniform Carte
 `amr_device_pack` (fused exchange kernels) when `amr_max_grid_size <= 64` and sets `amr_snap = min(2, amr_buf - 2)`
 (regrid hysteresis) under dynamic regrid, unless they are set explicitly.
 
-`rank_time_wrt = T` prints a per-phase time budget of the AMR step and the block-balance report.
+`rank_time_wrt = T` prints a per-phase time budget of the AMR step, the block-balance report, and at the end of the run
+the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, advance scratch, coarse patches, flux
+registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies).
 
 ## Supported physics {#amr-physics}
 
-Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO (`recon_type = 1`) or IGR, a uniform Cartesian grid, and
+Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL (`recon_type = 1` or `2`) or IGR, a uniform Cartesian grid, and
 `mpp_lim = T` when `num_fluids > 1`.
 
 | Feature | Status |
@@ -68,13 +75,17 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO (`recon_type = 1`) o
 | Single- and multi-fluid Euler, 6-equation model | Supported |
 | Viscous, hypoelastic (with continuum damage), body forces | Supported |
 | Chemistry (reactions, diffusion) | Lock-step only; no reaction substepping |
-| Immersed boundaries (fixed, prescribed or force-driven motion; not STL, `thermal_bc`, `surface_reaction`, `ib_surface_wrt` or `ib_heat_wrt`) | Supported; blocks always contain each body; moving bodies are lock-step only; multi-level with IB is single-rank |
+| Immersed boundaries (fixed, prescribed or force-driven motion; not STL, `thermal_bc`, `surface_reaction`, `ib_surface_wrt` or `ib_heat_wrt`) | Supported; blocks always contain each body; moving bodies are lock-step only; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`) |
 | Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
+| Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
-| Euler-Euler bubbles, QBMM, phase change (`relax`), surface tension, synthetic turbulence | Not supported |
-| Cylindrical coordinates, stretched grids, `bc = -4` | Not supported |
+| Synthetic turbulence forcing | Supported; evaluated on each block's own grid |
+| Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
+| Euler-Euler bubbles, QBMM, surface tension | Not supported |
+| Riemann-extrapolation boundaries (`bc = -4`) | Supported, except with `null_weights` |
+| Cylindrical coordinates, stretched grids | Not supported |
 
 ## Parameters {#amr-parameters}
 
