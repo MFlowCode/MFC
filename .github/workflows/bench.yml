@@ -2,6 +2,8 @@ name: 'Benchmark'
 
 on:
   pull_request:
+    # ready_for_review: the self job skips drafts, so a draft marked ready would never bench
+    types: [opened, synchronize, reopened, ready_for_review]
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
@@ -95,7 +97,7 @@ jobs:
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
-    # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
+    # Includes SLURM queue wait. Kept under 24h, when GITHUB_TOKEN expires.
     timeout-minutes: 1380
     steps:
       - name: Clean stale output files

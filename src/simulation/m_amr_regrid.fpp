@@ -314,9 +314,9 @@ contains
         call s_phase_tic(PH_RG_CLUS)
         call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes)
         call s_phase_toc(PH_RG_CLUS)
-        if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
+        if (nboxes == 0) call s_amr_regrid_dormant_seed(boxes, nboxes)  ! nothing tagged: retract to one small block
         call s_amr_regrid_shape_boxes(boxes, nboxes)
-        if (nboxes == 0) return  ! every box was confined to the domain margin
+        if (nboxes == 0) return  ! every box was confined to the domain margin; keep the current blocks
         call s_phase_tic(PH_RG_CLUS)
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
         if (amr_snap > 0) call s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
@@ -400,6 +400,20 @@ contains
         deallocate (tags)
 
     end subroutine s_amr_regrid_cluster_tags
+
+    !> One coarse cell at the domain center, which shaping pads into the dormant block that replaces the hierarchy.
+    impure subroutine s_amr_regrid_dormant_seed(boxes, nboxes)
+
+        type(t_box), allocatable, intent(inout) :: boxes(:)
+        integer, intent(out)                    :: nboxes
+
+        if (allocated(boxes)) deallocate (boxes)
+        allocate (boxes(1))
+        boxes(1)%lo = merge([m_glb, n_glb, p_glb]/2, 0, amr_dim)
+        boxes(1)%hi = boxes(1)%lo
+        nboxes = 1
+
+    end subroutine s_amr_regrid_dormant_seed
 
     !> True iff two same-level blocks can coexist: disjoint, and either >= 2 empty coarse cells apart or face-adjacent with an exact
     !! transverse match. Mirrors s_amr_check_seam_topology.
@@ -804,13 +818,13 @@ contains
     end subroutine s_amr_mig_pack_device
 
     !> Fine-index window [flo, fhi] in level-1 old block ilo's stash of the coarse box [wlo, whi] (0:0 in collapsed dims).
-    pure subroutine s_amr_mig_window(wlo, whi, ilo, flo, fhi)
+    pure subroutine s_amr_mig_window(wlo, whi, ilo, lev, flo, fhi)
 
-        integer, intent(in)  :: wlo(3), whi(3), ilo(3)
+        integer, intent(in)  :: wlo(3), whi(3), ilo(3), lev
         integer, intent(out) :: flo(3), fhi(3)
 
-        flo = merge(amr_ref_ratio*(wlo - ilo), 0, amr_dim)
-        fhi = merge(amr_ref_ratio*(whi - ilo + 1) - 1, 0, amr_dim)
+        flo = merge(amr_ref_ratio**lev*(wlo - ilo), 0, amr_dim)
+        fhi = merge(amr_ref_ratio**lev*(whi - ilo + 1) - 1, 0, amr_dim)
 
     end subroutine s_amr_mig_window
 
@@ -961,8 +975,8 @@ contains
     end subroutine s_amr_commit_boxes
 
     !> Cross-rank migration as one wave: each old owner ships the bounding box of its overlaps to every other rank owning an
-    !! overlapping new level-1 block (level >= 2 re-prolongs from its parent). Both sides enumerate old blocks ascending, so the
-    !! transfers line up; received windows stay in amr_mig_rq. No-op at np=1.
+    !! overlapping new block of the same level. Both sides enumerate old blocks ascending, so the transfers line up; received
+    !! windows stay in amr_mig_rq. No-op at np=1.
     impure subroutine s_amr_migrate_old_blocks(boxes, nboxes, box_level, old_np, old_ilo, old_chi, old_owner, old_level, old_owns)
 
         type(t_box), intent(in) :: boxes(:)
@@ -979,17 +993,16 @@ contains
             call s_amr_wave_open(amr_wave, amr_band_migrate)
             call s_amr_wave_reset(amr_wsend); call s_amr_wave_reset(amr_wrecv)
             do kk = 1, old_np
-                if (old_level(kk) /= 1) cycle
                 do k2 = 1, nboxes
                     rr = amr_block_owner(k2)
-                    if (box_level(k2) /= 1 .or. rr == old_owner(kk)) cycle
+                    if (box_level(k2) /= old_level(kk) .or. rr == old_owner(kk)) cycle
                     if (.not. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:,kk))) cycle
                     wlo(:,rr) = min(wlo(:,rr), max(boxes(k2)%lo, old_ilo(:,kk)))
                     whi(:,rr) = max(whi(:,rr), min(boxes(k2)%hi, old_chi(:,kk)))
                 end do
                 do rr = 0, num_procs - 1
                     if (whi(1, rr) < wlo(1, rr)) cycle
-                    call s_amr_mig_window(wlo(:,rr), whi(:,rr), old_ilo(:,kk), flo, fhi)
+                    call s_amr_mig_window(wlo(:,rr), whi(:,rr), old_ilo(:,kk), old_level(kk), flo, fhi)
                     cnt = sys_size*product(fhi - flo + 1)
                     if (rr == proc_rank) then
                         call s_amr_wave_add(amr_wrecv, old_owner(kk), kk, wlo(:,rr), whi(:,rr), cnt)
@@ -1006,7 +1019,7 @@ contains
             do ix = 1, amr_wsend%nx
                 kk = amr_wsend%blk(ix)
                 call s_amr_wave_slice(amr_wsend, ix, lo, hi)
-                call s_amr_mig_window(amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), old_ilo(:,kk), flo, fhi)
+                call s_amr_mig_window(amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), old_ilo(:,kk), old_level(kk), flo, fhi)
                 h_loc = amr_loc_of(kk)
                 call s_amr_mig_pack_device(h_loc, flo(1), flo(2), flo(3), fhi(1), fhi(2), fhi(3), amr_mig_sq(lo:hi))
             end do
@@ -1016,7 +1029,7 @@ contains
             do ix = 1, amr_wrecv%nx
                 kk = amr_wrecv%blk(ix)
                 call s_amr_wave_slice(amr_wrecv, ix, lo, hi)
-                call s_amr_mig_window(amr_wrecv%bl(:,ix), amr_wrecv%bh(:,ix), old_ilo(:,kk), flo, fhi)
+                call s_amr_mig_window(amr_wrecv%bl(:,ix), amr_wrecv%bh(:,ix), old_ilo(:,kk), old_level(kk), flo, fhi)
                 amr_mig_win(:,kk) = [lo, flo, fhi]
             end do
         end if
@@ -1075,13 +1088,13 @@ contains
 
     end subroutine s_amr_plan_rebuild_visits
 
-    !> Overwrite the freshly prolonged level-1 slot ks with the overlapping old level-1 blocks: from the migration pool when another
+    !> Overwrite the freshly prolonged slot ks with the overlapping old blocks of its level: from the migration pool when another
     !! rank owned them, else from the local stash.
     impure subroutine s_amr_carry_old_into_slot(ks, boxes, old_np, old_ilo, old_ext, old_level)
 
         integer, intent(in)     :: ks, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         type(t_box), intent(in) :: boxes(:)
-        integer                 :: sh(3), kk, ohi(3)
+        integer                 :: sh(3), kk, ohi(3), rl
         ! NVHPC -Minline: plain scalars for device routines
         integer :: loc_kks, loc_ks, m_ks, n_ks, old_ext1_kk, old_ext2_kk, old_ext3_kk, p_ks, w1, w2, w3, w4, w5, w6, lo, hi
 
@@ -1090,10 +1103,12 @@ contains
         n_ks = amr_slots(ks)%n
         p_ks = amr_slots(ks)%p
         do kk = 1, old_np
-            if (old_level(kk) /= 1) cycle  ! a child's stash is in the 4x frame
-            ohi = old_ilo(:,kk) + merge((old_ext(:,kk) + 1)/amr_ref_ratio - 1, 0, amr_dim)
+            if (old_level(kk) /= amr_block_level(ks)) cycle
+            rl = amr_ref_ratio**old_level(kk)
+            ohi = old_ilo(:,kk) + merge((old_ext(:,kk) + 1)/rl - 1, 0, amr_dim)
             if (.not. f_amr_boxes_overlap(boxes(ks)%lo, boxes(ks)%hi, old_ilo(:,kk), ohi)) cycle
-            sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))  ! old local fine index = new local fine index + sh
+            ! a level-l slot's local fine index 0 is L0 cell lo at rl = ratio**l (for l >= 2 amr_isect_lo is in the parent's frame)
+            sh = merge(rl*(boxes(ks)%lo - old_ilo(:,kk)), 0, amr_dim)  ! old local fine index = new local fine index + sh
             if (amr_mig_win(1, kk) > 0) then
                 ! owned elsewhere: window in the migration receive pool
                 lo = amr_mig_win(1, kk); hi = lo + sys_size*product(amr_mig_win(5:7,kk) - amr_mig_win(2:4,kk) + 1) - 1
@@ -1163,9 +1178,8 @@ contains
                 else
                     call s_amr_parent_fill_consume(ks, .true.)
                 end if
-                ! level >= 2 re-prolongs from its freshly built parent (its stash is in the parent-fine frame): no carry-forward
+                ! prolong from the freshly built coarse/parent patch, then overwrite the overlap with old blocks of this level
                 call s_interpolate_coarse_to_fine()
-                if (lev >= 2) cycle
                 call s_amr_carry_old_into_slot(ks, boxes, old_np, old_ilo, old_ext, old_level)
             end do
             call s_amr_fill_wave_done()

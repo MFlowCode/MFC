@@ -671,7 +671,7 @@ contains
             else if (ib_state_wrt) then
                 call s_compute_ib_forces()
             end if
-            if (ib_exchange) call s_update_ib_temperatures(dt)
+            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
             if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
         end if
 
@@ -909,21 +909,40 @@ contains
     end subroutine s_compute_dt
 
     !> AMR with a fixed dt: abort if dt exceeds the finest level's inviscid limit (ICFL = 1, as s_write_run_time_information).
-    impure subroutine s_amr_check_fixed_dt()
+    !! reach: test every cell as if refined to amr_max_level, which a regrid may do later, and warn instead of aborting.
+    impure subroutine s_amr_check_fixed_dt(reach)
 
-        real(wp), dimension(5) :: dt_cand
-        real(wp)               :: cfl_save
-        character(len=256)     :: msg
+        logical, intent(in), optional :: reach
+        real(wp), dimension(5)        :: dt_cand
+        real(wp)                      :: cfl_save
+        real(wp), allocatable         :: rf_save(:,:,:)
+        logical                       :: all_fine
+        character(len=256)            :: msg
 
         ! the cell state and signal speed behind the candidates are the non-relativistic ones
 
         if (cfl_dt .or. .not. amr .or. relativity) return
+        all_fine = .false.; if (present(reach)) all_fine = reach
+        if (all_fine) then
+            rf_save = amr_cfl_rf; amr_cfl_rf = real(amr_ref_ratio**amr_max_level, wp)
+            $:GPU_UPDATE(device='[amr_cfl_rf]')
+        end if
         cfl_save = cfl_target; cfl_target = 1._wp
         $:GPU_UPDATE(device='[cfl_target]')
         call s_compute_dt(dt_cand)
         cfl_target = cfl_save
         $:GPU_UPDATE(device='[cfl_target]')
+        if (all_fine) then
+            amr_cfl_rf = rf_save
+            $:GPU_UPDATE(device='[amr_cfl_rf]')
+        end if
         if (dt <= dt_cand(1)) return
+        if (all_fine) then
+            if (proc_rank == 0) print '(A,ES11.4,A,I0,A,ES11.4,A)', ' [amr] WARNING: dt = ', dt, &
+                & ' exceeds the inviscid CFL limit if a regrid refines the fastest cells to level ', amr_max_level, &
+                & ' (largest stable dt ', dt_cand(1), '); the run would then abort at that regrid.'
+            return
+        end if
         write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
                & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', dt_cand(1), &
                & '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
