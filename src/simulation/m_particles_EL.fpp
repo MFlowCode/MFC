@@ -812,8 +812,8 @@ contains
             ! with contacts the mirror force pushes the particle back, which needs overlap, so only mirror a crossed center
             wall_offset = merge(0._wp, particle_rad(k), particle_params%coupling == coupling_four_way)
             do dir = 1, num_dims
-                if (particle_params%coupling == coupling_four_way) &
-                    & call s_reflect_lag_entity_at_wall(dir, particle_pos(k, dir, 2), particle_vel(k, dir, 2))
+                if (particle_params%coupling == coupling_four_way) call s_reflect_lag_entity_at_wall(dir, particle_pos(k, dir, &
+                    & 2), particle_vel(k, dir, 2))
                 call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), wall_offset, keep, &
                                                   & wrap_loc)
                 ! a periodic face this rank spans alone: move the particle to the opposite side on both time levels

@@ -47,7 +47,7 @@ contains
         ! one lookup sized for the larger of the IB and EL pair counts; EL allows 12 contacts per particle (3D close packing)
         max_collisions = 0
         if (ib) max_collisions = num_local_ibs_max*27*8
-        if (particles_lagrange) max_collisions = max(max_collisions, 12*particle_params%nparticles_glb)
+        if (particles_lagrange) max_collisions = max(max_collisions, 12*min(particle_params%nparticles_glb, max_particles_per_rank))
         if (max_collisions > 0) then
             @:ALLOCATE(collision_lookup(max_collisions, 4))
             collision_lookup = 0
