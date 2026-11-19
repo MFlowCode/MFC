@@ -129,7 +129,8 @@ Full descriptions: @ref case.
 "amr_max_grid_size": 32,
 ```
 
-See `examples/2D_amr_droplet` for a complete case.
+Complete cases: `examples/2D_amr_droplet` (a tracked interface), `examples/2D_amr_blast_multilevel` (two refined
+levels), `examples/2D_amr_ibm_cylinder` (an immersed body) and `examples/3D_amr_blast` (3D, subcycled).
 
 ## Limitations {#amr-limitations}
 
