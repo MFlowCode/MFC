@@ -914,6 +914,12 @@ can go once CI no longer uses 24.3.
 Every entry here was measured. They share a failure mode: the build stays green and the
 answer is wrong, or one backend diverges from all the others.
 
+- **Push a new value of a `GPU_DECLARE` module variable with `GPU_UPDATE`, never `GPU_ENTER_DATA(copyin=...)`.**
+  A static (non-allocatable) declared variable is always present on the device with an infinite
+  reference count, so on AMD flang `enter data map(to:)` copies nothing and kernels read the old value
+  (often 0). Cray and NVHPC copy anyway, so only AMD is wrong. This was the "amdflang reads `Re_size`
+  stale" bug (ROCm/llvm-project#2890, closed as conformant); `GPU_UPDATE(device=...)` is the fix,
+  and no host copy is needed.
 - **Do not wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops.** `GPU_LOOP` emits empty
   directives on Cray and AMD, so the loop runs serially with no diagnostic. Spatial loops
   always use `GPU_PARALLEL_LOOP` / `END_GPU_PARALLEL_LOOP`.
