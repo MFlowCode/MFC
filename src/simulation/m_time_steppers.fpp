@@ -36,6 +36,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_advance, only: s_amr_fine_stage_ib
     use m_amr_registers, only: s_amr_set_rk_table
 
     implicit none
@@ -524,16 +525,18 @@ contains
 
             if (s == 1 .and. bodyForces) call s_update_mean_sources(q_cons_ts(1)%vf, q_T_sf, t_step)
 
-            ! AMR: move the bodies before the fine stage, so its IB rebuild and correction use this stage's pose, as the coarse
-            ! ones do; the fine containment check reads the pose and rotation on the host
+            ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
+            if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
+                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
+            ! AMR: move the bodies once the fine frames have added their faces to this stage's forces, then run the fine IB
+            ! rebuild and correction the fine stage left waiting, at this stage's pose as the coarse ones are; the fine
+            ! containment check reads the pose and rotation on the host
             if (amr .and. moving_immersed_boundary_flag) then
                 call s_advance_ib_pose(s, t_step)
                 call s_update_ib_rotation_matrices(num_ibs)
                 $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+                call s_amr_fine_stage_ib(pb_ts(1)%sf, mv_ts(1)%sf)
             end if
-            ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
-            if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
-                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
             if (bubbles_lagrange .and. .not. adap_dt) then
                 call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
                 if (s == time_stepper) call s_write_lag_step_output()
