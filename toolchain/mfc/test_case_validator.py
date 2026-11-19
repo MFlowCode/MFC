@@ -571,7 +571,8 @@ class TestAmrDefaults(unittest.TestCase):
     def test_tag_var(self):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")
-        for bad, msg in (({"amr_tag_var": 4}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T")):
+        validate_case_constraints({**self.AMR, "amr_tag_var": 4}, "simulation")
+        for bad, msg in (({"amr_tag_var": 5}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T"), ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2")):
             with self.assertRaises(CaseConstraintError) as ctx:
                 validate_case_constraints({**self.AMR, **bad}, "simulation")
             self.assertIn(msg, str(ctx.exception))
