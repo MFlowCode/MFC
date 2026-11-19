@@ -139,8 +139,9 @@ See `examples/2D_amr_droplet` for a complete case.
   more ranks than wrote the checkpoint. The serial format needs the rank count that wrote it.
   The file header records `amr_ref_ratio`, `amr_max_level` and the storage precision, which must match (the level count may
   only grow); a missing fine-level file aborts the restart.
-- **Nesting.** A level-2 block must lie inside one level-1 block; the run aborts otherwise (reduce
-  `amr_max_grid_size`).
+- **Nesting.** A level-2 or deeper block lies inside one block of the level above; regrid builds each block's children
+  inside it, a few coarse cells from its edge. Where a feature crosses the seam between two parent blocks, a strip that
+  wide on each side of the seam stays at the parent's resolution. A larger `amr_max_grid_size` gives fewer seams.
 - **Regrid.** When no cell is tagged, regrid replaces the hierarchy with one small dormant level-1 block (one coarse cell
   at the domain center, padded by `amr_buf`), since the solver needs at least one block. At every level, the part of a
   new block that an old block of the same level covered keeps the old data; the rest is prolonged from the parent.
