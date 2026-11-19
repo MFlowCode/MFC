@@ -283,7 +283,7 @@ contains
         real(wp), dimension(3), intent(out) :: force_1
         real(wp), dimension(3), intent(in), optional :: angular_vel_1, angular_vel_2
         real(wp), dimension(3), intent(out), optional :: torque_1, torque_2
-        real(wp) :: overlap_distance
+        real(wp) :: overlap_distance, center_distance
         real(wp), dimension(3) :: normal_vector
         real(wp), dimension(3) :: normal_velocity, tangential_vector, normal_force, tangential_force, radial_vector, &
              & rotation_velocity, vel1, vel2
@@ -293,10 +293,12 @@ contains
         if (present(torque_1)) torque_1 = 0._wp
         if (present(torque_2)) torque_2 = 0._wp
 
-        ! the caller guarantees overlap_distance > 0
+        ! the caller guarantees overlap_distance > 0; coincident centers have no contact direction
         normal_vector = pos_2 - pos_1
-        overlap_distance = radius_1 + radius_2 - norm2(normal_vector)
-        normal_vector = normal_vector/norm2(normal_vector)
+        center_distance = norm2(normal_vector)
+        if (center_distance < sgm_eps) return
+        overlap_distance = radius_1 + radius_2 - center_distance
+        normal_vector = normal_vector/center_distance
 
         ! compute constants of the collision
         effective_mass = 1.0_wp/((1.0_wp/mass_1) + (1._wp/mass_2))
