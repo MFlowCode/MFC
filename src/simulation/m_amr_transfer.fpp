@@ -328,8 +328,8 @@ contains
         if (amr_rank_owns_block) then
             amr_isect_lo = lo; amr_isect_hi = hi
             if (amr_block_level(amr_cur) >= 2) then
-                ! multi-level: footprint in the parent block's fine frame (parent-fine index of L0 cell c is rr*(c - parent lo)),
-                ! as s_amr_parent_foot derives it. rr is the global amr_ref_ratio: amr_slots(pblk) may be unallocated here
+                ! multi-level: footprint in the parent block's fine frame (parent-fine index of L0 cell c is
+                ! amr_ref_ratio**(parent level)*(c - parent lo)), from replicated metadata: amr_slots(pblk) may be unallocated here
                 pblk = f_amr_parent_block(amr_cur)
                 call s_amr_parent_foot(amr_cur, pblk, amr_isect_lo, amr_isect_hi)
             end if
