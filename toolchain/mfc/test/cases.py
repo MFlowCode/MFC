@@ -6437,6 +6437,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))
         stack.pop()
 
+        # Three levels in 2D (the 1D test above is the only other one): 128x64 with amr_buf = 8 leaves level-2 boxes wide
+        # enough to nest a third level; the 64x32 base stops at level 2. dt: the level-3 cells are 8x finer than level 0.
+        three_2d = {"m": 127, "n": 63, "dt": 2.5e-5, "amr_block_beg(1)": 32, "amr_block_end(1)": 95, "amr_block_beg(2)": 16, "amr_block_end(2)": 47}
+        three_2d.update({"amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 8, "amr_max_level": 3, "amr_max_blocks": 64})
+        stack.push("AMR -> 2D -> three levels", {**amr_2d_base, **three_2d})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        stack.pop()
+
     amr_golden_tests()
 
     def diagnostic_writer_tests():
