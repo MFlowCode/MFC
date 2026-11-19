@@ -314,9 +314,9 @@ contains
         call s_phase_tic(PH_RG_CLUS)
         call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes)
         call s_phase_toc(PH_RG_CLUS)
-        if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
+        if (nboxes == 0) call s_amr_regrid_dormant_seed(boxes, nboxes)  ! nothing tagged: retract to one small block
         call s_amr_regrid_shape_boxes(boxes, nboxes)
-        if (nboxes == 0) return  ! every box was confined to the domain margin
+        if (nboxes == 0) return  ! every box was confined to the domain margin; keep the current blocks
         call s_phase_tic(PH_RG_CLUS)
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
         if (amr_snap > 0) call s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
@@ -400,6 +400,20 @@ contains
         deallocate (tags)
 
     end subroutine s_amr_regrid_cluster_tags
+
+    !> One coarse cell at the domain center, which shaping pads into the dormant block that replaces the hierarchy.
+    impure subroutine s_amr_regrid_dormant_seed(boxes, nboxes)
+
+        type(t_box), allocatable, intent(inout) :: boxes(:)
+        integer, intent(out)                    :: nboxes
+
+        if (allocated(boxes)) deallocate (boxes)
+        allocate (boxes(1))
+        boxes(1)%lo = merge([m_glb, n_glb, p_glb]/2, 0, amr_dim)
+        boxes(1)%hi = boxes(1)%lo
+        nboxes = 1
+
+    end subroutine s_amr_regrid_dormant_seed
 
     !> True iff two same-level blocks can coexist: disjoint, and either >= 2 empty coarse cells apart or face-adjacent with an exact
     !! transverse match. Mirrors s_amr_check_seam_topology.

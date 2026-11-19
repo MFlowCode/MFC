@@ -246,10 +246,10 @@ contains
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
-        ! GPU routines require updated cell centers
-        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, dx, dy, ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end]')
+        ! GPU routines require updated cell centers and boundaries
+        $:GPU_UPDATE(device='[num_ibs, num_gbl_ibs, x_cc, y_cc, x_cb, y_cb, dx, dy, ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end]')
         if (p /= 0) then
-            $:GPU_UPDATE(device='[z_cc, dz, ib_bc_z%beg, ib_bc_z%end]')
+            $:GPU_UPDATE(device='[z_cc, z_cb, dz, ib_bc_z%beg, ib_bc_z%end]')
         end if
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs), glb_bounds]')
 
@@ -2085,58 +2085,56 @@ contains
     !! bracketing cell at integer offsets, which keeps the partition of unity exactly on a stretched grid. The stencil is kept
     !! inside the halo. Solid cells in it carry the ghost values of the last correction (see ib_keep_ghost); a point buried in a
     !! body has no fluid weight.
-    subroutine s_tsc_weights(markers, loc, ic, wd, fluid_frac)
+    subroutine s_tsc_weights(markers, loc, stencil_center, axis_weights, fluid_frac)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(integer_field), intent(in) :: markers    !< ib_markers, passed so the device routine reads the caller's present copy
+        type(integer_field), intent(in) :: markers  !< ib_markers, passed so the device routine reads the caller's present copy
         real(wp), dimension(3), intent(in) :: loc
-        integer, dimension(3), intent(out) :: ic      !< Cell centring the stencil
-        real(wp), dimension(3, 3), intent(out) :: wd  !< 1D weights on ic - 1, ic, ic + 1, per direction
-        real(wp), intent(out) :: fluid_frac
-        real(wp) :: ds, frac, wsum, wfluid, buf
-        integer :: dim, ii, jj, kk
+        integer, dimension(3), intent(out) :: stencil_center  !< Cell nearest to loc, centring the stencil
+        real(wp), dimension(3, 3), intent(out) :: axis_weights  !< 1D weights on stencil_center - 1, +0, +1, per direction
+        real(wp), intent(out) :: fluid_frac  !< Fraction of the stencil weight on fluid cells
+        integer, dimension(3) :: containing_cell  !< Cell whose boundaries hold loc
+        real(wp), dimension(3) :: cell_coord  !< Computational coordinates from s_locate_cell (unused)
+        real(wp) :: cell_offset  !< Offset of loc from the stencil's centre cell, in center-to-center spacings
+        real(wp) :: weight_sum, fluid_weight, cell_weight
+        integer :: ii, jj, kk
 
-        ic = 0
-        wd = 0._wp
-        do dim = 1, merge(3, 2, p /= 0)
-            if (dim == 1) then
-                ic(1) = max(min(floor((loc(1) - x_cc(0))/(x_cc(1) - x_cc(0))), m + buff_size - 2), -buff_size + 2)
-                ! the estimate assumes a uniform grid: one step brackets the point on a mildly stretched one
-                if (loc(1) < x_cc(ic(1))) ic(1) = max(ic(1) - 1, -buff_size + 2)
-                if (loc(1) >= x_cc(ic(1) + 1)) ic(1) = min(ic(1) + 1, m + buff_size - 2)
-                ds = x_cc(ic(1) + 1) - x_cc(ic(1)); frac = (loc(1) - x_cc(ic(1)))/ds
-            else if (dim == 2) then
-                ic(2) = max(min(floor((loc(2) - y_cc(0))/(y_cc(1) - y_cc(0))), n + buff_size - 2), -buff_size + 2)
-                if (loc(2) < y_cc(ic(2))) ic(2) = max(ic(2) - 1, -buff_size + 2)
-                if (loc(2) >= y_cc(ic(2) + 1)) ic(2) = min(ic(2) + 1, n + buff_size - 2)
-                ds = y_cc(ic(2) + 1) - y_cc(ic(2)); frac = (loc(2) - y_cc(ic(2)))/ds
-            else
-                ic(3) = max(min(floor((loc(3) - z_cc(0))/(z_cc(1) - z_cc(0))), p + buff_size - 2), -buff_size + 2)
-                if (loc(3) < z_cc(ic(3))) ic(3) = max(ic(3) - 1, -buff_size + 2)
-                if (loc(3) >= z_cc(ic(3) + 1)) ic(3) = min(ic(3) + 1, p + buff_size - 2)
-                ds = z_cc(ic(3) + 1) - z_cc(ic(3)); frac = (loc(3) - z_cc(ic(3)))/ds
+        stencil_center = 0
+        axis_weights = 0._wp
+        ! Binary search, so the lookup holds on any stretched grid
+        call s_locate_cell(loc, containing_cell, cell_coord)
+        #:for D, CC, N in [(1, 'x_cc', 'm'), (2, 'y_cc', 'n'), (3, 'z_cc', 'p')]
+            if (${D}$ < 3 .or. num_dims == 3) then
+                ! Lower of the two cell centres bracketing loc, kept inside the halo
+                stencil_center(${D}$) = containing_cell(${D}$)
+                if (loc(${D}$) < ${CC}$(stencil_center(${D}$))) stencil_center(${D}$) = stencil_center(${D}$) - 1
+                stencil_center(${D}$) = max(min(stencil_center(${D}$), ${N}$ + buff_size - 2), -buff_size + 2)
+                cell_offset = (loc(${D}$) - ${CC}$(stencil_center(${D}$)))/(${CC}$(stencil_center(${D}$) + 1) &
+                               & - ${CC}$(stencil_center(${D}$)))
+                ! Centre the stencil on the nearer of the two
+                if (cell_offset > 0.5_wp) then
+                    stencil_center(${D}$) = stencil_center(${D}$) + 1
+                    cell_offset = cell_offset - 1._wp
+                end if
+                axis_weights(1, ${D}$) = 0.5_wp*(1.5_wp - abs(cell_offset + 1._wp))**2
+                axis_weights(2, ${D}$) = 0.75_wp - cell_offset*cell_offset
+                axis_weights(3, ${D}$) = 0.5_wp*(1.5_wp - abs(cell_offset - 1._wp))**2
             end if
-            if (frac > 0.5_wp) then
-                ic(dim) = ic(dim) + 1
-                frac = frac - 1._wp
-            end if
-            wd(1, dim) = 0.5_wp*(1.5_wp - abs(frac + 1._wp))**2
-            wd(2, dim) = 0.75_wp - frac*frac
-            wd(3, dim) = 0.5_wp*(1.5_wp - abs(frac - 1._wp))**2
-        end do
-        if (p == 0) wd(1, 3) = 1._wp  ! 2D: the consumers index this slot as k - k1 + 1 = 1
+        #:endfor
+        if (p == 0) axis_weights(1, 3) = 1._wp  ! 2D: the consumers index this slot as k - k1 + 1 = 1
 
-        wsum = 0._wp; wfluid = 0._wp
+        weight_sum = 0._wp; fluid_weight = 0._wp
         do ii = 1, 3
             do jj = 1, 3
                 do kk = 1, merge(3, 1, p /= 0)
-                    buf = wd(ii, 1)*wd(jj, 2)*wd(kk, 3)
-                    wsum = wsum + buf
-                    if (markers%sf(ic(1) + ii - 2, ic(2) + jj - 2, ic(3) + (kk - 2)*min(p, 1)) == 0) wfluid = wfluid + buf
+                    cell_weight = axis_weights(ii, 1)*axis_weights(jj, 2)*axis_weights(kk, 3)
+                    weight_sum = weight_sum + cell_weight
+                    if (markers%sf(stencil_center(1) + ii - 2, stencil_center(2) + jj - 2, stencil_center(3) + (kk - 2)*min(p, &
+                        & 1)) == 0) fluid_weight = fluid_weight + cell_weight
                 end do
             end do
         end do
-        fluid_frac = wfluid/wsum
+        fluid_frac = fluid_weight/weight_sum
 
     end subroutine s_tsc_weights
 
@@ -2190,39 +2188,45 @@ contains
     !!     phi_g = L0 phi_w + L1 phi_1 + L2 phi_2
     !!     L0 = (d + s1)(d + s2)/(s1 s2),  L1 = -d (d + s2)/(s1 (s2 - s1)),  L2 = d (d + s1)/(s2 (s2 - s1))
     !!
-    !! L0 + L1 + L2 = 1 and at d = 0 they reduce to (1, 0, 0), so the wall value is exact on the wall. s1 = max(h, d) bounds the
-    !! weights by (3, -3, 1) at any ghost depth. Tier 1 uses both probes; tier 2 is the linear mirror where the outer probe has too
-    !! little fluid around it (a narrow gap, a rim, a neighbouring body); tier 3 leaves the default treatment.
+    !! (d = ghost_depth, s1 = probe1_dist, s2 = probe2_dist below.) L0 + L1 + L2 = 1 and at d = 0 they reduce to (1, 0, 0), so the
+    !! wall value is exact on the wall. s1 = max(h, d) bounds the weights by (3, -3, 1) at any ghost depth. Tier 1 uses both probes;
+    !! tier 2 is the linear mirror where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body);
+    !! tier 3 leaves the default treatment.
     subroutine s_wall_fill(gp, wf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(ghost_point), intent(in) :: gp
         type(wall_fill), intent(out)  :: wf
         real(wp), parameter           :: FLUID_FRAC_MIN = 0.5_wp  !< A probe needs this much fluid weight to be used
-        real(wp), dimension(3)        :: norm, wall_loc
-        real(wp)                      :: d, s1, s2, f1, f2, dV
+        real(wp), dimension(3)        :: wall_normal, wall_loc  !< Unit outward normal, and the surface point nearest the ghost
+        real(wp)                      :: ghost_depth  !< Distance from the ghost cell centre to the surface
+        real(wp)                      :: probe1_dist, probe2_dist  !< Distances of the probes from the wall along wall_normal
+        real(wp)                      :: probe1_fluid_frac, probe2_fluid_frac  !< Fraction of each probe's TSC weight on fluid cells
+        real(wp)                      :: cell_vol
 
-        dV = dx(gp%loc(1))*dy(gp%loc(2))
-        if (p > 0) dV = dV*dz(gp%loc(3))
-        d = abs(real(gp%levelset, kind=wp))
-        s1 = max(dV**(1._wp/real(num_dims, wp)), d)
-        s2 = 2._wp*s1
+        cell_vol = dx(gp%loc(1))*dy(gp%loc(2))
+        if (p > 0) cell_vol = cell_vol*dz(gp%loc(3))
+        ghost_depth = abs(real(gp%levelset, kind=wp))
+        probe1_dist = max(cell_vol**(1._wp/real(num_dims, wp)), ghost_depth)
+        probe2_dist = 2._wp*probe1_dist
 
-        norm = gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
+        wall_normal = gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
         wall_loc = 0._wp
         wall_loc(1) = x_cc(gp%loc(1)); wall_loc(2) = y_cc(gp%loc(2))
         if (p > 0) wall_loc(3) = z_cc(gp%loc(3))
-        wall_loc = wall_loc + d*norm
-        call s_tsc_weights(ib_markers, wall_loc + s1*norm, wf%ic1, wf%wd1, f1)
-        call s_tsc_weights(ib_markers, wall_loc + s2*norm, wf%ic2, wf%wd2, f2)
+        wall_loc = wall_loc + ghost_depth*wall_normal
+        call s_tsc_weights(ib_markers, wall_loc + probe1_dist*wall_normal, wf%ic1, wf%wd1, probe1_fluid_frac)
+        call s_tsc_weights(ib_markers, wall_loc + probe2_dist*wall_normal, wf%ic2, wf%wd2, probe2_fluid_frac)
 
-        wf%llin = [1._wp + d/s1, -d/s1]
+        wf%llin = [1._wp + ghost_depth/probe1_dist, -ghost_depth/probe1_dist]
         wf%lw = [wf%llin(1), wf%llin(2), 0._wp]
         wf%tier = 3
-        if (f1 < FLUID_FRAC_MIN) return
+        if (probe1_fluid_frac < FLUID_FRAC_MIN) return
         wf%tier = 2
-        if (f2 < FLUID_FRAC_MIN) return
-        wf%lw = [(d + s1)*(d + s2)/(s1*s2), -d*(d + s2)/(s1*(s2 - s1)), d*(d + s1)/(s2*(s2 - s1))]
+        if (probe2_fluid_frac < FLUID_FRAC_MIN) return
+        wf%lw = [(ghost_depth + probe1_dist)*(ghost_depth + probe2_dist)/(probe1_dist*probe2_dist), &
+                  & -ghost_depth*(ghost_depth + probe2_dist)/(probe1_dist*(probe2_dist - probe1_dist)), &
+                  & ghost_depth*(ghost_depth + probe1_dist)/(probe2_dist*(probe2_dist - probe1_dist))]
         wf%tier = 1
 
     end subroutine s_wall_fill

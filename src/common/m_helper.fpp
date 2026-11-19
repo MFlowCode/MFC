@@ -21,7 +21,7 @@ module m_helper
         & s_simpson, s_transcoeff, s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, &
         & f_create_transform_matrix, f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, &
         & double_factorial, factorial, f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, &
-        & s_prng, modmul, s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, f_finite_vec
+        & s_prng, modmul, s_prng_splitmix32, f_local_rank_owns_location, s_locate_cell, s_sort_int_key_value, f_finite_vec
 
 contains
 
@@ -812,6 +812,39 @@ contains
 #endif
 
     end function f_local_rank_owns_location
+
+    !> Locate the cell holding pos by bisection on the cell boundaries, and its computational coordinates scoord (cell index plus
+    !! the fraction of the cell width). Positions beyond the buffer region clamp to its edge cell.
+    subroutine s_locate_cell(pos, cell, scoord)
+
+        $:GPU_ROUTINE(function_name='s_locate_cell',parallelism='[seq]', cray_inline=True)
+
+        real(wp), dimension(3), intent(in)  :: pos
+        real(wp), dimension(3), intent(out) :: scoord
+        integer, dimension(3), intent(out)  :: cell
+        integer                             :: lo, hi, mid
+
+        cell(3) = 0
+        scoord(3) = 0._wp
+        #:for D, CB, N in [(1, 'x_cb', 'm'), (2, 'y_cb', 'n'), (3, 'z_cb', 'p')]
+            if (${D}$ < 3 .or. num_dims == 3) then
+                ! Smallest cell in the buffered range whose right boundary exceeds pos
+                lo = -buff_size; hi = ${N}$ + buff_size
+                do while (lo < hi)
+                    mid = lo + (hi - lo)/2
+                    if (pos(${D}$) >= ${CB}$(mid)) then
+                        lo = mid + 1
+                    else
+                        hi = mid
+                    end if
+                end do
+                cell(${D}$) = lo
+                ! Cell 0 starts at the domain boundary, so the center of cell i is at scoord = i + 1/2
+                scoord(${D}$) = cell(${D}$) + (pos(${D}$) - ${CB}$(cell(${D}$) - 1))/(${CB}$(cell(${D}$)) - ${CB}$(cell(${D}$) - 1))
+            end if
+        #:endfor
+
+    end subroutine s_locate_cell
 
     !> One IB's restart_data/ib_state record; see ib_state_nfields for the layout.
     pure subroutine s_pack_ib_state(ib_patch, time, buf, mass_bank)

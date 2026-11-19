@@ -52,18 +52,12 @@ case "$cluster" in
     phoenix)
         compiler_flag="p"
         job_prefix="shb"
-        # Benchmarks stay on the free, preemptible 'embers' QOS: they run on
-        # every PR and most are superseded before they start. Tests and case
-        # optimization run on master (or by label) only; under 'embers' they
-        # queued 11-12 h behind every charged job and could be preempted
-        # mid-run, so they use the charged 'inferno' QOS.
-        if [ "$job_type" = "bench" ]; then
-            account="gts-sbryngelson3"
-            qos="embers"
-        else
-            account="gts-coc-coda20"
-            qos="inferno"
-        fi
+        # Every job type uses the charged 'inferno' QOS. Under the free,
+        # preemptible 'embers' QOS jobs queued for hours behind every charged
+        # job and could be preempted mid-run; benchmarks were the last to move
+        # and were the check that kept finished PRs waiting.
+        account="gts-coc-coda20"
+        qos="inferno"
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
         # Combined build+test needs build headroom on top of the test budget;
