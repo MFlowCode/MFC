@@ -663,14 +663,15 @@ contains
         if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
 
         if (ib) then
+            ! Before the handoff: ib_heat and ib_shell are indexed by the patch_ib slots the stages used
+            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
+            if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
             if (moving_immersed_boundary_flag) then
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
             else if (ib_state_wrt) then
                 call s_compute_ib_forces()
             end if
-            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
-            if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
         end if
 
         ! Adaptive dt: final stage
