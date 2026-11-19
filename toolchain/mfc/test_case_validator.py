@@ -568,6 +568,14 @@ class TestAmrDefaults(unittest.TestCase):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
 
+    def test_tag_var(self):
+        validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
+        validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")
+        for bad, msg in (({"amr_tag_var": 4}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T")):
+            with self.assertRaises(CaseConstraintError) as ctx:
+                validate_case_constraints({**self.AMR, **bad}, "simulation")
+            self.assertIn(msg, str(ctx.exception))
+
     def test_subcycle_needs_a_step_start_state(self):
         sub = {**self.AMR, "amr_subcycle": "T"}
         validate_case_constraints({**sub, "time_stepper": 2}, "simulation")
