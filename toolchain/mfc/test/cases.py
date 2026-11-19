@@ -1582,6 +1582,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_ib(1)%slip": "T",
                         "patch_ib(1)%moving_ibm": 0,
                     },
+                    # the shell mass is summed in 32 partial sums: round-off moves the result by about 1e-10 between platforms
+                    override_tol=1e-8,
                 )
             )
 
