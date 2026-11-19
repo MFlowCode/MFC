@@ -3517,6 +3517,13 @@ contains
                     call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
                                     & ierr)
                     call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j, num_ibs_pre)
+                    ! A rank filling several table slots (periodicity, few ranks) sends each arrival once per slot, and the map
+                    ! holds only the num_ibs_pre older entries: look among this call's arrivals too
+                    if (j < 0) then
+                        do k = num_ibs_pre + 1, num_ibs
+                            if (patch_ib(k)%gbl_patch_id == tmp_patch%gbl_patch_id) j = k
+                        end do
+                    end if
                     if (j < 0) then
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
@@ -3528,6 +3535,7 @@ contains
                 end do
             end do
 
+            @:PROHIBIT(num_ibs > num_gbl_ibs, "IB handoff duplicated a patch: num_ibs exceeds num_gbl_ibs.")
             deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
             $:GPU_UPDATE(device='[patch_ib, num_ibs]')
             call s_merge_ib_lookup(num_ibs_pre)
