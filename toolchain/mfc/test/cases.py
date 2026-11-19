@@ -6347,6 +6347,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 128}))
         stack.pop()
 
+        # 3D paths the list above leaves out: the rank seam under regrid, the subcycled registers, and a two-level hierarchy
+        # through a restart.
+        amr_3d_regrid = {**amr_3d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "amr_max_blocks": 16, "amr_max_grid_size": 13}
+        stack.push("AMR -> 3D -> dynamic regrid", amr_3d_regrid)
+        # m = 51: a 26-cell axis split over two ranks is below the WENO5 floor
+        cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 51}, ppn=2))
+        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
+        stack.pop()
+        stack.push("AMR -> 3D -> multi-level static", {**amr_3d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))
+        stack.pop()
+
     amr_golden_tests()
 
     def diagnostic_writer_tests():
