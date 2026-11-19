@@ -1531,6 +1531,8 @@ contains
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
                                             & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0)
 
+        call s_resolve_ib_mass_relax()
+
         allocate (namelist_ibs(num_ibs))
         namelist_ibs(:) = patch_ib(1:num_ibs)
         num_gbl_ibs = num_ibs + sum(particle_cloud(1:num_particle_clouds)%num_particles)
@@ -1613,6 +1615,22 @@ contains
         end if
 
     end subroutine s_read_ib_restart_data
+
+    !> ib_mass_relax = -1 (default): N = 30 for a moving body, else 0 (a fixed body leaks little, and the slip-wall N = 1 costs too
+    !! much on some GPUs to be a default). It is 0 wherever an explicit value is refused (amr, cyl_coord, igr, bubbles, model_eqns
+    !! /= 2, a blowing body), with a surface reaction (ib_flux_wall conserves there), and with hypoelasticity or mhd (their extra
+    !! variables are not scaled), so the default never invalidates a case. Explicit values are unchanged. Called while patch_ib
+    !! still holds the case-file patches (particle-cloud bodies carry no blowing or reaction), so every rank resolves alike.
+    impure subroutine s_resolve_ib_mass_relax()
+
+        if (ib_mass_relax >= 0) return
+        ib_mass_relax = 0
+        if (amr .or. cyl_coord .or. igr .or. bubbles_euler .or. model_eqns /= 2 .or. hypoelasticity .or. mhd) return
+        if (any(patch_ib(1:num_ibs)%v_blow > 0._wp) .or. any(patch_ib(1:num_ibs)%inj_species > 0)) return
+        if (any(patch_ib(1:num_ibs)%surface_reaction /= 0)) return
+        if (moving_immersed_boundary_flag) ib_mass_relax = 30
+
+    end subroutine s_resolve_ib_mass_relax
 
     !> @brief Completes this rank's IB neighborhood once s_read_ib_restart_data has loaded only the IBs it owns: every rank sends
     !! its own IBs to, and receives the owned IBs of, each distinct rank in ib_neighbor_ranks, appending them to patch_ib after its

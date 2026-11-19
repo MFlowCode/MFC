@@ -689,7 +689,7 @@ contains
         ib_slip_ccst = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
-        ib_mass_relax = 0
+        ib_mass_relax = -1
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
         ib_uncover_fill = .false.
