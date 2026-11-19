@@ -661,6 +661,7 @@ contains
         amr_regrid_int = 0
         amr_tag_eps = 0.1_wp
         amr_tag_abs = .false.
+        amr_tag_var = 1
         amr_place_owner = .false.
         amr_buf = 3
         amr_snap = 0

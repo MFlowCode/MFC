@@ -6363,6 +6363,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 128}))
         stack.pop()
 
+        # amr_tag_var: features with no density jump, which the default density tagger cannot see. Uniform density and
+        # pressure in both; the blocks must leave the initial block and follow the feature.
+        uniform = {f"patch_icpp({i})%pres": 1.0 for i in (1, 2, 3)}
+        tag_regrid = {"amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2}
+        # density-matched two-fluid interface at x = 0.5, advected at u = 0.5: tagged on the volume fraction
+        matched = {"num_fluids": 2, "mpp_lim": "T", "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00), "fluid_pp(2)%pi_inf": 0.0}
+        matched.update({"patch_icpp(2)%x_centroid": 0.3, "patch_icpp(2)%length_x": 0.4, "patch_icpp(3)%x_centroid": 0.75, "patch_icpp(3)%length_x": 0.5})
+        for i, a1 in ((1, 1.0 - 1.0e-6), (2, 1.0 - 1.0e-6), (3, 1.0e-6)):
+            matched.update({f"patch_icpp({i})%vel(1)": 0.5, f"patch_icpp({i})%alpha(1)": a1, f"patch_icpp({i})%alpha(2)": 1.0 - a1})
+            matched.update({f"patch_icpp({i})%alpha_rho(1)": a1, f"patch_icpp({i})%alpha_rho(2)": 1.0 - a1})
+        stack.push("AMR -> 1D -> tag volume fraction", {**amr_1d_base, **uniform, **tag_regrid, **matched, "amr_tag_var": 2})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        # shear layers at x = 0.1 and 0.8 (a jump in the transverse velocity only), outside the initial block: tagged on the speed
+        shear = {f"patch_icpp({i})%alpha_rho(1)": 1.0 for i in (1, 2, 3)}
+        shear.update({"patch_icpp(2)%vel(2)": 0.5, "amr_tag_abs": "T", "amr_tag_var": 3})
+        stack.push("AMR -> 2D -> tag velocity", {**amr_2d_base, **uniform, **tag_regrid, **shear})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}))
+        stack.pop()
+
         # 3D paths the list above leaves out: the rank seam under regrid, the subcycled registers, and a two-level hierarchy
         # through a restart.
         amr_3d_regrid = {**amr_3d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "amr_max_blocks": 16, "amr_max_grid_size": 13}
