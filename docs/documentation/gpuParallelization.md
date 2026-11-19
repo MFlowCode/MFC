@@ -905,7 +905,9 @@ while the host still registers it. The first launch aborts with
 
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
 hoist it into its own (module) subroutine with the locals passed as arguments. A minimal
-reproducer runs correctly on AFAR 24.3, but this is not yet verified inside MFC.
+reproducer runs correctly on AFAR 24.3. On AFAR 24.4 an MFC kernel inside a `block` (with a
+`block`-local `firstprivate`) is present in the device image and passes its tests, so the rule
+can go once CI no longer uses 24.3.
 
 ## Silent-Failure Traps {#silent-failure-traps}
 

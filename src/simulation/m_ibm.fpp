@@ -3472,8 +3472,7 @@ contains
         if (num_gps == 0) return
         dcnt = 0
         ng = num_gps
-        $:GPU_PARALLEL_LOOP(private='[a, gid]', copy='[dcnt]', firstprivate='[ng]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a, gid]', copy='[dcnt]', firstprivate='[ng]')
         do a = 1, ng
             gid = patch_ib(ghost_points(a)%ib_patch_id)%gbl_patch_id
             $:GPU_ATOMIC(atomic='update')
@@ -3551,12 +3550,10 @@ contains
         ! ghost_points and gp_park are device-resident and never reallocated after setup. Park the coarse list into gp_park's coarse
         ! segment, then (correct/moving path) pull this slot's fine list in, via on-device kernels; a whole-array GPU_UPDATE of
         ! ghost_points aborts amdflang (per-element custom mapper, ROCm HSA OUT_OF_RESOURCES). On the setup path s_ibm_setup_fine
-        ! fills ghost_points in place. The AMD-only defaultmap(present:allocatable) stops flang from generating that per-element
-        ! mapper (a multi-minute offload-runtime busy-loop) for these device-resident derived-type arrays.
+        ! fills ghost_points in place.
         n_c = num_gps
         @:PROHIBIT(int(n_c, 8) > park_coarse, "AMR fine IB: coarse ghost-point count exceeds the gp_park capacity")
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]')
         do a = 1, n_c
             gp_park(a) = ghost_points(a)
         end do
@@ -3567,8 +3564,7 @@ contains
             n_f = num_gps
             off = ib_fine(islot)%off
             @:PROHIBIT(int(n_f, 8) > ib_fine(islot)%cap, "AMR fine IB: a slot with ghost points has no gp_park segment")
-            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', &
-                                & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]')
             do a = 1, n_f
                 ghost_points(a) = gp_park(off + a)
             end do
@@ -3597,8 +3593,7 @@ contains
         n_f = num_gps
         if (int(n_f, 8) > ib_fine(islot)%cap) call s_ibm_reserve_park(islot, n_f)
         off = ib_fine(islot)%off
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]')
         do a = 1, n_f
             gp_park(off + a) = ghost_points(a)
         end do
@@ -3606,8 +3601,7 @@ contains
         ib_fine(islot)%num_gps = num_gps
         num_gps = num_gps_save
         n_c = num_gps
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]')
         do a = 1, n_c
             ghost_points(a) = gp_park(a)
         end do
@@ -3644,7 +3638,7 @@ contains
     end subroutine s_ibm_reserve_park
 
     !> Rebuild corrected_gps from the ghost-point list now in ghost_points: s_compute_interpolation_coeffs only sets entries, so
-    !! clear the whole field and re-mark the valid ghost points on-device (same defaultmap treatment as the swap kernels).
+    !! clear the whole field and re-mark the valid ghost points on-device.
     impure subroutine s_ibm_rebuild_corrected_gps(n_g)
 
         integer, intent(in) :: n_g
@@ -3659,8 +3653,7 @@ contains
         end do; end do; end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_g]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_g]')
         do a = 1, n_g
             if (ghost_points(a)%interp_valid) then
                 corrected_gps%sf(ghost_points(a)%loc(1), ghost_points(a)%loc(2), ghost_points(a)%loc(3)) = 1
