@@ -3218,8 +3218,8 @@ contains
                             ! if the boundary exited "left", wrap it back around to the "right"
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${DIR}$)%end &
                                      & - glb_bounds(${DIR}$)%beg)
-                        else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${DIR}$)%end) then
-                            ! if the boundary exited "right", wrap it back around to the "left"
+                        else if (patch_ib(patch_id)%${X}$_centroid >= glb_bounds(${DIR}$)%end) then
+                            ! "right": the last rank owns [beg, end), so a centroid on the end belongs to no rank until wrapped
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${DIR}$)%end &
                                      & - glb_bounds(${DIR}$)%beg)
                         end if
