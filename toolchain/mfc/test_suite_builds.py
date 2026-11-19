@@ -10,9 +10,16 @@ the point of the exercise, given the failure it replaces took ~1.5 h to surface 
 lane and pointed at srun rather than at the missing build.
 """
 
+import os
 from pathlib import Path
 
+import pytest
+
 from .lint_test_suite import check_amr_flags_tested, check_no_case_specific_builds
+
+# Both checks materialize every test-suite case (about five minutes), so the pre-commit precheck skips them
+# (MFC_SKIP_SUITE_LINT=1). The Lint Gate job runs them through ./mfc.sh lint.
+pytestmark = pytest.mark.skipif(os.environ.get("MFC_SKIP_SUITE_LINT", "") == "1", reason="MFC_SKIP_SUITE_LINT=1 — skipping the test-suite linters")
 
 
 def test_no_test_suite_case_needs_its_own_build():
