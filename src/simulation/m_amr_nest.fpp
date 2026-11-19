@@ -498,11 +498,14 @@ contains
 
     end subroutine s_amr_tag_child_from_fine
 
-    !> Total density (sum of the continuity variables) at one cell; `_st` reads the flat store, `_sf` the level-0 field.
+    !> The tagged variable at one cell (amr_tag_var): 1 total density (sum of the continuity variables), 2 volume fraction of fluid
+    !! 1, 3 velocity magnitude. `_st` reads the flat store, `_sf` the level-0 field.
     #:for RSFX, RSRC in [('st', 'amr_cons_st'), ('sf', '')]
         #:set RARG = 'loc' if RSRC else 'q'
-        #:set RHO = 'f_amr_rho_tot_' + RSFX
-        pure function f_amr_rho_tot_${RSFX}$(${RARG}$, ci, cj, ck) result(r)
+        #:set RHO = 'f_amr_tag_val_' + RSFX
+        #:set QPRE = 'real(amr_cons_st(ci, cj, ck, ' if RSRC else 'real(q('
+        #:set QPOST = ', loc), wp)' if RSRC else ')%sf(ci, cj, ck), wp)'
+        pure function f_amr_tag_val_${RSFX}$(${RARG}$, ci, cj, ck) result(r)
 
             #:if RSRC
                 integer, intent(in) :: loc  !< flat-store slot
@@ -510,22 +513,29 @@ contains
                 type(scalar_field), dimension(:), intent(in) :: q
             #:endif
             integer, intent(in) :: ci, cj, ck
-            real(wp)            :: r
+            real(wp)            :: r, u2
             integer             :: f
 
             r = 0._wp
+            if (amr_tag_var == 2) then
+                r = ${QPRE}$eqn_idx%adv%beg${QPOST}$
+                return
+            end if
             do f = eqn_idx%cont%beg, eqn_idx%cont%end
-                #:if RSRC
-                    r = r + real(amr_cons_st(ci, cj, ck, f, loc), wp)
-                #:else
-                    r = r + real(q(f)%sf(ci, cj, ck), wp)
-                #:endif
+                r = r + ${QPRE}$f${QPOST}$
             end do
+            if (amr_tag_var == 3) then
+                u2 = 0._wp
+                do f = eqn_idx%mom%beg, eqn_idx%mom%end
+                    u2 = u2 + ${QPRE}$f${QPOST}$**2
+                end do
+                r = sqrt(u2)/max(r, 1.e-30_wp)
+            end if
 
-        end function f_amr_rho_tot_${RSFX}$
+        end function f_amr_tag_val_${RSFX}$
 
-        !> Density-gradient tag indicator at one cell, max over the active dimensions. `_st` clamps the stencil to the block
-        !! (fm1:fm3 = block extents) since its ghosts are stale; `_sf` reads the level-0 halo.
+        !> Tag indicator (jump of the amr_tag_var variable) at one cell, max over the active dimensions. `_st` clamps the stencil to
+        !! the block (fm1:fm3 = block extents) since its ghosts are stale; `_sf` reads the level-0 halo.
         pure function f_amr_tag_grad_${RSFX}$(${RARG}$, ci, cj, ck${', fm1, fm2, fm3' if RSRC else ''}$) result(g)
 
             #:if RSRC
@@ -549,7 +559,7 @@ contains
         end function f_amr_tag_grad_${RSFX}$
     #:endfor
 
-    !> Tag indicator from the densities at i+1, i, i-1: central difference over 2*rho_i, or with amr_tag_abs the larger absolute
+    !> Tag indicator from the tagged variable at i+1, i, i-1: central difference over 2*r_i, or with amr_tag_abs the larger absolute
     !! face jump.
     pure real(wp) function f_amr_tag_ind(rp, r0, rm) result(v)
         real(wp), intent(in) :: rp, r0, rm

@@ -2368,6 +2368,12 @@ class CaseValidator:
             (amr_regrid_int or 0) > 0 and amr_tag_eps is not None and amr_tag_eps <= 0,
             "amr_tag_eps must be > 0 when amr_regrid_int > 0",
         )
+        amr_tag_var = self.get("amr_tag_var", 1)
+        self.prohibit(amr_tag_var not in (1, 2, 3), "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1) or 3 (velocity magnitude)")
+        self.prohibit(
+            amr_tag_var == 3 and self.get("amr_tag_abs", "F") != "T",
+            "amr_tag_var = 3 (velocity magnitude) requires amr_tag_abs = T: a relative jump is undefined where the fluid is at rest",
+        )
         self.prohibit(
             (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,
             "amr_buf must be >= 1 when amr_regrid_int > 0",
