@@ -1011,6 +1011,9 @@ contains
             end if
             call s_build_ib_neighborhood()
             call s_ibm_setup()
+            ! the wall conduction temperature of the last stage, which the saved state cannot reproduce
+            if (chemistry .and. chem_params%diffusion .and. merge(n_start, t_step_start, &
+                & cfl_dt) > 0) call s_read_ib_conduction_temperature(merge(n_start, t_step_start, cfl_dt))
             ! resolve the body on each fine block from the geometry
             if (amr) call s_amr_setup_ib()
             ! a CFL-mode run keeps t_step_start = 0, so only n_start tells a restart apart

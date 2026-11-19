@@ -4681,13 +4681,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
     # Two saves: the restart check restarts from the first and compares with the straight run, Twall included. Diffusion is off
-    # because the wall conduction temperature (ghost_point%T_cond) is not checkpointed: the first stage after a restart conducts
-    # through the ghost's own temperature.
+    # here and on in the next case, which also carries the wall conduction temperature (ghost_point%T_cond) across the restart.
     cases.append(
         define_case_f(
             "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Restart",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={**lumped_wall, "t_save": 1.0e-5, "ib_surface_wrt": "T", "ib_heat_wrt": "T", "chem_params%diffusion": "F"},
+            override_tol=1e-6,
+            restart_check=True,
+        )
+    )
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Restart -> Diffusion",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={**lumped_wall, "t_save": 1.0e-5, "chem_params%diffusion": "T"},
             override_tol=1e-6,
             restart_check=True,
         )
