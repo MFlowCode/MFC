@@ -132,6 +132,34 @@ Full descriptions: @ref case.
 Complete cases: `examples/2D_amr_droplet` (a tracked interface), `examples/2D_amr_blast_multilevel` (two refined
 levels), `examples/2D_amr_ibm_cylinder` (an immersed body) and `examples/3D_amr_blast` (3D, subcycled).
 
+## When AMR pays {#amr-payoff}
+
+AMR costs more per cell than a uniform grid: extra kernels for ghost fills, flux registers and restriction, plus the
+regrids. On a GPU it pays only when the grid it replaces is large enough that the cell count, and not that fixed cost,
+sets the time per step.
+
+Measured on one MI250X GCD (amdflang, OpenMP offload): `examples/2D_amr_droplet` with one refined level, against the
+same case on a uniform grid at the fine resolution. Time is the solver's time to the same physical time; below 1 the
+AMR run is faster.
+
+| Base grid | Uniform fine grid | Fine cells held by AMR | Lock-step / uniform fine | Subcycled / uniform fine |
+| :--- | :--- | ---: | ---: | ---: |
+| 128^2 | 256^2 (0.07 M cells) | 11% | 2.98 | 2.19 |
+| 512^2 | 1024^2 (1.0 M cells) | 7% | 2.05 | 1.54 |
+| 2048^2 | 4096^2 (16.8 M cells) | 6% | 1.05 | 0.70 |
+
+The last row is from the time per step over 400 steps. A 3D spherical blast (64^3 base against a uniform 128^3, the
+blocks holding 54% of the fine cells) took 1.86 (lock-step) and 1.40 (subcycled) times the uniform run.
+
+- **Size.** Below a few million cells on the grid AMR would replace, run the uniform grid: a GPU advances those
+  cells at nearly no extra cost.
+- **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
+  blast's 54% would need a far larger grid.
+- **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
+- **Accuracy.** In the droplet runs AMR halved the L1 difference from the uniform fine solution (2.5e-4 against 5.0e-4
+  at the 512^2 base), not more: the fine block's initial data is interpolated from level 0, so a sharp initial
+  interface starts at the coarse resolution.
+
 ## Limitations {#amr-limitations}
 
 - **Block size.** A block spans at most about half a rank's subdomain per dimension unless `amr_max_grid_size` is set;
