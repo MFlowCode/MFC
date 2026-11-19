@@ -35,7 +35,8 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   limit. With a CFL-based time step (`cfl_adap_dt`, `cfl_const_dt`) each coarse cell's limit is that of the finest cell
   covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
   aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
-  largest stable `dt`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  largest stable `dt`. With regrid on, start-up also warns if `dt` would exceed that limit were the fastest cells
+  refined to `amr_max_level`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
   cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
@@ -45,7 +46,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 
 Conservation across coarse/fine faces holds to round-off for single- and multi-fluid, viscous and chemistry cases, and
 a uniform state stays uniform with regrid on. Interiors keep the WENO order; the coarse/fine ghost fill is second
-order (linear) or higher (quartic). Results do not depend on message timing, and agree across rank counts to round-off
+order (linear) or higher (quartic). For a smooth wave crossing a static block, the measured global rate is about 2.5 with
+either fill (the quartic fill lowers the error about 5x), against 5 for WENO5 on a uniform grid; the
+`Convergence -> 1D -> AMR` tests track it. Results do not depend on message timing, and agree across rank counts to round-off
 when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the block size cap, and therefore the box set, depends
 on the decomposition).
 
