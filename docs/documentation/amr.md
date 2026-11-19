@@ -140,4 +140,5 @@ See `examples/2D_amr_droplet` for a complete case.
   tagged again. Level-2 and deeper blocks are re-prolonged from their parent at every regrid (only level-1 data is
   carried over), so frequent regrids cost accuracy at those levels.
 - **Output.** Field output is at level-0 resolution with the fine solution restricted into it; post_process with
-  `amr = T` overlays the blocks as separate SILO domains.
+  `amr = T` overlays the blocks as separate SILO domains. Each save also writes `D/amr_levels.<step>.dat`: one line per
+  refined level with its fine cell count and the sum of `|q|` over its cells for each conserved variable.
