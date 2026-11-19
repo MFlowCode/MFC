@@ -6424,6 +6424,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 2D -> tag velocity", {**amr_2d_base, **uniform, **tag_regrid, **shear})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}))
         stack.pop()
+        # weak pressure steps at x = 0.1 and 0.8 in a gas of uniform density, outside the initial block: tagged on the pressure
+        weak = {f"patch_icpp({i})%alpha_rho(1)": 1.0 for i in (1, 2, 3)}
+        weak.update({"patch_icpp(1)%pres": 1.0, "patch_icpp(2)%pres": 1.2, "patch_icpp(3)%pres": 1.0, "amr_tag_eps": 0.05, "amr_tag_var": 4})
+        stack.push("AMR -> 1D -> tag pressure", {**amr_1d_base, "amr_regrid_int": 2, "amr_buf": 2, **weak})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
 
         # 3D paths the list above leaves out: the rank seam under regrid, the subcycled registers, and a two-level hierarchy
         # through a restart.
