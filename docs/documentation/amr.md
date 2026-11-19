@@ -138,8 +138,8 @@ See `examples/2D_amr_droplet` for a complete case.
   only grow); a missing fine-level file aborts the restart.
 - **Nesting.** A level-2 block must lie inside one level-1 block; the run aborts otherwise (reduce
   `amr_max_grid_size`).
-- **Regrid.** When no cell is tagged, regrid keeps the current blocks, so refinement does not retract until something is
-  tagged again. Level-2 and deeper blocks are re-prolonged from their parent at every regrid (only level-1 data is
-  carried over), so frequent regrids cost accuracy at those levels.
+- **Regrid.** When no cell is tagged, regrid replaces the hierarchy with one small dormant level-1 block (one coarse cell
+  at the domain center, padded by `amr_buf`), since the solver needs at least one block. At every level, the part of a
+  new block that an old block of the same level covered keeps the old data; the rest is prolonged from the parent.
 - **Output.** Field output is at level-0 resolution with the fine solution restricted into it; post_process with
   `amr = T` overlays the blocks as separate SILO domains.

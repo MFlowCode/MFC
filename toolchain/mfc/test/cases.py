@@ -1582,6 +1582,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_ib(1)%slip": "T",
                         "patch_ib(1)%moving_ibm": 0,
                     },
+                    # the shell mass is summed in 32 partial sums: round-off moves the result by about 1e-10 between platforms
+                    override_tol=1e-8,
                 )
             )
 
@@ -4674,8 +4676,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         define_case_f(
             "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall",
             "examples/2D_ibm_reacting_surface/case.py",
-            # Two saves: the restart check restarts from the first and compares with the straight run, Twall included
             mods={**lumped_wall, "t_save": 1.0e-5, "ib_surface_wrt": "T", "ib_heat_wrt": "T"},
+            override_tol=1e-6,
+        )
+    )
+    # Two saves: the restart check restarts from the first and compares with the straight run, Twall included. Diffusion is off
+    # because the wall conduction temperature (ghost_point%T_cond) is not checkpointed: the first stage after a restart conducts
+    # through the ghost's own temperature.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Restart",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={**lumped_wall, "t_save": 1.0e-5, "ib_surface_wrt": "T", "ib_heat_wrt": "T", "chem_params%diffusion": "F"},
             override_tol=1e-6,
             restart_check=True,
         )
@@ -5233,6 +5245,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("2 MPI Ranks", {"parallel_io": "T"})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2, restart_check=True, honor_io_keys=True, kind="smoke"))
         stack.pop()
+        stack.pop()
+        # nothing tagged (#2222): the block retracts to the dormant seed block at the domain center, and restarts from it
+        stack.push("AMR -> 1D -> nothing tagged", {**amr_1d_base, "amr_regrid_int": 2, "amr_tag_eps": 1.0e6, "amr_buf": 2})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         stack.pop()
 
         # 1D MHD + RMHD: div(B) is identically zero in 1D, so By/Bz reflux as ordinary scalars.
@@ -6365,6 +6381,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         shear.update({"patch_icpp(2)%vel(2)": 0.5, "amr_tag_abs": "T", "amr_tag_var": 3})
         stack.push("AMR -> 2D -> tag velocity", {**amr_2d_base, **uniform, **tag_regrid, **shear})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}))
+        stack.pop()
+
+        # 3D paths the list above leaves out: the rank seam under regrid, the subcycled registers, and a two-level hierarchy
+        # through a restart.
+        amr_3d_regrid = {**amr_3d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "amr_max_blocks": 16, "amr_max_grid_size": 13}
+        stack.push("AMR -> 3D -> dynamic regrid", amr_3d_regrid)
+        # m = 51: a 26-cell axis split over two ranks is below the WENO5 floor
+        cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 51}, ppn=2))
+        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
+        stack.pop()
+        stack.push("AMR -> 3D -> multi-level static", {**amr_3d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))
         stack.pop()
 
     amr_golden_tests()
