@@ -5920,7 +5920,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
         # prescribed-motion moving IB: a body translating at prescribed velocity (moving_ibm=1) through quiescent flow on a
-        # static fine block containing its trajectory; fine IB markers are rebuilt each RK stage. moving_ibm=2 stays gated under amr.
+        # static fine block containing its trajectory; fine IB markers are rebuilt each RK stage.
         stack.push(
             "AMR -> 2D -> moving IBM circle",
             {
@@ -5979,6 +5979,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # A moving body advances on the stage's complete force, the fine faces included: with the body wholly inside the block,
+        # D/ib_forces.dat is the fine-grid force (it was zero while the bodies moved before the fine frames ran)
+        cases.append(define_case_d(stack, "ib forces", {"ib_state_wrt": "T", "ib_force_wrt": "T"}))
+        # Force-driven (moving_ibm = 2): the body decelerates on that force, so its velocity in D/ib_forces.dat guards the same path
+        force_driven = {"patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.0628, "ib_state_wrt": "T", "ib_force_wrt": "T"}
+        cases.append(define_case_d(stack, "force-driven", force_driven))
         # Two prescribed-motion bodies: exercises the multi-body fine-IB rebuild for moving bodies
         stack.push(
             "two bodies",
