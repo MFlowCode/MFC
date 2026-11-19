@@ -220,10 +220,8 @@ contains
                                 write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, 0, 0)/rho
                             else if (i == eqn_idx%mom%beg + 2) then  ! w
                                 write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, 0, 0)/rho
-                            else if (i == eqn_idx%B%beg) then  ! By
-                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg)%sf(j, 0, 0)/rho
-                            else if (i == eqn_idx%B%beg + 1) then  ! Bz
-                                write (2, FMT) x_cb(j), q_cons_vf(eqn_idx%B%beg + 1)%sf(j, 0, 0)/rho
+                            else if (i == eqn_idx%B%beg .or. i == eqn_idx%B%beg + 1) then  ! By, Bz: conserved = primitive
+                                write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)
                             end if
                         else if ((i >= eqn_idx%bub%beg) .and. (i <= eqn_idx%bub%end) .and. bubbles_euler) then
                             if (qbmm) then
