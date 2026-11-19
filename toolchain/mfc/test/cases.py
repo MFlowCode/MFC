@@ -3942,6 +3942,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # An AMR block needs >= buff_size cells inside the domain, which the capped 25x25 grid cannot hold;
                 # covered by amr_golden_tests.
                 "2D_amr_droplet",
+                "2D_amr_blast_multilevel",
+                "2D_amr_ibm_cylinder",
+                "3D_amr_blast",
                 # Finite-rate propellant flame: the flame-front position after 50 steps is set by
                 # accumulated stiff-kinetics roundoff, so it drifts past the 1e-3 Example tolerance
                 # across compilers (nvhpc 25.11 golden vs 24.3/GNU/Intel/CCE/AMD disagree by ~1-5e-3).
