@@ -1092,6 +1092,7 @@ class CaseValidator:
         ib_ip_interp = self.get("ib_ip_interp")
         self.prohibit(ib_ip_interp is not None and ib_ip_interp != 1 and not ib, "ib_ip_interp requires ib to be enabled")
         self.prohibit(ib_ip_interp == 2 and ib_second_order_vel, "ib_ip_interp = 2 (TSC) does not combine with ib_second_order_vel, which has its own bilinear image-point weights")
+        # -1 (auto, the default) is resolved at start-up and never refused; the checks below apply to an explicit N > 0
         ib_mass_relax = self.get("ib_mass_relax", 0)
         self.prohibit(ib_mass_relax > 0 and not ib, "ib_mass_relax requires ib to be enabled")
         self.prohibit(ib_mass_relax > 0 and self.get("igr", "F") == "T", "ib_mass_relax is not supported with igr")
