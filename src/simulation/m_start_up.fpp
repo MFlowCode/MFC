@@ -622,7 +622,10 @@ contains
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         call s_phase_step_tic()
-        if (t_step == t_step_start) call s_amr_check_fixed_dt()
+        if (t_step == t_step_start) then
+            call s_amr_check_fixed_dt()
+            if (amr_regrid_int > 0) call s_amr_check_fixed_dt(reach=.true.)
+        end if
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
