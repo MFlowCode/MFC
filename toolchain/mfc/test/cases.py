@@ -5966,6 +5966,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # A moving body advances on the stage's complete force, the fine faces included: with the body wholly inside the block,
         # D/ib_forces.dat is the fine-grid force (it was zero while the bodies moved before the fine frames ran)
         cases.append(define_case_d(stack, "ib forces", {"ib_state_wrt": "T", "ib_force_wrt": "T"}))
+        # Force-driven (moving_ibm = 2): the body decelerates on that force, so its velocity in D/ib_forces.dat guards the same path
+        force_driven = {"patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.0628, "ib_state_wrt": "T", "ib_force_wrt": "T"}
+        cases.append(define_case_d(stack, "force-driven", force_driven))
         # Two prescribed-motion bodies: exercises the multi-body fine-IB rebuild for moving bodies
         stack.push(
             "two bodies",
