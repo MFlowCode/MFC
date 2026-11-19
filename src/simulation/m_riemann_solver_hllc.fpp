@@ -907,7 +907,8 @@ contains
                                 #:set _hllc_arr = '[' + ', '.join(_hllc_a1 + _hllc_a2) + ']'
                             #:endif
                             ! Identical calls on purpose: offload kernels are named by the .fpp line of their GPU_PARALLEL_LOOP, so
-                            ! a shared call gives both emissions one name and amdflang launches the wrong one. Do not merge.
+                            ! a shared call gives both emissions one name and amdflang launches the wrong one (still on AFAR 24.4:
+                            ! merged, non-hypo cases fault in this kernel). Do not merge.
                             #:if HYPO
                                 $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, privateArrays=_hllc_arr, copyin='[is1, is2, &
                                                     & is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')

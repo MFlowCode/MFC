@@ -955,7 +955,12 @@ answer is wrong, or one backend diverges from all the others.
   4-5x slower: private arrays sized by runtime globals move from registers to scratch (the
   WENO kernel goes from 0 to 400 B of scratch per thread and runs 11x slower; HLLC 4.9x). On
   AFAR 23.2.x it also produced NaNs in CBC, `wave_speeds=2`, IBM, surface tension, QBMM,
-  viscous, and MHD HLLD cases. Removing them needs a benchmark, not just the tests.
+  viscous, and MHD HLLD cases. AFAR 24.4 is no better: on Frontier the `./mfc.sh bench` grind
+  time is 4.5-5.9x worse without the guards in every finite-volume case (IGR, which uses no
+  WENO or Riemann solver, is unchanged). In that build a runtime-sized local array in a
+  kernel is heap-allocated, with a call to the device `malloc` (`__llvm_libc::gpu::allocate`)
+  and `free` per thread per launch: WENO kernels go from 0 to 5-6 such calls, the LF solver
+  from 0 to 8. Removing the guards needs a benchmark, not just the tests.
 - **`#:set MFC_OMP_PRESENT_ALLOCATABLE = True` is a per-file opt-in** (`m_rhs`, `m_weno`,
   `m_riemann_solver_hllc`) that makes the AMD OpenMP kernels assume allocatables are already
   present. A file may opt in only if every array a kernel names is allocated whenever that
