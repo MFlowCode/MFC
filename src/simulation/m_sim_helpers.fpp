@@ -15,8 +15,7 @@ module m_sim_helpers
     implicit none
 
     private; public :: s_compute_cell_state, s_compute_cell_diffusivity, s_compute_stability_from_dt, s_compute_dt_from_cfl, &
-        & s_amr_scale_stability, &
-        & dt_limiter, dt_limiter_names
+        & s_amr_scale_stability, dt_limiter, dt_limiter_names
 
     !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, TCFL, the collision cap, or the ramp limiter)
     character(len=4)                          :: dt_limiter = 'none'

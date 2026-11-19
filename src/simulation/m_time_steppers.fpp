@@ -773,8 +773,8 @@ contains
             if (amr .eqv. ${'.true.' if ON_AMR else '.false.'}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, &
                                     & Re_size_loc2' + (', pw1, pw2, pw3' if ON_AMR else '') + ']', private='[vel, alpha, &
-                                    & alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, &
-                                    & Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
+                                    & alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, &
+                                    & Ys, Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
                                     & vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
                 do l = 0, p
                     do k = 0, n

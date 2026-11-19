@@ -37,6 +37,7 @@ contains
         type(scalar_field), intent(inout), optional              :: q_T_sf
 
         ! the projection applies body forces in its pressure solve
+
         if (bodyForces .and. .not. proj_method) call s_apply_bodyforces(q_cons, q_prim, rhs, ldt, q_T_sf)
         if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons, q_prim, rhs, ldt)
         if (grid_geometry == 3 .and. .not. on_block) call s_apply_fourier_filter(q_cons)
@@ -59,7 +60,8 @@ contains
     !> Whether s_stage_hooks_pre_ib does anything on a fine block (it costs a frame swap there).
     pure logical function f_stage_hooks_pre_ib_on_block() result(on)
 
-        on = (bodyForces .and. .not. proj_method) .or. synthetic_turbulence .or. (model_eqns == model_eqns_6eq .and. (.not. relax)) .or. adv_n
+        on = (bodyForces .and. .not. proj_method) .or. synthetic_turbulence .or. (model_eqns == model_eqns_6eq .and. (.not. relax) &
+              & ) .or. adv_n
 
     end function f_stage_hooks_pre_ib_on_block
 
