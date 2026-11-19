@@ -4536,17 +4536,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
-    # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2. The golden holds the ib_forces.dat history
-    # (velocity and centroid, printed to 9 digits) and the cons fields. The kinematics are deterministic (round-off 1e-13 on GNU), so
-    # 1e-10 leaves room for another compiler's round-off without hiding a wrong stage weight (a 1e-3 position error). Provisional:
-    # tighten once CI shows the cross-compiler spread (see the hot-rod case below).
+    # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
+    # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history
+    # (velocity and centroid) and the cons fields. GNU 13 double builds at O0, O3 and reldebug agree to 1e-12 relative (absolute
+    # differences on near-zero entries 4e-13), so 1e-10 leaves two orders of margin for another compiler and still fails a wrong stage
+    # weight (a 1e-3 position error). Skipped in the single-precision lane (see test.py).
     cases.append(define_case_f("2D -> IBM -> Moving Circle -> Constant Acceleration", "examples/2D_mibm_constant_acceleration/case.py", mods={"parallel_io": "F"}, override_tol=1e-10))
 
-    # Soft-sphere wall collision (collision_model = 1): normal impact at e = 0.8 and a 30 degree impact with friction that sticks.
-    # The contact adds a force that switches on at a step, so a compiler that moves it by one step changes the rebound by order 1e-2;
-    # 1e-6 passes round-off and still fails that. Provisional, to be tightened once CI shows the cross-compiler spread.
-    for label, args in (("Normal", []), ("Sticking Friction", ["--angle", "30", "--e", "0.98", "--mu", "0.092"])):
-        cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
+    # Soft-sphere wall collision (collision_model = 1) in air at 1e5 Pa: a normal impact at e = 0.8 and a 50 degree impact that slides.
+    # The contact begins half a step into a step so no compiler can move it by one. The sticking regime is left to check_collision.py:
+    # where the contact point stops sliding, the friction direction is the sign of a velocity that goes to zero, so the rebound depends
+    # on round-off. GNU 13 double builds at O0, O3 and reldebug agree to 3e-12 relative (ib_forces entries to 1e-18 of the largest),
+    # so 1e-8 leaves three orders of margin.
+    for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
+        cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-8))
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(

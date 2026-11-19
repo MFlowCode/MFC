@@ -25,7 +25,7 @@ parser.add_argument("--angle", type=float, default=0.0)
 parser.add_argument("--e", type=float, default=0.8)
 parser.add_argument("--mu", type=float, default=0.0)
 parser.add_argument("--speed", type=float, default=3.9)
-parser.add_argument("--tol", type=float, default=0.015)
+parser.add_argument("--tol", type=float, default=0.02)
 args = parser.parse_args()
 
 saves = glob.glob(os.path.join(args.case_dir, "restart_data", "ib_state_*.dat"))

@@ -11,8 +11,8 @@ position.
 
 | cells per radius | steps | t [s] | position error | velocity error |
 |---:|---:|---:|---:|---:|
-| 5 | 200 | 2.34e-6 | -1.1e-13 | -6.1e-14 |
-| 10 | 200 | 1.17e-6 | -9.2e-14 | -5.2e-14 |
+| 5 | 200 | 2.34e-6 | -3.5e-13 | -2.2e-13 |
+| 10 | 200 | 1.17e-6 | -2.9e-13 | -1.9e-13 |
 
 Both are round-off. A build with the stage weights of the position update before the fix of #2040 gave a position error of 1.2e-3
 with the same exact velocity (measured earlier, not repeated here).
@@ -22,8 +22,8 @@ with the same exact velocity (measured earlier, not repeated here).
     ./mfc.sh run examples/2D_mibm_constant_acceleration/case.py -t pre_process simulation -n 1 --gpu mp
     python3 examples/2D_mibm_constant_acceleration/check_kinematics.py examples/2D_mibm_constant_acceleration
 
-`case.py` takes `--cells_per_R` (default 5), `--steps` (200) and `--g` (1e5). The suite registers it as
-`2D -> IBM -> Moving Circle -> Constant Acceleration` with the golden `ib_forces.dat` history (force, velocity and centroid).
+`case.py` takes `--cells_per_R` (default 5), `--steps` (200), `--g` (1e5) and `--weno_order` (default 1: first-order reconstruction keeps the check free of WENO weights, which amplify round-off; 5 gives WENO5 with the same kinematics). The suite registers it as
+`2D -> IBM -> Moving Circle -> Constant Acceleration` with the golden `ib_forces.dat` history (force, velocity and centroid); it is skipped in the single-precision lane, where pressure round-off at 1e5 Pa moves the quiescent gas by about 1e-3 of the signal.
 
 ## Limits
 

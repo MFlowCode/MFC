@@ -17,34 +17,39 @@ against the applicable rigid-body result:
 
     python3 examples/3D_mibm_wall_collision/check_collision.py <case directory> --angle 30 --e 0.98 --mu 0.092
 
-Measured with 24^3 cells, 30 lead steps and `collision_time` = 20 steps (the gas plays no role, so the grid does not matter):
+Measured with 16^3 cells, first-order reconstruction, air at 1e5 Pa, a contact onset half a step into a step and `collision_time` = 20 steps
+(the gas plays no role, so the grid and the reconstruction do not matter):
 
 | Case | Prescribed | Measured | Error |
 |---|---|---|---|
-| normal, e = 0.5 | 0.5000 | 0.5108 | +2.17 % |
-| normal, e = 0.8 | 0.8000 | 0.8055 | +0.69 % |
-| normal, e = 0.98 | 0.9800 | 0.97984 | -0.02 % |
-| 30 deg, mu = 0, e = 0.98: `vx_out` | 1.9500 | 1.95000 | exact; e_n equals the normal impact |
-| 30 deg, mu = 0.092, e = 0.98: `vx_out` (sticking, tan 30 deg = 0.577 < 0.638) | 1.3929 | 1.3906 | -0.16 % |
-| 50 deg, mu = 0.092, e = 0.98: `vx_out` (sliding, tan 50 deg = 1.19 > 0.638) | 2.5309 | 2.5308 | -0.00 % |
+| normal, e = 0.5 | 0.5000 | 0.4765 | -4.70 % |
+| normal, e = 0.8 | 0.8000 | 0.7877 | -1.54 % |
+| normal, e = 0.98 | 0.9800 | 0.97948 | -0.05 % |
+| 30 deg, mu = 0, e = 0.98: `vx_out` | 1.9500 | 1.94998 | 0.00 % |
+| 30 deg, mu = 0.092, e = 0.98: `vx_out` (sticking, tan 30 deg = 0.577 < 0.638) | 1.3929 | 1.3958 | +0.21 % |
+| 50 deg, mu = 0.092, e = 0.98: `vx_out` (sliding, tan 50 deg = 1.19 > 0.638) | 2.5309 | 2.5310 | +0.00 % |
 
 Error in e_n against the steps per collision (`--steps-per-collision`):
 
 | e | 20 | 40 | 80 |
 |---|---|---|---|
-| 0.5 | +2.17 % | +1.12 % | +0.57 % |
-| 0.8 | +0.69 % | not run | +0.18 % |
+| 0.5 | -4.70 % | -2.33 % | -1.16 % |
+| 0.8 | -1.54 % | not run | -0.37 % |
 
-The restitution error is first order in the steps per collision (it halves at each doubling). At the default 20 steps expect up
-to about 2 % error in e at low e.
+The restitution error is first order in the steps per collision (it halves at each doubling). At the default 20 steps expect a few
+percent at low e. Its size and sign depend on where in a step the contact begins: an earlier run with the contact beginning on a step
+boundary gave +2.17 % and +0.69 % for e = 0.5 and 0.8 at 20 steps. The test registration therefore starts the contact half a step into
+a step, which keeps the contact timing the same on every compiler.
 
 ## Run
 
     ./mfc.sh run examples/3D_mibm_wall_collision/case.py -t pre_process simulation -n 1 --gpu mp
     python3 examples/3D_mibm_wall_collision/check_collision.py examples/3D_mibm_wall_collision
 
-`case.py` takes `--angle`, `--e`, `--mu`, `--speed`, `--cells`, `--steps-per-collision` and `--lead-steps`. The suite registers
-the normal impact and the 30 degree sticking-friction impact as `3D -> IBM -> Wall Collision -> ...`.
+`case.py` takes `--angle`, `--e`, `--mu`, `--speed`, `--cells`, `--steps-per-collision`, `--lead-steps` and `--weno_order`. The suite registers
+the normal impact and the 50 degree sliding impact as `3D -> IBM -> Wall Collision -> ...`. The sticking case is not a golden: where
+the contact point stops sliding, the friction direction is the sign of a velocity that goes to zero, so the rebound depends on round-off.
+The tests are skipped in the single-precision lane, where one-step shifts of the contact onset flip the rebound.
 
 ## Limits
 
