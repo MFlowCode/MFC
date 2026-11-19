@@ -4048,6 +4048,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(1)": 16,
             "amr_block_end(1)": 31,
             "amr_regrid_int": 0,
+            "chem_params%reaction_substeps": 0,  # the example's sub-stepping is not what these tests cover
         }
         # np=1 pins a non-tiling cap (batched advance); np=2 keeps the derived cap, tiling the block to the rank extent.
         for ppn, label in ((1, "Reactive Shocktube AMR"), (2, "Reactive Shocktube AMR -> 2 MPI Ranks")):
@@ -5238,7 +5239,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Brio-Wu with HLLD, plus a relativistic variant.
         mhd_1d_base = {
             **amr_1d_base,
-            "m": 200,
+            # 200 cells, so the patch edge at x = 0.5 is a cell face: with 201 a cell centre sat on it, and which patch
+            # claimed that cell depended on the rank count
+            "m": 199,
             "dt": 1.0e-3,
             "t_step_stop": 20,
             "t_step_save": 20,

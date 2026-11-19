@@ -313,9 +313,11 @@ contains
 
         integer, intent(in)  :: k, pblk
         integer, intent(out) :: plo(3), phi(3)
+        integer              :: rp
 
-        plo = merge(amr_ref_ratio*(amr_region_lo_all(:,k) - amr_region_lo_all(:,pblk)), 0, amr_dim)
-        phi = merge(amr_ref_ratio*(amr_region_hi_all(:,k) - amr_region_lo_all(:,pblk)) + amr_ref_ratio - 1, 0, amr_dim)
+        rp = amr_ref_ratio**amr_block_level(pblk)  ! the parent's fine cells per L0 cell
+        plo = merge(rp*(amr_region_lo_all(:,k) - amr_region_lo_all(:,pblk)), 0, amr_dim)
+        phi = merge(rp*(amr_region_hi_all(:,k) - amr_region_lo_all(:,pblk) + 1) - 1, 0, amr_dim)
 
     end subroutine s_amr_parent_foot
 
