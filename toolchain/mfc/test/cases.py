@@ -5353,10 +5353,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # roundoff. The patches meet on coarse faces (cells 32 and 48), the first inside the block.
         amr_chk = {**BASE_CFG, **amr_1d_base, "amr_max_grid_size": 64, "patch_icpp(1)%x_centroid": 0.25, "patch_icpp(1)%length_x": 0.5}
         amr_chk.update({"patch_icpp(2)%x_centroid": 0.625, "patch_icpp(2)%length_x": 0.25, "patch_icpp(3)%x_centroid": 0.875, "patch_icpp(3)%length_x": 0.25})
+        # two fluids at a 1e-2 minor fraction: amr_check scales each variable by its largest value in the block, so at
+        # amr_two_fluid's 1e-6 the roundoff of the minor fluid reads as 5e-9
+        chk_two_fluid = dict(amr_two_fluid)
+        for i, (a1, rho) in enumerate([(0.99, 1.0), (0.99, 0.5), (0.01, 0.125)], start=1):
+            chk_two_fluid.update({f"patch_icpp({i})%alpha(1)": a1, f"patch_icpp({i})%alpha(2)": 1 - a1})
+            chk_two_fluid.update({f"patch_icpp({i})%alpha_rho(1)": a1 * rho, f"patch_icpp({i})%alpha_rho(2)": (1 - a1) * rho})
         for label, chk_mods in (
             ("Euler", {}),
             ("viscous", {"viscous": "T", "fluid_pp(1)%Re(1)": 100.0}),
             ("subcycle", {"amr_subcycle": "T"}),
+            ("two fluids", chk_two_fluid),
         ):
             spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**amr_chk, **chk_mods})
             cases.append(define_convergence_case(f"Convergence -> amr_check -> 1D -> {label}", spec))
@@ -5719,6 +5726,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        # the body sits in the block's core, so the fine IB state must reproduce the uniform fine-grid run there
+        chk_ib = {**BASE_CFG, "amr_max_grid_size": 32}
+        for mod in stack.mods:
+            chk_ib.update(mod)
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=chk_ib)
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body", spec))
         # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
         # fine-grid force (the coarse faces under the block are skipped)
         cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))
