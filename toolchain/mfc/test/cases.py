@@ -6,8 +6,8 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
+from .case import BASE_CFG, PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .convergence import ConvergenceSpec, run_amp_sweep, run_amr_check, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -5332,6 +5332,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     f"patch_icpp({i})%alpha_rho(2)": (1 - a1) * rho,
                 }
             )
+        # ./mfc.sh amr_check under `--only Convergence`: a static block's core must match the uniform fine-grid run to
+        # roundoff. The patches meet on coarse faces (cells 32 and 48), the first inside the block.
+        amr_chk = {**BASE_CFG, **amr_1d_base, "amr_max_grid_size": 64, "patch_icpp(1)%x_centroid": 0.25, "patch_icpp(1)%length_x": 0.5}
+        amr_chk.update({"patch_icpp(2)%x_centroid": 0.625, "patch_icpp(2)%length_x": 0.25, "patch_icpp(3)%x_centroid": 0.875, "patch_icpp(3)%length_x": 0.25})
+        for label, chk_mods in (
+            ("Euler", {}),
+            ("viscous", {"viscous": "T", "fluid_pp(1)%Re(1)": 100.0}),
+            ("subcycle", {"amr_subcycle": "T"}),
+        ):
+            spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**amr_chk, **chk_mods})
+            cases.append(define_convergence_case(f"Convergence -> amr_check -> 1D -> {label}", spec))
+
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
         cases.append(define_case_d(stack, "teno", {"teno": "T", "teno_CT": 1.0e-6}))
         cases.append(define_case_d(stack, "wenoz", {"wenoz": "T"}))
