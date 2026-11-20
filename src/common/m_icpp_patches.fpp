@@ -51,6 +51,11 @@ contains
         integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         integer :: i
+
+        if (.not. g%hardcoded .and. any(patch_icpp(1:num_patches)%hcid /= dflt_int)) then
+            call s_mpi_abort('Hard-coded initial conditions (hcid) are only supported on the pre_process grid.')
+        end if
+
         ! Load STL/OBJ models once into the shared flat arrays if any patch is an STL/OBJ model (geometry 21)
 
         do i = 1, num_patches
@@ -234,6 +239,7 @@ contains
         integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: th, thickness, nturns, mya
         real(wp)                                                 :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
+        integer, allocatable, dimension(:,:)                     :: logic_grid
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -245,7 +251,7 @@ contains
         thickness = patch_icpp(patch_id)%length_x
         nturns = patch_icpp(patch_id)%length_y
 
-        !
+        allocate (logic_grid(0:g%m,0:g%n))
         logic_grid = 0
         do k = 0, int(g%m*91*nturns)
             th = k/real(int(g%m*91._wp*nturns))*nturns*2._wp*pi
@@ -259,14 +265,14 @@ contains
             do j = 0, g%n; do i = 0, g%m
                 if ((g%x_cc(i) > spiral_x_min) .and. (g%x_cc(i) < spiral_x_max) .and. (g%y_cc(j) > spiral_y_min) .and. (g%y_cc(j) &
                     & < spiral_y_max)) then
-                    logic_grid(i, j, 0) = 1
+                    logic_grid(i, j) = 1
                 end if
             end do; end do
         end do
 
         do j = 0, g%n
             do i = 0, g%m
-                if ((logic_grid(i, j, 0) == 1)) then
+                if (logic_grid(i, j) == 1) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
@@ -1314,8 +1320,6 @@ contains
     !> Convert cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
-
         real(wp), intent(in) :: cyl_y, cyl_z
 
         cart_y = cyl_y*sin(cyl_z)
@@ -1325,8 +1329,6 @@ contains
 
     !> Return a 3D Cartesian coordinate vector from a cylindrical (x, r, theta) input vector.
     function f_convert_cyl_to_cart(cyl) result(cart)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(1:3), intent(in) :: cyl
         real(wp), dimension(1:3)             :: cart
@@ -1338,7 +1340,6 @@ contains
     !> Archimedes spiral function
     elemental function f_r(myth, offset, a)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: myth, offset, a
         real(wp)             :: b
         real(wp)             :: f_r

@@ -119,6 +119,7 @@ contains
         end if
 
         g%m = m; g%n = n; g%p = p
+        g%hardcoded = .true.
         g%dx_min = dx_min; g%dy_min = dy_min; g%dz_min = dz_min
         g%x_cc = x_cc
         if (n > 0) g%y_cc = y_cc

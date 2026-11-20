@@ -81,10 +81,10 @@ macro(HANDLE_SOURCES target useCommon)
     if (${useCommon})
         file(GLOB common_FPPs CONFIGURE_DEPENDS "${common_DIR}/*.fpp")
 
-        # If we're building post_process, exclude m_compute_levelset.fpp
+        # post_process never applies initial condition patches
         if("${target}" STREQUAL "post_process")
-            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_compute_levelset\.fpp$")
-            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_ib_patches\.fpp$")
+            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_icpp_patches\.fpp$")
+            list(FILTER common_FPPs EXCLUDE REGEX ".*/m_assign_variables\.fpp$")
         endif()
 
         list(APPEND ${target}_FPPs ${common_FPPs})
