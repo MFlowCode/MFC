@@ -236,7 +236,7 @@ fi
 # Frontier (famd) and Tuolumne (tamd): AFAR LLVM Flang (amdflang) + Cray MPICH.
 if [ "$u_c" '==' 'famd' ] || [ "$u_c" '==' 'tamd' ]; then
     if [ "$u_c" '==' 'famd' ]; then
-        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
+        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/ccs/proj/cfd154/sw/therock-afar-24.4.0-multiarch-10.3.0-a71da8f}"
     else
         export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
     fi
