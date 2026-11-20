@@ -882,7 +882,7 @@ contains
     end subroutine s_compute_dt
 
     !> AMR with a fixed dt: abort if dt exceeds the finest level's inviscid limit (ICFL = 1, as s_write_run_time_information).
-    !! reach: test every cell as if refined to amr_max_level, which a regrid may do later, and warn instead of aborting.
+    !! reach: test every cell as if refined to amr_max_level, which a regrid may do later, so the failure is at start-up.
     impure subroutine s_amr_check_fixed_dt(reach)
 
         logical, intent(in), optional :: reach
@@ -911,14 +911,14 @@ contains
         end if
         if (dt <= dt_cand(1)) return
         if (all_fine) then
-            if (proc_rank == 0) print '(A,ES11.4,A,I0,A,ES11.4,A)', ' [amr] WARNING: dt = ', dt, &
-                & ' exceeds the inviscid CFL limit if a regrid refines the fastest cells to level ', amr_max_level, &
-                & ' (largest stable dt ', dt_cand(1), '); the run would then abort at that regrid.'
-            return
+            write (msg, '(A,ES11.4,A,I0,A,ES11.4,A)') 'amr: dt = ', dt, &
+                   & ' exceeds the inviscid CFL limit a regrid would set by refining the fastest cells to level ', amr_max_level, &
+                   & '; the largest stable dt (ICFL = 1) there is ', dt_cand(1), '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
+        else
+            write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
+                   & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', &
+                   & dt_cand(1), '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
         end if
-        write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
-               & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', dt_cand(1), &
-               & '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
         call s_mpi_abort(trim(msg))
 
     end subroutine s_amr_check_fixed_dt
