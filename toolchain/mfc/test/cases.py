@@ -1716,6 +1716,36 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         ppn=ranks,
                     )
                 )
+            # A centroid exactly on the periodic domain end is owned by no rank until it is wrapped, so with 2 ranks the body lost its
+            # force record for that step. dt is a power of two, so the circle reaches x = 1 exactly after 3 steps.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Centroid On Periodic Domain End -> 2 MPI Ranks",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "dt": 2.0**-11,
+                        "bc_x%beg": -1,
+                        "bc_x%end": -1,
+                        "bc_y%beg": -1,
+                        "bc_y%end": -1,
+                        "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 1.0 - 3.0 * 2.0**-11,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%vel(1)": 1.0,
+                        **uniform,
+                    },
+                    ppn=2,
+                )
+            )
             # Fluid at 100 m/s sliding round a slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R. The ccst
             # variants add ib_slip_ccst (isentropic ghost density, total-enthalpy tangential speed) with the TSC image points it needs
             # for its accuracy, on a fixed circle and on one moving at a prescribed 40 m/s
