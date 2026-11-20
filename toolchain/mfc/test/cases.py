@@ -1684,7 +1684,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # V + omega x r is not a stress on the body. Gas at rest, a translating (and turning) circle, and ib_force_wrt so the
             # golden holds the force and torque history.
             uniform = {f"patch_icpp({i})%{k}": v for i in (1, 2, 3) for k, v in (("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0))}
-            for label, spin in (("Translating Circle", 0.0), ("Translating Spinning Circle", 3.0)):
+            # The 2-rank variant puts the body on a rank seam and moves it across the seam in both directions: the moving-wall term
+            # (proportional to the wall's normal velocity) reads the body cell's momentum from the neighbouring rank there.
+            for label, spin, ranks, vy in (
+                ("Translating Circle", 0.0, 1, 0.0),
+                ("Translating Spinning Circle", 3.0, 1, 0.0),
+                ("Translating Circle -> 2 MPI Ranks", 0.0, 2, 0.6),
+            ):
                 cases.append(
                     define_case_d(
                         stack,
@@ -1703,11 +1709,43 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "patch_ib(1)%slip": "F",
                             "patch_ib(1)%moving_ibm": 1,
                             "patch_ib(1)%vel(1)": 1.0,
+                            "patch_ib(1)%vel(2)": vy,
                             "patch_ib(1)%angular_vel(3)": spin,
                             **uniform,
                         },
+                        ppn=ranks,
                     )
                 )
+            # A centroid exactly on the periodic domain end is owned by no rank until it is wrapped, so with 2 ranks the body lost its
+            # force record for that step. dt is a power of two, so the circle reaches x = 1 exactly after 3 steps.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Centroid On Periodic Domain End -> 2 MPI Ranks",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "dt": 2.0**-11,
+                        "bc_x%beg": -1,
+                        "bc_x%end": -1,
+                        "bc_y%beg": -1,
+                        "bc_y%end": -1,
+                        "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 1.0 - 3.0 * 2.0**-11,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%vel(1)": 1.0,
+                        **uniform,
+                    },
+                    ppn=2,
+                )
+            )
             # Fluid at 100 m/s sliding round a slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R. The ccst
             # variants add ib_slip_ccst (isentropic ghost density, total-enthalpy tangential speed) with the TSC image points it needs
             # for its accuracy, on a fixed circle and on one moving at a prescribed 40 m/s
@@ -4718,13 +4756,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
     # Two saves: the restart check restarts from the first and compares with the straight run, Twall included. Diffusion is off
-    # because the wall conduction temperature (ghost_point%T_cond) is not checkpointed: the first stage after a restart conducts
-    # through the ghost's own temperature.
+    # here and on in the next case, which also carries the wall conduction temperature (ghost_point%T_cond) across the restart.
     cases.append(
         define_case_f(
             "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Restart",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={**lumped_wall, "t_save": 1.0e-5, "ib_surface_wrt": "T", "ib_heat_wrt": "T", "chem_params%diffusion": "F"},
+            override_tol=1e-6,
+            restart_check=True,
+        )
+    )
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Restart -> Diffusion",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={**lumped_wall, "t_save": 1.0e-5, "chem_params%diffusion": "T"},
             override_tol=1e-6,
             restart_check=True,
         )
