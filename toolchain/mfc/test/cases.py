@@ -4643,12 +4643,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # energy and 1e-7 absolute in a mole fraction, and the Intel CPU run by 2e-6 relative in a conservative variable (1.2e-6 in
     # another, 1.2e-6 absolute in a 7e-5 mole fraction): the column's implicit solves and the time-step limit pass roundoff on.
     cases.append(define_case_f("2D -> Chemistry -> IBM Reacting Surface -> Wall Column", "examples/2D_ibm_reacting_surface/case.py", mods=wall_column, override_tol=1e-4))
+    # 1e-3: with the limit binding, the end state follows the step sequence to first order (a 0.1 % change of wall_column_dt_frac moves
+    # a momentum entry by 1.6e-3). Against the nvhpc A100 golden, a CCE CPU run agrees to 1.5e-10 relative, but the Intel (ifx) release
+    # CPU run differs by up to 1.5e-4 absolute (7.7e-4 relative at a near-zero entry); the Intel reldebug run passes at 1e-4.
     cases.append(
         define_case_f(
             "2D -> Chemistry -> IBM Reacting Surface -> Wall Column -> Time-Step Limit",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={**wall_column, "wall_column_dt_frac": 1.0e-3},
-            override_tol=1e-4,
+            override_tol=1e-3,
         )
     )
 
