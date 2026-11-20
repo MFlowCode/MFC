@@ -28,7 +28,7 @@ module m_assign_variables
         !> Skeleton of s_assign_patch_mixture_primitive_variables and s_assign_patch_species_primitive_variables
         subroutine s_assign_patch_xxxxx_primitive_variables(patch_id, j, k, l, eta, q_prim_vf, patch_id_fp)
 
-            import :: scalar_field, sys_size, n, m, p, wp
+            import :: scalar_field, sys_size, wp
 
             integer, intent(in)                                      :: patch_id
             integer, intent(in)                                      :: j, k, l
@@ -36,9 +36,9 @@ module m_assign_variables
             type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
 #ifdef MFC_MIXED_PRECISION
-            integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+            integer(kind=1), dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #else
-            integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+            integer, dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #endif
 
         end subroutine s_assign_patch_xxxxx_primitive_variables
@@ -77,9 +77,9 @@ contains
         real(wp), intent(in)                                     :: eta
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #endif
 
         real(wp) :: Ys(1:num_species)
@@ -207,9 +207,9 @@ contains
         integer, intent(in)  :: j, k, l
         real(wp), intent(in) :: eta
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 

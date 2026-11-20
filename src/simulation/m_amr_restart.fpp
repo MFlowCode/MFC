@@ -16,8 +16,9 @@ module m_amr_restart
     use m_global_parameters
     use m_constants, only: amr_restart_blk_hdr_ints, amr_restart_blk_own_ints
     use m_mpi_proxy, only: s_mpi_abort
-    use m_mpi_common, only: s_mpi_allreduce_integer_min
+    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_vectors_sum
     use m_amr_restart_io
+    use m_data_output, only: s_create_D_dir
     use m_amr_state, only: max_f
     use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, &
         & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_assign_block_owners, s_set_amr_fine_geometry
@@ -166,6 +167,7 @@ contains
             end if
         end do
 
+        call s_amr_write_level_sums(t_step)
         if (.not. parallel_io) then
             call s_amr_restart_write_serial(t_step)
         else
@@ -175,6 +177,42 @@ contains
         end if
 
     end subroutine s_write_amr_restart
+
+    !> Write D/amr_levels.<t_step>.dat: per refined level, its fine cell count and the mean of |q| over its cells for each equation.
+    !! Puts fine-level data under the golden comparison; the level-0 output only sees it restricted.
+    impure subroutine s_amr_write_level_sums(t_step)
+
+        integer, intent(in)                  :: t_step
+        real(wp)                             :: sums(sys_size + 1, amr_max_level)
+        character(LEN=path_len + 2*name_len) :: file_loc
+        integer                              :: i, k, l
+
+        sums = 0._wp
+        do k = 1, amr_num_blocks
+            if (.not. amr_owns_all(k)) cycle
+            l = amr_block_level(k)
+            sums(1, l) = sums(1, l) + real((amr_slots(k)%m + 1)*(amr_slots(k)%n + 1)*(amr_slots(k)%p + 1), wp)
+            do i = 1, sys_size
+                sums(i + 1, l) = sums(i + 1, l) + sum(abs(real(amr_cons_st(0:amr_slots(k)%m,0:amr_slots(k)%n,0:amr_slots(k)%p,i, &
+                     & amr_loc_of(k)), wp)))
+            end do
+        end do
+        call s_mpi_allreduce_vectors_sum(sums, sums, sys_size + 1, amr_max_level)
+        ! means, not sums: per-cell differences within a golden tolerance would add up past it in a sum
+        do l = 1, amr_max_level
+            sums(2:,l) = sums(2:,l)/max(sums(1, l), 1._wp)
+        end do
+        call s_create_D_dir()
+        if (proc_rank /= 0) return
+
+        write (file_loc, '(A,I6.6,A)') trim(case_dir) // '/D/amr_levels.', t_step, '.dat'
+        open (2, FILE=trim(file_loc), form='formatted', STATUS='replace')
+        do l = 1, amr_max_level
+            write (2, '(I0,*(1X,ES24.16E3))') l, sums(:,l)
+        end do
+        close (2)
+
+    end subroutine s_amr_write_level_sums
 
     !> Restore the fine level from the AMR restart file at t_step_start (n_start under cfl_dt), if one exists: rebuild each saved
     !! block via s_set_amr_fine_geometry and read the fine state (exact stp round-trip). parallel_io repartitions across rank

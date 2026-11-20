@@ -63,3 +63,11 @@
 - slug: igr
   path: benchmarks/igr/case.py
   args: []
+
+# Benchmark amr
+# Additional Benchmarked Features
+# - amr : T (one level, ratio 2, dynamic regrid every 4 steps)
+# - amr_subcycle : T
+- slug: amr
+  path: benchmarks/amr/case.py
+  args: []

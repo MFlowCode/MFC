@@ -15,6 +15,9 @@ from ..build import SIMULATION, MFCTarget, get_target
 from ..run import input
 from ..state import ARG, CFG
 
+# Per-test wall limit; also enforced on the launched process so a hung MPI job cannot hold a CI shard to its SLURM limit.
+TEST_TIMEOUT_SECONDS = 3600
+
 # Parameters that enable simulation output writing for post_process.
 # When post_process is a target, simulation must write field data so
 # post_process has something to read.  Used in the generated case.py
@@ -219,7 +222,7 @@ class TestCase(case.Case):
 
         # env is per-subprocess, never os.environ: cases run in worker threads,
         # so a mutated global would leak into every concurrent case.
-        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, timeout=TEST_TIMEOUT_SECONDS)
 
     def is_cfl_dt(self) -> bool:
         return "T" in (self.params.get("cfl_adap_dt", "F"), self.params.get("cfl_const_dt", "F"))

@@ -1137,6 +1137,7 @@ class CaseValidator:
         ib_ip_interp = self.get("ib_ip_interp")
         self.prohibit(ib_ip_interp is not None and ib_ip_interp != 1 and not ib, "ib_ip_interp requires ib to be enabled")
         self.prohibit(ib_ip_interp == 2 and ib_second_order_vel, "ib_ip_interp = 2 (TSC) does not combine with ib_second_order_vel, which has its own bilinear image-point weights")
+        # -1 (auto, the default) is resolved at start-up and never refused; the checks below apply to an explicit N > 0
         ib_mass_relax = self.get("ib_mass_relax", 0)
         self.prohibit(ib_mass_relax > 0 and not ib, "ib_mass_relax requires ib to be enabled")
         self.prohibit(ib_mass_relax > 0 and self.get("igr", "F") == "T", "ib_mass_relax is not supported with igr")
@@ -2482,6 +2483,16 @@ class CaseValidator:
         self.prohibit(
             (amr_regrid_int or 0) > 0 and amr_tag_eps is not None and amr_tag_eps <= 0,
             "amr_tag_eps must be > 0 when amr_regrid_int > 0",
+        )
+        amr_tag_var = self.get("amr_tag_var", 1)
+        self.prohibit(amr_tag_var not in (1, 2, 3, 4), "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1), 3 (velocity magnitude) or 4 (pressure)")
+        self.prohibit(
+            amr_tag_var == 4 and (self.get("model_eqns") != 2 or any(self.get(k, "F") == "T" for k in ("chemistry", "mhd", "bubbles_euler", "hypoelasticity"))),
+            "amr_tag_var = 4 (pressure) uses the five-equation mixture pressure: it requires model_eqns = 2 without chemistry, mhd, bubbles_euler or hypoelasticity",
+        )
+        self.prohibit(
+            amr_tag_var == 3 and self.get("amr_tag_abs", "F") != "T",
+            "amr_tag_var = 3 (velocity magnitude) requires amr_tag_abs = T: a relative jump is undefined where the fluid is at rest",
         )
         self.prohibit(
             (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,

@@ -2,6 +2,7 @@ import collections
 import logging
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import typing
@@ -62,14 +63,38 @@ class MFCException(Exception):
     pass
 
 
-def system(command: typing.List[str], print_cmd=None, **kwargs) -> subprocess.CompletedProcess:
+def system(command: typing.List[str], print_cmd=None, timeout=None, **kwargs) -> subprocess.CompletedProcess:
     cmd = [str(x) for x in command if not isspace(str(x))]
 
     if print_cmd in [True, None]:
         cons.print(f"$ {' '.join(cmd)}")
         cons.print(no_indent=True)
 
-    return subprocess.run(cmd, **kwargs, check=False)
+    if timeout is None:
+        return subprocess.run(cmd, **kwargs, check=False)
+
+    # subprocess.run(timeout=) kills only the child, so a hung mpirun/srun grandchild
+    # keeps the output pipe open and the call never returns. Kill the whole group, also
+    # on Ctrl-C, since the new session no longer receives the terminal's signals.
+    with subprocess.Popen(cmd, start_new_session=True, **kwargs) as proc:
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_group(proc)
+            out, err = proc.communicate()
+            note = f"\nKilled after {timeout} s timeout.\n"
+            out = (out or ("" if kwargs.get("text") else b"")) + (note if kwargs.get("text") else note.encode())
+        except BaseException:
+            _kill_group(proc)
+            raise
+        return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
+def _kill_group(proc: subprocess.Popen):
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
 
 
 def file_write(filepath: str, content: str, if_different: bool = False):

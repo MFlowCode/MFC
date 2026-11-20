@@ -534,11 +534,12 @@ contains
         if (allocated(amr_gs_buf)) then
             @:DEALLOCATE(amr_gs_buf)
         end if
-        #:for ST in ['amr_cons_st', 'amr_stor_st']
+        #:for ST in ['amr_cons_st', 'amr_stor_st', 'amr_ibp']
             if (allocated(${ST}$)) then
                 @:DEALLOCATE(${ST}$)
             end if
         #:endfor
+        if (allocated(amr_ibp_blk)) deallocate (amr_ibp_blk)
         if (allocated(amr_cons_br)) then
             do i = 1, sys_size
                 @:ACC_TEARDOWN_SFs(amr_cons_br(i))

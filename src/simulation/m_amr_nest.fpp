@@ -15,6 +15,7 @@ module m_amr_nest
     use m_derived_types
     use m_global_parameters
     use m_amr_cluster, only: s_amr_cluster
+    use m_eos, only: s_compute_mixture_coefficients, f_pressure
     use m_amr, only: amr_slots, amr_cons_st, amr_loc_of, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, &
         & amr_cpat_mar, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_boxes_overlap
 
@@ -498,11 +499,14 @@ contains
 
     end subroutine s_amr_tag_child_from_fine
 
-    !> Total density (sum of the continuity variables) at one cell; `_st` reads the flat store, `_sf` the level-0 field.
+    !> The tagged variable at one cell (amr_tag_var): 1 total density (sum of the continuity variables), 2 volume fraction of fluid
+    !! 1, 3 velocity magnitude, 4 pressure (five-equation mixture). `_st` reads the flat store, `_sf` the level-0 field.
     #:for RSFX, RSRC in [('st', 'amr_cons_st'), ('sf', '')]
         #:set RARG = 'loc' if RSRC else 'q'
-        #:set RHO = 'f_amr_rho_tot_' + RSFX
-        pure function f_amr_rho_tot_${RSFX}$(${RARG}$, ci, cj, ck) result(r)
+        #:set RHO = 'f_amr_tag_val_' + RSFX
+        #:set QPRE = 'real(amr_cons_st(ci, cj, ck, ' if RSRC else 'real(q('
+        #:set QPOST = ', loc), wp)' if RSRC else ')%sf(ci, cj, ck), wp)'
+        function f_amr_tag_val_${RSFX}$(${RARG}$, ci, cj, ck) result(r)
 
             #:if RSRC
                 integer, intent(in) :: loc  !< flat-store slot
@@ -510,23 +514,44 @@ contains
                 type(scalar_field), dimension(:), intent(in) :: q
             #:endif
             integer, intent(in) :: ci, cj, ck
-            real(wp)            :: r
+            real(wp)            :: r, u2, gam, pinf, qv
             integer             :: f
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(3) :: ar, al
+            #:else
+                real(wp), dimension(num_fluids) :: ar, al
+            #:endif
 
             r = 0._wp
+            if (amr_tag_var == 2) then
+                r = ${QPRE}$eqn_idx%adv%beg${QPOST}$
+                return
+            end if
             do f = eqn_idx%cont%beg, eqn_idx%cont%end
-                #:if RSRC
-                    r = r + real(amr_cons_st(ci, cj, ck, f, loc), wp)
-                #:else
-                    r = r + real(q(f)%sf(ci, cj, ck), wp)
-                #:endif
+                r = r + ${QPRE}$f${QPOST}$
             end do
+            if (amr_tag_var < 3) return
+            u2 = 0._wp
+            do f = eqn_idx%mom%beg, eqn_idx%mom%end
+                u2 = u2 + ${QPRE}$f${QPOST}$**2
+            end do
+            if (amr_tag_var == 3) then
+                r = sqrt(u2)/max(r, 1.e-30_wp)
+                return
+            end if
+            ar = 0._wp; al = 0._wp
+            do f = 1, num_fluids
+                ar(f) = ${QPRE}$eqn_idx%cont%beg + f - 1${QPOST}$
+                al(f) = ${QPRE}$eqn_idx%adv%beg + f - 1${QPOST}$
+            end do
+            call s_compute_mixture_coefficients(ar, al, r, gam, pinf, qv)
+            r = f_pressure(${QPRE}$eqn_idx%E${QPOST}$ - 0.5_wp*u2/max(r, 1.e-30_wp), gam, pinf, qv)
 
-        end function f_amr_rho_tot_${RSFX}$
+        end function f_amr_tag_val_${RSFX}$
 
-        !> Density-gradient tag indicator at one cell, max over the active dimensions. `_st` clamps the stencil to the block
-        !! (fm1:fm3 = block extents) since its ghosts are stale; `_sf` reads the level-0 halo.
-        pure function f_amr_tag_grad_${RSFX}$(${RARG}$, ci, cj, ck${', fm1, fm2, fm3' if RSRC else ''}$) result(g)
+        !> Tag indicator (jump of the amr_tag_var variable) at one cell, max over the active dimensions. `_st` clamps the stencil to
+        !! the block (fm1:fm3 = block extents) since its ghosts are stale; `_sf` reads the level-0 halo.
+        function f_amr_tag_grad_${RSFX}$(${RARG}$, ci, cj, ck${', fm1, fm2, fm3' if RSRC else ''}$) result(g)
 
             #:if RSRC
                 integer, intent(in) :: loc, fm1, fm2, fm3
@@ -549,7 +574,7 @@ contains
         end function f_amr_tag_grad_${RSFX}$
     #:endfor
 
-    !> Tag indicator from the densities at i+1, i, i-1: central difference over 2*rho_i, or with amr_tag_abs the larger absolute
+    !> Tag indicator from the tagged variable at i+1, i, i-1: central difference over 2*r_i, or with amr_tag_abs the larger absolute
     !! face jump.
     pure real(wp) function f_amr_tag_ind(rp, r0, rm) result(v)
         real(wp), intent(in) :: rp, r0, rm
