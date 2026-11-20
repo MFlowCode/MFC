@@ -616,7 +616,7 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
-            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, tally=.true.)
+            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, 0)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
