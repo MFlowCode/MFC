@@ -1688,6 +1688,8 @@ contains
             do i = 1, n_nbrs
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                @:PROHIBIT(num_ibs + recv_counts(i) > num_local_ibs_max, &
+                           & "Owned plus neighboring IBs on a rank exceed num_local_ibs_max, which sizes ib_box and ib_face_ft. Use more ranks or increase num_local_ibs_max.")
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i))%owner_rank = nbr_ranks(i)
                 num_ibs = num_ibs + recv_counts(i)

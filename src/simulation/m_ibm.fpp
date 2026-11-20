@@ -3520,6 +3520,8 @@ contains
                     if (j < 0) then
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
+                        @:PROHIBIT(num_ibs > num_local_ibs_max, &
+                                   & "Owned plus neighboring IBs on a rank exceed num_local_ibs_max, which sizes ib_box and ib_face_ft. Use more ranks or increase num_local_ibs_max.")
                         patch_ib(num_ibs) = tmp_patch
                     else
                         ! an IB we already hold changed owner: record the new owner, keep our own copy of its state
