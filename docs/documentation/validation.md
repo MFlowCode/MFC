@@ -11,7 +11,7 @@ Errors are (MFC − reference)/reference.
 
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
-**Status:** validated. **Code:** `master` at [e29d3c25](https://github.com/MFlowCode/MFC/commit/e29d3c25d), with the stage-consistent position update of [#2040](https://github.com/MFlowCode/MFC/pull/2040). **Examples:** `examples/2D_mibm_constant_acceleration`, `examples/3D_mibm_wall_collision`.
+**Status:** validated. **Code:** `master` at e29d3c25d, with the stage-consistent position update of [#2040](https://github.com/MFlowCode/MFC/pull/2040). **Examples:** `examples/2D_mibm_constant_acceleration`, `examples/3D_mibm_wall_collision`.
 
 Two-way coupled bodies (`moving_ibm = 2`) are advanced from the force on them. Particle-resolved runs depend on the integration being exact where an exact answer exists, and on collisions returning the prescribed restitution.
 
