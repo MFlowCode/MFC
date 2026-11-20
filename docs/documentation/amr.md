@@ -149,8 +149,8 @@ AMR run is faster.
 | 512^2 | 1024^2 (1.0 M cells) | 7% | 2.05 | 1.54 |
 | 2048^2 | 4096^2 (16.8 M cells) | 6% | 1.05 | 0.70 |
 
-The last row is from the time per step over 400 steps. A 3D spherical blast (64^3 base against a uniform 128^3, the
-blocks holding 54% of the fine cells) took 1.86 (lock-step) and 1.40 (subcycled) times the uniform run.
+The last row is from the time per step over 400 steps. A 3D spherical blast (`examples/3D_amr_blast`, 64^3 base
+against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lock-step) and 1.40 (subcycled) times the uniform run.
 
 - **Size.** Below a few million cells on the grid AMR would replace, run the uniform grid: a GPU advances those
   cells at nearly no extra cost.
