@@ -50,6 +50,9 @@ export MFC_SKIP_RENDER_TESTS=1
 # Skip tests that compile Fortran: they depend on the modules loaded in the committer's
 # shell (./mfc.sh load), not on the commit. CI still runs them via ./mfc.sh lint.
 export MFC_SKIP_COMPILER_TESTS=1
+# Skip the test-suite linters: they materialize every test case, which takes about five of the
+# seven minutes this check otherwise needs. CI still runs them via ./mfc.sh lint.
+export MFC_SKIP_SUITE_LINT=1
 
 NCHECK=7
 

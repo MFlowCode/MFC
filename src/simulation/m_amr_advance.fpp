@@ -30,7 +30,7 @@ module m_amr_advance
     implicit none
 
     private
-    public :: s_amr_fine_stage_advance_batched, s_amr_setup_ib
+    public :: s_amr_fine_stage_advance_batched, s_amr_setup_ib, s_amr_fine_stage_ib
 
 contains
 
@@ -151,6 +151,7 @@ contains
         call s_amr_refresh_my_blocks()
         allocate (done(amr_n_my)); done = .false.
         my = amr_my_blk(1:amr_n_my)
+        call s_amr_ibp_reserve(my)
         do i = 1, amr_n_my
             if (done(i)) cycle
             done(i) = .true.
@@ -293,7 +294,11 @@ contains
                 call s_amr_fine_leave()
             end if
             if (ib) then
-                if (moving_immersed_boundary_flag) call s_amr_update_mib_fine()
+                ! a moving body's block: the correction and the clamps after it follow the bodies' move (s_amr_fine_stage_ib)
+                if (f_amr_ib_waits(amr_bat_blk(ibm))) then
+                    call s_amr_ibp_save(ibm)
+                    cycle
+                end if
                 call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
                 call s_amr_ib_correct_fine(amr_scr_prim_blk, pb_in, mv_in)
             end if
@@ -306,6 +311,118 @@ contains
         amr_bat_n = nb
 
     end subroutine s_amr_batch_post_rk_hooks
+
+    !> Whether block blk's IB correction waits for the bodies to move: it holds ghost points, or a moving body (one coarse cell
+    !! beyond the margin s_amr_update_mib_fine keeps it inside, for this stage's displacement) overlaps it.
+    impure logical function f_amr_ib_waits(blk) result(waits)
+
+        integer, intent(in) :: blk
+        integer             :: i, blo(3), bhi(3)
+
+        waits = .false.
+        if (.not. (ib .and. moving_immersed_boundary_flag)) return
+        if (amr_block_owner(blk) /= proc_rank) return
+        waits = f_ibm_fine_gps(blk) > 0
+        do i = 1, num_ibs
+            if (waits) return
+            if (patch_ib(i)%moving_ibm == 0) cycle
+            call s_amr_body_bbox(i, merge(2, 0, amr_regrid_int > 0) + 1, blo, bhi)
+            waits = f_amr_boxes_overlap(blo, bhi, amr_slots(blk)%region%lo, amr_slots(blk)%region%hi)
+        end do
+
+    end function f_amr_ib_waits
+
+    !> Size amr_ibp for the owned blocks my(:) that wait (their columns need not survive a stage) and start the stage's list.
+    impure subroutine s_amr_ibp_reserve(my)
+
+        integer, intent(in) :: my(:)
+        integer             :: i, nw
+
+        amr_ibp_n = 0
+        if (.not. (ib .and. moving_immersed_boundary_flag)) return
+        nw = 0
+        do i = 1, size(my)
+            if (f_amr_ib_waits(my(i))) nw = nw + 1
+        end do
+        if (allocated(amr_ibp)) then
+            if (size(amr_ibp, 5) >= nw) return
+            @:DEALLOCATE(amr_ibp)
+            deallocate (amr_ibp_blk)
+        end if
+        if (nw == 0) return
+        @:ALLOCATE(amr_ibp(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3), 1:sys_size, 1:nw))
+        allocate (amr_ibp_blk(nw))
+
+    end subroutine s_amr_ibp_reserve
+
+    !> Keep batch member ibm's primitive state from the RHS pass (amr_scr_prim, at its slab offset) in the next amr_ibp column.
+    impure subroutine s_amr_ibp_save(ibm)
+
+        integer, intent(in) :: ibm
+        integer             :: i, j, k, l, h, q, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h
+
+        h = amr_bat_blk(ibm)
+        amr_ibp_n = amr_ibp_n + 1; q = amr_ibp_n
+        amr_ibp_blk(q) = h
+        o1 = amr_bat_off(1, ibm); o2 = amr_bat_off(2, ibm); o3 = amr_bat_off(3, ibm)
+        b1l = amr_slots(h)%idwbuff(1)%beg; b1h = amr_slots(h)%idwbuff(1)%end
+        b2l = amr_slots(h)%idwbuff(2)%beg; b2h = amr_slots(h)%idwbuff(2)%end
+        b3l = amr_slots(h)%idwbuff(3)%beg; b3h = amr_slots(h)%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[q, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h]')
+        do i = 1, sys_size
+            do l = b3l, b3h
+                do k = b2l, b2h
+                    do j = b1l, b1h
+                        amr_ibp(j, k, l, i, q) = amr_scr_prim(i)%sf(j + o1, k + o2, l + o3)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_ibp_save
+
+    !> After the bodies have moved on the stage's complete force: the IB rebuild, the correction and the clamps after it, on each
+    !! block s_amr_batch_post_rk_hooks left waiting, from its saved primitive state.
+    impure subroutine s_amr_fine_stage_ib(pb_in, mv_in)
+
+        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
+        integer                                        :: i, j, k, l, h, q, b1l, b1h, b2l, b2h, b3l, b3h
+        logical                                        :: post
+
+        if (amr_ibp_n == 0) return
+        post = f_stage_hooks_post_ib()
+        amr_bat_n = 1  ! as s_amr_batch_post_rk_hooks: each block in its own frame
+        do q = 1, amr_ibp_n
+            h = amr_ibp_blk(q)
+            call s_amr_select_slot(h)
+            call s_amr_update_mib_fine()
+            b1l = amr_slots(h)%idwbuff(1)%beg; b1h = amr_slots(h)%idwbuff(1)%end
+            b2l = amr_slots(h)%idwbuff(2)%beg; b2h = amr_slots(h)%idwbuff(2)%end
+            b3l = amr_slots(h)%idwbuff(3)%beg; b3h = amr_slots(h)%idwbuff(3)%end
+            $:GPU_PARALLEL_LOOP(collapse=4, copyin='[q, b1l, b1h, b2l, b2h, b3l, b3h]')
+            do i = 1, sys_size
+                do l = b3l, b3h
+                    do k = b2l, b2h
+                        do j = b1l, b1h
+                            amr_scr_prim_blk(i)%sf(j, k, l) = amr_ibp(j, k, l, i, q)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            call s_amr_ib_correct_fine(amr_scr_prim_blk, pb_in, mv_in)
+            if (post) then
+                call s_amr_fine_enter()
+                call s_stage_hooks_post_ib(amr_cons_br, tally=.false.)
+                call s_amr_fine_leave()
+            end if
+        end do
+        amr_bat_n = 0
+        amr_ibp_n = 0
+        call s_amr_select_slot(1)  ! the next stage's coarse RHS captures creg into slot 1
+
+    end subroutine s_amr_fine_stage_ib
 
     !> The batch's slab layout: members stacked along the last active dim, stride amr_bat_w.
     impure subroutine s_amr_bat_layout()

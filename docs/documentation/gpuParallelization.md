@@ -893,6 +893,17 @@ The failure signature without the flag: after adding a kernel, unrelated kernels
 resource usage shifts image-wide (uniform LDS increase, scratch/spill jumps visible in
 `rocprofv3` dispatch records) and previously fast kernels slow several-fold.
 
+### Contended atomics and launch cost (measured on MI300A, AFAR 24.3)
+
+- A `GPU_ATOMIC` update of a double lowers to a `flat_atomic_cmpswap` loop; `-munsafe-fp-atomics` does not change that on
+  amdflang (checked in the device ISA). Many threads adding to one address serialize: the roughly 900 shell cells of a
+  512 x 512 circle summing its gas mass took 700 us, against 56 us with the adds spread over 32 sums (`ib_part`).
+- A kernel's launch cost grows with the arrays it names: the general `s_accumulate_ib_face_fluxes` kernel (120 arguments)
+  left a 0.5 ms host gap before every launch, the mass-only `s_accumulate_ib_mass` (a few arrays) 25 to 50 us. A kernel the
+  common case does not need should not carry the arrays of the rare ones.
+- A `GPU_UPDATE` host/device round trip of a few bytes is a device sync costing about 0.5 ms; skip it where the data are not
+  read on the host (one rank needs no allreduce).
+
 ### Target regions inside Fortran BLOCK constructs are silently dropped
 
 A `GPU_PARALLEL_LOOP` (OpenMP target region) written inside a Fortran `block ...

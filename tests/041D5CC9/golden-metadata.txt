@@ -1,12 +1,12 @@
-This file was created on 2026-11-16 18:29:12.479674.
+This file was created on 2026-11-18 15:37:52.271404.
 
 mfc.sh:
 
-    Invocation: test --gpu acc --mpi --no-build -j 1 -g 0 --generate --only B5CAD86E 041D5CC9
+    Invocation: test --gpu acc --mpi --no-build -j 1 -g 0 --generate --only B5CAD86E 041D5CC9 92C38C91
     Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
     Git:         on  (dirty)
 
-simulation:
+post_process:
 
     CMake Configuration:
     
@@ -16,8 +16,8 @@ simulation:
         Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -26,7 +26,7 @@ simulation:
         OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/w44swept/swept/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w28fixpr/tree/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -60,7 +60,7 @@ syscheck:
         OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/w44swept/swept/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w28fixpr/tree/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -94,7 +94,41 @@ pre_process:
         OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/w44swept/swept/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w28fixpr/tree/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
+        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
+        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
+        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : ON
+        OpenMP  : OFF
+    
+        Fypp    : /fastscratch/sbryngelson3/w28fixpr/tree/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -126,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      33%
+    CPU(s) scaling MHz:                      30%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
