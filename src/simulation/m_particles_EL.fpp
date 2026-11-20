@@ -250,14 +250,14 @@ contains
 
     end subroutine s_load_particles
 
-    !> Store one particle from the input file: position, velocity, radius, mass from particle_pp%rho0ref_particle, and its
+    !> Store one particle from the input file: position, velocity, radius, mass from its cloud density or rho0ref_particle, and its
     !! fluctuation-model seed.
     impure subroutine s_add_particle(inputPart, part_id, glb_part_id)
 
-        real(wp), dimension(7), intent(in) :: inputPart
-        integer, intent(in)                :: part_id, glb_part_id
-        real(wp)                           :: volparticle
-        integer, dimension(3)              :: cell
+        real(wp), dimension(num_lag_particle_input_vars), intent(in) :: inputPart
+        integer, intent(in)                                          :: part_id, glb_part_id
+        real(wp)                                                     :: volparticle
+        integer, dimension(3)                                        :: cell
 
         particle_rad(part_id) = inputPart(7)
         particle_pos(part_id,1:3,1) = inputPart(1:3)
@@ -284,7 +284,7 @@ contains
 
         ! Initial particle mass
         volparticle = 4._wp/3._wp*pi*particle_rad(part_id)**3  ! volume
-        particle_mass(part_id) = volparticle*particle_pp%rho0ref_particle  ! mass
+        particle_mass(part_id) = volparticle*f_cloud_particle_density(glb_part_id, particle_pp%rho0ref_particle)
         if (particle_mass(part_id) <= 0._wp) then
             call s_mpi_abort("The initial particle mass is negative or zero. Check the particle file.")
         end if
