@@ -10,8 +10,9 @@ AMR adds refined rectangular blocks on top of the base grid (level 0) where the 
 interfaces, wakes, bodies. The base grid is advanced by the ordinary solver; refined blocks run the same solver on
 their own grids, nested up to `amr_max_level` levels at `amr_ref_ratio`:1 per level.
 
-With `amr_regrid_int > 0`, every `amr_regrid_int` steps the blocks are rebuilt around the cells where the density
-gradient exceeds `amr_tag_eps`. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the density gradient exceeds `amr_tag_eps`:
+once per level before the first step of a fresh run, so they start on the initial features, and then every
+`amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
 
 AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overlay the blocks. Internals:
 @subpage amr_implementation.
