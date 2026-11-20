@@ -1053,6 +1053,21 @@ class CaseValidator:
                     f"patch_ib({i})%thermal_layer > 0 requires a circle (geometry 2) or sphere (geometry 8)",
                 )
 
+            # Sub-grid wall column: a radial conduction model on a fixed inert isothermal circle or sphere, whose flux reaches the gas
+            # through the mixture-averaged conduction flux. A step start's column flux sets the time step (wall_column_dt_frac).
+            self.prohibit((self.get(f"patch_ib({i})%wall_column_len", 0.0) or 0.0) < 0, f"patch_ib({i})%wall_column_len must be >= 0")
+            if self.get(f"patch_ib({i})%wall_column", "F") == "T":
+                pre = f"patch_ib({i})%wall_column"
+                self.prohibit(thermal_bc != 1, f"{pre} requires thermal_bc = 1")
+                self.prohibit(not chemistry or self.get("chem_params%diffusion", "F") != "T", f"{pre} requires chemistry = T and chem_params%diffusion = T")
+                self.prohibit(self.get("chem_params%transport_model", 1) != 1, f"{pre} requires chem_params%transport_model = 1")
+                self.prohibit(surface_reaction != 0, f"{pre} requires surface_reaction = 0")
+                self.prohibit(self.get(f"patch_ib({i})%geometry", 0) not in (2, 8), f"{pre} requires a circle (geometry 2) or sphere (geometry 8)")
+                self.prohibit(moving, f"{pre} requires every immersed boundary to be fixed (moving_ibm = 0)")
+                self.prohibit(self.get("amr", "F") == "T", f"{pre} is not supported with amr")
+                self.prohibit(self.get("cfl_adap_dt", "F") != "T" and self.get("cfl_const_dt", "F") != "T", f"{pre} requires cfl_adap_dt or cfl_const_dt (the WCOL time-step limit)")
+                self.prohibit(not 0 < (self.get("wall_column_dt_frac", 0.1) or 0.1) <= 1, "wall_column_dt_frac must be in (0, 1]")
+
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
                 self.prohibit(inj_species > 0, f"patch_ib({i})%surface_reaction = 1 cannot be combined with inj_species > 0")

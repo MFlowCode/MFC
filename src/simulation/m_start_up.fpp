@@ -1503,6 +1503,8 @@ contains
         ib_patch%emissivity = 0._wp
         ib_patch%T_rad = 0._wp
         ib_patch%heat_power = 0._wp
+        ib_patch%wall_column = .false.
+        ib_patch%wall_column_len = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0

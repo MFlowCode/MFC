@@ -19,7 +19,7 @@ module m_sim_helpers
 
     !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, TCFL, the collision cap, or the ramp limiter)
     character(len=4)                          :: dt_limiter = 'none'
-    character(len=4), dimension(5), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'TCFL', 'COLL'/)
+    character(len=4), dimension(6), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'TCFL', 'COLL', 'WCOL'/)
 
 contains
 

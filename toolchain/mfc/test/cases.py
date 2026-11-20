@@ -4627,6 +4627,31 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # The sub-grid wall conduction column (patch_ib%wall_column) on an inert isothermal cylinder in the same example: the column's
+    # wall flux, its time-step limit (wall_column_dt_frac) and its heat booking (ib_heat_wrt).
+    wall_column = {
+        "m": 24,
+        "n": 24,
+        "parallel_io": "F",
+        "t_stop": 2.0e-5,
+        "t_save": 2.0e-5,
+        "patch_ib(1)%surface_reaction": 0,
+        "patch_ib(1)%wall_column": "T",
+        "ib_heat_wrt": "T",
+    }
+    # 1e-4: the golden was generated with nvhpc on an A100. The amdflang MI300A run differs from it by up to 4e-8 relative in the
+    # energy and 1e-7 absolute in a mole fraction, and the Intel CPU run by 2e-6 relative in a conservative variable (1.2e-6 in
+    # another, 1.2e-6 absolute in a 7e-5 mole fraction): the column's implicit solves and the time-step limit pass roundoff on.
+    cases.append(define_case_f("2D -> Chemistry -> IBM Reacting Surface -> Wall Column", "examples/2D_ibm_reacting_surface/case.py", mods=wall_column, override_tol=1e-4))
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Wall Column -> Time-Step Limit",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={**wall_column, "wall_column_dt_frac": 1.0e-3},
+            override_tol=1e-4,
+        )
+    )
+
     # ib_flux_wall (with its surface records) on the same example and mechanism: the wall faces carry the surface solve's species,
     # mass and energy fluxes.
     cases.append(
