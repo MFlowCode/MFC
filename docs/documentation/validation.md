@@ -11,7 +11,7 @@ Errors are (MFC − reference)/reference.
 
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
-**Status:** validated. **Code:** `master` at e29d3c25d, with the stage-consistent position update of [#2040](https://github.com/MFlowCode/MFC/pull/2040). **Examples:** `examples/2D_mibm_constant_acceleration`, `examples/3D_mibm_wall_collision`.
+**Status:** validated. **Code:** `master` at 067f23074, with the stage-consistent position update of [#2040](https://github.com/MFlowCode/MFC/pull/2040). **Examples:** `examples/2D_mibm_constant_acceleration`, `examples/3D_mibm_wall_collision`.
 
 Two-way coupled bodies (`moving_ibm = 2`) are advanced from the force on them. Particle-resolved runs depend on the integration being exact where an exact answer exists, and on collisions returning the prescribed restitution.
 
@@ -28,7 +28,7 @@ Two-way coupled bodies (`moving_ibm = 2`) are advanced from the force on them. P
 
 | Cells per radius | Position error | Velocity error |
 | ---: | ---: | ---: |
-| 5 | −3.5e-13 | −2.2e-13 |
+| 5 | −3.6e-13 | −2.3e-13 |
 | 10 | −2.9e-13 | −1.9e-13 |
 
 Both are round-off. A build with the stage weights of the position update from before #2040 gave a position error of 1.2e-3 with an exact velocity (measured earlier on a build without #2040; not repeated). The check cannot see a wrong stage velocity in the velocity, only in the position, which is why it uses a position.
@@ -76,10 +76,14 @@ python3 examples/3D_mibm_wall_collision/check_collision.py examples/3D_mibm_wall
 ```
 
 The small cases run in the test suite as `2D -> IBM -> Moving Circle -> Constant Acceleration` and `3D -> IBM -> Wall Collision -> Normal` and `-> Sliding Friction`.
-The tables above were measured with GNU 13.3 (CPU, one rank). The golden tolerance is 1e-6 for both, about two orders above the largest difference seen across compilers and CPUs (2.1e-8); it makes the golden a regression guard, while the checker scripts validate the physics; both tests are skipped in the single-precision lane. The sticking case is checked by `check_collision.py` and is not a golden, because the friction direction there depends on round-off.
+The tables above were measured with GNU 13.3 (CPU, one rank). The golden tolerance is 1e-6 for both. Against goldens generated on the current master, the GNU, Intel, NVHPC and macOS CI lanes agreed to 1e-13 absolute on the fields and 5e-9 relative on the contact force; the checker scripts validate the physics, and the golden is a regression guard. Both tests are skipped in the single-precision lane. The sticking case is checked by `check_collision.py` and is not a golden, because the friction direction there depends on round-off.
 
 ## Adding a section
 
 One `##` section per family, with an anchor `{#sec-validation-<family>}`: status and code version, one setup table per check, the reference and how it was obtained, a results table with signed errors, and the limits.
 Put each check's example, checker script and README under `examples/`, and register a small version in `toolchain/mfc/test/cases.py`.
 Cite references with `\cite` keys from `docs/references.bib`.
+
+## Keeping the goldens current
+
+The registered tests are regression guards: their goldens hold the output of the code at the time they were generated. When a default or an algorithm in the numerics a test exercises changes (for moving bodies, for example the `ib_mass_relax` default), regenerate the goldens with `./mfc.sh test --generate --only <UUID>` in the same change, and re-run the checker scripts to confirm the physics results above.

@@ -11,7 +11,7 @@ position.
 
 | cells per radius | steps | t [s] | position error | velocity error |
 |---:|---:|---:|---:|---:|
-| 5 | 200 | 2.34e-6 | -3.5e-13 | -2.2e-13 |
+| 5 | 200 | 2.34e-6 | -3.6e-13 | -2.3e-13 |
 | 10 | 200 | 1.17e-6 | -2.9e-13 | -1.9e-13 |
 
 Both are round-off. A build with the stage weights of the position update before the fix of #2040 gave a position error of 1.2e-3
