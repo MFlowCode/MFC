@@ -51,6 +51,8 @@ module m_ibm
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
+    use m_compile_specific, only: s_create_directory
+    use m_delay_file_access, only: s_delay_file_access
     use m_variables_conversion
     use m_eos
     use m_helper
@@ -82,7 +84,7 @@ module m_ibm
         & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, s_ibm_note_fine_memory, &
         & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, &
         & s_add_swept_cells, s_fill_uncovered_cells, f_ib_mass_bank, ib_mass_res, s_ibm_set_conduction_temperature, &
-        & s_ibm_restore_conduction_temperature
+        & s_ibm_restore_conduction_temperature, s_write_ib_conduction_temperature, s_read_ib_conduction_temperature
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -128,6 +130,12 @@ module m_ibm
     !! there; a stencil that reads ghost cells (ib_ip_interp = 2) needs it.
     real(wp), dimension(:,:), allocatable :: gp_prim_new
     $:GPU_DECLARE(create='[ghost_points]')
+    integer(kind=8), parameter :: tcond_magic = 7164990_8  !< first header word of restart_data/ib_tcond files
+    integer(kind=8), parameter :: tcond_version = 1_8      !< format version of the ib_tcond header
+    integer, parameter         :: tcond_chunk = 65536      !< records per block read or written of an ib_tcond file
+
+    !> Packed (i, j, k, T_cond) per ghost for the T_cond restart file, so only these four reals per ghost cross to the host
+    real(wp), dimension(:,:), allocatable :: gp_tc_rec
     !> per-i-slab ghost-point counts/offsets for the ordered gather (AMR)
     integer, allocatable, dimension(:) :: gp_slab
     $:GPU_DECLARE(create='[gp_slab]')
@@ -339,6 +347,9 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
         @:ALLOCATE(gp_prim_new(1:sys_size, 1:max_num_gps))
         $:GPU_ENTER_DATA(copyin='[gp_prim_new]')
+        if (chemistry .and. chem_params%diffusion) then
+            @:ALLOCATE(gp_tc_rec(4, 1:max_num_gps))
+        end if
         ! Global, not per rank: s_update_ib_temperatures is collective, and a rank whose neighborhood holds no thermal_bc = 3
         ! body must still take part in its allreduce.
         call s_mpi_allreduce_integer_sum(int(count(patch_ib(1:num_ibs)%thermal_bc == 3), 8), n_lumped)
@@ -1127,6 +1138,239 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ibm_restore_conduction_temperature
+
+    !> Pack every ghost's global cell index (i, j, k) and T_cond into gp_tc_rec(1:4, 1:num_gps) on the device and bring only those
+    !! four reals per ghost to the host, instead of the whole ghost_point (about 380 B).
+    impure subroutine s_pack_ghost_tcond()
+
+        integer :: i, s(3), s1, s2, s3
+
+        if (num_gps == 0) return
+        s = 0
+        s(1:num_dims) = start_idx(1:num_dims)
+        s1 = s(1); s2 = s(2); s3 = s(3)
+        $:GPU_PARALLEL_LOOP(private='[i]', firstprivate='[s1, s2, s3]', present='[ghost_points, gp_tc_rec]')
+        do i = 1, num_gps
+            gp_tc_rec(1, i) = real(ghost_points(i)%loc(1) + s1, wp)
+            gp_tc_rec(2, i) = real(ghost_points(i)%loc(2) + s2, wp)
+            gp_tc_rec(3, i) = real(ghost_points(i)%loc(3) + s3, wp)
+            gp_tc_rec(4, i) = ghost_points(i)%T_cond
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[gp_tc_rec(:, 1:num_gps)]')
+
+    end subroutine s_pack_ghost_tcond
+
+    !> Send gp_tc_rec(4, :) to the T_cond of each ghost: a component copy, never the whole ghost_point.
+    impure subroutine s_unpack_ghost_tcond()
+
+        integer :: i
+
+        if (num_gps == 0) return
+        $:GPU_UPDATE(device='[gp_tc_rec(:, 1:num_gps)]')
+        $:GPU_PARALLEL_LOOP(private='[i]', present='[ghost_points, gp_tc_rec]')
+        do i = 1, num_gps
+            ghost_points(i)%T_cond = gp_tc_rec(4, i)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_unpack_ghost_tcond
+
+    !> Path of the T_cond file of a save: one shared file, or one file per rank with file_per_process (as ib_state).
+    impure function f_tcond_file(t_step) result(file_loc)
+
+        integer, intent(in)                  :: t_step
+        character(len=path_len + 2*name_len) :: file_loc
+
+        if (file_per_process) then
+            write (file_loc, '(A,I0,A,I0,A,I7.7,A)') trim(case_dir) // '/restart_data/lustre_', t_step, '/ib_tcond_', t_step, &
+                   & '_', proc_rank, '.dat'
+        else
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_tcond_', t_step, '.dat'
+        end if
+
+    end function f_tcond_file
+
+    !> Write every ghost's T_cond to restart_data/ib_tcond_<t_step>.dat (lustre_<t_step>/ib_tcond_<t_step>_<rank>.dat with
+    !! file_per_process). The file is a header of 64-bit integers (magic, format version, bytes per real, number of slabs n_w, then
+    !! per slab its record count and the bounding box of its global cell indices) followed by one slab per writing rank, each record
+    !! four reals: the global cell index (i, j, k) and T_cond of a ghost that has one. Keyed by cell, so the file does not depend on
+    !! the order the ghosts were found in or on the rank count. Each rank writes its own slab at an offset from an exclusive scan of
+    !! the counts: no rank holds the global records, and only 7 integers per rank reach rank 0 for the header. T_cond is formed from
+    !! the primitive state at the start of the last stage, so it cannot be rebuilt from the saved conservative state. Collective.
+    impure subroutine s_write_ib_conduction_temperature(t_step)
+
+        integer, intent(in)                  :: t_step
+        character(len=path_len + 2*name_len) :: file_loc
+        character(len=10)                    :: t_step_string
+        integer(kind=8)                      :: info(7), off
+        integer(kind=8), allocatable         :: tab(:,:), hdr(:)
+        integer                              :: i, n_loc, n_w
+        logical                              :: lead
+
+#ifdef MFC_MPI
+        integer(kind=MPI_OFFSET_KIND)       :: base, rb
+        integer                             :: ifile, ierr, k0, nc
+        integer, dimension(MPI_STATUS_SIZE) :: status
+#else
+        integer :: file_unit
+#endif
+
+        call s_pack_ghost_tcond()
+        n_loc = 0
+        info = 0
+        do i = 1, num_gps
+            if (gp_tc_rec(4, i) <= T_cond_unset) cycle
+            n_loc = n_loc + 1
+            gp_tc_rec(:,n_loc) = gp_tc_rec(:,i)
+            if (n_loc == 1) then
+                info(2:4) = nint(gp_tc_rec(1:3,i), 8)
+                info(5:7) = info(2:4)
+            else
+                info(2:4) = min(info(2:4), nint(gp_tc_rec(1:3,i), 8))
+                info(5:7) = max(info(5:7), nint(gp_tc_rec(1:3,i), 8))
+            end if
+        end do
+        info(1) = n_loc
+
+        n_w = merge(1, num_procs, file_per_process)
+        lead = file_per_process .or. proc_rank == 0
+        allocate (tab(7, merge(n_w, 1, lead)))
+        off = 0
+        tab(:,1) = info
+#ifdef MFC_MPI
+        if (.not. file_per_process) then
+            call MPI_GATHER(info, 7, MPI_INTEGER8, tab, 7, MPI_INTEGER8, 0, MPI_COMM_WORLD, ierr)
+            call MPI_EXSCAN(int(n_loc, 8), off, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+            if (proc_rank == 0) off = 0
+        end if
+#endif
+
+        if (file_per_process) then
+            call s_int_to_str(t_step, t_step_string)
+            if (proc_rank == 0) call s_create_directory(trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string))
+        else if (proc_rank == 0) then
+            call s_create_directory(trim(case_dir) // '/restart_data')
+        end if
+        call s_mpi_barrier()
+        if (file_per_process) call s_delay_file_access(proc_rank)
+        file_loc = f_tcond_file(t_step)
+
+        allocate (hdr(4 + 7*n_w))
+        if (lead) then
+            hdr(1:4) = [tcond_magic, tcond_version, int(storage_size(0._wp)/8, 8), int(n_w, 8)]
+            hdr(5:) = reshape(tab, [7*n_w])
+        end if
+
+#ifdef MFC_MPI
+        call MPI_FILE_OPEN(merge(MPI_COMM_SELF, MPI_COMM_WORLD, file_per_process), file_loc, ior(MPI_MODE_WRONLY, &
+                           & MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+        call s_check_mpi_file_open(ierr, file_loc)
+        call MPI_FILE_SET_SIZE(ifile, 0_MPI_OFFSET_KIND, ierr)
+        rb = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)*4
+        base = size(hdr, kind=MPI_OFFSET_KIND)*8 + int(off, MPI_OFFSET_KIND)*rb
+        if (lead) call MPI_FILE_WRITE_AT(ifile, 0_MPI_OFFSET_KIND, hdr, size(hdr), MPI_INTEGER8, status, ierr)
+        do k0 = 1, n_loc, tcond_chunk
+            nc = min(tcond_chunk, n_loc - k0 + 1)
+            call MPI_FILE_WRITE_AT(ifile, base + int(k0 - 1, MPI_OFFSET_KIND)*rb, gp_tc_rec(:,k0:k0 + nc - 1), 4*nc, mpi_p, &
+                                   & status, ierr)
+        end do
+        call MPI_FILE_CLOSE(ifile, ierr)
+#else
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace')
+        write (file_unit) hdr
+        write (file_unit) gp_tc_rec(:,1:n_loc)
+        close (file_unit)
+#endif
+
+    end subroutine s_write_ib_conduction_temperature
+
+    !> Restore T_cond of this rank's ghosts from the file of s_write_ib_conduction_temperature, after s_ibm_setup has found them.
+    !! Rank 0 reads the header and broadcasts it (with file_per_process each rank reads its own); a rank then reads only the slabs
+    !! whose bounding box meets its cells, in blocks of tcond_chunk records, keeping the records it owns. On the rank count that
+    !! wrote the file that is its own slab: O(local ghosts) reads plus O(n_w) header entries; on another rank count a few
+    !! neighbouring slabs. Nothing is proportional to the global ghost count. A file from before T_cond was saved is absent: the
+    !! first stage then conducts through each ghost's own temperature, as it always did.
+    impure subroutine s_read_ib_conduction_temperature(t_step)
+
+        integer, intent(in)                     :: t_step
+        real(wp), allocatable, dimension(:,:,:) :: tc
+        real(wp), allocatable, dimension(:,:)   :: buf
+        character(len=path_len + 2*name_len)    :: file_loc
+        integer(kind=8)                         :: head(4), pre, hbytes, rb, fsize, k0, cnt
+        integer(kind=8), allocatable            :: tab(:,:)
+        integer                                 :: i, w, r, nc, ios, file_unit, c(3), lo(3), hi(3)
+        logical                                 :: file_exist, rd
+
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
+
+        file_loc = f_tcond_file(t_step)
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (.not. file_exist) then
+            if (proc_rank == 0) print '(A)', &
+                & 'Warning: ' // trim(file_loc) // ' not found; the first stage conducts through the ghost temperature'
+            return
+        end if
+
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', action='read')
+        rd = file_per_process .or. proc_rank == 0
+        head = 0
+        ios = 0
+        if (rd) read (file_unit, iostat=ios, pos=1) head
+        if (ios /= 0) head = 0
+#ifdef MFC_MPI
+        if (.not. file_per_process) call MPI_BCAST(head, 4, MPI_INTEGER8, 0, MPI_COMM_WORLD, ierr)
+#endif
+        rb = int(storage_size(0._wp)/8, 8)*4
+        if (head(1) /= tcond_magic .or. head(2) /= tcond_version .or. head(3)*4 /= rb .or. head(4) < 1) then
+            call s_mpi_abort(trim(file_loc) // ' is not an ib_tcond file of this format (an old file without a header, a ' &
+                             & // 'different real precision, or a corrupt file): delete it to restart without the wall ' &
+                             & // 'conduction temperature, or rerun the save that wrote it')
+        end if
+
+        allocate (tab(7, head(4)))
+        if (rd) read (file_unit, iostat=ios, pos=33) tab
+        if (rd .and. ios /= 0) call s_mpi_abort('Error reading the header of ' // trim(file_loc))
+#ifdef MFC_MPI
+        if (.not. file_per_process) call MPI_BCAST(tab, 7*int(head(4)), MPI_INTEGER8, 0, MPI_COMM_WORLD, ierr)
+#endif
+        hbytes = 8*(4 + 7*head(4))
+        inquire (UNIT=file_unit, SIZE=fsize)
+        if (fsize /= hbytes + sum(tab(1,:))*rb) call s_mpi_abort(trim(file_loc) // ' is truncated or does not match its header')
+
+        lo = 0
+        lo(1:num_dims) = start_idx(1:num_dims)
+        hi = lo + [m, n, p]
+        allocate (tc(0:m,0:n,0:p), buf(4, tcond_chunk))
+        tc = T_cond_unset
+        pre = 0
+        do w = 1, int(head(4))
+            cnt = tab(1, w)
+            if (cnt > 0 .and. all(tab(2:4,w) <= hi) .and. all(tab(5:7,w) >= lo)) then
+                do k0 = 0, cnt - 1, tcond_chunk
+                    nc = int(min(int(tcond_chunk, 8), cnt - k0))
+                    read (file_unit, iostat=ios, pos=hbytes + (pre + k0)*rb + 1) buf(:,1:nc)
+                    if (ios /= 0) call s_mpi_abort('Error reading ' // trim(file_loc))
+                    do r = 1, nc
+                        c = nint(buf(1:3,r)) - lo
+                        if (all(c >= 0) .and. all(c <= [m, n, p])) tc(c(1), c(2), c(3)) = buf(4, r)
+                    end do
+                end do
+            end if
+            pre = pre + cnt
+        end do
+        close (file_unit)
+
+        call s_pack_ghost_tcond()
+        do i = 1, num_gps
+            c = nint(gp_tc_rec(1:3,i)) - lo
+            gp_tc_rec(4, i) = tc(c(1), c(2), c(3))
+        end do
+        call s_unpack_ghost_tcond()
+
+    end subroutine s_read_ib_conduction_temperature
 
     !> One line at the end of a run if the reacting surface ever failed to solve. Silence means every ghost point on every step
     !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.
@@ -2693,6 +2937,26 @@ contains
 
     end function f_ib_face_mass
 
+    !> Momentum density of component i in cell (j, k, l). The momentum halos of q_cons_vf are not exchanged between ranks, so a halo
+    !! cell (rank seam, periodic edge) takes rho*u from q_prim_vf, whose halos are.
+    function f_ib_cell_momentum(q_cons_vf, q_prim_vf, i, j, k, l) result(mom)
+
+        $:GPU_ROUTINE(function_name='f_ib_cell_momentum', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
+        integer, intent(in)                                 :: i, j, k, l
+        real(wp)                                            :: mom, rho
+        integer                                             :: c
+
+        mom = q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
+        if (igr .or. (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0 .and. l <= p)) return
+        rho = 0._wp
+        do c = eqn_idx%cont%beg, eqn_idx%cont%end
+            rho = rho + q_prim_vf(c)%sf(j, k, l)
+        end do
+        mom = rho*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
+
+    end function f_ib_cell_momentum
+
     !> Area of the face (j, k, l) normal to direction idir
     pure real(wp) function f_ib_face_area(idir, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -2784,10 +3048,10 @@ contains
     !! moving with its wall (face momentum times the wall's normal velocity is removed). With ib_exchange: energy in and mass out of
     !! each lumped body (every body with ib_heat_wrt) into ib_heat(2:3), weighted so a step's stages sum to its exchange (SSP-RK: 1;
     !! 1/2, 1/2; 1/6, 1/6, 2/3).
-    subroutine s_accumulate_ib_face_fluxes(idir, stage, q_cons_vf, markers)
+    subroutine s_accumulate_ib_face_fluxes(idir, stage, q_cons_vf, q_prim_vf, markers)
 
         integer, intent(in) :: idir, stage
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(integer_field), intent(in) :: markers  !< ib_markers, or ib_markers_fine on an AMR fine frame
         real(wp), dimension(3) :: f, r, tq, vb
         real(wp) :: area, w, f_E, f_m, f_mom
@@ -2917,8 +3181,8 @@ contains
                                     ! + p n_i: the lab flux carries rho u_i u_n, so remove the face momentum (mean of the fluid
                                     ! and body cell) times the wall's normal velocity V_n
                                     if (patch_ib(ib_id)%moving_ibm > 0) then
-                                        f(i) = f(i) - 0.5_wp*vb(idir)*(q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(fj, fk, &
-                                          & fl) + q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(ci, cj, ck))
+                                        f(i) = f(i) - 0.5_wp*vb(idir)*(f_ib_cell_momentum(q_cons_vf, q_prim_vf, i, fj, fk, &
+                                          & fl) + f_ib_cell_momentum(q_cons_vf, q_prim_vf, i, ci, cj, ck))
                                     end if
                                     f(i) = real(side, wp)*area*f(i)
                                 end do
@@ -3218,8 +3482,8 @@ contains
                             ! if the boundary exited "left", wrap it back around to the "right"
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid + (glb_bounds(${DIR}$)%end &
                                      & - glb_bounds(${DIR}$)%beg)
-                        else if (patch_ib(patch_id)%${X}$_centroid > glb_bounds(${DIR}$)%end) then
-                            ! if the boundary exited "right", wrap it back around to the "left"
+                        else if (patch_ib(patch_id)%${X}$_centroid >= glb_bounds(${DIR}$)%end) then
+                            ! "right": the last rank owns [beg, end), so a centroid on the end belongs to no rank until wrapped
                             patch_ib(patch_id)%${X}$_centroid = patch_ib(patch_id)%${X}$_centroid - (glb_bounds(${DIR}$)%end &
                                      & - glb_bounds(${DIR}$)%beg)
                         end if
@@ -3517,6 +3781,13 @@ contains
                     call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
                                     & ierr)
                     call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j, num_ibs_pre)
+                    ! A rank filling several table slots (periodicity, few ranks) sends each arrival once per slot, and the map
+                    ! holds only the num_ibs_pre older entries: look among this call's arrivals too
+                    if (j < 0) then
+                        do k = num_ibs_pre + 1, num_ibs
+                            if (patch_ib(k)%gbl_patch_id == tmp_patch%gbl_patch_id) j = k
+                        end do
+                    end if
                     if (j < 0) then
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
@@ -3528,6 +3799,7 @@ contains
                 end do
             end do
 
+            @:PROHIBIT(num_ibs > num_gbl_ibs, "IB handoff duplicated a patch: num_ibs exceeds num_gbl_ibs.")
             deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
             $:GPU_UPDATE(device='[patch_ib, num_ibs]')
             call s_merge_ib_lookup(num_ibs_pre)
@@ -3920,6 +4192,9 @@ contains
         if (allocated(ghost_points)) then
             @:DEALLOCATE(ghost_points)
             @:DEALLOCATE(gp_prim_new)
+        end if
+        if (allocated(gp_tc_rec)) then
+            @:DEALLOCATE(gp_tc_rec)
         end if
         if (allocated(gp_surf)) then
             @:DEALLOCATE(gp_surf)

@@ -72,6 +72,10 @@ module m_start_up
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
 
+    !> AMR: the fine level was prolonged from level 0 at start-up (no restart file), so the first step regrids onto the initial
+    !! features
+    logical :: amr_fresh_start = .false.
+
 contains
 
     !> Read data files. Dispatch subroutine that replaces procedure pointer.
@@ -622,6 +626,14 @@ contains
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         call s_phase_step_tic()
+        ! one regrid per level, so each level is tagged on the one above it
+        if (t_step == t_step_start .and. amr_fresh_start .and. amr_regrid_int > 0) then
+            call s_phase_tic(PH_REGRID)
+            do i = 1, amr_max_level
+                call s_amr_regrid(q_cons_ts(1)%vf)
+            end do
+            call s_phase_toc(PH_REGRID)
+        end if
         if (t_step == t_step_start) then
             call s_amr_check_fixed_dt()
             if (amr_regrid_int > 0) call s_amr_check_fixed_dt(reach=.true.)
@@ -999,6 +1011,7 @@ contains
         ! restarts restore the saved fine state; otherwise prolong from coarse
         call s_read_amr_restart(amr_restored)
         if (.not. amr_restored) call s_populate_amr_fine(q_cons_ts(1)%vf)
+        amr_fresh_start = amr .and. .not. amr_restored
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
@@ -1014,6 +1027,9 @@ contains
             end if
             call s_build_ib_neighborhood()
             call s_ibm_setup()
+            ! the wall conduction temperature of the last stage, which the saved state cannot reproduce
+            if (chemistry .and. chem_params%diffusion .and. merge(n_start, t_step_start, &
+                & cfl_dt) > 0) call s_read_ib_conduction_temperature(merge(n_start, t_step_start, cfl_dt))
             ! resolve the body on each fine block from the geometry
             if (amr) call s_amr_setup_ib()
             ! a CFL-mode run keeps t_step_start = 0, so only n_start tells a restart apart
