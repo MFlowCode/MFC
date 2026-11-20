@@ -807,9 +807,9 @@ contains
                     ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
                     ! this direction's faces, on every AMR level with that level's markers.
                     if (amr_in_fine_advance) then
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
                     else
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
                     end if
 
                     ! Bubble dynamics source terms
@@ -865,9 +865,9 @@ contains
                 call nvtxEndRange
                 ! flux_rsx_vf holds the hat_L set and flux_hatR_rsx_vf the hat_R set, each the RHS's at its own faces
                 if (amr_in_fine_advance) then
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
                 else
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
                 end if
             end do
 

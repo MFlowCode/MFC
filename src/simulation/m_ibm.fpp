@@ -2693,6 +2693,26 @@ contains
 
     end function f_ib_face_mass
 
+    !> Momentum density of component i in cell (j, k, l). The momentum halos of q_cons_vf are not exchanged between ranks, so a halo
+    !! cell (rank seam, periodic edge) takes rho*u from q_prim_vf, whose halos are.
+    function f_ib_cell_momentum(q_cons_vf, q_prim_vf, i, j, k, l) result(mom)
+
+        $:GPU_ROUTINE(function_name='f_ib_cell_momentum', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
+        integer, intent(in)                                 :: i, j, k, l
+        real(wp)                                            :: mom, rho
+        integer                                             :: c
+
+        mom = q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
+        if (igr .or. (j >= 0 .and. j <= m .and. k >= 0 .and. k <= n .and. l >= 0 .and. l <= p)) return
+        rho = 0._wp
+        do c = eqn_idx%cont%beg, eqn_idx%cont%end
+            rho = rho + q_prim_vf(c)%sf(j, k, l)
+        end do
+        mom = rho*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
+
+    end function f_ib_cell_momentum
+
     !> Area of the face (j, k, l) normal to direction idir
     pure real(wp) function f_ib_face_area(idir, j, k, l)
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -2784,10 +2804,10 @@ contains
     !! moving with its wall (face momentum times the wall's normal velocity is removed). With ib_exchange: energy in and mass out of
     !! each lumped body (every body with ib_heat_wrt) into ib_heat(2:3), weighted so a step's stages sum to its exchange (SSP-RK: 1;
     !! 1/2, 1/2; 1/6, 1/6, 2/3).
-    subroutine s_accumulate_ib_face_fluxes(idir, stage, q_cons_vf, markers)
+    subroutine s_accumulate_ib_face_fluxes(idir, stage, q_cons_vf, q_prim_vf, markers)
 
         integer, intent(in) :: idir, stage
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(integer_field), intent(in) :: markers  !< ib_markers, or ib_markers_fine on an AMR fine frame
         real(wp), dimension(3) :: f, r, tq, vb
         real(wp) :: area, w, f_E, f_m, f_mom
@@ -2917,8 +2937,8 @@ contains
                                     ! + p n_i: the lab flux carries rho u_i u_n, so remove the face momentum (mean of the fluid
                                     ! and body cell) times the wall's normal velocity V_n
                                     if (patch_ib(ib_id)%moving_ibm > 0) then
-                                        f(i) = f(i) - 0.5_wp*vb(idir)*(q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(fj, fk, &
-                                          & fl) + q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(ci, cj, ck))
+                                        f(i) = f(i) - 0.5_wp*vb(idir)*(f_ib_cell_momentum(q_cons_vf, q_prim_vf, i, fj, fk, &
+                                          & fl) + f_ib_cell_momentum(q_cons_vf, q_prim_vf, i, ci, cj, ck))
                                     end if
                                     f(i) = real(side, wp)*area*f(i)
                                 end do
