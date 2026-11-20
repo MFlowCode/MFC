@@ -4539,17 +4539,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
     # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history
     # (velocity and centroid) and the cons fields. GNU 13 double builds at O0, O3 and reldebug agree to 1e-12 relative (absolute
-    # differences on near-zero entries 4e-13), so 1e-10 leaves two orders of margin for another compiler and still fails a wrong stage
-    # weight (a 1e-3 position error). Skipped in the single-precision lane (see test.py).
-    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Constant Acceleration", "examples/2D_mibm_constant_acceleration/case.py", mods={"parallel_io": "F"}, override_tol=1e-10))
+    # differences on near-zero entries 4e-13) on one CPU, but the CI runners differ: GNU and Intel -O3 on GitHub hardware differ from that
+    # golden by up to 8.7e-9 absolute (7.2e-9 relative). 1e-6 is two orders above that and still fails a wrong stage weight (a 1e-3 position
+    # error); the checker script validates the physics, the golden is a regression guard. Skipped in the single-precision lane (see test.py).
+    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Constant Acceleration", "examples/2D_mibm_constant_acceleration/case.py", mods={"parallel_io": "F"}, override_tol=1e-6))
 
     # Soft-sphere wall collision (collision_model = 1) in air at 1e5 Pa: a normal impact at e = 0.8 and a 50 degree impact that slides.
     # The contact begins half a step into a step so no compiler can move it by one. The sticking regime is left to check_collision.py:
     # where the contact point stops sliding, the friction direction is the sign of a velocity that goes to zero, so the rebound depends
-    # on round-off. GNU 13 double builds at O0, O3 and reldebug agree to 3e-12 relative (ib_forces entries to 1e-18 of the largest),
-    # so 1e-8 leaves three orders of margin.
+    # on round-off. GNU 13 double builds at O0, O3 and reldebug agree to 3e-12 relative on one CPU, but a GNU reldebug runner differs by up
+    # to 2.1e-8 absolute (1.7e-8 relative); 1e-6 is about two orders above the worst spread seen across CPUs and still fails a one-step
+    # shift of the contact (order 1e-2).
     for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
-        cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-8))
+        cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(

@@ -76,7 +76,7 @@ python3 examples/3D_mibm_wall_collision/check_collision.py examples/3D_mibm_wall
 ```
 
 The small cases run in the test suite as `2D -> IBM -> Moving Circle -> Constant Acceleration` and `3D -> IBM -> Wall Collision -> Normal` and `-> Sliding Friction`.
-The tables above were measured with GNU 13.3 (CPU, one rank). The golden tolerances are 1e-10 (constant acceleration) and 1e-8 (collision), set from the agreement of GNU 13 double builds at O0, O3 and reldebug; both tests are skipped in the single-precision lane. The sticking case is checked by `check_collision.py` and is not a golden, because the friction direction there depends on round-off.
+The tables above were measured with GNU 13.3 (CPU, one rank). The golden tolerance is 1e-6 for both, about two orders above the largest difference seen across compilers and CPUs (2.1e-8); it makes the golden a regression guard, while the checker scripts validate the physics; both tests are skipped in the single-precision lane. The sticking case is checked by `check_collision.py` and is not a golden, because the friction direction there depends on round-off.
 
 ## Adding a section
 
