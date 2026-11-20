@@ -1801,7 +1801,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Soft-sphere friction across the x = 10 rank seam: two circles close head-on, so the slip is round-off. With
             # ib_friction_slip_eps = 0 that round-off sets a full mu*|F_n| force whose direction depends on the rank layout (the
             # y force of 1 and 2 ranks has opposite sign from step 80, 0.13 apart); with it both stay ~1e-4. A seam transient in the
-            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence.
+            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. override_tol: the golden is
+            # from Cray Fortran; the GNU/Intel/macOS CI lanes agree with each other to 1e-13 and differ from it by up to 3.2e-5
+            # (1 fluid) and 9.1e-6 (2 fluids), abs, in the energy; 3e-4 is ~10x that and far below the 0.13 sign flip it guards.
             seam_pair = {
                 "ib": "T",
                 "num_ibs": 2,
@@ -1836,7 +1838,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     for k, v in [("geometry", 2), ("x_centroid", x), ("y_centroid", 15.0), ("radius", 0.5), ("slip", "F"), ("moving_ibm", 2), ("mass", 1.0), ("vel(1)", ux)]
                 },
             }
-            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=1e-6))
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=3e-4))
             cases.append(
                 define_case_d(
                     stack,
