@@ -44,14 +44,14 @@ contains
 
     end subroutine s_stage_hooks_pre_ib
 
-    !> Clamps, after the IB correction. tally: count the species cleanup in its report (the coarse grid only).
-    impure subroutine s_stage_hooks_post_ib(q_cons, tally)
+    !> Clamps, after the IB correction. lvl: the AMR level of the frame (0 = the coarse grid), for the species cleanup's report.
+    impure subroutine s_stage_hooks_post_ib(q_cons, lvl)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons
-        logical, intent(in)                                      :: tally
+        integer, intent(in)                                      :: lvl
 
         if (cont_damage) call s_enforce_cont_damage_bounds(q_cons)
-        if (chemistry) call s_clean_species(q_cons, tally)
+        if (chemistry) call s_clean_species(q_cons, lvl)
 
     end subroutine s_stage_hooks_post_ib
 

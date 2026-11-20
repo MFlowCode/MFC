@@ -15,7 +15,7 @@ module m_species_bounds
     use m_mpi_common, only: s_mpi_allreduce_sum
     use m_constants, only: T_surface_max, verysmall
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight
-    use m_ibm, only: ib_markers
+    use m_ibm, only: ib_markers, ib_markers_fine
 
     implicit none
 
@@ -24,8 +24,8 @@ module m_species_bounds
 
     !> Violations below this fraction of rho are roundoff: cleaned but not counted
     real(wp), parameter :: clean_report_tol = 1.e-12_wp
-    !> Fluid-cell cleanings, and sum of |rho_new - rho_old|, since the last report
-    real(wp) :: clean_cells = 0._wp, clean_mass = 0._wp
+    !> Fluid-cell cleanings, and sum of |rho_new - rho_old|, since the last report, per AMR level (0 = the coarse grid)
+    real(wp), allocatable :: clean_cells(:), clean_mass(:)
 
 contains
 
@@ -180,12 +180,12 @@ contains
     !> Fallback (as PeleC's clean_massfrac): clip each rho*Y_k to [0, rho], set rho = sum rho*Y_k, and scale momentum and energy by
     !! rho_new/rho_old so velocity and specific energy are kept. A cell whose clipped sum is not positive is left untouched. Every
     !! cell is cleaned, but only fluid cells (not IB cells) off by > clean_report_tol*rho, or left untouched, are counted as cell
-    !! cleanings (per cell per RK stage) for s_report_species_cleanup. tally = F (an AMR fine block, whose markers ib_markers does
-    !! not hold) cleans without counting.
-    subroutine s_clean_species(q_cons_vf, tally)
+    !! cleanings (per cell per RK stage) for s_report_species_cleanup, under AMR level lvl (0 = the coarse grid). A fine block's
+    !! markers are in ib_markers_fine.
+    subroutine s_clean_species(q_cons_vf, lvl)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        logical, intent(in), optional                          :: tally
+        integer, intent(in)                                    :: lvl
         real(wp)                                               :: rho_old, rho_new, f, n_cells, d_mass, viol, rhoY
         logical                                                :: is_fluid
         integer                                                :: i, j, k, l
@@ -207,7 +207,8 @@ contains
                     end do
                     if (viol > 0._wp .and. rho_old > 0._wp) then
                         is_fluid = .true.
-                        if (ib) is_fluid = (ib_markers%sf(j, k, l) == 0)
+                        if (ib .and. lvl == 0) is_fluid = (ib_markers%sf(j, k, l) == 0)
+                        if (ib .and. lvl > 0) is_fluid = (ib_markers_fine%sf(j, k, l) == 0)
                         if (rho_new > 0._wp) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%species%beg, eqn_idx%species%end
@@ -232,23 +233,32 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        if (present(tally)) then
-            if (.not. tally) return
+        if (.not. allocated(clean_cells)) then
+            allocate (clean_cells(0:amr_max_level), clean_mass(0:amr_max_level))
+            clean_cells = 0._wp; clean_mass = 0._wp
         end if
-        clean_cells = clean_cells + n_cells; clean_mass = clean_mass + d_mass
+        clean_cells(lvl) = clean_cells(lvl) + n_cells; clean_mass(lvl) = clean_mass(lvl) + d_mass
 
     end subroutine s_clean_species
 
-    !> Print, once per time step and only if nonzero, how many cell cleanings s_clean_species made across all ranks.
+    !> Print, once per time step and only if nonzero, how many cell cleanings s_clean_species made across all ranks, per AMR level.
+    !! Coarse cells under a fine block are counted on level 0 too.
     impure subroutine s_report_species_cleanup(t_step)
 
         integer, intent(in) :: t_step
         real(wp)            :: cells_glb, mass_glb
+        integer             :: lvl
+        character(len=16)   :: tag
 
-        call s_mpi_allreduce_sum(clean_cells, cells_glb)
-        call s_mpi_allreduce_sum(clean_mass, mass_glb)
-        if (proc_rank == 0 .and. cells_glb > 0._wp) print '(A,I0,A,I0,A,ES10.3)', 'Species cleanup at step ', t_step, ': ', &
-            & nint(cells_glb), ' cell cleanings, sum |d rho| = ', mass_glb
+        if (.not. allocated(clean_cells)) return
+        do lvl = 0, amr_max_level
+            call s_mpi_allreduce_sum(clean_cells(lvl), cells_glb)
+            call s_mpi_allreduce_sum(clean_mass(lvl), mass_glb)
+            tag = ''
+            if (lvl > 0) write (tag, '(A,I0)') ', AMR level ', lvl
+            if (proc_rank == 0 .and. cells_glb > 0._wp) print '(A,I0,A,I0,A,ES10.3)', 'Species cleanup at step ', t_step, &
+                & trim(tag) // ': ', nint(cells_glb), ' cell cleanings, sum |d rho| = ', mass_glb
+        end do
         clean_cells = 0._wp; clean_mass = 0._wp
 
     end subroutine s_report_species_cleanup

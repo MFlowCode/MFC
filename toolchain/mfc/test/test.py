@@ -165,7 +165,7 @@ def _assert_particle_cloud_ib_state(case: TestCase):
 
 
 _CONS_FILE = re.compile(r"D/cons\.(\d+)\.(\d+)\.(\d+)\.dat")
-_CLEANUP_REPORT = re.compile(r"Species cleanup at step (\d+): (\d+) cell cleanings, sum \|d rho\| =\s*(\S+)")
+_CLEANUP_REPORT = re.compile(r"Species cleanup at step (\d+)(?:, AMR level \d+)?: (\d+) cell cleanings, sum \|d rho\| =\s*(\S+)")
 
 
 def _assert_species_bounds(case: TestCase, pack, stdout: str, single: bool = False):
