@@ -78,44 +78,7 @@ contains
             #:endfor
         end do
 
-        ! manual: patch_icpp (complex members: alter_patch, sph_har_coeff, size() arrays)
-        do i = 1, num_patches_max
-            #:for VAR in [ 'geometry', 'smooth_patch_id', 'hcid']
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-
-            call MPI_BCAST(patch_icpp(i)%smoothen, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%non_axis_sym, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%alter_patch(0), num_patches_max, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
-            #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid',           &
-                & 'length_x', 'length_y', 'length_z', 'radius', 'epsilon',     &
-                & 'beta', 'smooth_coeff', 'rho', 'p0', 'm0', 'r0', 'v0',       &
-                & 'pres', 'gamma', 'pi_inf', 'cv', 'qv', 'qvp',        &
-                & 'cf_val', 'Bx', 'By', 'Bz']
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-
-            #:for VAR in [ '2', '3', '4', '5', '6', '7', '8', '9']
-                call MPI_BCAST(patch_icpp(i)%a(${VAR}$), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-
-            #:for VAR in [ 'normal', 'radii', 'vel', 'tau_e', 'alpha_rho', 'alpha', &
-                'fourier_cos', 'fourier_sin' ]
-                call MPI_BCAST(patch_icpp(i)%${VAR}$, size(patch_icpp(i)%${VAR}$), mpi_p, 0, MPI_COMM_WORLD, ierr)
-            #:endfor
-
-            call MPI_BCAST(patch_icpp(i)%sph_har_coeff, size(patch_icpp(i)%sph_har_coeff), mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%modal_clip_r_to_min, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%modal_r_min, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            call MPI_BCAST(patch_icpp(i)%modal_use_exp_form, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-
-            call MPI_BCAST(patch_icpp(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-            if (chemistry) then
-                call MPI_BCAST(patch_icpp(i)%Y, size(patch_icpp(i)%Y), mpi_p, 0, MPI_COMM_WORLD, ierr)
-            end if
-        end do
+        call s_mpi_bcast_icpp_patches
 
         ! manual: patch_ib (per-target member subset; pre uses size() for vel/angular_vel/angles)
         do i = 1, num_ibs

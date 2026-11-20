@@ -70,12 +70,11 @@ contains
     !! combination may be found in Shyue's work (1998).
     subroutine s_assign_patch_mixture_primitive_variables(patch_id, j, k, l, eta, q_prim_vf, patch_id_fp)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
-
         integer, intent(in)                                      :: patch_id
         integer, intent(in)                                      :: j, k, l
         real(wp), intent(in)                                     :: eta
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #else
@@ -201,11 +200,10 @@ contains
     !! ensemble-averaged bubble modeling
     impure subroutine s_assign_patch_species_primitive_variables(patch_id, j, k, l, eta, q_prim_vf, patch_id_fp)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
-
         integer, intent(in)  :: patch_id
         integer, intent(in)  :: j, k, l
         real(wp), intent(in) :: eta
+
 #ifdef MFC_MIXED_PRECISION
         integer(kind=1), dimension(0:,0:,0:), intent(inout) :: patch_id_fp
 #else
@@ -455,8 +453,6 @@ contains
 
     !> Scale the liquid volume fractions of cell (j,k,l) so they sum to one minus the modeled gas void fraction
     subroutine s_scale_volume_fractions_to_void(q_prim_vf, j, k, l)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                      :: j, k, l

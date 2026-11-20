@@ -541,6 +541,8 @@ contains
         chem_params%reaction_substeps_max = 0
         chem_params%transport_dt = .false.
 
+        call s_assign_ic_patch_defaults
+
         num_bc_patches = 0
         bc_io = .false.
         periodic_bc = .false.
