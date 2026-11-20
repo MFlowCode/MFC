@@ -57,7 +57,7 @@ module m_start_up
     use m_igr
     use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
     use m_amr_regrid, only: s_amr_regrid
-    use m_amr_stage, only: s_amr_relax_fine
+    use m_amr_stage, only: s_amr_relax_fine, s_amr_apply_ic_patches
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
@@ -67,7 +67,8 @@ module m_start_up
 
     private; public :: s_read_input_file, s_check_input_file, s_read_data_files, s_read_serial_data_files, &
         & s_read_parallel_data_files, s_initialize_internal_energy_equations, s_initialize_modules, s_initialize_gpu_vars, &
-        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics
+        & s_amr_start_fresh_blocks, s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, &
+        & s_save_performance_metrics
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
@@ -626,14 +627,6 @@ contains
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         call s_phase_step_tic()
-        ! one regrid per level, so each level is tagged on the one above it
-        if (t_step == t_step_start .and. amr_fresh_start .and. amr_regrid_int > 0) then
-            call s_phase_tic(PH_REGRID)
-            do i = 1, amr_max_level
-                call s_amr_regrid(q_cons_ts(1)%vf)
-            end do
-            call s_phase_toc(PH_REGRID)
-        end if
         if (t_step == t_step_start) then
             call s_amr_check_fixed_dt()
             if (amr_regrid_int > 0) call s_amr_check_fixed_dt(reach=.true.)
@@ -1219,6 +1212,23 @@ contains
         #:endif
 
     end subroutine s_initialize_gpu_vars
+
+    !> Fresh AMR run, before the first save: put the initial condition patches on the blocks and, under dynamic regrid, regrid once
+    !! per level, so each level is tagged on the one above it.
+    impure subroutine s_amr_start_fresh_blocks
+
+        integer :: i
+
+        if (.not. amr_fresh_start) return
+        call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+        if (amr_regrid_int > 0) then
+            do i = 1, amr_max_level
+                call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+            end do
+        end if
+
+    end subroutine s_amr_start_fresh_blocks
 
     !> Read the Lagrangian bubbles or particles this rank starts with: the input-file rows (and their global IDs) on a fresh start,
     !! otherwise the restart-file rows, which also reset mytime and dt.

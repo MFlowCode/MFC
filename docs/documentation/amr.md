@@ -14,6 +14,12 @@ With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the den
 once per level before the first step of a fresh run, so they start on the initial features, and then every
 `amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
 
+On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
+that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
+smoothed initial condition, old data), the simulation prints a note and the blocks start from data interpolated from
+level 0. The step-0 files are pre_process's level-0 data: under a block the run starts from the average of the fine
+data instead, which differs from them where a patch varies within a coarse cell.
+
 AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overlay the blocks. Internals:
 @subpage amr_implementation.
 
@@ -158,9 +164,9 @@ blocks holding 54% of the fine cells) took 1.86 (lock-step) and 1.40 (subcycled)
 - **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
   blast's 54% would need a far larger grid.
 - **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
-- **Accuracy.** In the droplet runs AMR halved the L1 difference from the uniform fine solution (2.5e-4 against 5.0e-4
-  at the 512^2 base), not more: the fine block's initial data is interpolated from level 0, so a sharp initial
-  interface starts at the coarse resolution.
+- **Accuracy.** In the droplet runs the AMR solution reproduces the uniform fine one: the L1 density difference from
+  it is 6.1e-8 at the 512^2 base, against 5.0e-4 for the uniform 512^2 grid. The blocks cover the interface from the
+  first step and start from the patches evaluated at the fine resolution.
 
 ## Limitations {#amr-limitations}
 
