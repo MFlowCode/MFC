@@ -22,7 +22,6 @@ module m_euler_lagrange
         & s_count_lag_entities_glb, s_apply_lag_entity_domain_bc, s_reflect_lag_entity_at_wall, s_wrap_lag_entities_periodic, &
         & f_lag_rk_stage, f_lag_entity_in_wall, s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
 
-
     !> Fornberg first-derivative weights at each cell center along x, y and z, one field per stencil point
     type(scalar_field), dimension(:), allocatable :: weights_x_grad, weights_y_grad, weights_z_grad
     integer                                       :: nWeights_grad  !< Number of stencil points
