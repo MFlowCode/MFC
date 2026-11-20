@@ -18,7 +18,9 @@ On a fresh run the blocks start from `patch_icpp` evaluated at their own cell ce
 that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
 smoothed initial condition, old data), the simulation prints a note and the blocks start from data interpolated from
 level 0. The step-0 files are pre_process's level-0 data: under a block the run starts from the average of the fine
-data instead, which differs from them where a patch varies within a coarse cell.
+data instead, which differs from them where a patch varies within a coarse cell. For a smooth analytic profile
+sampled at cell centers that difference is second order in the cell width; an expression that is the exact cell
+average (it may use `dx`) agrees on every level.
 
 AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overlay the blocks. Internals:
 @subpage amr_implementation.

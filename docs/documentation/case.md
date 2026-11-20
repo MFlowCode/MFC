@@ -228,8 +228,10 @@ The following variables are available in IC patch expressions:
 | `z`       | `z_cc(k)`                | `lz`      | The patch's `length_z`    | `zc`      | The patch's `z_centroid` |
 | `eps`     | The patch's `epsilon`    | `beta`    | The patch's `beta`        | `radii`   | The patch's `radii`      |
 | `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi`      | \f$\pi\f$ (Fortran constant from `m_constants`) |
+| `dx`      | Smallest cell width in x | `dy`      | Smallest cell width in y  | `dz`      | Smallest cell width in z |
 
 where $(i,j,k)$ are the grid-indices of the current cell in each coordinate direction.
+`dx`, `dy` and `dz` are the widths of the grid being filled, so on an AMR fine block they are the block's.
 
 The allowed functions are the standard Fortran intrinsics:
 `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`,
