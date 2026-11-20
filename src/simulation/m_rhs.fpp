@@ -694,6 +694,7 @@ contains
                 call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_qp%vf, cv_int)
             end if
             call nvtxEndRange
+            if (ib .and. chemistry .and. chem_params%diffusion) call s_ibm_set_conduction_temperature(q_T_sf)
 
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf, skip_mpi=amr_cons_ghosts_valid)
@@ -779,7 +780,8 @@ contains
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
                         call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
-                                                                & ib_markers, ib_wall_src(ibw_a), ib_flux_wall)
+                                                                & ib_markers, ib_wall_src(ibw_a), merge(merge(2, 1, &
+                                                                & ib_flux_wall), 0, ib))
                         call nvtxEndRange
                     end if
 
@@ -805,9 +807,9 @@ contains
                     ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
                     ! this direction's faces, on every AMR level with that level's markers.
                     if (amr_in_fine_advance) then
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
                     else
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
                     end if
 
                     ! Bubble dynamics source terms
@@ -863,9 +865,9 @@ contains
                 call nvtxEndRange
                 ! flux_rsx_vf holds the hat_L set and flux_hatR_rsx_vf the hat_R set, each the RHS's at its own faces
                 if (amr_in_fine_advance) then
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
                 else
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
                 end if
             end do
 
@@ -945,6 +947,10 @@ contains
                 call nvtxEndRange
             end if
         end if
+
+        ! The face fluxes are formed: the ghosts' own temperatures back for the reaction source and the split chemistry (the set
+        ! call is inside the .not. igr conversion above, and ib is not supported with igr)
+        if (ib .and. chemistry .and. chem_params%diffusion .and. .not. igr) call s_ibm_restore_conduction_temperature(q_T_sf)
 
         if (particles_lagrange) then
             call nvtxStartRange("RHS-EL-PARTICLES-DYN")

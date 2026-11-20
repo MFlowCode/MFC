@@ -36,6 +36,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_advance, only: s_amr_fine_stage_ib
     use m_amr_registers, only: s_amr_set_rk_table
 
     implicit none
@@ -524,16 +525,18 @@ contains
 
             if (s == 1 .and. bodyForces) call s_update_mean_sources(q_cons_ts(1)%vf, q_T_sf, t_step)
 
-            ! AMR: move the bodies before the fine stage, so its IB rebuild and correction use this stage's pose, as the coarse
-            ! ones do; the fine containment check reads the pose and rotation on the host
+            ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
+            if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
+                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
+            ! AMR: move the bodies once the fine frames have added their faces to this stage's forces, then run the fine IB
+            ! rebuild and correction the fine stage left waiting, at this stage's pose as the coarse ones are; the fine
+            ! containment check reads the pose and rotation on the host
             if (amr .and. moving_immersed_boundary_flag) then
                 call s_advance_ib_pose(s, t_step)
                 call s_update_ib_rotation_matrices(num_ibs)
                 $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+                call s_amr_fine_stage_ib(pb_ts(1)%sf, mv_ts(1)%sf)
             end if
-            ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
-            if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
-                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
             if (bubbles_lagrange .and. .not. adap_dt) then
                 call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
                 if (s == time_stepper) call s_write_lag_step_output()
@@ -613,7 +616,7 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
-            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, tally=.true.)
+            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, 0)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
@@ -666,7 +669,7 @@ contains
             else if (ib_state_wrt) then
                 call s_compute_ib_forces()
             end if
-            if (ib_exchange) call s_update_ib_temperatures(dt)
+            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
             if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
         end if
 
@@ -879,24 +882,43 @@ contains
     end subroutine s_compute_dt
 
     !> AMR with a fixed dt: abort if dt exceeds the finest level's inviscid limit (ICFL = 1, as s_write_run_time_information).
-    impure subroutine s_amr_check_fixed_dt()
+    !! reach: test every cell as if refined to amr_max_level, which a regrid may do later, so the failure is at start-up.
+    impure subroutine s_amr_check_fixed_dt(reach)
 
-        real(wp), dimension(5) :: dt_cand
-        real(wp)               :: cfl_save
-        character(len=256)     :: msg
+        logical, intent(in), optional :: reach
+        real(wp), dimension(5)        :: dt_cand
+        real(wp)                      :: cfl_save
+        real(wp), allocatable         :: rf_save(:,:,:)
+        logical                       :: all_fine
+        character(len=256)            :: msg
 
         ! the cell state and signal speed behind the candidates are the non-relativistic ones
 
         if (cfl_dt .or. .not. amr .or. relativity) return
+        all_fine = .false.; if (present(reach)) all_fine = reach
+        if (all_fine) then
+            rf_save = amr_cfl_rf; amr_cfl_rf = real(amr_ref_ratio**amr_max_level, wp)
+            $:GPU_UPDATE(device='[amr_cfl_rf]')
+        end if
         cfl_save = cfl_target; cfl_target = 1._wp
         $:GPU_UPDATE(device='[cfl_target]')
         call s_compute_dt(dt_cand)
         cfl_target = cfl_save
         $:GPU_UPDATE(device='[cfl_target]')
+        if (all_fine) then
+            amr_cfl_rf = rf_save
+            $:GPU_UPDATE(device='[amr_cfl_rf]')
+        end if
         if (dt <= dt_cand(1)) return
-        write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
-               & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', dt_cand(1), &
-               & '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
+        if (all_fine) then
+            write (msg, '(A,ES11.4,A,I0,A,ES11.4,A)') 'amr: dt = ', dt, &
+                   & ' exceeds the inviscid CFL limit a regrid would set by refining the fastest cells to level ', amr_max_level, &
+                   & '; the largest stable dt (ICFL = 1) there is ', dt_cand(1), '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
+        else
+            write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
+                   & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', &
+                   & dt_cand(1), '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
+        end if
         call s_mpi_abort(trim(msg))
 
     end subroutine s_amr_check_fixed_dt

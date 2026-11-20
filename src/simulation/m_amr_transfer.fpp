@@ -328,8 +328,8 @@ contains
         if (amr_rank_owns_block) then
             amr_isect_lo = lo; amr_isect_hi = hi
             if (amr_block_level(amr_cur) >= 2) then
-                ! multi-level: footprint in the parent block's fine frame (parent-fine index of L0 cell c is rr*(c - parent lo)),
-                ! as s_amr_parent_foot derives it. rr is the global amr_ref_ratio: amr_slots(pblk) may be unallocated here
+                ! multi-level: footprint in the parent block's fine frame (parent-fine index of L0 cell c is
+                ! amr_ref_ratio**(parent level)*(c - parent lo)), from replicated metadata: amr_slots(pblk) may be unallocated here
                 pblk = f_amr_parent_block(amr_cur)
                 call s_amr_parent_foot(amr_cur, pblk, amr_isect_lo, amr_isect_hi)
             end if
@@ -340,6 +340,7 @@ contains
         amr_owns_all(amr_cur) = amr_rank_owns_block
         ! fine extents cover the whole block on the owner, -1 (empty) elsewhere
         fext = merge(amr_ref_ratio*max(amr_isect_hi - amr_isect_lo + 1, 0) - 1, 0, amr_dim)
+        if (amr_rank_owns_block) call s_amr_check_block_geometry(amr_cur, pblk, fext)
         amr_slots(amr_cur)%m = fext(1); amr_slots(amr_cur)%n = fext(2); amr_slots(amr_cur)%p = fext(3)
         amr_slots(amr_cur)%idwbuff%beg = merge(-buff_size, 0, amr_dim); amr_slots(amr_cur)%idwbuff%end = merge(fext + buff_size, &
                   & 0, amr_dim)
@@ -364,6 +365,29 @@ contains
         amr_xchg_bad = max(amr_xchg_bad, bad_loc)
 
     end subroutine s_set_amr_fine_geometry
+
+    !> Abort unless block k's fine extent is amr_ref_ratio**level*(region width) - 1 and, above level 1, its region lies inside
+    !! parent pblk.
+    impure subroutine s_amr_check_block_geometry(k, pblk, fext)
+
+        integer, intent(in) :: k, pblk, fext(3)
+        integer             :: want(3)
+
+        want = merge(amr_ref_ratio**amr_block_level(k)*(amr_region_hi_all(:,k) - amr_region_lo_all(:,k) + 1) - 1, 0, amr_dim)
+        if (any(fext /= want)) then
+            print '(A,I0,A,I0,A,3(1X,I0),A,3(1X,I0))', ' [amr] block ', k, ' level ', amr_block_level(k), ': fine extent', fext, &
+                & ', expected', want
+            call s_mpi_abort("AMR: a block's fine extent is not amr_ref_ratio**level*(region width) - 1 (printed above).")
+        end if
+        if (amr_block_level(k) < 2) return
+        if (pblk == 0) call s_mpi_abort("AMR: a block above level 1 has no parent block.")
+        if (any(amr_dim .and. (amr_region_lo_all(:,k) < amr_region_lo_all(:,pblk) .or. amr_region_hi_all(:, &
+            & k) > amr_region_hi_all(:,pblk)))) then
+            print '(A,I0,A,I0)', ' [amr] block ', k, ' is not inside its parent block ', pblk
+            call s_mpi_abort("AMR: a block above level 1 does not lie inside its parent block (printed above).")
+        end if
+
+    end subroutine s_amr_check_block_geometry
 
     !> Close a geometry scan: one allreduce of the accumulated flag, then reset. Call after every s_set_amr_fine_geometry loop; the
     !! flag is read by s_amr_exchange_coarse_cons_halo.

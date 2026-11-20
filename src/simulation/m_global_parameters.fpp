@@ -661,6 +661,7 @@ contains
         amr_regrid_int = 0
         amr_tag_eps = 0.1_wp
         amr_tag_abs = .false.
+        amr_tag_var = 1
         amr_place_owner = .false.
         amr_buf = 3
         amr_snap = 0
@@ -688,7 +689,7 @@ contains
         ib_slip_ccst = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
-        ib_mass_relax = 0
+        ib_mass_relax = -1
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
         ib_uncover_fill = .false.

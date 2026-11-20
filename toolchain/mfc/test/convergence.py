@@ -66,6 +66,8 @@ class ConvergenceSpec:
     fixed_N: int = 0
     # Amplitude-sweep cases:
     amps: typing.List[float] = dataclasses.field(default_factory=list)
+    # amr_check cases: the full case dictionary (no case file)
+    params: dict = dataclasses.field(default_factory=dict)
 
 
 # Low-level helpers.
@@ -518,6 +520,15 @@ def run_isentropic_release(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
 
 
 # Entry point used by test.py.
+
+
+def run_amr_check(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """./mfc.sh amr_check on spec.params: the block core must match the uniform fine-grid run within spec.tol."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        case = os.path.join(tmpdir, "case.json")
+        common.file_write(case, json.dumps(spec.params))
+        run = subprocess.run([MFC, "amr_check", case, "--tol", str(spec.tol)] + spec.extra_args, capture_output=True, text=True, check=False)
+    return run.returncode == 0, run.stdout[-3000:] + run.stderr[-1000:]
 
 
 def run_case(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:

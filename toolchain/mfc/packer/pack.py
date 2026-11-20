@@ -136,8 +136,8 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
                 # Skip the header line; a rank that owns no bubble writes nothing else
                 content = "\n".join(content.splitlines()[1:])
                 doubles = _extract_doubles(content) if content.strip() else []
-            elif any(name in short_filepath for name in ("probe", "integral", "ib_forces", "ib_surface", "ib_heat")):
-                # Probe, integral, IB-force, IB-surface and IB-heat output are multi-column records, not
+            elif any(name in short_filepath for name in ("probe", "integral", "ib_forces", "ib_surface", "ib_heat", "amr_levels")):
+                # Probe, integral, IB-force, IB-surface, IB-heat and AMR level-sum output are multi-column records, not
                 # spatial fields: each column is a distinct physical quantity (probe: rho,
                 # vel, pres, gamma, pi_inf, qv, c, accel, ...; integral: int_pres,
                 # max_pres; forces: force, torque, velocity, angles, centroid; heat: mass
