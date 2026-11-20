@@ -4624,6 +4624,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Thermal Layer",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
+            # the golden keeps seven decimals: one last-digit flip on a value near 750 is 1.3e-10 (seen with Intel)
+            override_tol=1e-9,
         )
     )
 
