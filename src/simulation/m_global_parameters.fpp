@@ -653,6 +653,7 @@ contains
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
+        ib_friction_slip_eps = 0._wp
         ib_state_wrt = .false.
         rank_time_wrt = .false.
         amr = .false.

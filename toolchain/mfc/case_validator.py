@@ -1085,6 +1085,9 @@ class CaseValidator:
             self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
         ib_second_order_vel = self.get("ib_second_order_vel", "F") == "T"
+        friction_eps = self.get("ib_friction_slip_eps")
+        self.prohibit(friction_eps is not None and friction_eps < 0, "ib_friction_slip_eps must be >= 0")
+        self.prohibit(friction_eps is not None and friction_eps > 0 and not self.get("collision_model"), "ib_friction_slip_eps requires collision_model > 0")
         ib_ip_min_dist = self.get("ib_ip_min_dist")
         self.prohibit(ib_second_order_vel and not ib, "ib_second_order_vel requires ib to be enabled")
         self.prohibit(ib_ip_min_dist is not None and not ib_second_order_vel, "ib_ip_min_dist requires ib_second_order_vel to be enabled")

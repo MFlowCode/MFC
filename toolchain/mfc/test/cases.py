@@ -1798,6 +1798,45 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "IBM -> Periodic Bodies -> many_ib_patch_parallelism", ibs))
 
         if len(dimInfo[0]) == 2 and not viscous:
+            # Soft-sphere friction across the x = 10 rank seam: two circles close head-on, so the slip is round-off. With
+            # ib_friction_slip_eps = 0 that round-off sets a full mu*|F_n| force whose direction depends on the rank layout (the
+            # y force of 1 and 2 ranks has opposite sign from step 80, 0.13 apart); with it both stay ~1e-4. A seam transient in the
+            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence.
+            seam_pair = {
+                "ib": "T",
+                "num_ibs": 2,
+                "fd_order": 2,
+                "x_domain%end": 20.0,
+                "y_domain%end": 20.0,
+                "m": 79,
+                "n": 79,
+                "dt": 0.04,
+                "t_step_stop": 100,
+                "t_step_save": 100,
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -1,
+                "bc_y%end": -1,
+                # still, uniform gas in all three (overlapping) patches
+                **{
+                    f"patch_icpp({i})%{k}": v
+                    for i in range(1, 4)
+                    for k, v in [("x_centroid", 10.0), ("y_centroid", 10.0), ("length_x", 20.0), ("length_y", 20.0), ("vel(1)", 0.0), ("pres", 1.0), ("alpha_rho(1)", 1.0)]
+                },
+                "collision_model": 1,
+                "coefficient_of_restitution": 0.9,
+                "collision_time": 0.8,
+                "ib_coefficient_of_friction": 0.1,
+                "ib_friction_slip_eps": 0.003,
+                **{
+                    f"patch_ib({i})%{k}": v
+                    for i, x, ux in [(1, 9.35, 0.3), (2, 10.65, -0.3)]
+                    for k, v in [("geometry", 2), ("x_centroid", x), ("y_centroid", 15.0), ("radius", 0.5), ("slip", "F"), ("moving_ibm", 2), ("mass", 1.0), ("vel(1)", ux)]
+                },
+            }
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=1e-6))
             cases.append(
                 define_case_d(
                     stack,
