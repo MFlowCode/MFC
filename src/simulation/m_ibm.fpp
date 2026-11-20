@@ -3400,7 +3400,7 @@ contains
 
             ! Sync GPU-updated fields (angles, angular_vel, centroids) to host before
             ! compaction and MPI packing, which read from host memory.
-            $:GPU_UPDATE(host='[patch_ib]')
+            $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
             ! delete any particles that no longer need to be tracked and coalesce the array
             num_ibs_old = num_ibs
@@ -3432,7 +3432,7 @@ contains
             num_ibs = output_idx
             num_local_ibs = local_output_idx
             ! num_ibs shrinks here, so refresh it with patch_ib: s_get_neighborhood_idx bounds its search by it on the device
-            $:GPU_UPDATE(device='[patch_ib, num_ibs]')
+            $:GPU_UPDATE(device='[patch_ib(1:num_ibs), num_ibs]')
             call s_compact_ib_lookup(old_to_new, num_ibs_old)
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
@@ -3529,7 +3529,7 @@ contains
             end do
 
             deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
-            $:GPU_UPDATE(device='[patch_ib, num_ibs]')
+            $:GPU_UPDATE(device='[patch_ib(1:num_ibs), num_ibs]')
             call s_merge_ib_lookup(num_ibs_pre)
         end if
 
