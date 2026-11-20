@@ -33,10 +33,11 @@ module m_collisions
     logical :: collisions_active
 
     !> One bit per unordered pair (a < b) of this rank's IBs (local + neighborhood indices, a triangular index over
-    !! num_local_ibs_max): the ghost-point candidate pass claims each pair with an atomic OR, so only the first thread to find a
+    !! pair_bits_capacity): the ghost-point candidate pass claims each pair with an atomic OR, so only the first thread to find a
     !! pair records it and duplicates are dropped on the GPU. Bits are cleared after the forces are applied, so the set is empty
-    !! between calls. num_local_ibs_max = 30000 gives 4.5e8 bits (56 MB).
+    !! between calls. Sized from num_ibs and regrown with it; memory is quadratic in the body count (1e4 bodies take 6 MB).
     integer, allocatable, dimension(:) :: pair_bits
+    integer                            :: pair_bits_capacity  !< Number of IBs the bitset is indexed for
     $:GPU_DECLARE(create='[pair_bits]')
 
 contains
@@ -53,9 +54,7 @@ contains
         @:ALLOCATE(collision_lookup(num_local_ibs_max * 27 * 8, 4))
         @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
 
-        @:ALLOCATE(pair_bits(f_pair_bit_index(num_local_ibs_max - 1, num_local_ibs_max)/32 + 1))
-        pair_bits = 0
-        $:GPU_UPDATE(device='[pair_bits]')
+        call s_resize_pair_bits(num_ibs)
 
         wall_overlap_distances = 0
         collisions_active = .false.
@@ -63,6 +62,22 @@ contains
         $:GPU_UPDATE(device='[ib_coefficient_of_friction]')
 
     end subroutine s_initialize_collisions_module
+
+    !> Size the pair bitset for num_bodies IBs, doubled so a growing body count does not reallocate every step (empty on exit)
+    subroutine s_resize_pair_bits(num_bodies)
+
+        integer, intent(in) :: num_bodies
+
+        if (allocated(pair_bits)) then
+            @:DEALLOCATE(pair_bits)
+        end if
+
+        pair_bits_capacity = min(max(2*num_bodies, 2), num_local_ibs_max)
+        @:ALLOCATE(pair_bits(f_pair_bit_index(pair_bits_capacity - 1, pair_bits_capacity, pair_bits_capacity)/32 + 1))
+        pair_bits = 0
+        $:GPU_UPDATE(device='[pair_bits]')
+
+    end subroutine s_resize_pair_bits
 
     subroutine s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
 
@@ -76,6 +91,9 @@ contains
         ! return if no collisions
 
         if (collision_model == 0) return
+
+        ! IBs migrating onto this rank can outgrow the bitset
+        if (num_ibs > pair_bits_capacity) call s_resize_pair_bits(num_ibs)
 
         ! get is distance used in the force calculation with each IB and each wall
         call s_detect_wall_collisions(any_wall_collision)
@@ -251,14 +269,14 @@ contains
 
     end subroutine s_apply_wall_collision_forces_soft_sphere
 
-    !> Triangular index (0-based) of the unordered pair a < b, both in 1 to num_local_ibs_max
-    pure function f_pair_bit_index(a, b) result(idx)
+    !> Triangular index (0-based) of the unordered pair a < b, both in 1 to num_bodies
+    pure function f_pair_bit_index(a, b, num_bodies) result(idx)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        integer, intent(in) :: a, b
+        integer, intent(in) :: a, b, num_bodies
         integer(kind=8)     :: idx
 
-        idx = int(a - 1, 8)*int(2*num_local_ibs_max - a, 8)/2 + int(b - a - 1, 8)
+        idx = int(a - 1, 8)*int(2*num_bodies - a, 8)/2 + int(b - a - 1, 8)
 
     end function f_pair_bit_index
 
@@ -272,20 +290,22 @@ contains
     subroutine s_detect_ib_collisions(gps, ib_markers, num_gps, num_considered_collisions)
 
         type(ghost_point), dimension(num_gps), intent(in) :: gps
-        type(integer_field), intent(in) :: ib_markers
-        integer, intent(in) :: num_gps
-        integer, intent(out) :: num_considered_collisions
-        integer :: i, j, k, ii, jj, kk, z_bound, gp_idx, gp_patch_id, neighbor_patch_id
-        integer :: a, b, gbl_a, gbl_b, enc_a, enc_b, xp, yp, zp, word, bit, mask, old_word, slot
-        integer :: num_found, max_pairs
-        integer(kind=8) :: idx
+        type(integer_field), intent(in)                   :: ib_markers
+        integer, intent(in)                               :: num_gps
+        integer, intent(out)                              :: num_considered_collisions
+        integer                                           :: i, j, k, ii, jj, kk, z_bound, gp_idx, gp_patch_id, neighbor_patch_id
+        integer                                           :: a, b, gbl_a, gbl_b, enc_a, enc_b, xp, yp, zp, bit, mask, old_word, slot
+        integer                                           :: num_found, max_pairs, num_bodies
+        integer(kind=8)                                   :: idx, word
 
         num_found = 0
         max_pairs = size(collision_lookup, 1)
+        num_bodies = pair_bits_capacity
         z_bound = 0; if (num_dims == 3) z_bound = 2
 
         $:GPU_PARALLEL_LOOP(private='[gp_idx, i, j, k, ii, jj, kk, gp_patch_id, neighbor_patch_id, a, b, gbl_a, gbl_b, enc_a, &
-                            & enc_b, xp, yp, zp, idx, word, bit, mask, old_word, slot]', copy='[num_found]', copyin='[z_bound, max_pairs]')
+                            & enc_b, xp, yp, zp, idx, word, bit, mask, old_word, slot]', copy='[num_found]', copyin='[z_bound, &
+                            & max_pairs, num_bodies]')
         do gp_idx = 1, num_gps
             i = gps(gp_idx)%loc(1)
             j = gps(gp_idx)%loc(2)
@@ -320,8 +340,8 @@ contains
             end if
 
             ! claim the pair: the thread whose OR flips the bit is the first to find it
-            idx = f_pair_bit_index(a, b)
-            word = int(idx/32) + 1
+            idx = f_pair_bit_index(a, b, num_bodies)
+            word = idx/32 + 1
             bit = int(mod(idx, 32_8))
             mask = ishft(1, bit)
             $:GPU_ATOMIC(atomic='capture')
@@ -352,11 +372,12 @@ contains
     subroutine s_clear_pair_bits(num_considered_collisions)
 
         integer, intent(in) :: num_considered_collisions
-        integer             :: n
+        integer             :: n, num_bodies
 
-        $:GPU_PARALLEL_LOOP(private='[n]')
+        num_bodies = pair_bits_capacity
+        $:GPU_PARALLEL_LOOP(private='[n]', copyin='[num_bodies]')
         do n = 1, num_considered_collisions
-            pair_bits(int(f_pair_bit_index(collision_lookup(n, 1), collision_lookup(n, 2))/32) + 1) = 0
+            pair_bits(f_pair_bit_index(collision_lookup(n, 1), collision_lookup(n, 2), num_bodies)/32 + 1) = 0
         end do
         $:END_GPU_PARALLEL_LOOP()
 
