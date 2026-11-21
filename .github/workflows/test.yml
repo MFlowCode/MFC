@@ -600,7 +600,7 @@ jobs:
 
   # Phoenix (GT) runs on pushes to master and on every non-draft PR, like Frontier.
   phoenix:
-    name: "${{ matrix.kind == 'case-opt' && 'Case Opt | ' || '' }}Georgia Tech | Phoenix (NVHPC) (gpu-${{ matrix.interface }})"
+    name: "${{ matrix.kind == 'case-opt' && 'Case Opt | ' || '' }}Georgia Tech | Phoenix (NVHPC) (gpu-${{ matrix.interface }}${{ matrix.shard != '' && format(' [{0}]', matrix.shard) || '' }})"
     needs: [lint-gate, file-changes]
     if: >-
       !cancelled() &&
@@ -614,8 +614,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kind:      [test, case-opt]
-        interface: [acc, omp]
+        # The suite is sharded in two: whole, it exceeded the 3.5 h allocation.
+        include:
+          - {kind: test,     interface: acc, shard: '1/2'}
+          - {kind: test,     interface: acc, shard: '2/2'}
+          - {kind: test,     interface: omp, shard: '1/2'}
+          - {kind: test,     interface: omp, shard: '2/2'}
+          - {kind: case-opt, interface: acc, shard: ''}
+          - {kind: case-opt, interface: omp, shard: ''}
     runs-on:
       group:  phoenix
       labels: gt
@@ -635,7 +641,7 @@ jobs:
       - name: Build & Test
         # One allocation so the queue wait is paid once.
         if:   matrix.kind == 'test'
-        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build-and-test.sh gpu ${{ matrix.interface }} phoenix
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build-and-test.sh gpu ${{ matrix.interface }} phoenix "${{ matrix.shard }}"
 
       - name: Pre-Build (SLURM)
         if:   matrix.kind == 'case-opt'
@@ -657,6 +663,6 @@ jobs:
       - name: Print Logs
         if:   always()
         run:  |
-          for f in build-and-test-gpu-${{ matrix.interface }}.out prebuild-case-optimization-*.out run-case-optimization-*.out; do
+          for f in build-and-test-gpu-${{ matrix.interface }}*.out prebuild-case-optimization-*.out run-case-optimization-*.out; do
             if [ -f "$f" ]; then echo "=== $f ==="; cat "$f"; fi
           done
