@@ -120,6 +120,10 @@ python3 examples/2D_thermal_channel/check_nu.py <hot run directory> <cold run di
 
 The cold run uses `--tw 270` in a copy of the directory (the output is written next to `case.py`). The tables were measured with GNU 13.3 (CPU, one rank, `-O3`). The suite runs the first 100 steps of the hot case as `2D -> Chemistry -> Thermal Channel -> Wall Temperature`; its golden holds the conservative fields, and the tolerance is 1e-6 (GNU 13 double -O3, reldebug and debug agree to 5e-8, AMD MI250X and an AMD CPU build to 8e-8 and 6e-8; single precision differs from double by 4e-4, so the test is skipped in that lane).
 
+## Other families
+
+- @ref validation_tsc_annulus "Isothermal conduction annulus": image-point interpolation (inverse distance and TSC) against the exact radial conduction solution.
+
 ## Adding a section
 
 One `##` section per family, with an anchor `{#sec-validation-<family>}`: status and code version, one setup table per check, the reference and how it was obtained, a results table with signed errors, and the limits.
