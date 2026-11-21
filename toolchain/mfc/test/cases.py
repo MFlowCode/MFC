@@ -6539,6 +6539,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 2D -> three levels", {**amr_2d_base, **three_2d})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
         stack.pop()
+        # Two levels with the level-2 region crossing a level-1 seam. The features at x = 0.1 and 0.8 run the whole height and the
+        # level-1 tiles meet at y = 31|32: the level-2 boxes on the two sides are joined across that seam, so their parent
+        # patches read the parents' seam ghosts and their reflux skips the shared face. np=2 puts the parents on different
+        # ranks; subcycling blends those ghosts in time.
+        seam_2d = {**amr_2d_base, **three_2d, "dt": 5.0e-5, "amr_max_level": 2, "amr_max_grid_size": 32}
+        stack.push("AMR -> 2D -> multi-level seam", seam_2d)
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
+        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
+        stack.pop()
 
     amr_golden_tests()
 

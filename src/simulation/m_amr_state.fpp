@@ -120,6 +120,8 @@ module m_amr_state
     integer              :: amr_n_own = 0
     !> cached f_amr_parent_block (0 for level <= 1), avoiding an O(global blocks) scan per block per stage
     integer, allocatable :: amr_parent_blk(:)
+    !> a level >= 2 block lies within amr_cpat_mar coarse cells of its parent's edge, so its parent patch reads the parent's ghosts
+    logical              :: amr_nest_seam = .false.
     integer, allocatable :: amr_child_ptr(:)   !< children of p = amr_child_idx(amr_child_ptr(p-1)+1 : amr_child_ptr(p)), ascending
     integer, allocatable :: amr_child_idx(:)   !< (amr_child_ptr(0) = 0)
     integer(8)           :: amr_l1r_epoch = -1_8

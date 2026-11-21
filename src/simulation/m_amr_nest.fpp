@@ -22,7 +22,7 @@ module m_amr_nest
     implicit none
 
     private
-    public :: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind
+    public :: s_amr_regrid_nest_children, f_amr_boxes_compatible, f_amr_nested, f_amr_tag_val_sf, f_amr_tag_ind
 
     !> Nested children were dropped for lack of block capacity (warn once per regrid)
     logical :: amr_child_dropped = .false.
@@ -84,7 +84,8 @@ contains
     !!
     !! Per level: pass 1 tags each parent's window from owned old blocks and packs (index, kb) pairs; an alltoall routes them to the
     !! parent's round-robin owner; pass 2 rebuilds the window and clusters it into children; an allgatherv plus a stable sort by kb
-    !! replays the children in serial order, so the list and its truncation are rank-invariant. IB nesting is np=1 only.
+    !! replays the children in serial order, so the list and its truncation are rank-invariant; s_amr_nest_close_seams then joins
+    !! children across parent seams. IB nesting is np=1 only.
     impure subroutine s_amr_regrid_nest_children(boxes, nboxes, box_level)
 
         type(t_box), allocatable, intent(inout) :: boxes(:)
@@ -93,7 +94,7 @@ contains
         integer                                 :: lev, plo, phi, newlo, kb, ob, jch, nloc_send, ntot_g, nmych, ntot_ch, nct
         integer                                 :: mlo(3), mhi(3)
         integer, allocatable                    :: mlo_all(:,:), mhi_all(:,:), powner(:), mych(:,:), gch(:,:), chord(:)
-        integer, allocatable                    :: skb(:), gkb(:), ctags(:,:)
+        integer, allocatable                    :: skb(:), gkb(:), ctags(:,:), par(:)
         integer(8), allocatable                 :: sidx(:), gidx(:)
         logical, allocatable                    :: mine(:), covered(:), gwin(:,:,:)
 
@@ -111,6 +112,7 @@ contains
             $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ob))]')
         end do
         call s_amr_refresh_my_blocks()
+        allocate (par(amr_max_blocks))
 
         plo = 1; phi = nboxes  ! parents
         do lev = 2, amr_max_level
@@ -159,7 +161,9 @@ contains
                 if (nboxes + 1 > amr_max_blocks) exit  ! canonical order gives the same truncation
                 nboxes = nboxes + 1
                 boxes(nboxes)%lo = gch(1:3,chord(jch)); boxes(nboxes)%hi = gch(4:6,chord(jch)); box_level(nboxes) = lev
+                par(nboxes) = gch(7, chord(jch))
             end do
+            call s_amr_nest_close_seams(boxes, par, newlo, nboxes, lev)
             deallocate (gch, chord, powner, mych, gidx, gkb, covered, mine, mlo_all, mhi_all)
             plo = newlo; phi = nboxes
         end do
@@ -196,6 +200,126 @@ contains
 #endif
 
     end subroutine s_amr_nest_mark_parents
+
+    !> Join children across parent seams. Where parent pb sits on parent pa's high face in dim d, and a child of each ends at its
+    !! nesting window there with the same transverse extents, both are extended to the shared parent face: they become a fine-fine
+    !! seam pair and the strip between them is refined. The parent patch of such a child reaches amr_cpat_mar cells into the
+    !! parent's ghosts, which the parents' own seam exchange fills. A closure that would break the level cap is skipped, and one
+    !! that leaves a neighbour with a partly shared face is undone (a tile joins only if the tiles beside it do). One dim at a time,
+    !! so a later dim sees the extended extents and can close the corner where four parents meet. Replicated inputs: rank-invariant.
+    !! Not with IB.
+    impure subroutine s_amr_nest_close_seams(boxes, par, clo, chi, lev)
+
+        type(t_box), intent(inout) :: boxes(:)
+        integer, intent(in)        :: par(:), clo, chi, lev
+        integer                    :: a, b, d, i, k, nc, cap
+        integer, allocatable       :: ca(:), cb(:)
+        logical                    :: ok, changed, tr(3)
+
+        if (ib .or. amr_cpat_mar > buff_size .or. chi <= clo) return
+        allocate (ca(chi - clo + 1), cb(chi - clo + 1))
+        do d = 1, num_dims
+            cap = max(amr_maxc_fit(d)/amr_ref_ratio**(lev - 1), 1) - amr_cpat_mar  ! widest box that may still be extended
+            tr = [1, 2, 3] /= d
+            nc = 0
+            do a = clo, chi
+                if (boxes(a)%hi(d) /= boxes(par(a))%hi(d) - amr_cpat_mar .or. boxes(a)%hi(d) - boxes(a)%lo(d) + 1 > cap) cycle
+                do b = clo, chi
+                    if (boxes(par(b))%lo(d) /= boxes(par(a))%hi(d) + 1) cycle
+                    if (boxes(b)%lo(d) /= boxes(par(b))%lo(d) + amr_cpat_mar .or. boxes(b)%hi(d) - boxes(b)%lo(d) + 1 > cap) cycle
+                    if (any(tr .and. (boxes(b)%lo /= boxes(a)%lo .or. boxes(b)%hi /= boxes(a)%hi))) cycle
+                    nc = nc + 1; ca(nc) = a; cb(nc) = b
+                    boxes(a)%hi(d) = boxes(par(a))%hi(d); boxes(b)%lo(d) = boxes(par(b))%lo(d)
+                    exit
+                end do
+            end do
+            ! undo this dim's closures until every joined child is compatible with its level
+            changed = nc > 0
+            do while (changed)
+                changed = .false.
+                do i = 1, nc
+                    a = ca(i); b = cb(i)
+                    if (a == 0) cycle
+                    ok = .true.
+                    do k = clo, chi
+                        if (k /= a) ok = ok .and. f_amr_boxes_compatible(boxes(a)%lo, boxes(a)%hi, boxes(k)%lo, boxes(k)%hi)
+                        if (k /= b) ok = ok .and. f_amr_boxes_compatible(boxes(b)%lo, boxes(b)%hi, boxes(k)%lo, boxes(k)%hi)
+                    end do
+                    if (ok) cycle
+                    boxes(a)%hi(d) = boxes(par(a))%hi(d) - amr_cpat_mar; boxes(b)%lo(d) = boxes(par(b))%lo(d) + amr_cpat_mar
+                    ca(i) = 0; changed = .true.
+                end do
+            end do
+        end do
+
+    end subroutine s_amr_nest_close_seams
+
+    !> Same-level box kk shares box k's whole face in dim d on `side` (+1 high, -1 low).
+    pure logical function f_amr_box_seam(boxes, nboxes, box_level, k, d, side) result(seam)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes, box_level(:), k, d, side
+        integer                 :: kk
+
+        seam = .false.
+        do kk = 1, nboxes
+            if (seam) exit
+            if (box_level(kk) /= box_level(k)) cycle
+            if (merge(boxes(kk)%lo(d) - boxes(k)%hi(d), boxes(k)%lo(d) - boxes(kk)%hi(d), side > 0) /= 1) cycle
+            seam = all((boxes(kk)%lo == boxes(k)%lo .and. boxes(kk)%hi == boxes(k)%hi) .or. [1, 2, 3] == d)
+        end do
+
+    end function f_amr_box_seam
+
+    !> Proper nesting of level >= 2 box k: it overlaps one parent-level box and each of its faces lies inside that parent's nesting
+    !! window, or on the parent's edge as a seam with a same-level box (s_amr_nest_close_seams).
+    pure logical function f_amr_nested(boxes, nboxes, box_level, k) result(ok)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes, box_level(:), k
+        integer                 :: kk, d, npar, mlo(3), mhi(3)
+
+        ok = .true.; npar = 0
+        do kk = 1, nboxes
+            if (box_level(kk) /= box_level(k) - 1) cycle
+            if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, boxes(kk)%lo, boxes(kk)%hi)) cycle
+            npar = npar + 1
+            call s_amr_nest_window(boxes(kk), mlo, mhi)
+            do d = 1, num_dims
+                if (boxes(k)%lo(d) < mlo(d)) ok = ok .and. boxes(k)%lo(d) == boxes(kk)%lo(d) .and. f_amr_box_seam(boxes, nboxes, &
+                    & box_level, k, d, -1)
+                if (boxes(k)%hi(d) > mhi(d)) ok = ok .and. boxes(k)%hi(d) == boxes(kk)%hi(d) .and. f_amr_box_seam(boxes, nboxes, &
+                    & box_level, k, d, 1)
+            end do
+        end do
+        ok = ok .and. npar == 1
+
+    end function f_amr_nested
+
+    !> True iff two same-level blocks can coexist: disjoint, and either >= 2 empty coarse cells apart or face-adjacent with an exact
+    !! transverse match. Mirrors s_amr_check_seam_topology (m_amr_regrid).
+    pure logical function f_amr_boxes_compatible(alo, ahi, blo, bhi) result(ok)
+
+        integer, intent(in) :: alo(3), ahi(3), blo(3), bhi(3)
+        integer             :: d, t, gap
+        logical             :: tmatch, tover
+
+        ok = .true.
+        if (all(alo <= bhi .and. blo <= ahi)) then; ok = .false.; return; end if
+        do d = 1, 3
+            if (.not. amr_dim(d)) cycle
+            gap = max(blo(d) - ahi(d), alo(d) - bhi(d)) - 1  ! empty cells along d (< 0: overlap)
+            if (gap >= 2 .or. gap < 0) cycle
+            tover = .true.; tmatch = .true.
+            do t = 1, 3
+                if (t == d .or. .not. amr_dim(t)) cycle
+                tover = tover .and. alo(t) <= bhi(t) .and. blo(t) <= ahi(t)
+                tmatch = tmatch .and. alo(t) == blo(t) .and. ahi(t) == bhi(t)
+            end do
+            if (tover .and. .not. (gap == 0 .and. tmatch)) then; ok = .false.; return; end if
+        end do
+
+    end function f_amr_boxes_compatible
 
     !> The nesting window of a parent: its box inset by amr_cpat_mar, so a child's ghost prolongation reads valid parent interior.
     pure subroutine s_amr_nest_window(box, mlo, mhi)

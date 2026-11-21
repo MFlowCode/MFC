@@ -33,7 +33,8 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   density jump. Tags are clustered
   by Berger-Rigoutsos bisection into boxes that reach `amr_cluster_eff` tag efficiency, are at least `amr_blocking_factor` cells wide, are padded by `amr_buf`
   cells and are capped at `amr_max_grid_size` cells per dimension. Levels nest properly (a level-2 box lies inside one
-  level-1 box).
+  level-1 box); boxes that end on either side of a seam between two parent blocks with the same extents along it are
+  joined across the seam.
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
   linear interpolation (`amr_prolong = 1`) or conservative quartic interpolation (`amr_prolong = 2`). The quartic fill
   falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (so a
@@ -180,8 +181,11 @@ against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lo
   The file header records `amr_ref_ratio`, `amr_max_level` and the storage precision, which must match (the level count may
   only grow); a missing fine-level file aborts the restart.
 - **Nesting.** A level-2 or deeper block lies inside one block of the level above; regrid builds each block's children
-  inside it, a few coarse cells from its edge. Where a feature crosses the seam between two parent blocks, a strip that
-  wide on each side of the seam stays at the parent's resolution. A larger `amr_max_grid_size` gives fewer seams.
+  inside it, a few coarse cells from its edge. Where a feature crosses the seam between two parent blocks, the children
+  on the two sides are extended to the seam when their extents along it are equal (a feature that crosses it squarely)
+  and the extended blocks stay within their level's size cap. Otherwise a strip that wide on each side of the seam stays at the parent's resolution; so does every seam with
+  immersed boundaries, or with `amr_prolong = 2` on a scheme with fewer
+  than 4 ghost cells (WENO3 and below). A larger `amr_max_grid_size` gives fewer seams.
 - **Regrid.** When no cell is tagged, regrid replaces the hierarchy with one small dormant level-1 block (one coarse cell
   at the domain center, padded by `amr_buf`), since the solver needs at least one block. At every level, the part of a
   new block that an old block of the same level covered keeps the old data; the rest is prolonged from the parent.

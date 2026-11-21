@@ -344,6 +344,7 @@ contains
         amr_n_l1r = 0
         amr_n_fch = 0
         amr_n_own = 0
+        amr_nest_seam = .false.
         amr_child_ptr(0:amr_num_blocks) = 0
         do b = 1, amr_num_blocks
             if (amr_owns_all(b)) then
@@ -356,6 +357,8 @@ contains
                 amr_parent_blk(b) = pblk
                 ! pblk == 0 is impossible on a nested mesh, but counting it would land in amr_child_ptr(0) and corrupt the lists
                 if (pblk > 0) then
+                    if (any(amr_dim .and. (amr_region_lo_all(:,b) < amr_region_lo_all(:,pblk) + mar .or. amr_region_hi_all(:, &
+                        & b) > amr_region_hi_all(:,pblk) - mar))) amr_nest_seam = .true.
                     amr_child_ptr(pblk) = amr_child_ptr(pblk) + 1
                     if (amr_block_owner(pblk) == proc_rank .and. amr_block_owner(b) /= proc_rank) then
                         amr_n_fch = amr_n_fch + 1

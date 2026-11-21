@@ -1016,8 +1016,9 @@ contains
     end subroutine s_amr_restrict_l1_batched
 
     !> Sibling-seam face weights for level>=2 block kb under parent pblk: 0 on a face shared with a same-parent sibling tile
-    !! (fine-fine; refluxing there double-writes), 1 otherwise. Uses replicated metadata only, and both the reflux apply and the
-    !! freg wire-skip call it, so shipped and consumed faces agree.
+    !! (fine-fine; refluxing there double-writes) and on a face on the parent's edge (a seam with a child of the neighbouring
+    !! parent, f_amr_nested; the outside cell is not the parent's), 1 otherwise. Uses replicated metadata only, and both the reflux
+    !! apply and the freg wire-skip call it, so shipped and consumed faces agree.
     impure subroutine s_amr_sibling_face_weights(kb, pblk, w_lo, w_hi)
 
         integer, intent(in)   :: kb, pblk
@@ -1028,6 +1029,10 @@ contains
 
         w_lo = 1._wp; w_hi = 1._wp
         if (pblk <= 0) return  ! orphan parent: no siblings; the CSR would index ptr(-1)
+        do d = 1, num_dims
+            if (amr_region_lo_all(d, kb) == amr_region_lo_all(d, pblk)) w_lo(d) = 0._wp
+            if (amr_region_hi_all(d, kb) == amr_region_hi_all(d, pblk)) w_hi(d) = 0._wp
+        end do
         do c = amr_child_ptr(pblk - 1) + 1, amr_child_ptr(pblk)
             y = amr_child_idx(c)
             if (y == kb) cycle
@@ -1073,9 +1078,12 @@ contains
             ghi(d) = phi(d) - plo(d)
             woff(d) = plo(d)
         end do
+        ! a zero-weight face may have its outside cell beyond the parent's coordinates
         #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (amr_dim(${D}$)) then; mlo(${D}$) = amr_slots(pblk)%d${X}$(olo(${D}$)); mhi(${D}$) &
-                & = amr_slots(pblk)%d${X}$(ohi(${D}$)); end if
+            if (amr_dim(${D}$)) then
+                if (w_lo(${D}$) /= 0._wp) mlo(${D}$) = amr_slots(pblk)%d${X}$(olo(${D}$))
+                if (w_hi(${D}$) /= 0._wp) mhi(${D}$) = amr_slots(pblk)%d${X}$(ohi(${D}$))
+            end if
         #:endfor
         loc_pblk = amr_loc_of(pblk)
         call s_amr_br_load_faces(loc_pblk, olo, ohi, glo, ghi, woff, w_lo, w_hi)

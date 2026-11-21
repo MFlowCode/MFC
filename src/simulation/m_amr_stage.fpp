@@ -22,7 +22,8 @@ module m_amr_stage
     implicit none
 
     private
-    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine, s_amr_apply_ic_patches
+    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine, &
+        & s_amr_apply_ic_patches, s_amr_fill_levels
 
     !> Whether patch_icpp was compared with the level-0 initial data, and reproduces it
     logical :: ic_checked = .false., ic_from_patches = .false.
@@ -164,7 +165,8 @@ contains
 
     !> Ghost fill of levels lev_lo..lev_hi: the level-1 wave from the coarse q_cons (or, with theta, the patch cache at that coarse
     !! time fraction), then the parent waves. The fine-fine seam reads stage-entry interiors only, so it is posted before the fills
-    !! and drained after.
+    !! and drained after. With a block on its parent's edge (amr_nest_seam) each level's seams are instead exchanged before the next
+    !! level gathers, since that block's parent patch reads them.
     impure subroutine s_amr_fill_levels(q_cons, lev_lo, lev_hi, theta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
@@ -172,20 +174,23 @@ contains
         real(wp), intent(in), optional                         :: theta
         integer                                                :: ilev
 
-        call s_amr_fine_fine_post()
-        if (lev_lo == 1) then
-            if (present(theta)) then
+        call s_amr_refresh_lists()
+        if (.not. amr_nest_seam) call s_amr_fine_fine_post()
+        do ilev = lev_lo, max(lev_lo, lev_hi)
+            if (amr_nest_seam) call s_amr_fine_fine_post(ilev)
+            if (ilev > 1) then
+                call s_amr_parent_fill_wave(ilev)
+            else if (present(theta)) then
                 call s_amr_pc_fill(theta)
             else
                 call s_amr_stage_fill_wave(q_cons)
             end if
-        end if
-        do ilev = max(lev_lo, 2), lev_hi
-            call s_amr_parent_fill_wave(ilev)
+            if (amr_nest_seam .or. ilev >= lev_hi) then
+                call s_phase_tic(PH_SEAM)
+                call s_amr_fine_fine_drain()
+                call s_phase_toc(PH_SEAM)
+            end if
         end do
-        call s_phase_tic(PH_SEAM)
-        call s_amr_fine_fine_drain()
-        call s_phase_toc(PH_SEAM)
 
     end subroutine s_amr_fill_levels
 
