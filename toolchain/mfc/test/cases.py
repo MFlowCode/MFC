@@ -4032,6 +4032,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
                 "2D_mibm_constant_acceleration",
                 "3D_mibm_wall_collision",
+                # Registered below at their own sizes (12 cells per radius, 8 cells across the gap): the 25-cell cap would change the wall resolution they test
+                "2D_ibm_taylor_couette",
+                "2D_ibm_plane_poiseuille",
             ]
             if path in casesToSkip:
                 continue
@@ -4611,6 +4614,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # contact (order 1e-2). Regenerate the goldens whenever a default in the moving-body numerics changes.
     for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
         cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
+
+    # Wall-normal ghost velocity (ib_wall_order = 2) at viscous no-slip walls whose exact solutions are known: a rotating inner circle with
+    # an STL outer ring (Taylor-Couette) and two flat rectangle walls (plane Poiseuille). Each runs 300 fixed steps at its CI size, far
+    # from steady state (only the last step is saved), so the golden is a regression guard on the cons fields and the ib_forces.dat history; the accuracy against the
+    # exact solutions is measured by check_couette.py and check_poiseuille.py (see the Validation page). The default order 1 is covered
+    # by the viscous IBM tests above. override_tol is TOL_PLACEHOLDER.
+    cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
+    cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
