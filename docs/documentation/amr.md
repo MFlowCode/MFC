@@ -36,8 +36,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   level-1 box).
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
   linear interpolation (`amr_prolong = 1`) or conservative quartic interpolation (`amr_prolong = 2`). The quartic fill
-  falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (so a
-  monotone profile stays monotone; only at a local extremum is the range widened), and wherever it would give
+  falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (widened
+  only where the second differences share a sign: at a smooth local extremum and next to one, so a smooth extremum keeps
+  the quartic, a steep monotone front stays monotone, and an overshoot beside a front is not amplified), and wherever it would give
   non-positive density or internal energy. Volume fractions are
   renormalized to sum to one and species mass fractions to `sum(Y) = 1, Y >= 0`. A block that survives a regrid
   keeps its own fine solution.
@@ -56,12 +57,12 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 
 Conservation across coarse/fine faces holds to round-off for single- and multi-fluid, viscous and chemistry cases, and
 a uniform state stays uniform with regrid on. Interiors keep the WENO order; the coarse/fine ghost fill is second
-order (linear) or higher (quartic). For a smooth wave crossing a static block, the measured global rate is about 2.5 with
-either fill (the quartic fill lowers the error about 5x), against 5 for WENO5 on a uniform grid; the
-`Convergence -> 1D -> AMR` tests track it. Results do not depend on message timing, and agree across rank counts to round-off
-when `amr_max_grid_size` is set. With `amr_max_grid_size = 0` they also agree as long as half of every rank's subdomain
-holds the default 32-cell block; below that, and with immersed bodies, the block size cap and therefore the box set depend
-on the decomposition.
+order (linear) or fifth order (quartic). For a smooth wave crossing a static block, the measured global L2 rate is 2.5 with
+the linear fill (its second-order ghost values leave a second-order error in the few cells at each interface) and 5 with
+the quartic fill, as for WENO5 on a uniform grid; the `Convergence -> 1D -> AMR` tests track it. Results do not depend on
+message timing, and agree across rank counts to round-off when `amr_max_grid_size` is set. With `amr_max_grid_size = 0` they
+also agree as long as half of every rank's subdomain holds the default 32-cell block; below that, and with immersed bodies,
+the block size cap and therefore the box set depend on the decomposition.
 
 ## Parallelism {#amr-parallel}
 
