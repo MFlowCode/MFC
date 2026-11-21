@@ -22,7 +22,7 @@ module m_amr_nest
     implicit none
 
     private
-    public :: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_grad_sf
+    public :: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind
 
     !> Nested children were dropped for lack of block capacity (warn once per regrid)
     logical :: amr_child_dropped = .false.
@@ -548,31 +548,24 @@ contains
             r = f_pressure(${QPRE}$eqn_idx%E${QPOST}$ - 0.5_wp*u2/max(r, 1.e-30_wp), gam, pinf, qv)
 
         end function f_amr_tag_val_${RSFX}$
-
-        !> Tag indicator (jump of the amr_tag_var variable) at one cell, max over the active dimensions. `_st` clamps the stencil to
-        !! the block (fm1:fm3 = block extents) since its ghosts are stale; `_sf` reads the level-0 halo.
-        function f_amr_tag_grad_${RSFX}$(${RARG}$, ci, cj, ck${', fm1, fm2, fm3' if RSRC else ''}$) result(g)
-
-            #:if RSRC
-                integer, intent(in) :: loc, fm1, fm2, fm3
-            #:else
-                type(scalar_field), dimension(:), intent(in) :: q
-            #:endif
-            integer, intent(in) :: ci, cj, ck
-            real(wp)            :: g, r0
-            integer             :: ip(3), im(3)
-
-            ip = [ci, cj, ck] + 1; im = [ci, cj, ck] - 1
-            #:if RSRC
-                ip = min(ip, [fm1, fm2, fm3]); im = max(im, 0)
-            #:endif
-            r0 = ${RHO}$(${RARG}$, ci, cj, ck)
-            g = f_amr_tag_ind(${RHO}$(${RARG}$, ip(1), cj, ck), r0, ${RHO}$(${RARG}$, im(1), cj, ck))
-            if (n_glb > 0) g = max(g, f_amr_tag_ind(${RHO}$(${RARG}$, ci, ip(2), ck), r0, ${RHO}$(${RARG}$, ci, im(2), ck)))
-            if (p_glb > 0) g = max(g, f_amr_tag_ind(${RHO}$(${RARG}$, ci, cj, ip(3)), r0, ${RHO}$(${RARG}$, ci, cj, im(3))))
-
-        end function f_amr_tag_grad_${RSFX}$
     #:endfor
+
+    !> Tag indicator (jump of the amr_tag_var variable) at one cell of a block in the flat store, max over the active dimensions.
+    !! The stencil is clamped to the block (fm1:fm3 = block extents) since its ghosts are stale.
+    function f_amr_tag_grad_st(loc, ci, cj, ck, fm1, fm2, fm3) result(g)
+
+        integer, intent(in) :: loc, fm1, fm2, fm3
+        integer, intent(in) :: ci, cj, ck
+        real(wp)            :: g, r0
+        integer             :: ip(3), im(3)
+
+        ip = min([ci, cj, ck] + 1, [fm1, fm2, fm3]); im = max([ci, cj, ck] - 1, 0)
+        r0 = f_amr_tag_val_st(loc, ci, cj, ck)
+        g = f_amr_tag_ind(f_amr_tag_val_st(loc, ip(1), cj, ck), r0, f_amr_tag_val_st(loc, im(1), cj, ck))
+        if (n_glb > 0) g = max(g, f_amr_tag_ind(f_amr_tag_val_st(loc, ci, ip(2), ck), r0, f_amr_tag_val_st(loc, ci, im(2), ck)))
+        if (p_glb > 0) g = max(g, f_amr_tag_ind(f_amr_tag_val_st(loc, ci, cj, ip(3)), r0, f_amr_tag_val_st(loc, ci, cj, im(3))))
+
+    end function f_amr_tag_grad_st
 
     !> Tag indicator from the tagged variable at i+1, i, i-1: central difference over 2*r_i, or with amr_tag_abs the larger absolute
     !! face jump.

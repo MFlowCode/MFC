@@ -21,7 +21,7 @@ module m_amr_regrid
     use m_amr_state, only: amr_band_migrate
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
-    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_grad_sf
+    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind
     use m_amr_distribution, only: s_amr_sort_by_key
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
@@ -356,18 +356,30 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         logical, allocatable, intent(inout)                 :: tag_grid(:,:,:)
         integer, intent(out)                                :: sidx(3)
-        integer                                             :: tg_lo(3), tg_hi(3), ci, cj, ck
+        integer                                             :: tg_lo(3), tg_hi(3), ci, cj, ck, h(3)
         real(wp)                                            :: g
+        real(wp), allocatable                               :: r(:,:,:)  !< the tagged variable, one evaluation per cell
 
         sidx = amr_sidx
         tg_lo = merge(merge(1, 0, sidx == 0), 0, amr_dim)
         tg_hi = merge(merge(amr_ext - 1, amr_ext, sidx + amr_ext == [m_glb, n_glb, p_glb]), 0, amr_dim)
         allocate (tag_grid(0:m,0:n,0:p)); tag_grid = .false.
+        h = merge(1, 0, amr_dim)
+        allocate (r(tg_lo(1) - h(1):tg_hi(1) + h(1),tg_lo(2) - h(2):tg_hi(2) + h(2),tg_lo(3) - h(3):tg_hi(3) + h(3)))
+        do ck = lbound(r, 3), ubound(r, 3)
+            do cj = lbound(r, 2), ubound(r, 2)
+                do ci = lbound(r, 1), ubound(r, 1)
+                    r(ci, cj, ck) = f_amr_tag_val_sf(q_cons_base, ci, cj, ck)
+                end do
+            end do
+        end do
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
                 do ci = tg_lo(1), tg_hi(1)
-                    ! total density (sum of continuity variables): single-fluid tagger, immune to trace-fluid noise
-                    g = f_amr_tag_grad_sf(q_cons_base, ci, cj, ck)
+                    ! jump of the tagged variable, max over the active dimensions
+                    g = f_amr_tag_ind(r(ci + 1, cj, ck), r(ci, cj, ck), r(ci - 1, cj, ck))
+                    if (n_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj + 1, ck), r(ci, cj, ck), r(ci, cj - 1, ck)))
+                    if (p_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj, ck + 1), r(ci, cj, ck), r(ci, cj, ck - 1)))
                     if (g > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! acoustic source support stays coarse
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
