@@ -1081,6 +1081,8 @@ class CaseValidator:
         moving_any = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in bodies)
         self.prohibit(ib_flux_wall and moving_any, "ib_flux_wall requires every immersed boundary to be fixed (moving_ibm = 0)")
         self.prohibit(ib_flux_wall and self.get("hypoelasticity", "F") == "T", "ib_flux_wall is not supported with hypoelasticity")
+        # the wall fields live on the coarse grid only
+        self.prohibit(ib_flux_wall and self.get("amr", "F") == "T", "ib_flux_wall is not supported with amr")
         for i in reacting:
             self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
@@ -2259,7 +2261,7 @@ class CaseValidator:
         self.prohibit(amr_max_blocks is not None and amr_max_blocks < 1, "amr_max_blocks must be >= 1")
         self.prohibit(
             amr_max_grid_size is not None and amr_max_grid_size < 0,
-            "amr_max_grid_size must be >= 0 (0 derives the block size cap from the decomposition)",
+            "amr_max_grid_size must be >= 0 (0 is the default cap of 32 coarse cells)",
         )
         self.prohibit(
             amr_max_grid_size is not None and 0 < amr_max_grid_size < 2,
