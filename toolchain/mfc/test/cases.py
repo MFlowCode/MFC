@@ -6492,6 +6492,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # m = 51: a 26-cell axis split over two ranks is below the WENO5 floor
         cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 51}, ppn=2))
         cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
+        # Two levels under regrid, through a restart. A level-2 child lies in its parent inset by amr_cpat_mar = 3 coarse cells
+        # per side, and a 26-cell axis caps a block at 13, so only the middle 7 cells of a parent can refine: the slabs' blocks
+        # are thinner than that in z, or tiled across the interface. Nested cubes (coarse cells 10..15 and 12..13) instead get one
+        # parent, 7..18, whose window is the outer cube.
+        cubes = {f"patch_icpp({i})%length_{d}": w / 26 for i, w in ((1, 26), (2, 6), (3, 2)) for d in "xyz"}
+        cubes.update({f"patch_icpp({i})%z_centroid": 0.5 for i in (1, 2, 3)})
+        cubes.update({f"patch_icpp({i})%alter_patch({j})": "T" for i, j in ((2, 1), (3, 1), (3, 2))})
+        cases.append(define_case_d(stack, "multi-level restart", {**cubes, "amr_max_level": 2}, restart_check=True))
         stack.pop()
         stack.push("AMR -> 3D -> multi-level static", {**amr_3d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))
