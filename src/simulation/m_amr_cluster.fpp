@@ -354,7 +354,7 @@ contains
         integer, allocatable :: slo(:,:), shi(:,:), sts(:), ste(:), wt(:,:), sdep(:), sig(:), ovr(:)
         integer, allocatable :: kpos(:), kbat(:), bofs(:), blen(:), boff(:,:), bsig(:), bnov(:), bovr(:,:)
         logical, allocatable :: bwide(:)
-        integer              :: cap, mg, ng, pg, t, i, j, ncur, nnxt, nkeep, nbat, nbuf, novr, nsig, ntag, dep
+        integer              :: cap, mg, ng, pg, t, i, j, ncur, nnxt, nkeep, nbat, nbuf, novr, nsig, ntag, dep, near
         integer              :: blo0(3), bhi0(3), off(3), blo(3), bhi(3), ts, te, lo, sax, spos
         integer(8)           :: vol  !< a global-bbox first pass can exceed 2**31 cells
         logical              :: ok, force, mine
@@ -394,9 +394,9 @@ contains
                 call s_amr_box_sig(wt, sts(i), ste(i), blo0, bhi0, sig, off, nsig)
                 nkeep = nkeep + 1; kpos(nkeep) = i; kbat(nkeep) = 0
                 if (reduce .and. num_procs > 1 .and. novr > 1) then
-                    call s_amr_size_int(bsig, nbuf + nsig)
+                    call s_amr_size_int(bsig, nbuf + nsig + 1)
                     nbat = nbat + 1; kbat(nkeep) = nbat
-                    bofs(nbat) = nbuf; blen(nbat) = nsig; boff(:,nbat) = off
+                    bofs(nbat) = nbuf; blen(nbat) = nsig + 1; boff(:,nbat) = off  ! + the near-cap flag, set below
                     bnov(nbat) = novr; bwide(nbat) = (novr > amr_cl_wide)
                     bovr(1, nbat) = -1  ! defined for wide nodes too: Fortran does not promise .or. short-circuits
                     if (.not. bwide(nbat)) then
@@ -404,8 +404,15 @@ contains
                         bovr(1:novr,nbat) = ovr(1:novr)
                     end if
                     bsig(nbuf + 1:nbuf + nsig) = sig(1:nsig)
-                    nbuf = nbuf + nsig
+                    nbuf = nbuf + nsig + 1
                 end if
+            end do
+            ! Near the amr_max_blocks cap (every kept node splitting bounds the pass-2 count below) a node is accepted unsplit. A
+            ! shared node must get the same decision on every rank it overlaps, or their next-depth batches differ: each rank's
+            ! flag rides the node's reduction, and the node is forced if any of them is set.
+            near = merge(1, 0, nacc + 2*nkeep >= cap)
+            do j = 1, nbat
+                bsig(bofs(j) + blen(j)) = near
             end do
 #ifdef MFC_MPI
             call s_cl_reduce_depth(nbat, bsig, bofs, blen, bnov, bwide, bovr)
@@ -414,10 +421,13 @@ contains
             do j = 1, nkeep
                 i = kpos(j); blo = slo(:,i); bhi = shi(:,i); ts = sts(i); te = ste(i); dep = sdep(i)
                 blo0 = blo; bhi0 = bhi
+                ! guard against overflowing the amr_max_blocks cap: pending = rest of this depth + children queued so far
+                force = (nacc + (nkeep - j) + nnxt + 1 >= cap)
                 if (kbat(j) > 0) then
                     off = boff(:,kbat(j))
-                    sig(1:blen(kbat(j))) = bsig(bofs(kbat(j)) + 1:bofs(kbat(j)) + blen(kbat(j)))
-                    nsig = blen(kbat(j))
+                    nsig = blen(kbat(j)) - 1
+                    sig(1:nsig) = bsig(bofs(kbat(j)) + 1:bofs(kbat(j)) + nsig)
+                    force = bsig(bofs(kbat(j)) + nsig + 1) > 0
                 else
                     ! rank-local node: recompute (safe, pass 2 only partitions this node's own wt range)
                     call s_amr_box_sig(wt, ts, te, blo0, bhi0, sig, off, nsig)
@@ -428,8 +438,6 @@ contains
                 do t = 1, num_dims; vol = vol*int(bhi(t) - blo(t) + 1, 8); end do
                 eff = real(ntag, wp)/real(max(vol, 1_8), wp)
                 call s_amr_find_split_sig(sig(1:nsig), off, blo0, blo, bhi, sax, spos, ok)
-                ! guard against overflowing the amr_max_blocks cap: pending = rest of this depth + children queued so far
-                force = (nacc + (nkeep - j) + nnxt + 1 >= cap)
                 if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
                     if (nacc < cap) then; nacc = nacc + 1; alo(:,nacc) = blo; ahi(:,nacc) = bhi; end if
                     if (force .and. ok .and. eff < amr_cluster_eff) capped = .true.
