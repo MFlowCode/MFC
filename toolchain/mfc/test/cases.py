@@ -6033,6 +6033,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Force-driven (moving_ibm = 2): the body decelerates on that force, so its velocity in D/ib_forces.dat guards the same path
         force_driven = {"patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.0628, "ib_state_wrt": "T", "ib_force_wrt": "T"}
         cases.append(define_case_d(stack, "force-driven", force_driven))
+        # The same on two ranks: the block is owned whole by one rank and spans the rank boundary, so it has to fit in half a
+        # subdomain (hence the finer grid and smaller body)
+        two_rank = {"m": 127, "n": 127, "patch_ib(1)%radius": 0.05, "patch_ib(1)%mass": 0.0157}
+        two_rank.update({"amr_block_beg(1)": 50, "amr_block_end(1)": 73, "amr_block_beg(2)": 53, "amr_block_end(2)": 76})
+        cases.append(define_case_d(stack, "force-driven -> 2 MPI Ranks", {**force_driven, **two_rank}, ppn=2))
         # Two prescribed-motion bodies: exercises the multi-body fine-IB rebuild for moving bodies
         stack.push(
             "two bodies",
