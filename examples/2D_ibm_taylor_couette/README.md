@@ -20,7 +20,7 @@ ghost velocity, default) and `ib_wall_order = 2` (two-probe quadratic) do at a c
 | 40 | 2 | 4.7e-3 | 4.9e-3 | -6.6e-3 | -8.8e-3 | -3.4e-2 |
 
 Order 2 lowers the velocity error by 26 to 42 % at every resolution and about halves the torque error from 20 cells per radius.
-Neither order converges cleanly: the azimuthal-mean error stays near 4e-3 to 9e-3 and the fitted inner wall speed stays 3 to 7 %
+Neither order converges cleanly on current master, which evaluates a rotating body's ghost-cell wall velocity at the ghost point, not at the wall point (a fix is in preparation); the azimuthal-mean error stays near 4e-3 to 9e-3 and the fitted inner wall speed stays 3 to 7 %
 low. The measurement, its limits and the rotating-wall variants are on the page @ref validation_wall_order_couette.
 
 ## Run

@@ -4619,7 +4619,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # an STL outer ring (Taylor-Couette) and two flat rectangle walls (plane Poiseuille). Each runs 300 fixed steps at its CI size, far
     # from steady state (only the last step is saved), so the golden is a regression guard on the cons fields and the ib_forces.dat history; the accuracy against the
     # exact solutions is measured by check_couette.py and check_poiseuille.py (see the Validation page). The default order 1 is covered
-    # by the viscous IBM tests above. override_tol is TOL_PLACEHOLDER.
+    # by the viscous IBM tests above. The annulus has a rotating inner wall: its golden changes with the wall-point velocity fix
+    # (a rotating body's ghost-cell wall velocity evaluated at the wall point, not the ghost point; in preparation); the channel golden
+    # does not. override_tol is TOL_PLACEHOLDER.
     cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
     cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
 
