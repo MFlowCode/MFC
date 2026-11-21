@@ -613,7 +613,7 @@ contains
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, 0)
             end if
 
             call s_stage_hooks_post_ib(q_cons_ts(1)%vf, 0)
