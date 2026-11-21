@@ -31,7 +31,7 @@ module m_constants
 
     !> Reals per IB in restart_data/ib_state: time, force(3), torque(3), vel(3), angular_vel(3), angles(3), centroid(3), radius,
     !! Twall, ib_mass_relax bank. Twall carries a thermal_bc = 3 body's evolving temperature across a restart; the bank is the
-    !! body's unreturned gas mass (ib_mass_res(1), identical on every rank).
+    !! body's unreturned gas mass (patch_ib%mass_bank, held by the owner).
     integer, parameter :: ib_state_nfields = 22
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
