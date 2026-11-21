@@ -4032,6 +4032,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
                 "2D_mibm_constant_acceleration",
                 "3D_mibm_wall_collision",
+                # Registered below at 16 cells per diameter, where the body is resolved
+                "2D_ibm_cylinder_drag_nu",
             ]
             if path in casesToSkip:
                 continue
@@ -4592,6 +4594,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-9,
         )
     )
+
+    # Re 20 cylinder at Mach 0.2 (16 cells per diameter, 192 x 128 cells, 200 fixed steps, not steady): the face-flux force and heat
+    # histories (ib_forces.dat, ib_heat.dat) are in the golden. The checker script validates the physics; the golden is a regression guard.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=1e-6))
 
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
     # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history
