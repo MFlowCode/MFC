@@ -111,15 +111,20 @@ if [ "$preflight_rc" -ne 0 ]; then
     exit "$preflight_rc"
 fi
 
-# --- Variants side by side (Frontier, when the job was not given one variant) ---
+# --- Variants side by side (Frontier and Phoenix, when the job was not given one variant) ---
 # Built one after another, the variants took 67-89 minutes with CCE on GPUs, of a
-# two-hour allocation: a retry after a late failure could not finish. They stage
-# under different slugs and the allocation is a whole node, so they build at the
-# same time here, each with its own retry and log. The g1 partition caps a user
+# two-hour allocation: a retry after a late failure could not finish. On Phoenix they took
+# about 80 minutes of a 3.5 h allocation that also holds the tests. They stage
+# under different slugs, so they build at the same time here, each with its own
+# retry and log. The g1 partition caps a user
 # at 16 nodes, which is why this is not one job per variant. The full build below
 # then runs as a sweep: it finds everything in place and builds whatever a variant
 # missed, so the end state is the same as before.
-if [ -z "${job_variant:-}" ] && { [ "$job_cluster" = "frontier" ] || [ "$job_cluster" = "frontier_amd" ]; }; then
+if [ -z "${job_variant:-}" ] && [[ "$job_cluster" =~ ^(frontier|frontier_amd|phoenix)$ ]]; then
+    # Frontier's login node installed the dependencies already. Here the variants would race to build the same ones.
+    if [ "$job_cluster" = "phoenix" ]; then
+        run_build_step "${log_base}-deps.log" retry_build ./mfc.sh build --deps-only -j 8 $build_opts
+    fi
     variant_pids=()
     for v in base chem eos; do
         variant_cmd "$v"

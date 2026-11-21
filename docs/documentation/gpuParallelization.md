@@ -978,6 +978,37 @@ answer is wrong, or one backend diverges from all the others.
   the rest overwrites neighbouring cells, with no error. A leading section (`arr(1:n)`, or a
   fixed trailing index such as `freg(d)%%lo(:,:,:,k)`) is contiguous and safe. Move a sub-box
   with a pack/unpack device kernel instead (`s_amr_pack_unpack_block_st`).
+- **Assign every GPU-private scalar unconditionally before any conditional use.** A private
+  copy is not initialised from the host value (only `firstprivate` is), so a scalar written
+  only under an `if` is undefined on the threads that skip the write. PR #2330 had
+  `if (ib_id > 0) g = ib_id` inside the `GPU_PARALLEL_LOOP` of `s_ib_shell_mass`
+  (`src/simulation/m_ibm.fpp`). On NVHPC 25.5 (A100 and H200, OpenACC and OpenMP) `g` was
+  undefined for cells with `ib_id <= 0`, the shell gas mass sum stayed 0, the `ib_mass_relax`
+  correction was silently inert, and 13 moving-body tests failed on NVIDIA. CPU, Cray and
+  amdflang happened to behave. It was found with debug prints on an A100 and fixed by
+  `g = max(ib_id, 0)`. The same pattern (`i`, `g`, `sh` set only under
+  `if (wc_on(c) == 1)`) turned up in the heat-booking loop of `s_accumulate_ib_face_fluxes`
+  in review of PR #2329 and was hardened. Give each private scalar a safe default, and clamp
+  or guard any array index taken from a marker id that can be `<= 0`. To find candidates, run
+  ``grep -nE 'if \(.*\) [a-z_]+ = ' src/simulation/*.fpp``; it over-matches (about 260 hits on
+  the tree at the time of writing), so each hit inside a GPU loop needs a
+  human check of its context.
+- **Run `GPU_UPDATE(device=...)` and `GPU_ENTER_DATA` of static module data only after the
+  rank is bound to its GPU.** `s_mpi_initialize` (`src/common/m_mpi_common.fpp`) updated
+  `num_procs` and `proc_rank` on the device before `s_initialize_mpi_domain`
+  (`src/simulation/m_start_up.fpp`) called `acc_set_device_num` / `omp_set_default_device`.
+  The update went to the default device, so a rank bound to another device kept an
+  uninitialised copy and `f_local_rank_owns_location` returned `.true.` on both ranks: a
+  collision force was applied twice and summed. Reproduced on an NVIDIA A100 as a
+  deterministic difference between `-g 0` and `-g 0 2`. AMD CI hides it because each rank sees
+  one GPU and the binding is a no-op. Test a 2-rank GPU change with both ranks on one GPU and
+  on two GPUs. The fix is #2371.
+- **A CI result that looks like a code failure can be the harness.** A Phoenix lane that hits
+  its Slurm time limit, or a launch failure such as `Submitting batch file for Interactive
+  failed`, is no result for the PR: check the job log for `TIMEOUT` before reading it as a code
+  failure. At the time of writing, NVHPC 25.5 and 25.11 differ by 1.8% on chemistry test
+  `124D7972` (issue #2181), so a lane on another compiler version that disagrees with a golden
+  file is not yet evidence of a regression.
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 

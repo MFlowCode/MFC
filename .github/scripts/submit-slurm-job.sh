@@ -60,9 +60,9 @@ case "$cluster" in
         qos="inferno"
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
-        # Combined build+test needs build headroom on top of the test budget;
-        # kept modest so it still backfills.
-        buildtest_time="03:30:00"
+        # Combined build+test: on a V100 node the build takes 1 h 30 min and the
+        # suite about 2 h 30 min.
+        buildtest_time="05:00:00"
         bench_time="04:00:00"
         gpu_partition_dynamic=true
         ;;
@@ -270,7 +270,7 @@ EOT
 # preempted job is killed outright and `--requeue` never restarts it. When the
 # monitor reports preemption (exit 76), submit a fresh job and monitor again.
 # Bounded by MAX_PREEMPT_RESUBMITS as a runaway guard; the job-level
-# `timeout-minutes` (1380m) remains the real backstop.
+# `timeout-minutes` remains the real backstop.
 : "${MAX_PREEMPT_RESUBMITS:=10}"
 # Node faults get a much tighter bound than preemption: preemption is routine on
 # 'embers' and says nothing about the node, whereas hitting a second unusable
