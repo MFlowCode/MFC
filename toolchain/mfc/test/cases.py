@@ -4031,6 +4031,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_hot_rod",
                 # Registered below with its own arguments: the 50-step cap would stop it before the ignition
                 "1D_h2_air_ignition",
+                # Docs-only: 165 thousand steps at the coarsest grid, and it writes its Cantera profile into IC/ at run time
+                "1D_h2_air_flame_speed",
                 # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
                 "2D_mibm_constant_acceleration",
                 "3D_mibm_wall_collision",
