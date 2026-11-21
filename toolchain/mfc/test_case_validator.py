@@ -571,7 +571,8 @@ class TestAmrDefaults(unittest.TestCase):
     def test_tag_var(self):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")
-        for bad, msg in (({"amr_tag_var": 4}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T")):
+        validate_case_constraints({**self.AMR, "amr_tag_var": 4}, "simulation")
+        for bad, msg in (({"amr_tag_var": 5}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T"), ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2")):
             with self.assertRaises(CaseConstraintError) as ctx:
                 validate_case_constraints({**self.AMR, **bad}, "simulation")
             self.assertIn(msg, str(ctx.exception))
@@ -973,6 +974,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**self.case(v_blow=1.0), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1, or a no-slip, non-blowing one")
         self.assertRejects({**flux, "patch_ib(1)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
         self.assertRejects({**flux, "hypoelasticity": "T"}, "ib_flux_wall is not supported with hypoelasticity")
+        self.assertRejects({**self.case(), **mech, "amr": "T"}, "ib_flux_wall is not supported with amr")
         second = {**flux, "num_ibs": 2, **{k.replace("patch_ib(1)", "patch_ib(2)"): v for k, v in flux.items() if k.startswith("patch_ib(1)%") and "surface_reaction" not in k}}
         self.assertAccepts(second)
         self.assertRejects({**second, "patch_ib(2)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")

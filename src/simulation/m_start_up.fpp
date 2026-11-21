@@ -58,7 +58,7 @@ module m_start_up
     use m_projection
     use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
     use m_amr_regrid, only: s_amr_regrid
-    use m_amr_stage, only: s_amr_relax_fine
+    use m_amr_stage, only: s_amr_relax_fine, s_amr_apply_ic_patches
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
@@ -68,10 +68,15 @@ module m_start_up
 
     private; public :: s_read_input_file, s_check_input_file, s_read_data_files, s_read_serial_data_files, &
         & s_read_parallel_data_files, s_initialize_internal_energy_equations, s_initialize_modules, s_initialize_gpu_vars, &
-        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics
+        & s_amr_start_fresh_blocks, s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, &
+        & s_save_performance_metrics
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
+
+    !> AMR: the fine level was prolonged from level 0 at start-up (no restart file), so the first step regrids onto the initial
+    !! features
+    logical :: amr_fresh_start = .false.
 
 contains
 
@@ -1000,6 +1005,7 @@ contains
         ! restarts restore the saved fine state; otherwise prolong from coarse
         call s_read_amr_restart(amr_restored)
         if (.not. amr_restored) call s_populate_amr_fine(q_cons_ts(1)%vf)
+        amr_fresh_start = amr .and. .not. amr_restored
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
@@ -1015,6 +1021,9 @@ contains
             end if
             call s_build_ib_neighborhood()
             call s_ibm_setup()
+            ! the wall conduction temperature of the last stage, which the saved state cannot reproduce
+            if (chemistry .and. chem_params%diffusion .and. merge(n_start, t_step_start, &
+                & cfl_dt) > 0) call s_read_ib_conduction_temperature(merge(n_start, t_step_start, cfl_dt))
             ! resolve the body on each fine block from the geometry
             if (amr) call s_amr_setup_ib()
             ! a CFL-mode run keeps t_step_start = 0, so only n_start tells a restart apart
@@ -1096,6 +1105,9 @@ contains
         call omp_set_default_device(dev)
 #endif
 #endif
+
+        ! After the device is bound: s_mpi_initialize ran earlier, so its update went to the default device
+        $:GPU_UPDATE(device='[num_procs, proc_rank]')
 
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
@@ -1208,6 +1220,23 @@ contains
         #:endif
 
     end subroutine s_initialize_gpu_vars
+
+    !> Fresh AMR run, before the first save: put the initial condition patches on the blocks and, under dynamic regrid, regrid once
+    !! per level, so each level is tagged on the one above it.
+    impure subroutine s_amr_start_fresh_blocks
+
+        integer :: i
+
+        if (.not. amr_fresh_start) return
+        call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+        if (amr_regrid_int > 0) then
+            do i = 1, amr_max_level
+                call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+            end do
+        end if
+
+    end subroutine s_amr_start_fresh_blocks
 
     !> Read the Lagrangian bubbles or particles this rank starts with: the input-file rows (and their global IDs) on a fresh start,
     !! otherwise the restart-file rows, which also reset mytime and dt.
@@ -1534,6 +1563,8 @@ contains
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
                                             & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0)
 
+        call s_resolve_ib_mass_relax()
+
         allocate (namelist_ibs(num_ibs))
         namelist_ibs(:) = patch_ib(1:num_ibs)
         num_gbl_ibs = num_ibs + sum(particle_cloud(1:num_particle_clouds)%num_particles)
@@ -1617,6 +1648,22 @@ contains
 
     end subroutine s_read_ib_restart_data
 
+    !> ib_mass_relax = -1 (default): N = 30 for a moving body, else 0 (a fixed body leaks little, and the slip-wall N = 1 costs too
+    !! much on some GPUs to be a default). It is 0 wherever an explicit value is refused (amr, cyl_coord, igr, bubbles, model_eqns
+    !! /= 2, a blowing body), with a surface reaction (ib_flux_wall conserves there), and with hypoelasticity or mhd (their extra
+    !! variables are not scaled), so the default never invalidates a case. Explicit values are unchanged. Called while patch_ib
+    !! still holds the case-file patches (particle-cloud bodies carry no blowing or reaction), so every rank resolves alike.
+    impure subroutine s_resolve_ib_mass_relax()
+
+        if (ib_mass_relax >= 0) return
+        ib_mass_relax = 0
+        if (amr .or. cyl_coord .or. igr .or. bubbles_euler .or. model_eqns /= 2 .or. hypoelasticity .or. mhd) return
+        if (any(patch_ib(1:num_ibs)%v_blow > 0._wp) .or. any(patch_ib(1:num_ibs)%inj_species > 0)) return
+        if (any(patch_ib(1:num_ibs)%surface_reaction /= 0)) return
+        if (moving_immersed_boundary_flag) ib_mass_relax = 30
+
+    end subroutine s_resolve_ib_mass_relax
+
     !> @brief Completes this rank's IB neighborhood once s_read_ib_restart_data has loaded only the IBs it owns: every rank sends
     !! its own IBs to, and receives the owned IBs of, each distinct rank in ib_neighbor_ranks, appending them to patch_ib after its
     !! own.
@@ -1673,6 +1720,8 @@ contains
             do i = 1, n_nbrs
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                @:PROHIBIT(num_ibs + recv_counts(i) > num_local_ibs_max, &
+                           & "Owned plus neighboring IBs on a rank exceed num_local_ibs_max, which sizes ib_box and ib_face_ft. Use more ranks or increase num_local_ibs_max.")
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i))%owner_rank = nbr_ranks(i)
                 num_ibs = num_ibs + recv_counts(i)

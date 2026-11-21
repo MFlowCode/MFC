@@ -97,8 +97,8 @@ jobs:
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
-    # Includes SLURM queue wait. Kept under 24h, when GITHUB_TOKEN expires.
-    timeout-minutes: 1380
+    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
+    timeout-minutes: 480
     steps:
       - name: Clean stale output files
         run: rm -f *.out

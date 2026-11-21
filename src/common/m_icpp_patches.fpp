@@ -40,16 +40,22 @@ module m_icpp_patches
 contains
 
     !> Dispatch each initial condition patch to its geometry-specific initialization routine.
-    impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf)
+    impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf, g)
 
+        type(ic_grid), intent(in)                                :: g
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         integer :: i
+
+        if (.not. g%hardcoded .and. any(patch_icpp(1:num_patches)%hcid /= dflt_int)) then
+            call s_mpi_abort('Hard-coded initial conditions (hcid) are only supported on the pre_process grid.')
+        end if
+
         ! Load STL/OBJ models once into the shared flat arrays if any patch is an STL/OBJ model (geometry 21)
 
         do i = 1, num_patches
@@ -60,7 +66,7 @@ contains
         end do
         !  3D Patch Geometries
 
-        if (p > 0) then
+        if (g%p > 0) then
             do i = 1, num_patches
                 if (proc_rank == 0) then
                     print *, 'Processing patch', i
@@ -70,34 +76,34 @@ contains
                 !> @{
                 ! Spherical patch
                 if (patch_icpp(i)%geometry == 8) then
-                    call s_icpp_sphere(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_sphere(i, patch_id_fp, q_prim_vf, g)
                     ! Cuboidal patch
                 else if (patch_icpp(i)%geometry == 9) then
-                    call s_icpp_cuboid(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_cuboid(i, patch_id_fp, q_prim_vf, g)
                     ! Cylindrical patch
                 else if (patch_icpp(i)%geometry == 10) then
-                    call s_icpp_cylinder(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_cylinder(i, patch_id_fp, q_prim_vf, g)
                     ! Swept plane patch
                 else if (patch_icpp(i)%geometry == 11) then
-                    call s_icpp_sweep_plane(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_sweep_plane(i, patch_id_fp, q_prim_vf, g)
                     ! Ellipsoidal patch
                 else if (patch_icpp(i)%geometry == 12) then
-                    call s_icpp_ellipsoid(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_ellipsoid(i, patch_id_fp, q_prim_vf, g)
                     ! 3D spherical harmonic patch
                 else if (patch_icpp(i)%geometry == 14) then
-                    call s_icpp_3d_spherical_harmonic(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_3d_spherical_harmonic(i, patch_id_fp, q_prim_vf, g)
                     ! 3D Modified circular patch
                 else if (patch_icpp(i)%geometry == 19) then
-                    call s_icpp_3dvarcircle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_3dvarcircle(i, patch_id_fp, q_prim_vf, g)
                     ! 3D STL patch
                 else if (patch_icpp(i)%geometry == 21) then
-                    call s_icpp_model(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
                 end if
             end do
             !> @}
 
             ! 2D Patch Geometries
-        else if (n > 0) then
+        else if (g%n > 0) then
             do i = 1, num_patches
                 if (proc_rank == 0) then
                     print *, 'Processing patch', i
@@ -107,35 +113,35 @@ contains
                 !> @{
                 ! Circular patch
                 if (patch_icpp(i)%geometry == 2) then
-                    call s_icpp_circle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_circle(i, patch_id_fp, q_prim_vf, g)
                     ! Rectangular patch
                 else if (patch_icpp(i)%geometry == 3) then
-                    call s_icpp_rectangle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_rectangle(i, patch_id_fp, q_prim_vf, g)
                     ! Swept line patch
                 else if (patch_icpp(i)%geometry == 4) then
-                    call s_icpp_sweep_line(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_sweep_line(i, patch_id_fp, q_prim_vf, g)
                     ! Elliptical patch
                 else if (patch_icpp(i)%geometry == 5) then
-                    call s_icpp_ellipse(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_ellipse(i, patch_id_fp, q_prim_vf, g)
                     ! Unimplemented patch (formerly isentropic vortex)
                 else if (patch_icpp(i)%geometry == 6) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, ' &
                                      & // 'which no longer exists. See Examples. Exiting.')
                     ! 2D modal (Fourier) patch
                 else if (patch_icpp(i)%geometry == 13) then
-                    call s_icpp_2d_modal(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_2d_modal(i, patch_id_fp, q_prim_vf, g)
                     ! Spiral patch
                 else if (patch_icpp(i)%geometry == 17) then
-                    call s_icpp_spiral(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_spiral(i, patch_id_fp, q_prim_vf, g)
                     ! Modified circular patch
                 else if (patch_icpp(i)%geometry == 18) then
-                    call s_icpp_varcircle(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_varcircle(i, patch_id_fp, q_prim_vf, g)
                     ! TaylorGreen vortex patch
                 else if (patch_icpp(i)%geometry == 20) then
-                    call s_icpp_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf, g)
                     ! STL patch
                 else if (patch_icpp(i)%geometry == 21) then
-                    call s_icpp_model(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
                 end if
                 !> @}
             end do
@@ -149,10 +155,10 @@ contains
 
                 ! Line segment patch
                 if (patch_icpp(i)%geometry == 1) then
-                    call s_icpp_line_segment(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_line_segment(i, patch_id_fp, q_prim_vf, g)
                     ! 1d analytical
                 else if (patch_icpp(i)%geometry == 16) then
-                    call s_icpp_1d_bubble_pulse(i, patch_id_fp, q_prim_vf)
+                    call s_icpp_1d_bubble_pulse(i, patch_id_fp, q_prim_vf, g)
                 end if
             end do
         end if
@@ -162,14 +168,15 @@ contains
     !> The line segment patch is a 1D geometry that may be used, for example, in creating a Riemann problem. The geometry of the
     !! patch is well-defined when its centroid and length in the x-coordinate direction are provided. Note that the line segment
     !! patch DOES NOT allow for the smearing of its boundaries.
-    subroutine s_icpp_line_segment(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_line_segment(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -196,9 +203,9 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do i = 0, m
-            if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, &
-                & 0, 0))) then
+        do i = 0, g%m
+            if (x_boundary%beg <= g%x_cc(i) .and. x_boundary%end >= g%x_cc(i) &
+                & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, eta, q_prim_vf, patch_id_fp)
 
                 @:analytical()
@@ -218,19 +225,21 @@ contains
 
     !> The spiral patch is a 2D geometry that may be used, The geometry of the patch is well-defined when its centroid and radius
     !! are provided. Note that the circular patch DOES allow for the smoothing of its boundary.
-    impure subroutine s_icpp_spiral(patch_id, patch_id_fp, q_prim_vf)
+    impure subroutine s_icpp_spiral(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: th, thickness, nturns, mya
         real(wp)                                                 :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
+        integer, allocatable, dimension(:,:)                     :: logic_grid
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -242,10 +251,10 @@ contains
         thickness = patch_icpp(patch_id)%length_x
         nturns = patch_icpp(patch_id)%length_y
 
-        !
+        allocate (logic_grid(0:g%m,0:g%n))
         logic_grid = 0
-        do k = 0, int(m*91*nturns)
-            th = k/real(int(m*91._wp*nturns))*nturns*2._wp*pi
+        do k = 0, int(g%m*91*nturns)
+            th = k/real(int(g%m*91._wp*nturns))*nturns*2._wp*pi
 
             spiral_x_min = minval((/f_r(th, 0.0_wp, mya)*cos(th), f_r(th, thickness, mya)*cos(th)/))
             spiral_y_min = minval((/f_r(th, 0.0_wp, mya)*sin(th), f_r(th, thickness, mya)*sin(th)/))
@@ -253,17 +262,17 @@ contains
             spiral_x_max = maxval((/f_r(th, 0.0_wp, mya)*cos(th), f_r(th, thickness, mya)*cos(th)/))
             spiral_y_max = maxval((/f_r(th, 0.0_wp, mya)*sin(th), f_r(th, thickness, mya)*sin(th)/))
 
-            do j = 0, n; do i = 0, m
-                if ((x_cc(i) > spiral_x_min) .and. (x_cc(i) < spiral_x_max) .and. (y_cc(j) > spiral_y_min) .and. (y_cc(j) &
+            do j = 0, g%n; do i = 0, g%m
+                if ((g%x_cc(i) > spiral_x_min) .and. (g%x_cc(i) < spiral_x_max) .and. (g%y_cc(j) > spiral_y_min) .and. (g%y_cc(j) &
                     & < spiral_y_max)) then
-                    logic_grid(i, j, 0) = 1
+                    logic_grid(i, j) = 1
                 end if
             end do; end do
         end do
 
-        do j = 0, n
-            do i = 0, m
-                if ((logic_grid(i, j, 0) == 1)) then
+        do j = 0, g%n
+            do i = 0, g%m
+                if (logic_grid(i, j) == 1) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
                     @:analytical()
@@ -283,14 +292,15 @@ contains
     !> The circular patch is a 2D geometry that may be used, for example, in creating a bubble or a droplet. The geometry of the
     !! patch is well-defined when its centroid and radius are provided. Note that the circular patch DOES allow for the smoothing of
     !! its boundary.
-    subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: radius
@@ -312,15 +322,16 @@ contains
 
         ! Assign patch vars if cell is covered and patch has write permission
 
-        do j = 0, n
-            do i = 0, m
+        do j = 0, g%n
+            do i = 0, g%m
                 if (patch_icpp(patch_id)%smoothen) then
                     ! Smooth Heaviside via hyperbolic tangent; smooth_coeff controls interface sharpness
-                    eta = tanh(smooth_coeff/min(dx_min, &
-                               & dy_min)*(sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
+                    eta = tanh(smooth_coeff/min(g%dx_min, &
+                               & g%dy_min)*(sqrt((g%x_cc(i) - x_centroid)**2 + (g%y_cc(j) - y_centroid)**2) - radius))*(-0.5_wp) &
+                               & + 0.5_wp
                 end if
 
-                if ((f_is_inside_cylinder(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, radius, &
+                if ((f_is_inside_cylinder(g%x_cc(i) - x_centroid, g%y_cc(j) - y_centroid, 0._wp, radius, &
                     & 0._wp) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
                     & 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
@@ -337,15 +348,16 @@ contains
     end subroutine s_icpp_circle
 
     !> The varcircle patch is a 2D geometry that may be used . It generatres an annulus
-    subroutine s_icpp_varcircle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_varcircle(patch_id, patch_id_fp, q_prim_vf, g)
 
         ! Patch identifier
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -368,9 +380,9 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do j = 0, n
-            do i = 0, m
-                myr = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
+        do j = 0, g%n
+            do i = 0, g%m
+                myr = sqrt((g%x_cc(i) - x_centroid)**2 + (g%y_cc(j) - y_centroid)**2)
 
                 if (myr <= radius + thickness/2._wp .and. myr >= radius - thickness/2._wp &
                     & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
@@ -394,15 +406,16 @@ contains
     end subroutine s_icpp_varcircle
 
     !> Initialize a 3D variable-thickness circular annulus patch extruded along the z-axis.
-    subroutine s_icpp_3dvarcircle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_3dvarcircle(patch_id, patch_id_fp, q_prim_vf, g)
 
         ! Patch identifier
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -429,10 +442,10 @@ contains
         ! write for all z
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-                    myr = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
+                    myr = sqrt((g%x_cc(i) - x_centroid)**2 + (g%y_cc(j) - y_centroid)**2)
 
                     if (myr <= radius + thickness/2._wp .and. myr >= radius - thickness/2._wp &
                         & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
@@ -458,14 +471,15 @@ contains
 
     !> The elliptical patch is a 2D geometry. The geometry of the patch is well-defined when its centroid and radii are provided.
     !! Note that the elliptical patch DOES allow for the smoothing of its boundary
-    subroutine s_icpp_ellipse(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_ellipse(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop operators
@@ -486,15 +500,15 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do j = 0, n
-            do i = 0, m
+        do j = 0, g%n
+            do i = 0, g%m
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = tanh(smooth_coeff/min(dx_min, &
-                               & dy_min)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((y_cc(j) - y_centroid)/b)**2) - 1._wp))*(-0.5_wp) &
-                               & + 0.5_wp
+                    eta = tanh(smooth_coeff/min(g%dx_min, &
+                               & g%dy_min)*(sqrt(((g%x_cc(i) - x_centroid)/a)**2 + ((g%y_cc(j) - y_centroid)/b)**2) - 1._wp)) &
+                               & *(-0.5_wp) + 0.5_wp
                 end if
 
-                if ((f_is_inside_ellipse(x_cc(i) - x_centroid, y_cc(j) - y_centroid, [2._wp*a, 2._wp*b, &
+                if ((f_is_inside_ellipse(g%x_cc(i) - x_centroid, g%y_cc(j) - y_centroid, [2._wp*a, 2._wp*b, &
                     & 0._wp]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
                     & 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
@@ -515,15 +529,16 @@ contains
 
     !> The ellipsoidal patch is a 3D geometry. The geometry of the patch is well-defined when its centroid and radii are provided.
     !! Note that the ellipsoidal patch DOES allow for the smoothing of its boundary
-    subroutine s_icpp_ellipsoid(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_ellipsoid(patch_id, patch_id_fp, q_prim_vf, g)
 
         ! Patch identifier
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -548,23 +563,23 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
                     if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
                     else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
+                        cart_y = g%y_cc(j)
+                        cart_z = g%z_cc(k)
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = tanh(smooth_coeff/min(dx_min, dy_min, &
-                                   & dz_min)*(sqrt(((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z &
+                        eta = tanh(smooth_coeff/min(g%dx_min, g%dy_min, &
+                                   & g%dz_min)*(sqrt(((g%x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z &
                                    & - z_centroid)/c)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((((x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c)**2 <= 1._wp &
+                    if ((((g%x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c)**2 <= 1._wp &
                         & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
@@ -588,14 +603,15 @@ contains
     !! region, in alignment with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x- and y- coordinate directions are provided. Please note that the rectangular patch DOES NOT
     !! allow for the smoothing of its boundaries.
-    subroutine s_icpp_rectangle(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_rectangle(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< generic loop iterators
@@ -619,9 +635,9 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do j = 0, n
-            do i = 0, m
-                if (f_is_inside_cuboid(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, [length_x, length_y, 0._wp])) then
+        do j = 0, g%n
+            do i = 0, g%m
+                if (f_is_inside_cuboid(g%x_cc(i) - x_centroid, g%y_cc(j) - y_centroid, 0._wp, [length_x, length_y, 0._wp])) then
                     if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
@@ -645,14 +661,15 @@ contains
     !! region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-defined
     !! when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep line patch DOES allow
     !! the smoothing of its boundary.
-    subroutine s_icpp_sweep_line(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_sweep_line(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop operators
@@ -676,13 +693,14 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do j = 0, n
-            do i = 0, m
+        do j = 0, g%n
+            do i = 0, g%m
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx_min, dy_min)*(a*x_cc(i) + b*y_cc(j) + c)/sqrt(a**2 + b**2))
+                    eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(g%dx_min, &
+                                                   & g%dy_min)*(a*g%x_cc(i) + b*g%y_cc(j) + c)/sqrt(a**2 + b**2))
                 end if
 
-                if ((a*x_cc(i) + b*y_cc(j) + c >= 0._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &
+                if ((a*g%x_cc(i) + b*g%y_cc(j) + c >= 0._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &
                     & 0))) .or. patch_id_fp(i, j, 0) == smooth_patch_id) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
@@ -702,14 +720,15 @@ contains
 
     !> The Taylor Green vortex is 2D decaying vortex that may be used, for example, to verify the effects of viscous attenuation.
     !! Geometry of the patch is well-defined when its centroid are provided.
-    subroutine s_icpp_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< generic loop iterators
@@ -737,9 +756,9 @@ contains
         ! L0 is the characteristic length of the vortex
         L0 = patch_icpp(patch_id)%vel(2)
         ! Assign patch vars if cell is covered and patch has write permission
-        do j = 0, n
-            do i = 0, m
-                if (f_is_inside_cuboid(x_cc(i) - x_centroid, y_cc(j) - y_centroid, 0._wp, [length_x, length_y, &
+        do j = 0, g%n
+            do i = 0, g%m
+                if (f_is_inside_cuboid(g%x_cc(i) - x_centroid, g%y_cc(j) - y_centroid, 0._wp, [length_x, length_y, &
                     & 0._wp]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) then
                     call s_assign_patch_primitive_variables(patch_id, i, j, 0, eta, q_prim_vf, patch_id_fp)
 
@@ -752,11 +771,11 @@ contains
                     if (1._wp - eta < sgm_eps) patch_id_fp(i, j, 0) = patch_id
 
                     ! Assign Parameters
-                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = U0*sin(x_cc(i)/L0)*cos(y_cc(j)/L0)
-                    q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = -U0*cos(x_cc(i)/L0)*sin(y_cc(j)/L0)
+                    q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = U0*sin(g%x_cc(i)/L0)*cos(g%y_cc(j)/L0)
+                    q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = -U0*cos(g%x_cc(i)/L0)*sin(g%y_cc(j)/L0)
                     q_prim_vf(eqn_idx%E)%sf(i, j, &
-                              & 0) = patch_icpp(patch_id)%pres + (cos(2*x_cc(i))/L0 + cos(2*y_cc(j))/L0)*(q_prim_vf(1)%sf(i, j, &
-                              & 0)*U0*U0)/16
+                              & 0) = patch_icpp(patch_id)%pres + (cos(2*g%x_cc(i))/L0 + cos(2*g%y_cc(j))/L0)*(q_prim_vf(1)%sf(i, &
+                              & j, 0)*U0*U0)/16
                 end if
             end do
         end do
@@ -765,17 +784,18 @@ contains
     end subroutine s_icpp_2D_TaylorGreen_Vortex
 
     !> Initialize a 1D bubble-pulse patch with analytical primitive variable profiles.
-    subroutine s_icpp_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_1d_bubble_pulse(patch_id, patch_id_fp, q_prim_vf, g)
 
         ! Description: This patch assigns the primitive variables as analytical functions such that the code can be verified.
 
         ! Patch identifier
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -798,9 +818,9 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do i = 0, m
-            if (x_boundary%beg <= x_cc(i) .and. x_boundary%end >= x_cc(i) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, &
-                & 0, 0))) then
+        do i = 0, g%m
+            if (x_boundary%beg <= g%x_cc(i) .and. x_boundary%end >= g%x_cc(i) &
+                & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, 0, 0))) then
                 call s_assign_patch_primitive_variables(patch_id, i, 0, 0, eta, q_prim_vf, patch_id_fp)
 
                 @:analytical()
@@ -817,14 +837,15 @@ contains
     !! sum_n [fourier_cos*cos(n*theta)+fourier_sin*sin(n*theta)]; coefficients are absolute (same units as radius). R is clipped to
     !! max(R,0). If modal_clip_r_to_min, R = max(R, modal_r_min). Exponential (modal_use_exp_form true): R = radius*exp(sum);
     !! coefficients are relative (dimensionless).
-    subroutine s_icpp_2d_modal(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_2d_modal(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: r, theta, R_boundary, sum_series
@@ -836,13 +857,13 @@ contains
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         eta = 1._wp
 
-        do j = 0, n
-            do i = 0, m
-                r = sqrt((x_cc(i) - x_centroid)**2 + (y_cc(j) - y_centroid)**2)
+        do j = 0, g%n
+            do i = 0, g%m
+                r = sqrt((g%x_cc(i) - x_centroid)**2 + (g%y_cc(j) - y_centroid)**2)
                 if (r < small_radius) then
                     theta = 0._wp
                 else
-                    theta = atan2(y_cc(j) - y_centroid, x_cc(i) - x_centroid)
+                    theta = atan2(g%y_cc(j) - y_centroid, g%x_cc(i) - x_centroid)
                 end if
                 sum_series = 0._wp
                 do nn = 1, max_2d_fourier_modes
@@ -859,7 +880,7 @@ contains
                     end if
                 end if
                 if (patch_icpp(patch_id)%smoothen) then
-                    eta = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx_min, dy_min)*(R_boundary - r))
+                    eta = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(g%dx_min, g%dy_min)*(R_boundary - r))
                 end if
                 if ((r <= R_boundary .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, 0))) .or. patch_id_fp(i, j, &
                     & 0) == smooth_patch_id) then
@@ -872,14 +893,15 @@ contains
 
     !> 3D spherical harmonic patch. Surface r = radius + sum_lm sph_har_coeff(l,m)*Y_lm(theta,phi). theta = acos(z/r), phi =
     !! atan2(y,x) relative to centroid.
-    subroutine s_icpp_3d_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_3d_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: dx_loc, dy_loc, dz_loc, r, theta, phi, R_surface, eta_local
@@ -892,18 +914,18 @@ contains
         smooth_coeff = patch_icpp(patch_id)%smooth_coeff
         eta_local = 1._wp
 
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
                     if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
-                        dx_loc = x_cc(i) - x_centroid
+                        call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
+                        dx_loc = g%x_cc(i) - x_centroid
                         dy_loc = cart_y - y_centroid
                         dz_loc = cart_z - z_centroid
                     else
-                        dx_loc = x_cc(i) - x_centroid
-                        dy_loc = y_cc(j) - y_centroid
-                        dz_loc = z_cc(k) - z_centroid
+                        dx_loc = g%x_cc(i) - x_centroid
+                        dy_loc = g%y_cc(j) - y_centroid
+                        dz_loc = g%z_cc(k) - z_centroid
                     end if
                     r = sqrt(dx_loc**2 + dy_loc**2 + dz_loc**2)
                     if (r < small_radius) then
@@ -921,7 +943,7 @@ contains
                         end do
                     end do
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta_local = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(dx_min, dy_min, dz_min)*(R_surface - r))
+                        eta_local = 0.5_wp + 0.5_wp*tanh(smooth_coeff/min(g%dx_min, g%dy_min, g%dz_min)*(R_surface - r))
                     end if
                     if ((r <= R_surface .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
@@ -936,14 +958,15 @@ contains
     !> The spherical patch is a 3D geometry that may be used, for example, in creating a bubble or a droplet. The patch geometry is
     !! well-defined when its centroid and radius are provided. Please note that the spherical patch DOES allow for the smoothing of
     !! its boundary.
-    subroutine s_icpp_sphere(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_sphere(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
@@ -968,23 +991,23 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
                     if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
                     else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
+                        cart_y = g%y_cc(j)
+                        cart_z = g%z_cc(k)
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = tanh(smooth_coeff/min(dx_min, dy_min, &
-                                   & dz_min)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z - z_centroid) &
-                                   & **2) - radius))*(-0.5_wp) + 0.5_wp
+                        eta = tanh(smooth_coeff/min(g%dx_min, g%dy_min, &
+                                   & g%dz_min)*(sqrt((g%x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2 + (cart_z &
+                                   & - z_centroid)**2) - radius))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((f_is_inside_sphere(x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, &
+                    if ((f_is_inside_sphere(g%x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, &
                         & radius) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
@@ -1005,14 +1028,15 @@ contains
     !! which is aligned with the axes of the Cartesian coordinate system. The geometry of such a patch is well- defined when its
     !! centroid and lengths in the x-, y- and z-coordinate directions are provided. Please notice that the cuboidal patch DOES NOT
     !! allow for the smearing of its boundaries.
-    subroutine s_icpp_cuboid(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_cuboid(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -1040,17 +1064,17 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
                     if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
                     else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
+                        cart_y = g%y_cc(j)
+                        cart_z = g%z_cc(k)
                     end if
 
-                    if (f_is_inside_cuboid(x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, [length_x, length_y, &
+                    if (f_is_inside_cuboid(g%x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, [length_x, length_y, &
                         & length_z])) then
                         if (patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
                             call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
@@ -1075,14 +1099,15 @@ contains
     !! like a blood vessel. The geometry of this patch is well-defined when the centroid, the radius and the length along the
     !! cylinder's axis, parallel to the x-, y- or z-coordinate direction, are provided. Please note that the cylindrical patch DOES
     !! allow for the smoothing of its lateral boundary.
-    subroutine s_icpp_cylinder(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_cylinder(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -1115,37 +1140,37 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
                     if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
                     else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
+                        cart_y = g%y_cc(j)
+                        cart_z = g%z_cc(k)
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
                         if (.not. f_is_default(length_x)) then
-                            eta = tanh(smooth_coeff/min(dy_min, &
-                                       & dz_min)*(sqrt((cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
+                            eta = tanh(smooth_coeff/min(g%dy_min, &
+                                       & g%dz_min)*(sqrt((cart_y - y_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
                                        & + 0.5_wp
                         else if (.not. f_is_default(length_y)) then
-                            eta = tanh(smooth_coeff/min(dx_min, &
-                                       & dz_min)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                            eta = tanh(smooth_coeff/min(g%dx_min, &
+                                       & g%dz_min)*(sqrt((g%x_cc(i) - x_centroid)**2 + (cart_z - z_centroid)**2) - radius)) &
+                                       & *(-0.5_wp) + 0.5_wp
                         else
-                            eta = tanh(smooth_coeff/min(dx_min, &
-                                       & dy_min)*(sqrt((x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2) - radius))*(-0.5_wp) &
-                                       & + 0.5_wp
+                            eta = tanh(smooth_coeff/min(g%dx_min, &
+                                       & g%dy_min)*(sqrt((g%x_cc(i) - x_centroid)**2 + (cart_y - y_centroid)**2) - radius)) &
+                                       & *(-0.5_wp) + 0.5_wp
                         end if
                     end if
 
                     if (((.not. f_is_default(length_x) .and. f_is_inside_cylinder(cart_y - y_centroid, cart_z - z_centroid, &
-                        & x_cc(i) - x_centroid, radius, &
-                        & length_x)) .or. (.not. f_is_default(length_y) .and. f_is_inside_cylinder(x_cc(i) - x_centroid, &
+                        & g%x_cc(i) - x_centroid, radius, &
+                        & length_x)) .or. (.not. f_is_default(length_y) .and. f_is_inside_cylinder(g%x_cc(i) - x_centroid, &
                         & cart_z - z_centroid, cart_y - y_centroid, radius, &
-                        & length_y)) .or. (.not. f_is_default(length_z) .and. f_is_inside_cylinder(x_cc(i) - x_centroid, &
+                        & length_y)) .or. (.not. f_is_default(length_z) .and. f_is_inside_cylinder(g%x_cc(i) - x_centroid, &
                         & cart_y - y_centroid, cart_z - z_centroid, radius, &
                         & length_z)) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
@@ -1170,14 +1195,15 @@ contains
     !! region, at an angle with respect to the axes of the Cartesian coordinate system. The geometry of the patch is well-defined
     !! when its centroid and normal vector, aimed in the sweep direction, are provided. Note that the sweep plane patch DOES allow
     !! the smoothing of its boundary.
-    subroutine s_icpp_sweep_plane(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_sweep_plane(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -1203,22 +1229,22 @@ contains
         eta = 1._wp
 
         ! Assign patch vars if cell is covered and patch has write permission
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
                     if (grid_geometry == 3) then
-                        call s_convert_cylindrical_to_cartesian_coord(y_cc(j), z_cc(k))
+                        call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
                     else
-                        cart_y = y_cc(j)
-                        cart_z = z_cc(k)
+                        cart_y = g%y_cc(j)
+                        cart_z = g%z_cc(k)
                     end if
 
                     if (patch_icpp(patch_id)%smoothen) then
-                        eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(dx_min, dy_min, &
-                                                       & dz_min)*(a*x_cc(i) + b*cart_y + c*cart_z + d)/sqrt(a**2 + b**2 + c**2))
+                        eta = 5.e-1_wp + 5.e-1_wp*tanh(smooth_coeff/min(g%dx_min, g%dy_min, &
+                                                       & g%dz_min)*(a*g%x_cc(i) + b*cart_y + c*cart_z + d)/sqrt(a**2 + b**2 + c**2))
                     end if
 
-                    if ((a*x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &
+                    if ((a*g%x_cc(i) + b*cart_y + c*cart_z + d >= 0._wp .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, &
                         & k))) .or. patch_id_fp(i, j, k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -1238,14 +1264,15 @@ contains
     end subroutine s_icpp_sweep_plane
 
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
-    subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf)
+    subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in) :: patch_id
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
 
 #ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #else
-        integer, dimension(0:m,0:n,0:p), intent(inout) :: patch_id_fp
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
 #endif
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k                 !< loop iterators
@@ -1257,16 +1284,16 @@ contains
         model_id = patch_icpp(patch_id)%model_id
         threshold = stl_models(model_id)%model_threshold
 
-        do i = 0, m; do j = 0, n; do k = 0, p
-            point = (/x_cc(i), y_cc(j), 0._wp/)
-            if (p > 0) point(3) = z_cc(k)
+        do i = 0, g%m; do j = 0, g%n; do k = 0, g%p
+            point = (/g%x_cc(i), g%y_cc(j), 0._wp/)
+            if (g%p > 0) point(3) = g%z_cc(k)
             if (grid_geometry == 3) point = f_convert_cyl_to_cart(point)
 
             ! Run the winding test only on cells whose Cartesian point lies inside the bounding box, else skip the calculation
             in_box = point(1) >= stl_bounding_boxes(model_id, 1, 1) .and. point(1) <= stl_bounding_boxes(model_id, 1, &
                            & 3) .and. point(2) >= stl_bounding_boxes(model_id, 2, &
                            & 1) .and. point(2) <= stl_bounding_boxes(model_id, 2, 3)
-            if (p > 0 .or. grid_geometry == 3) then
+            if (g%p > 0 .or. grid_geometry == 3) then
                 in_box = in_box .and. point(3) >= stl_bounding_boxes(model_id, 3, &
                                             & 1) .and. point(3) <= stl_bounding_boxes(model_id, 3, 3)
             end if
@@ -1293,8 +1320,6 @@ contains
     !> Convert cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
-
         real(wp), intent(in) :: cyl_y, cyl_z
 
         cart_y = cyl_y*sin(cyl_z)
@@ -1304,8 +1329,6 @@ contains
 
     !> Return a 3D Cartesian coordinate vector from a cylindrical (x, r, theta) input vector.
     function f_convert_cyl_to_cart(cyl) result(cart)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(1:3), intent(in) :: cyl
         real(wp), dimension(1:3)             :: cart
@@ -1317,7 +1340,6 @@ contains
     !> Archimedes spiral function
     elemental function f_r(myth, offset, a)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: myth, offset, a
         real(wp)             :: b
         real(wp)             :: f_r

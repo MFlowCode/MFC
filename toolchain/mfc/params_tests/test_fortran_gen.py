@@ -90,6 +90,7 @@ def test_pre_namelist_has_patch_icpp():
     c = generate_namelist_fpp("pre")
     assert "patch_icpp" in c
     assert "run_time_info" not in c
+    assert "patch_icpp" in generate_namelist_fpp("sim")
 
 
 def test_post_namelist_has_sim_data():
@@ -203,8 +204,9 @@ def test_generate_decls_emits_typed_declarations():
     sim = generate_decls_fpp("sim")
     post = generate_decls_fpp("post")
 
-    # patch_icpp is pre-only
-    assert "patch_icpp" in pre and "patch_icpp" not in post and "patch_icpp" not in sim
+    # patch_icpp is declared everywhere (shared defaults and broadcast) but read by pre and sim only
+    for out in (pre, sim, post):
+        assert "patch_icpp" in out
 
     # fluid_pp appears in all three targets
     for out in (pre, sim, post):
@@ -454,11 +456,12 @@ def test_generate_bcast_fpp_class_a_str_scalars():
     sim = generate_bcast_fpp("sim")
     post = generate_bcast_fpp("post")
 
-    # files_dir/file_extension are pre-only STR scalars
+    # files_dir/file_extension are STR scalars read by pre and sim only
     for name in ("files_dir", "file_extension"):
-        assert f"call MPI_BCAST({name}, len({name}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)" in pre, f"pre: {name} missing"
-        assert f"call MPI_BCAST({name}, " not in sim and f"call MPI_BCAST({name}, " not in post
-        assert f"call MPI_BCAST({name}, 1, mpi_p" not in pre
+        for out in (pre, sim):
+            assert f"call MPI_BCAST({name}, len({name}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)" in out, f"{name} missing"
+            assert f"call MPI_BCAST({name}, 1, mpi_p" not in out
+        assert f"call MPI_BCAST({name}, " not in post
 
 
 def test_generate_bcast_fpp_case_opt_guard_sim():

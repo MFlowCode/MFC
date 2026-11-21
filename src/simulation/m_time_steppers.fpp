@@ -37,6 +37,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_advance, only: s_amr_fine_stage_ib
     use m_amr_registers, only: s_amr_set_rk_table
 
     implicit none
@@ -527,16 +528,18 @@ contains
 
             if (s == 1 .and. bodyForces) call s_update_mean_sources(q_cons_ts(1)%vf, q_T_sf, t_step)
 
-            ! AMR: move the bodies before the fine stage, so its IB rebuild and correction use this stage's pose, as the coarse
-            ! ones do; the fine containment check reads the pose and rotation on the host
+            ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
+            if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
+                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
+            ! AMR: move the bodies once the fine frames have added their faces to this stage's forces, then run the fine IB
+            ! rebuild and correction the fine stage left waiting, at this stage's pose as the coarse ones are; the fine
+            ! containment check reads the pose and rotation on the host
             if (amr .and. moving_immersed_boundary_flag) then
                 call s_advance_ib_pose(s, t_step)
                 call s_update_ib_rotation_matrices(num_ibs)
                 $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+                call s_amr_fine_stage_ib(pb_ts(1)%sf, mv_ts(1)%sf)
             end if
-            ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
-            if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
-                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
             if (bubbles_lagrange .and. .not. adap_dt) then
                 call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
                 if (s == time_stepper) call s_write_lag_step_output()
@@ -615,10 +618,10 @@ contains
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, 0)
             end if
 
-            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, tally=.true.)
+            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, 0)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
@@ -909,7 +912,7 @@ contains
     end subroutine s_compute_dt
 
     !> AMR with a fixed dt: abort if dt exceeds the finest level's inviscid limit (ICFL = 1, as s_write_run_time_information).
-    !! reach: test every cell as if refined to amr_max_level, which a regrid may do later, and warn instead of aborting.
+    !! reach: test every cell as if refined to amr_max_level, which a regrid may do later, so the failure is at start-up.
     impure subroutine s_amr_check_fixed_dt(reach)
 
         logical, intent(in), optional :: reach
@@ -938,14 +941,14 @@ contains
         end if
         if (dt <= dt_cand(1)) return
         if (all_fine) then
-            if (proc_rank == 0) print '(A,ES11.4,A,I0,A,ES11.4,A)', ' [amr] WARNING: dt = ', dt, &
-                & ' exceeds the inviscid CFL limit if a regrid refines the fastest cells to level ', amr_max_level, &
-                & ' (largest stable dt ', dt_cand(1), '); the run would then abort at that regrid.'
-            return
+            write (msg, '(A,ES11.4,A,I0,A,ES11.4,A)') 'amr: dt = ', dt, &
+                   & ' exceeds the inviscid CFL limit a regrid would set by refining the fastest cells to level ', amr_max_level, &
+                   & '; the largest stable dt (ICFL = 1) there is ', dt_cand(1), '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
+        else
+            write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
+                   & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', &
+                   & dt_cand(1), '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
         end if
-        write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
-               & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', dt_cand(1), &
-               & '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
         call s_mpi_abort(trim(msg))
 
     end subroutine s_amr_check_fixed_dt

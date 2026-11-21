@@ -418,7 +418,7 @@ CONSTRAINTS = {
     "ib_neighborhood_radius": {"min": 0},
     "face_bound": {"choices": [0, 1], "value_labels": {0: "off", 1: "positivity bound on face states"}},
     "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
-    "ib_mass_relax": {"min": 0},
+    "ib_mass_relax": {"min": -1},
     "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
@@ -1522,6 +1522,11 @@ _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "
 _nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
+# Initial condition patch inputs: read by pre_process and simulation, declared
+# everywhere because their defaults and broadcast live in common modules
+_IC_PATCH_INPUTS = ("num_patches", "patch_icpp", "sigV", "dist_type", "rhoRV", "mixlayer_vel_profile", "mixlayer_vel_coef", "files_dir", "file_extension")
+_nv(_PRE_SIM, *_IC_PATCH_INPUTS)
+_decl(_ALL, *_IC_PATCH_INPUTS)
 _nv(
     _SIM,
     "dt",
@@ -1683,12 +1688,7 @@ _nv(
     "loops_y",
     "loops_z",
     "n_start_old",
-    "num_patches",
-    "patch_icpp",
     "patch_bc",
-    "sigV",
-    "dist_type",
-    "rhoRV",
     "old_grid",
     "old_ic",
     "perturb_flow",
@@ -1697,8 +1697,6 @@ _nv(
     "perturb_sph",
     "perturb_sph_fluid",
     "fluid_rho",
-    "mixlayer_vel_profile",
-    "mixlayer_vel_coef",
     "mixlayer_perturb",
     "mixlayer_perturb_nk",
     "mixlayer_perturb_k0",
@@ -1706,8 +1704,6 @@ _nv(
     "elliptic_smoothing_iters",
     "simplex_perturb",
     "simplex_params",
-    "files_dir",
-    "file_extension",
     "viscous",
 )
 _nv(

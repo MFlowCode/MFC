@@ -37,9 +37,6 @@ module m_global_parameters
     !> Locations of cell-boundaries (cb) in x-, y- and z-directions, respectively
     real(wp), allocatable, dimension(:) :: x_cb, y_cb, z_cb
     type(bounds_info) :: x_domain, y_domain, z_domain  !< Locations of the domain bounds in the x-, y- and z-coordinate directions
-    !> Global (pre-decomposition) domain bounds, needed by s_generate_serial_grid to stretch the grid using the full domain length
-    !! rather than a local processor's sub-domain length
-    type(bounds_info) :: x_domain_glb, y_domain_glb, z_domain_glb
 
     ! Simulation Algorithm Parameters
     ! sys_size, eqn_idx, chemistry, shear_*: in m_global_parameters_common
@@ -100,14 +97,9 @@ module m_global_parameters
     real(wp) :: p0ref, rho0ref, T0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, cp_v, cp_g, R_v, R_g
     !> @}
 
-    integer, allocatable, dimension(:,:,:) :: logic_grid
-    type(pres_field)                       :: pb
-    type(pres_field)                       :: mv
-    integer                                :: buff_size  !< Number of ghost cells for boundary condition storage
-
-    ! Variables for hardcoded initial conditions that are read from input files
-    character(LEN=2*path_len) :: interface_file
-    real(wp)                  :: normFac, normMag, g0_ic, p0_ic
+    type(pres_field) :: pb
+    type(pres_field) :: mv
+    integer          :: buff_size  !< Number of ghost cells for boundary condition storage
 
 contains
 
@@ -145,8 +137,6 @@ contains
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
         ! Logistics (pre-specific)
-        file_extension = '000000'
-        files_dir = './'
         old_grid = .false.
         old_ic = .false.
         t_step_old = dflt_int
@@ -182,8 +172,6 @@ contains
         ptgalpha_eps = dflt_real
         igr_order = dflt_int
         precision = 2
-        mixlayer_vel_profile = .false.
-        mixlayer_vel_coef = 1._wp
         mixlayer_perturb = .false.
         mixlayer_perturb_nk = 100
         mixlayer_perturb_k0 = 0.4446_wp
@@ -206,9 +194,6 @@ contains
         simplex_params%perturb_dens_scale(:) = dflt_real
         simplex_params%perturb_dens_offset(:,:) = dflt_real
 
-        ! Initial condition parameters
-        num_patches = dflt_int
-
         fd_order = dflt_int
         lag_params%cluster_type = dflt_int
         lag_params%pressure_corrector = .false.
@@ -228,68 +213,7 @@ contains
         lag_params%charNz = dflt_int
         lag_params%valmaxvoid = dflt_real
 
-        do i = 1, num_patches_max
-            patch_icpp(i)%geometry = dflt_int
-            patch_icpp(i)%model_id = 0
-            patch_icpp(i)%x_centroid = dflt_real
-            patch_icpp(i)%y_centroid = dflt_real
-            patch_icpp(i)%z_centroid = dflt_real
-            patch_icpp(i)%length_x = dflt_real
-            patch_icpp(i)%length_y = dflt_real
-            patch_icpp(i)%length_z = dflt_real
-            patch_icpp(i)%radius = dflt_real
-            patch_icpp(i)%epsilon = dflt_real
-            patch_icpp(i)%beta = dflt_real
-            patch_icpp(i)%normal = dflt_real
-            patch_icpp(i)%radii = dflt_real
-            patch_icpp(i)%alter_patch = .false.
-            patch_icpp(i)%alter_patch(0) = .true.
-            patch_icpp(i)%smoothen = .false.
-            patch_icpp(i)%smooth_patch_id = i
-            patch_icpp(i)%smooth_coeff = dflt_real
-            patch_icpp(i)%alpha_rho = dflt_real
-            patch_icpp(i)%rho = dflt_real
-            patch_icpp(i)%vel = dflt_real
-            patch_icpp(i)%pres = dflt_real
-            patch_icpp(i)%alpha = dflt_real
-            patch_icpp(i)%gamma = dflt_real
-            patch_icpp(i)%pi_inf = dflt_real
-            patch_icpp(i)%cv = 0._wp
-            patch_icpp(i)%qv = 0._wp
-            patch_icpp(i)%qvp = 0._wp
-            patch_icpp(i)%tau_e = 0._wp
-            patch_icpp(i)%Bx = dflt_real
-            patch_icpp(i)%By = dflt_real
-            patch_icpp(i)%Bz = dflt_real
-            patch_icpp(i)%a(2) = dflt_real
-            patch_icpp(i)%a(3) = dflt_real
-            patch_icpp(i)%a(4) = dflt_real
-            patch_icpp(i)%a(5) = dflt_real
-            patch_icpp(i)%a(6) = dflt_real
-            patch_icpp(i)%a(7) = dflt_real
-            patch_icpp(i)%a(8) = dflt_real
-            patch_icpp(i)%a(9) = dflt_real
-            patch_icpp(i)%non_axis_sym = .false.
-            patch_icpp(i)%fourier_cos(:) = 0._wp
-            patch_icpp(i)%fourier_sin(:) = 0._wp
-            patch_icpp(i)%modal_clip_r_to_min = .false.
-            patch_icpp(i)%modal_r_min = 1.e-12_wp
-            patch_icpp(i)%modal_use_exp_form = .false.
-            patch_icpp(i)%sph_har_coeff(:,:) = 0._wp
-
-            ! should get all of r0's and v0's
-            patch_icpp(i)%r0 = dflt_real
-            patch_icpp(i)%v0 = dflt_real
-
-            patch_icpp(i)%p0 = dflt_real
-            patch_icpp(i)%m0 = dflt_real
-
-            patch_icpp(i)%hcid = dflt_int
-
-            if (chemistry) then
-                patch_icpp(i)%Y(:) = 0._wp
-            end if
-        end do
+        call s_assign_ic_patch_defaults
 
         num_bc_patches = 0
         bc_io = .false.
@@ -315,9 +239,6 @@ contains
         Web = dflt_real
 
         nmom = 1
-        sigV = dflt_real
-        rhoRV = 0._wp
-        dist_type = dflt_int
 
         R_g = dflt_real
         R_v = dflt_real
@@ -588,10 +509,6 @@ contains
             grid_geometry = 2
         else  ! Fully 3D cylindrical grid
             grid_geometry = 3
-        end if
-
-        if (.not. igr) then
-            allocate (logic_grid(0:m,0:n,0:p))
         end if
 
     end subroutine s_initialize_global_parameters_module
