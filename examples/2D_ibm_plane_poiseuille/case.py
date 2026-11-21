@@ -9,7 +9,7 @@ u = g y (H - y) / (2 nu), with peak u_max = g H^2 / (8 nu) (equal to the Mach nu
     ./mfc.sh run examples/2D_ibm_plane_poiseuille/case.py -t pre_process simulation -n 1 -- --cells 16 --ntau 12 --wall_order 2
     python3 examples/2D_ibm_plane_poiseuille/check_poiseuille.py examples/2D_ibm_plane_poiseuille --cells 16
 
-Defaults are a CI-sized run (8 cells across the gap, 32 x 34 cells, 300 fixed steps, far from steady state). Studied values:
+Defaults are a CI-sized run (8 cells across the gap, 32 x 28 cells, 300 fixed steps, far from steady state). Studied values:
 u_max = 0.05, Re = u_max H / nu = 1, 12 slowest viscous times, 4 to 64 cells across the gap, wall on a cell face or 0.37 cell
 inside it (the page validation_wall_order_couette). Output is serial text (parallel_io = F), so run on one rank.
 """

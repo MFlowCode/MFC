@@ -20,6 +20,7 @@ DOCS = [
     "docs/documentation/visualization.md",
     "docs/documentation/expectedPerformance.md",
     "docs/documentation/validation.md",
+    "docs/documentation/validation_wall_order_couette.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]
