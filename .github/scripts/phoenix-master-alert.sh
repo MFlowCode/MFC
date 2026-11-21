@@ -1,8 +1,7 @@
 #!/bin/bash
 # Keep one issue open while Phoenix fails on master, and close it on the next green run.
-# Phoenix runs only after merge (see the phoenix job in test.yml), so this is how a
-# failure gets noticed. A job that ends cancelled or timed out (preempted until the job
-# timeout, or never scheduled) gave no answer, so it counts too, labelled "no result".
+# A job that ends cancelled or timed out (preempted until the job timeout, or never
+# scheduled) gave no answer, so it counts too, labelled "no result".
 #
 # Env: GH_TOKEN, REPO, RUN_ID, RUN_ATTEMPT, HEAD_SHA. DRY_RUN=1 prints instead of writing.
 set -euo pipefail
