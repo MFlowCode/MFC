@@ -4029,6 +4029,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_stl_test",
                 # Registered below at the resolution where the hot-wall NaN appears; the 25-cell cap would not reach it.
                 "3D_ibm_hot_rod",
+                # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
+                "2D_mibm_constant_acceleration",
+                "3D_mibm_wall_collision",
             ]
             if path in casesToSkip:
                 continue
@@ -4589,6 +4592,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-9,
         )
     )
+
+    # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
+    # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history
+    # (velocity and centroid) and the cons fields. Regenerate it whenever a default in the moving-body numerics changes (the first
+    # golden went stale when ib_mass_relax became the default for moving bodies, and every CI lane then differed from it by the same
+    # 3.6e-5). Against a golden generated on the current master, GNU, Intel, NVHPC and macOS CI lanes agree to 1e-13 absolute on the
+    # fields and 5e-9 relative on ib_forces entries, so 1e-6 is two to three orders above the observed spread and still fails a wrong
+    # stage weight (a 1e-3 position error). The checker script validates the physics; the golden is a regression guard. Skipped in the
+    # single-precision lane (see test.py).
+    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Constant Acceleration", "examples/2D_mibm_constant_acceleration/case.py", mods={"parallel_io": "F"}, override_tol=1e-6))
+
+    # Soft-sphere wall collision (collision_model = 1) in air at 1e5 Pa: a normal impact at e = 0.8 and a 50 degree impact that slides.
+    # The contact begins half a step into a step so no compiler can move it by one. The sticking regime is left to check_collision.py:
+    # where the contact point stops sliding, the friction direction is the sign of a velocity that goes to zero, so the rebound depends
+    # on round-off. Against goldens generated on the current master, the CI lanes agree to 1e-14 absolute on the fields and 5e-9
+    # relative on the contact force (1e-9 on tiny entries), so 1e-6 leaves two orders of margin and still fails a one-step shift of the
+    # contact (order 1e-2). Regenerate the goldens whenever a default in the moving-body numerics changes.
+    for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
+        cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
