@@ -959,7 +959,8 @@ uniform Cartesian grid.
 | `amr_regrid_int`        | Integer | Steps between regrids; 0 keeps the initial block (default 0) |
 | `amr_tag_eps`           | Real    | Tagging threshold on the normalized density jump; > 0 with regrid (default 0.1) |
 | `amr_tag_abs`           | Logical | Tag on the absolute jump; `amr_tag_eps` then has the units of the tagged variable (default F) |
-| `amr_tag_var`           | Integer | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model) (default 1) |
+| `amr_tag_var`           | Integer | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model), 5 vorticity (magnitude times the cell size against `amr_tag_eps`; 2D/3D), 6 temperature (chemistry), 7 mass fraction of species `amr_tag_species` (chemistry, needs `amr_tag_abs`) (default 1) |
+| `amr_tag_species`       | Integer | Species index tagged by `amr_tag_var = 7` (default 1) |
 | `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
 | `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
 | `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |

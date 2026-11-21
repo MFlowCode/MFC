@@ -21,7 +21,7 @@ module m_amr_regrid
     use m_amr_state, only: amr_band_migrate
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
-    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind
+    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_vort_sf, f_amr_tag_ind
     use m_amr_distribution, only: s_amr_sort_by_key
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
@@ -369,17 +369,21 @@ contains
         do ck = lbound(r, 3), ubound(r, 3)
             do cj = lbound(r, 2), ubound(r, 2)
                 do ci = lbound(r, 1), ubound(r, 1)
-                    r(ci, cj, ck) = f_amr_tag_val_sf(q_cons_base, ci, cj, ck)
+                    if (amr_tag_var /= 5) r(ci, cj, ck) = f_amr_tag_val_sf(q_cons_base, ci, cj, ck)
                 end do
             end do
         end do
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
                 do ci = tg_lo(1), tg_hi(1)
-                    ! jump of the tagged variable, max over the active dimensions
-                    g = f_amr_tag_ind(r(ci + 1, cj, ck), r(ci, cj, ck), r(ci - 1, cj, ck))
-                    if (n_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj + 1, ck), r(ci, cj, ck), r(ci, cj - 1, ck)))
-                    if (p_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj, ck + 1), r(ci, cj, ck), r(ci, cj, ck - 1)))
+                    if (amr_tag_var == 5) then
+                        g = f_amr_tag_vort_sf(q_cons_base, [ci, cj, ck], [ci, cj, ck] - h, [ci, cj, ck] + h)
+                    else
+                        ! jump of the tagged variable, max over the active dimensions
+                        g = f_amr_tag_ind(r(ci + 1, cj, ck), r(ci, cj, ck), r(ci - 1, cj, ck))
+                        if (n_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj + 1, ck), r(ci, cj, ck), r(ci, cj - 1, ck)))
+                        if (p_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj, ck + 1), r(ci, cj, ck), r(ci, cj, ck - 1)))
+                    end if
                     if (g > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! acoustic source support stays coarse
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
