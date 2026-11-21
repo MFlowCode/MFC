@@ -37,8 +37,8 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
   linear interpolation (`amr_prolong = 1`) or conservative quartic interpolation (`amr_prolong = 2`). The quartic fill
   falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (widened
-  at a local extremum and, where the second differences are uniform, next to one, so a smooth extremum keeps the quartic
-  and a steep monotone front stays monotone), and wherever it would give
+  only where the second differences share a sign: at a smooth local extremum and next to one, so a smooth extremum keeps
+  the quartic, a steep monotone front stays monotone, and an overshoot beside a front is not amplified), and wherever it would give
   non-positive density or internal energy. Volume fractions are
   renormalized to sum to one and species mass fractions to `sum(Y) = 1, Y >= 0`. A block that survives a regrid
   keeps its own fine solution.
