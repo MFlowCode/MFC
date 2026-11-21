@@ -182,8 +182,9 @@ against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lo
   only grow); a missing fine-level file aborts the restart.
 - **Nesting.** A level-2 or deeper block lies inside one block of the level above; regrid builds each block's children
   inside it, a few coarse cells from its edge. Where a feature crosses the seam between two parent blocks, the children
-  on the two sides are extended to the seam when their extents along it are equal (a feature that crosses it squarely)
-  and the extended blocks stay within their level's size cap. Otherwise a strip that wide on each side of the seam stays at the parent's resolution; so does every seam with
+  on the two sides are joined across it when their extents along it are equal (a feature that crosses it squarely):
+  each is extended to the seam, or, where that would exceed its level's size cap, the gap is filled by a thin block of
+  its own. Otherwise a strip that wide on each side of the seam stays at the parent's resolution; so does every seam with
   immersed boundaries, or with `amr_prolong = 2` on a scheme with fewer
   than 4 ghost cells (WENO3 and below). A larger `amr_max_grid_size` gives fewer seams.
 - **Regrid.** When no cell is tagged, regrid replaces the hierarchy with one small dormant level-1 block (one coarse cell

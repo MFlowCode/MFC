@@ -163,7 +163,7 @@ contains
                 boxes(nboxes)%lo = gch(1:3,chord(jch)); boxes(nboxes)%hi = gch(4:6,chord(jch)); box_level(nboxes) = lev
                 par(nboxes) = gch(7, chord(jch))
             end do
-            call s_amr_nest_close_seams(boxes, par, newlo, nboxes, lev)
+            call s_amr_nest_close_seams(boxes, par, box_level, newlo, nboxes, lev)
             deallocate (gch, chord, powner, mych, gidx, gkb, covered, mine, mlo_all, mhi_all)
             plo = newlo; phi = nboxes
         end do
@@ -202,57 +202,119 @@ contains
     end subroutine s_amr_nest_mark_parents
 
     !> Join children across parent seams. Where parent pb sits on parent pa's high face in dim d, and a child of each ends at its
-    !! nesting window there with the same transverse extents, both are extended to the shared parent face: they become a fine-fine
-    !! seam pair and the strip between them is refined. The parent patch of such a child reaches amr_cpat_mar cells into the
-    !! parent's ghosts, which the parents' own seam exchange fills. A closure that would break the level cap is skipped, and one
-    !! that leaves a neighbour with a partly shared face is undone (a tile joins only if the tiles beside it do). One dim at a time,
-    !! so a later dim sees the extended extents and can close the corner where four parents meet. Replicated inputs: rank-invariant.
-    !! Not with IB.
-    impure subroutine s_amr_nest_close_seams(boxes, par, clo, chi, lev)
+    !! nesting window there with the same transverse extents, both are brought to the shared parent face (s_amr_nest_reach): the
+    !! boxes on it become a fine-fine seam pair and the strip between the children is refined. The parent patch of such a box
+    !! reaches amr_cpat_mar cells into the parent's ghosts, which the parents' own seam exchange fills. A closure that leaves a
+    !! neighbour with a partly shared face is undone (a tile joins only if the tiles beside it do), as is one the block pool has no
+    !! room for. One dim at a time, so a later dim sees the new extents and can close the corner where four parents meet. Replicated
+    !! inputs: rank-invariant. Not with IB.
+    impure subroutine s_amr_nest_close_seams(boxes, par, box_level, clo, nboxes, lev)
 
         type(t_box), intent(inout) :: boxes(:)
-        integer, intent(in)        :: par(:), clo, chi, lev
-        integer                    :: a, b, d, i, k, nc, cap
-        integer, allocatable       :: ca(:), cb(:)
-        logical                    :: ok, changed, tr(3)
+        integer, intent(inout)     :: par(:), box_level(:), nboxes
+        integer, intent(in)        :: clo, lev
+        integer                    :: a, b, d, i, k, nc, n0, cap
+        integer, allocatable       :: cj(:,:)  !< per closure: the two boxes on the shared parent face (0: undone)
+        logical                    :: changed, tr(3)
 
-        if (ib .or. amr_cpat_mar > buff_size .or. chi <= clo) return
-        allocate (ca(chi - clo + 1), cb(chi - clo + 1))
+        if (ib .or. amr_cpat_mar > buff_size .or. nboxes <= clo) return
+        allocate (cj(2, amr_max_blocks))
         do d = 1, num_dims
             cap = max(amr_maxc_fit(d)/amr_ref_ratio**(lev - 1), 1) - amr_cpat_mar  ! widest box that may still be extended
+            if (cap < 0) cycle  ! a strip itself would break the level cap
             tr = [1, 2, 3] /= d
-            nc = 0
-            do a = clo, chi
-                if (boxes(a)%hi(d) /= boxes(par(a))%hi(d) - amr_cpat_mar .or. boxes(a)%hi(d) - boxes(a)%lo(d) + 1 > cap) cycle
-                do b = clo, chi
-                    if (boxes(par(b))%lo(d) /= boxes(par(a))%hi(d) + 1) cycle
-                    if (boxes(b)%lo(d) /= boxes(par(b))%lo(d) + amr_cpat_mar .or. boxes(b)%hi(d) - boxes(b)%lo(d) + 1 > cap) cycle
+            nc = 0; n0 = nboxes
+            do a = clo, n0
+                if (boxes(a)%hi(d) /= boxes(par(a))%hi(d) - amr_cpat_mar) cycle
+                do b = clo, n0
+                    if (boxes(par(b))%lo(d) /= boxes(par(a))%hi(d) + 1 .or. boxes(b)%lo(d) /= boxes(par(b))%lo(d) + amr_cpat_mar) &
+                        & cycle
                     if (any(tr .and. (boxes(b)%lo /= boxes(a)%lo .or. boxes(b)%hi /= boxes(a)%hi))) cycle
-                    nc = nc + 1; ca(nc) = a; cb(nc) = b
-                    boxes(a)%hi(d) = boxes(par(a))%hi(d); boxes(b)%lo(d) = boxes(par(b))%lo(d)
+                    if (nboxes + count([boxes(a)%hi(d) - boxes(a)%lo(d), &
+                        & boxes(b)%hi(d) - boxes(b)%lo(d)] + 1 > cap) > amr_max_blocks) exit
+                    nc = nc + 1
+                    call s_amr_nest_reach(boxes, par, box_level, nboxes, a, d, 1, cap, cj(1, nc))
+                    call s_amr_nest_reach(boxes, par, box_level, nboxes, b, d, -1, cap, cj(2, nc))
                     exit
                 end do
             end do
-            ! undo this dim's closures until every joined child is compatible with its level
+            ! undo this dim's closures until every box on a parent face is compatible with its level
             changed = nc > 0
             do while (changed)
                 changed = .false.
                 do i = 1, nc
-                    a = ca(i); b = cb(i)
-                    if (a == 0) cycle
-                    ok = .true.
-                    do k = clo, chi
-                        if (k /= a) ok = ok .and. f_amr_boxes_compatible(boxes(a)%lo, boxes(a)%hi, boxes(k)%lo, boxes(k)%hi)
-                        if (k /= b) ok = ok .and. f_amr_boxes_compatible(boxes(b)%lo, boxes(b)%hi, boxes(k)%lo, boxes(k)%hi)
-                    end do
-                    if (ok) cycle
-                    boxes(a)%hi(d) = boxes(par(a))%hi(d) - amr_cpat_mar; boxes(b)%lo(d) = boxes(par(b))%lo(d) + amr_cpat_mar
-                    ca(i) = 0; changed = .true.
+                    if (cj(1, i) == 0) cycle
+                    if (f_amr_nest_fits(boxes, clo, nboxes, cj(1, i), d) .and. f_amr_nest_fits(boxes, clo, nboxes, cj(2, i), &
+                        & d)) cycle
+                    call s_amr_nest_retract(boxes, par, n0, cj(1, i), d, 1)
+                    call s_amr_nest_retract(boxes, par, n0, cj(2, i), d, -1)
+                    cj(1, i) = 0; changed = .true.
                 end do
             end do
+            ! drop the undone strips
+            k = n0
+            do i = n0 + 1, nboxes
+                if (boxes(i)%hi(d) < boxes(i)%lo(d)) cycle
+                k = k + 1; boxes(k) = boxes(i); par(k) = par(i); box_level(k) = box_level(i)
+            end do
+            nboxes = k
         end do
 
     end subroutine s_amr_nest_close_seams
+
+    !> Bring box k from its nesting window to its parent's edge in dim d on `side` (+1 high, -1 low): extend it, or, if it is wider
+    !! than `cap`, append the strip between as its own tile. j = the box now on the edge.
+    pure subroutine s_amr_nest_reach(boxes, par, box_level, nboxes, k, d, side, cap, j)
+
+        type(t_box), intent(inout) :: boxes(:)
+        integer, intent(inout)     :: par(:), box_level(:), nboxes
+        integer, intent(in)        :: k, d, side, cap
+        integer, intent(out)       :: j
+
+        j = k
+        if (boxes(k)%hi(d) - boxes(k)%lo(d) + 1 > cap) then
+            nboxes = nboxes + 1; j = nboxes
+            boxes(j) = boxes(k); par(j) = par(k); box_level(j) = box_level(k)
+            boxes(j)%lo(d) = boxes(k)%hi(d) + 1; boxes(j)%hi(d) = boxes(k)%lo(d) - 1  ! the far bound is set below
+        end if
+        if (side > 0) then
+            boxes(j)%hi(d) = boxes(par(k))%hi(d)
+        else
+            boxes(j)%lo(d) = boxes(par(k))%lo(d)
+        end if
+
+    end subroutine s_amr_nest_reach
+
+    !> Undo s_amr_nest_reach for box j: a strip (j > n0) is emptied in dim d, an extended box goes back to its nesting window.
+    pure subroutine s_amr_nest_retract(boxes, par, n0, j, d, side)
+
+        type(t_box), intent(inout) :: boxes(:)
+        integer, intent(in)        :: par(:), n0, j, d, side
+
+        if (j > n0) then
+            boxes(j)%hi(d) = boxes(j)%lo(d) - 1
+        else if (side > 0) then
+            boxes(j)%hi(d) = boxes(par(j))%hi(d) - amr_cpat_mar
+        else
+            boxes(j)%lo(d) = boxes(par(j))%lo(d) + amr_cpat_mar
+        end if
+
+    end subroutine s_amr_nest_retract
+
+    !> Box j is compatible with every other box of clo..chi (those emptied in dim d aside).
+    pure logical function f_amr_nest_fits(boxes, clo, chi, j, d) result(ok)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: clo, chi, j, d
+        integer                 :: k
+
+        ok = .true.
+        do k = clo, chi
+            if (k == j .or. boxes(k)%hi(d) < boxes(k)%lo(d)) cycle
+            ok = ok .and. f_amr_boxes_compatible(boxes(j)%lo, boxes(j)%hi, boxes(k)%lo, boxes(k)%hi)
+        end do
+
+    end function f_amr_nest_fits
 
     !> Same-level box kk shares box k's whole face in dim d on `side` (+1 high, -1 low).
     pure logical function f_amr_box_seam(boxes, nboxes, box_level, k, d, side) result(seam)
