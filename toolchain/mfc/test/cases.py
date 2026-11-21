@@ -3885,8 +3885,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
-                # Wall-bounded thermostat: its golden differed by up to 7e-3 between AMD and NVIDIA GPUs after five steps (the isothermal
-                # wall and the controller both go through the 1e-6 temperature solve), so it is checked by hand: the Nu = 7.541 runs.
+                # Registered below at its own size (the 25-cell cap does not fit the 32-cell gap); Nu = 7.541 is checked by check_nu.py.
                 "2D_thermal_channel",
                 "2D_spatial_reacting_mixing_layer",
                 "3D_reacting_mixing_layer",
@@ -4839,6 +4838,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 override_tol=1e-6,
             )
         )
+
+    # Thermally developed plane channel (mean_temp_wall), first 100 steps, 32 x 25 cells; the developed state and Nu = 7.541 (WENO5)
+    # are checked by examples/2D_thermal_channel/check_nu.py. The golden uses non-mapped WENO3 with weno_eps = 1e-6: with the
+    # example's mapped WENO5 and weno_eps = 1e-16, round-off in the weights moves the wall-row transverse momentum by 2-3 % between GNU
+    # -O3 and debug builds within 20 steps. With these settings GNU 13 double -O3, reldebug and debug agree to 5e-8 (-O3 repeats
+    # bitwise) and an AMD MI250X (Cray Fortran, OpenMP offload) run and an AMD CPU build (amdflang) differ from the GNU golden by 8e-8 and 6e-8, so 1e-6 leaves a factor 12.
+    # Single precision differs from double by 4e-4: skipped there (label "Chemistry", test.py).
+    channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "weno_avg": "F", "t_step_stop": 100, "t_step_save": 100}
+    cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=channel_mods, override_tol=1e-6))
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
