@@ -351,10 +351,6 @@ module m_global_parameters
     !! per-dimension geometry is one masked vector expression.
     logical :: amr_dim(3) = .true.
     integer :: amr_sidx(3) = 0, amr_ext(3) = 0
-    !> Block width cap in coarse cells: amr_max_grid_size when set, else amr_grid_cap_dflt, except with immersed bodies, whose
-    !! blocks are owned whole and sized by the body (no fixed cap).
-    integer, parameter :: amr_grid_cap_dflt = 32
-    integer            :: amr_grid_cap = huge(1)
 
     !> The block's coarse footprint driving the coarse<->fine gather/scatter, per dim (collapsed dims 0:0): the entire block on its
     !! owner, empty (lo > hi) elsewhere. Level-dependent frame: a level-1 block records global level-0 cell indices; a level>=2
@@ -677,7 +673,7 @@ contains
         ! A small default would cap the global box count and silently truncate the refined region. amr_max_blocks sizes replicated
         ! metadata only (slots are allocated lazily for owned blocks), so a large pool is cheap.
         amr_max_blocks = 1024
-        amr_max_grid_size = 0  ! 0 = amr_grid_cap_dflt, or less when the rank subdomain is smaller (see amr_grid_cap)
+        amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent)
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
         ! 4, not 1: at 1 the bisection does not converge on its own and splits until amr_max_blocks stops it, which blocks scoped
@@ -1146,12 +1142,6 @@ contains
         ! Allocation bounds: the coarse subdomain, widened to hold a refined block when amr_max_grid_size pins one larger than it.
         ! A pinned cap of C coarse cells is amr_ref_ratio*C - 1 fine cells plus the same ghost shell.
         idwbuff_alloc = idwbuff
-        amr_grid_cap = huge(1)
-        if (amr_max_grid_size > 0) then
-            amr_grid_cap = amr_max_grid_size
-        else if (.not. ib) then
-            amr_grid_cap = amr_grid_cap_dflt
-        end if
         if (amr .and. amr_max_grid_size > 0) then
             do i = 1, num_dims
                 idwbuff_alloc(i)%end = max(idwbuff(i)%end, amr_ref_ratio*amr_max_grid_size - 1 - idwbuff(i)%beg)
@@ -1170,7 +1160,8 @@ contains
                 case (2); cap = n
                 case default; cap = p
                 end select
-                cap = min((cap + 1)/amr_ref_ratio, amr_grid_cap)
+                cap = (cap + 1)/amr_ref_ratio
+                if (amr_max_grid_size > 0) cap = min(cap, amr_max_grid_size)
                 idwbuff_alloc(sd)%end = max(idwbuff_alloc(sd)%end, amr_bat_lim*(amr_ref_ratio*cap + 2*buff_size) - buff_size - 1)
             end block
         end if

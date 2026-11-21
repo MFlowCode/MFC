@@ -500,20 +500,28 @@ contains
     end function f_amr_cons_ok
 
     !> Average over one half (xi < 0 left, > 0 right; |xi| = 1/4) of the middle of five cell averages q: the conservative quartic,
-    !! or MC-limited linear where either half leaves the range of the three nearest averages. At a local extremum of the averages
-    !! that range is widened by their smallest second difference; where they are monotone it is not, so the children make no new
-    !! extremum (at the foot of a steep front that difference is as large as q(0)). Both halves are tested so the two children share
-    !! one reconstruction (their mean stays q(0)).
+    !! or MC-limited linear where either half leaves the range of the three nearest averages. That range is widened only where the
+    !! three second differences share a sign (smooth data): by the smallest of them, c, at a local extremum of the averages, and
+    !! where they are monotone by c/4 times the ratio of the smallest to the largest, never across zero. A smooth extremum in the
+    !! next cell needs c/8 (without it the fill is second order there) and has a ratio near one; at the foot of a steep front c is
+    !! as large as q(0) and the ratio is small; at an under- or overshoot beside a front the differences change sign and the
+    !! quartic's slope is the front's, not the cell's. Both halves are tested so the two children share one reconstruction (their
+    !! mean stays q(0)).
     pure real(wp) function f_amr_quartic_half(q, xi) result(v)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: q(-2:2), xi
-        real(wp)             :: c, a, b, d, lo, hi
+        real(wp)             :: c, a, b, d, dl, dc, dr, lo, hi
 
         d = (3._wp*(q(-2) - q(2)) - 22._wp*(q(-1) - q(1)))/128._wp
         a = q(1) - q(0); b = q(0) - q(-1)
+        dl = q(-2) - 2._wp*q(-1) + q(0); dc = a - b; dr = q(0) - 2._wp*q(1) + q(2)
+        lo = min(q(-1), q(0), q(1)); hi = max(q(-1), q(0), q(1))
         c = 0._wp
-        if (a*b <= 0._wp) c = min(abs(q(-2) - 2._wp*q(-1) + q(0)), abs(a - b), abs(q(0) - 2._wp*q(1) + q(2)))
-        lo = min(q(-1), q(0), q(1)) - c; hi = max(q(-1), q(0), q(1)) + c
+        if (dl*dc > 0._wp .and. dc*dr > 0._wp) then
+            c = min(abs(dl), abs(dc), abs(dr))
+            if (a*b > 0._wp) c = min(0.25_wp*c*c/max(abs(dl), abs(dc), abs(dr)), max(lo, 0._wp, -hi))
+        end if
+        lo = lo - c; hi = hi + c
         if (min(q(0) - abs(d), q(0) + abs(d)) >= lo .and. q(0) + abs(d) <= hi) then
             v = q(0) + sign(1._wp, xi)*d
         else

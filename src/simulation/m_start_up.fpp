@@ -1104,6 +1104,9 @@ contains
 #endif
 #endif
 
+        ! After the device is bound: s_mpi_initialize ran earlier, so its update went to the default device
+        $:GPU_UPDATE(device='[num_procs, proc_rank]')
+
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
