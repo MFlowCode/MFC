@@ -4032,6 +4032,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
                 "2D_mibm_constant_acceleration",
                 "3D_mibm_wall_collision",
+                # Registered below at 12 cells per radius: at the 25-cell cap the gap holds about 4 cells
+                "2D_ibm_conduction_annulus",
             ]
             if path in casesToSkip:
                 continue
@@ -4611,6 +4613,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # contact (order 1e-2). Regenerate the goldens whenever a default in the moving-body numerics changes.
     for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
         cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
+
+    # Isothermal conduction annulus (inner circle, outer STL ring) against the exact ln(r) profile, with inverse-distance and TSC
+    # image points. 12 cells per radius (64 x 64) and 300 steps (about 3 conduction times). TOLERANCE_COMMENT
+    for label, args in (("Inverse Distance", []), ("TSC", ["--interp", "2"])):
+        cases.append(
+            define_case_f(f"2D -> IBM -> Conduction Annulus -> {label}", "examples/2D_ibm_conduction_annulus/case.py", args=[*args, "--steps", "300"], mods={"parallel_io": "F"}, override_tol=1e-6)
+        )
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
