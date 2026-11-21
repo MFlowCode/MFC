@@ -916,13 +916,21 @@ while the host still registers it. The first launch aborts with
 
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
 hoist it into its own (module) subroutine with the locals passed as arguments. A minimal
-reproducer runs correctly on AFAR 24.3, but this is not yet verified inside MFC.
+reproducer runs correctly on AFAR 24.3. On AFAR 24.4 an MFC kernel inside a `block` (with a
+`block`-local `firstprivate`) is present in the device image and passes its tests, so the rule
+can go once CI no longer uses 24.3.
 
 ## Silent-Failure Traps {#silent-failure-traps}
 
 Every entry here was measured. They share a failure mode: the build stays green and the
 answer is wrong, or one backend diverges from all the others.
 
+- **Push a new value of a `GPU_DECLARE` module variable with `GPU_UPDATE`, never `GPU_ENTER_DATA(copyin=...)`.**
+  A static (non-allocatable) declared variable is always present on the device with an infinite
+  reference count, so on AMD flang `enter data map(to:)` copies nothing and kernels read the old value
+  (often 0). Cray and NVHPC copy anyway, so only AMD is wrong. This was the "amdflang reads `Re_size`
+  stale" bug (ROCm/llvm-project#2890, closed as conformant); `GPU_UPDATE(device=...)` is the fix,
+  and no host copy is needed.
 - **Do not wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops.** `GPU_LOOP` emits empty
   directives on Cray and AMD, so the loop runs serially with no diagnostic. Spatial loops
   always use `GPU_PARALLEL_LOOP` / `END_GPU_PARALLEL_LOOP`.
@@ -966,7 +974,12 @@ answer is wrong, or one backend diverges from all the others.
   4-5x slower: private arrays sized by runtime globals move from registers to scratch (the
   WENO kernel goes from 0 to 400 B of scratch per thread and runs 11x slower; HLLC 4.9x). On
   AFAR 23.2.x it also produced NaNs in CBC, `wave_speeds=2`, IBM, surface tension, QBMM,
-  viscous, and MHD HLLD cases. Removing them needs a benchmark, not just the tests.
+  viscous, and MHD HLLD cases. AFAR 24.4 is no better: on Frontier the `./mfc.sh bench` grind
+  time is 4.5-5.9x worse without the guards in every finite-volume case (IGR, which uses no
+  WENO or Riemann solver, is unchanged). In that build a runtime-sized local array in a
+  kernel is heap-allocated, with a call to the device `malloc` (`__llvm_libc::gpu::allocate`)
+  and `free` per thread per launch: WENO kernels go from 0 to 5-6 such calls, the LF solver
+  from 0 to 8. Removing the guards needs a benchmark, not just the tests.
 - **`#:set MFC_OMP_PRESENT_ALLOCATABLE = True` is a per-file opt-in** (`m_rhs`, `m_weno`,
   `m_riemann_solver_hllc`) that makes the AMD OpenMP kernels assume allocatables are already
   present. A file may opt in only if every array a kernel names is allocated whenever that

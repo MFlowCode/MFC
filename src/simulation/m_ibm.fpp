@@ -618,8 +618,6 @@ contains
         logical :: use_ccst  !< ib_slip_ccst applies to this ghost point
         logical :: surface_converged
         integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
-        !> Host copies; amdflang reads Re_size stale cross-TU
-        integer                :: Re_size_loc1, Re_size_loc2
         real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
@@ -665,7 +663,6 @@ contains
         n_not_converged = 0
         n_ill_posed = 0
         nf1 = 0; nf2 = 0; nf3 = 0
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         if (num_gps > 0) then
             ! Seed the staging buffer, so a component no ghost point writes survives the flush unchanged.
@@ -684,7 +681,7 @@ contains
                                 & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, T_adv, mw_s, mw_g, rho_s, rho_g, mdot_s, &
                                 & v_stefan, d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, h_w, &
                                 & e_s, nrm_l, wf, h_IP, dh_ccst, p_ratio, use_ccst]', reduction='[[n_not_converged, n_ill_posed, &
-                                & nf1, nf2, nf3]]', reductionOp='[+]', present='[ghost_points]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                & nf1, nf2, nf3]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 if (record_surface) then
                     $:GPU_LOOP(parallelism='[seq]')
@@ -836,10 +833,9 @@ contains
                 ! If in simulation, use acc mixture subroutines
                 if (hypoelasticity) then
                     call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
-                        & G_K, Gs, Re_size_loc1, Re_size_loc2)
+                        & G_K, Gs)
                 else
-                    call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
-                        & Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
+                    call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                 end if
 
                 if (surface_tension) gp_prim_new(eqn_idx%c, i) = c_IP
@@ -3943,8 +3939,7 @@ contains
         if (num_gps == 0) return
         dcnt = 0
         ng = num_gps
-        $:GPU_PARALLEL_LOOP(private='[a, gid]', copy='[dcnt]', firstprivate='[ng]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a, gid]', copy='[dcnt]', firstprivate='[ng]')
         do a = 1, ng
             gid = patch_ib(ghost_points(a)%ib_patch_id)%gbl_patch_id
             $:GPU_ATOMIC(atomic='update')
@@ -4022,12 +4017,10 @@ contains
         ! ghost_points and gp_park are device-resident and never reallocated after setup. Park the coarse list into gp_park's coarse
         ! segment, then (correct/moving path) pull this slot's fine list in, via on-device kernels; a whole-array GPU_UPDATE of
         ! ghost_points aborts amdflang (per-element custom mapper, ROCm HSA OUT_OF_RESOURCES). On the setup path s_ibm_setup_fine
-        ! fills ghost_points in place. The AMD-only defaultmap(present:allocatable) stops flang from generating that per-element
-        ! mapper (a multi-minute offload-runtime busy-loop) for these device-resident derived-type arrays.
+        ! fills ghost_points in place.
         n_c = num_gps
         @:PROHIBIT(int(n_c, 8) > park_coarse, "AMR fine IB: coarse ghost-point count exceeds the gp_park capacity")
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]')
         do a = 1, n_c
             gp_park(a) = ghost_points(a)
         end do
@@ -4038,8 +4031,7 @@ contains
             n_f = num_gps
             off = ib_fine(islot)%off
             @:PROHIBIT(int(n_f, 8) > ib_fine(islot)%cap, "AMR fine IB: a slot with ghost points has no gp_park segment")
-            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', &
-                                & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]')
             do a = 1, n_f
                 ghost_points(a) = gp_park(off + a)
             end do
@@ -4068,8 +4060,7 @@ contains
         n_f = num_gps
         if (int(n_f, 8) > ib_fine(islot)%cap) call s_ibm_reserve_park(islot, n_f)
         off = ib_fine(islot)%off
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]')
         do a = 1, n_f
             gp_park(off + a) = ghost_points(a)
         end do
@@ -4077,8 +4068,7 @@ contains
         ib_fine(islot)%num_gps = num_gps
         num_gps = num_gps_save
         n_c = num_gps
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]')
         do a = 1, n_c
             ghost_points(a) = gp_park(a)
         end do
@@ -4115,7 +4105,7 @@ contains
     end subroutine s_ibm_reserve_park
 
     !> Rebuild corrected_gps from the ghost-point list now in ghost_points: s_compute_interpolation_coeffs only sets entries, so
-    !! clear the whole field and re-mark the valid ghost points on-device (same defaultmap treatment as the swap kernels).
+    !! clear the whole field and re-mark the valid ghost points on-device.
     impure subroutine s_ibm_rebuild_corrected_gps(n_g)
 
         integer, intent(in) :: n_g
@@ -4130,8 +4120,7 @@ contains
         end do; end do; end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_g]', &
-                            & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_g]')
         do a = 1, n_g
             if (ghost_points(a)%interp_valid) then
                 corrected_gps%sf(ghost_points(a)%loc(1), ghost_points(a)%loc(2), ghost_points(a)%loc(3)) = 1
