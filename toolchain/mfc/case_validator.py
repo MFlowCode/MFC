@@ -1081,6 +1081,8 @@ class CaseValidator:
         moving_any = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in bodies)
         self.prohibit(ib_flux_wall and moving_any, "ib_flux_wall requires every immersed boundary to be fixed (moving_ibm = 0)")
         self.prohibit(ib_flux_wall and self.get("hypoelasticity", "F") == "T", "ib_flux_wall is not supported with hypoelasticity")
+        # the wall fields live on the coarse grid only
+        self.prohibit(ib_flux_wall and self.get("amr", "F") == "T", "ib_flux_wall is not supported with amr")
         for i in reacting:
             self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")

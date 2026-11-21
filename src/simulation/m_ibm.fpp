@@ -105,9 +105,9 @@ module m_ibm
         real(wp), dimension(3, 3) :: wd1, wd2  !< TSC weights of the probes
     end type wall_fill
 
-    !> Ghost-point updates per fill tier, summed over the run and reported at its end, because a tight packing can sit mostly in
-    !! tier 2 and a second-order claim is then not true of that surface.
-    integer, dimension(3)       :: n_fill_tier = 0
+    !> Ghost-point updates per fill tier and AMR level (0 = the coarse grid), summed over the run and reported at its end, because a
+    !! tight packing can sit mostly in tier 2 and a second-order claim is then not true of that surface.
+    integer, allocatable        :: n_fill_tier(:,:)
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
@@ -217,6 +217,7 @@ contains
     !> Allocates memory for the variables in the IBM module
     impure subroutine s_initialize_ibm_module()
 
+        allocate (n_fill_tier(3,0:amr_max_level)); n_fill_tier = 0
         if (amr .and. ib) then
             ! size the declare-target ib_markers for the deepest fine level (never reallocated on Cray); at amr_max_level = 1 the
             ! bounds reduce to the coarse extents
@@ -572,11 +573,12 @@ contains
     end subroutine s_compute_ghost_point_velocity
 
     !> Update the conservative variables at the ghost points
-    subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
+    subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in, lvl)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        integer, intent(in) :: lvl  !< AMR level of the frame (0 = the coarse grid), for the fill-tier tally
         integer :: i, j, k, l, q, r  !< Iterator variables
         integer :: jj, kk, ll  !< Neighbor iterators
         integer :: rad, rad_z, num_nbrs  !< Neighbor stencil radius and population
@@ -1096,7 +1098,7 @@ contains
 
         n_surface_not_converged = n_surface_not_converged + n_not_converged
         n_surface_ill_posed = n_surface_ill_posed + n_ill_posed
-        n_fill_tier = n_fill_tier + [nf1, nf2, nf3]
+        n_fill_tier(:,lvl) = n_fill_tier(:,lvl) + [nf1, nf2, nf3]
 
     end subroutine s_ibm_correct_state
 
@@ -1376,35 +1378,39 @@ contains
     !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.
     impure subroutine s_report_ibm_surface
 
-        integer               :: n_not_converged_glb, n_ill_posed_glb, q
-        integer, dimension(3) :: ft  !< Global fill-tier tallies
+        integer               :: n_not_converged_glb, n_ill_posed_glb, q, lvl
+        integer, dimension(3) :: ft  !< Global fill-tier tallies of one level
+        character(len=16)     :: tag
 
         call s_mpi_reduce_int_sum(n_surface_not_converged, n_not_converged_glb)
         call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
-        ! Every rank reduces before the root-only return below: a collective after it would deadlock rank 0
-        do q = 1, 3
-            call s_mpi_reduce_int_sum(n_fill_tier(q), ft(q))
-        end do
+        if (proc_rank == 0) then
+            if (n_not_converged_glb > 0) then
+                print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', &
+                    & n_not_converged_glb, &
+                    & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, ' &
+                    & // 'zero temperature gradient for thermal_bc = 2).'
+            end if
 
-        if (proc_rank /= 0) return
-
-        if (n_not_converged_glb > 0) then
-            print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', n_not_converged_glb, &
-                & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, ' &
-                & // 'zero temperature gradient for thermal_bc = 2).'
+            if (n_ill_posed_glb > 0) then
+                print '(A,I0,A)', ' Immersed-boundary surface chemistry: ', n_ill_posed_glb, &
+                    & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
+                    & // 'fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, zero temperature gradient for ' // 'thermal_bc = 2). Check the immersed geometry against the grid.'
+            end if
         end if
 
-        if (n_ill_posed_glb > 0) then
-            print '(A,I0,A)', ' Immersed-boundary surface chemistry: ', n_ill_posed_glb, &
-                & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
-                & // 'fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, zero temperature gradient for ' &
-                & // 'thermal_bc = 2). Check the immersed geometry against the grid.'
-        end if
-
-        if (ib_wall_quad .and. sum(ft) > 0) then
-            print '(A,3(F6.1,A))', ' [WALLFILL] ghost fill tiers: quadratic ', 1.e2_wp*ft(1)/sum(ft), '%, linear ', &
+        ! One line per AMR level; coarse ghost points under a fine block are counted on level 0 too
+        if (.not. ib_wall_quad) return
+        do lvl = 0, amr_max_level
+            do q = 1, 3
+                call s_mpi_reduce_int_sum(n_fill_tier(q, lvl), ft(q))
+            end do
+            tag = ''
+            if (lvl > 0) write (tag, '(A,I0)') ', AMR level ', lvl
+            if (proc_rank == 0 .and. sum(ft) > 0) print '(A,3(F6.1,A))', &
+                & ' [WALLFILL] ghost fill tiers' // trim(tag) // ': quadratic ', 1.e2_wp*ft(1)/sum(ft), '%, linear ', &
                 & 1.e2_wp*ft(2)/sum(ft), '%, default ', 1.e2_wp*ft(3)/sum(ft), '%'
-        end if
+        end do
 
     end subroutine s_report_ibm_surface
 
@@ -4170,6 +4176,7 @@ contains
 
         integer :: i
 
+        deallocate (n_fill_tier)
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(corrected_gps%sf)
         if (associated(ib_wall_theta%sf)) then
