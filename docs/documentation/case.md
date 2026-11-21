@@ -610,6 +610,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
 | `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro09)	 |
 | `weno_Re_flux`             | Logical | Compute velocity gradient using scalar divergence theorem	 |
+| `weno_Re_flux_compact`     | Logical | With `weno_Re_flux`, take the face-normal velocity gradient as the difference across the face |
 | `weno_avg`          	     | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 | `dt`                       | Real    | Time step size |
 | `t_step_start`             | Integer | Simulation starting time step |
@@ -725,6 +726,12 @@ Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate 
 
 - `weno_Re_flux` activates the scalar divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
 If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
+
+- `weno_Re_flux_compact` (requires `weno_Re_flux`, Cartesian coordinates) replaces, on every face, the face-normal velocity gradient of the viscous flux by the difference across the face, `(u_{j+1} - u_j)/(x_{j+1} - x_j)`, the gradient that `weno_Re_flux = F` uses. The tangential and cross gradients keep the WENO chain, and the default `F` leaves every result unchanged.
+  The WENO chain (face values, divergence-theorem cell gradient, reconstruction of that gradient, face mean) has a damping rate of exactly zero at the checkerboard wavenumber: a periodic box with a seeded u(y) = (-1)^j mode decays at rate 0.000 with `weno_Re_flux`, at 4 nu/dy^2 (20.5 at nu = 0.005, 32 cells) with `weno_Re_flux = F` or this option, and a smooth mode decays at the exact nu k^2 either way.
+  At a no-slip wall (`bc_y%%beg = -16`) the odd-mirror ghost forces that band, and the velocity next to the wall alternates about the exact profile (up to 6 % of the bulk velocity in the first four cells of a 32-cell channel with HLLC, 12 % in the hot-wall thermal channel); the option removes it.
+  The face difference brings the explicit viscous time-step limit of `weno_Re_flux = F`, about nu dt/dy^2 below 0.25 to 0.4 (a 128-cell channel with nu dt/dy^2 = 0.47 diverged, 0.23 was stable), which the WENO chain does not impose at this scale.
+  It does not touch the tangential and cross terms or the immersed-boundary walls (use `ib_visc_compact`, whose band covers faces near a body; the two can be combined). `weno_avg = F` with `weno_Re_flux` reads a cell's own two reconstructed face values, so it does not see a jump between two cells (an impulsive start next to a wall gives zero wall shear at the first step); this is a separate observation.
 
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
