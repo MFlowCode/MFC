@@ -4597,7 +4597,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     # Re 20 cylinder at Mach 0.2 (16 cells per diameter, 192 x 128 cells, 200 fixed steps, not steady): the face-flux force and heat
     # histories (ib_forces.dat, ib_heat.dat) are in the golden. The checker script validates the physics; the golden is a regression guard.
-    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=1e-6))
+    # Golden: GNU 13 double on an x86 CPU. An AMD MI300A (OpenMP offload) run differs from it by up to 5e-5 (min of absolute and relative
+    # error; the y-momentum near zero and ib_heat.dat are the largest, the fields otherwise 3e-6), so 5e-4 is ten times that spread.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=5e-4))
 
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
     # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history

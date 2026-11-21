@@ -86,7 +86,7 @@ def forces(run, info, avg):
     late = t >= t[-1] - avg * (t[-1] - t[0])
     out = {"t*": t[-1] * info["U"] / info["D"], "Cd_IB": window_mean(t, cd, avg), "Cl_amp": 0.5 * float(cl[late].max() - cl[late].min())}
     h = t >= 0.5 * t[-1]
-    if h.sum() > 16:
+    if h.sum() > 16 and out["Cl_amp"] > 1.0e-2:  # a steady wake has no shedding frequency
         tu = np.linspace(t[h][0], t[h][-1], h.sum())
         y = np.interp(tu, t[h], cl[h] - cl[h].mean())
         spec = np.abs(np.fft.rfft(y * np.hanning(len(y))))
@@ -179,7 +179,8 @@ def main():
     if os.path.isdir(os.path.join(args.case_dir, "silo_hdf5")):
         f = fields(args.case_dir, info, args.avg)
         print("  Cd_CV (half-width 1, 2, 4 D): " + ", ".join(f"{c:.4f}" for c in f["Cd_CV(h=1,2,4)"]))
-        print(f"  L/D {f['L/D']:.3f}" + (f" (Dennis & Chang {LD_REF[re_key]})" if re_key in LD_REF else ""))
+        if re_key in LD_REF:  # the wake of a shedding cylinder has no steady length
+            print(f"  L/D {f['L/D']:.3f} (Dennis & Chang {LD_REF[re_key]})")
     if args.hot:
         nu = nusselt(args.case_dir, args.hot, info, case_info(args.hot), args.avg)
         print(
