@@ -5,6 +5,7 @@
 
 import argparse
 import json
+import math
 
 import cantera as ct
 
@@ -25,6 +26,8 @@ parser.add_argument(
     help="Disable chemistry.",
 )
 parser.add_argument("--scale", type=float, default=1, help="Scale.")
+parser.add_argument("--t_save_us", type=float, default=0, help="If > 0: save every T_SAVE_US microseconds (dt is rounded down to fit a whole number of steps).")
+parser.add_argument("--substeps", type=int, default=4, help="chem_params%%reaction_substeps.")
 
 args = parser.parse_args()
 
@@ -44,9 +47,14 @@ dx = L / Nx
 dt = dx / abs(u_r) * 0.02
 Tend = 230e-6
 
-NT = int(Tend / dt)
-SAVE_COUNT = 100
-NS = NT // SAVE_COUNT
+if args.t_save_us > 0:
+    NS = math.ceil(args.t_save_us * 1e-6 / dt)
+    dt = args.t_save_us * 1e-6 / NS
+    NT = math.ceil(Tend / (NS * dt) - 1e-9) * NS
+else:
+    NT = int(Tend / dt)
+    SAVE_COUNT = 100
+    NS = NT // SAVE_COUNT
 
 case = {
     # Logistics
@@ -85,7 +93,7 @@ case = {
     "chem_params%diffusion": "F",
     "chem_params%reactions": "T",
     # Operator-split alpha-QSS reactions: the explicit RK3 source is unstable at this dt where the reflected shock heats the wall cells
-    "chem_params%reaction_substeps": 4,
+    "chem_params%reaction_substeps": args.substeps,
     "cantera_file": ctfile,
     # Formatted Database Files Structure Parameters
     "format": "silo",

@@ -4029,6 +4029,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_stl_test",
                 # Registered below at the resolution where the hot-wall NaN appears; the 25-cell cap would not reach it.
                 "3D_ibm_hot_rod",
+                # Registered below with its own arguments: the 50-step cap would stop it before the ignition
+                "1D_h2_air_ignition",
                 # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
                 "2D_mibm_constant_acceleration",
                 "3D_mibm_wall_collision",
@@ -4092,6 +4094,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 mods={**common_mods, "chem_params%reaction_substeps": 10},
             )
         )
+
+        # Constant-volume H2/air ignition (T0 = 1200 K) through the ignition and into the burnt state with the split integrator; the
+        # uniform box has no fluxes, so the run is smooth and does not amplify cross-compiler round-off. compare_cantera.py checks the
+        # ignition delay and T(t) against a Cantera reactor.
+        cases.append(define_case_f("1D -> Chemistry -> H2-Air Ignition -> Split Reactions", "examples/1D_h2_air_ignition/case.py", ["--T0", "1200", "--dt", "2e-8", "--tend", "1e-4", "--nsaves", "5"]))
 
         # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
         for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
