@@ -439,6 +439,19 @@ contains
 
     end function f_wall_velocity
 
+    !> The wall point nearest a ghost point, relative to the body's centroid: the ghost point is |levelset| inside the wall along
+    !! the outward normal.
+    function f_wall_point(gp, radial_vector) result(r_w)
+
+        $:GPU_ROUTINE(function_name='f_wall_point', parallelism='[seq]', cray_inline=True)
+        type(ghost_point), intent(in)      :: gp
+        real(wp), dimension(3), intent(in) :: radial_vector  !< Centroid to ghost point
+        real(wp), dimension(3)             :: r_w
+
+        r_w = radial_vector + abs(real(gp%levelset, kind=wp))*gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
+
+    end function f_wall_point
+
     !> sum_i kappa_i u_i^2 over the principal directions of the wall, for a velocity u_t tangent to it: the centripetal acceleration
     !! of fluid sliding along a curved wall with outward normal n. Known for a circle and a sphere (1/R in every direction) and the
     !! curved side of a cylinder (none along its axis, the first column of its rotation matrix); zero for any other shape, which
@@ -486,7 +499,7 @@ contains
         norm = gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
         accel = patch_ib(gp_patch_id)%accel
         if (patch_ib(gp_patch_id)%moving_ibm > 1) accel = patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass
-        r_w = radial_vector + abs(real(gp%levelset, kind=wp))*norm  ! the wall point, relative to the centroid
+        r_w = f_wall_point(gp, radial_vector)
         call s_cross_product(patch_ib(gp_patch_id)%angular_vel, r_w, w_x_r)
         call s_cross_product(patch_ib(gp_patch_id)%angular_vel, w_x_r, w_x_w_x_r)
         call s_cross_product(patch_ib(gp_patch_id)%angular_accel, r_w, w_x_r)
@@ -519,7 +532,8 @@ contains
         real(wp) :: buf, v_blow_eff
         integer :: q  !< Iterator variable
 
-        ! Calculate velocity of ghost cell
+        ! Calculate velocity of ghost cell; the body's motion is evaluated at the wall point, not the ghost point
+        vel_w = f_wall_velocity(gp_patch_id, f_wall_point(gp, radial_vector))
         if (gp%slip) then
             norm(1:3) = gp%levelset_norm
             buf = sqrt(sum(norm**2))
@@ -527,7 +541,6 @@ contains
             vel_norm_IP = sum(vel_IP*norm)*norm
             vel_GP = vel_IP - vel_norm_IP
             ! add only the component of the IB's motion that is normal to the surface
-            vel_w = f_wall_velocity(gp_patch_id, radial_vector)
             vel_GP = vel_GP + sum(vel_w*norm)*norm
             if (ib_slip_ccst .and. dh /= 0._wp) then
                 ! Total enthalpy held across the wall (ghost normal velocity zero relative to it) sets the tangential speed; the
@@ -539,7 +552,7 @@ contains
                 if (ut2 > sgm_eps .and. ut2_g > 0._wp) vel_GP = vel_w + u_t*min(max(sqrt(ut2_g/ut2), 0.5_wp), 2._wp)
             end if
         else
-            vel_GP = f_wall_velocity(gp_patch_id, radial_vector)
+            vel_GP = vel_w
         end if
 
         ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
