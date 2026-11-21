@@ -4127,6 +4127,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # ./mfc.sh amr_check on the same block: 48 cells put the diaphragm on a coarse face (cell 24), inside the block. One
+        # step, so the core (7 cells from the block edges) is the two cells at the diaphragm. -j 4 is for the chemistry build.
+        chk = ConvergenceSpec(runner=run_amr_check, case_path="examples/1D_reactive_shocktube/case.py", expected_order=0.0, tol=1.0e-8)
+        chk.params = {**amr_chem_mods, "m": 47, "amr_max_grid_size": 64}
+        chk.extra_args = ["--", "-j", "4"]
+        cases.append(define_convergence_case("Convergence -> amr_check -> 1D -> chemistry", chk))
+
         # Chemistry diffusion AMR: species/energy diffusion flux reflux; at np=2 the block boundary is also a rank seam.
         for ppn, label in ((1, "Species Diffusion"), (2, "Species Diffusion -> 2 MPI Ranks")):
             cases.append(
