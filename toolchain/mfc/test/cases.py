@@ -1804,41 +1804,47 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. override_tol: the golden is
             # from Cray Fortran; the GNU/Intel/macOS CI lanes agree with each other to 1e-13 and differ from it by up to 3.2e-5
             # (1 fluid) and 9.1e-6 (2 fluids), abs, in the energy; 3e-4 is ~10x that and far below the 0.13 sign flip it guards.
-            seam_pair = {
-                "ib": "T",
-                "num_ibs": 2,
-                "fd_order": 2,
-                "x_domain%end": 20.0,
-                "y_domain%end": 20.0,
-                "m": 79,
-                "n": 79,
-                "dt": 0.04,
-                "t_step_stop": 100,
-                "t_step_save": 100,
-                "mapped_weno": "T",
-                "mp_weno": "T",
-                "bc_x%beg": -1,
-                "bc_x%end": -1,
-                "bc_y%beg": -1,
-                "bc_y%end": -1,
-                # still, uniform gas in all three (overlapping) patches
-                **{
-                    f"patch_icpp({i})%{k}": v
-                    for i in range(1, 4)
-                    for k, v in [("x_centroid", 10.0), ("y_centroid", 10.0), ("length_x", 20.0), ("length_y", 20.0), ("vel(1)", 0.0), ("pres", 1.0), ("alpha_rho(1)", 1.0)]
-                },
-                "collision_model": 1,
-                "coefficient_of_restitution": 0.9,
-                "collision_time": 0.8,
-                "ib_coefficient_of_friction": 0.1,
-                "ib_friction_slip_eps": 0.003,
-                **{
-                    f"patch_ib({i})%{k}": v
-                    for i, x, ux in [(1, 9.35, 0.3), (2, 10.65, -0.3)]
-                    for k, v in [("geometry", 2), ("x_centroid", x), ("y_centroid", 15.0), ("radius", 0.5), ("slip", "F"), ("moving_ibm", 2), ("mass", 1.0), ("vel(1)", ux)]
-                },
-            }
+            def friction_box(box, bodies, steps, eps, mu, **extra):
+                # still uniform gas in a periodic box of side box (0.25 cells), soft-sphere circles (x, y, vx, vy), mass 1
+                cells = round(box / 0.25) - 1
+                return {
+                    "ib": "T",
+                    "num_ibs": len(bodies),
+                    "fd_order": 2,
+                    "x_domain%end": box,
+                    "y_domain%end": box,
+                    "m": cells,
+                    "n": cells,
+                    "dt": 0.04,
+                    "t_step_stop": steps,
+                    "t_step_save": steps,
+                    "mapped_weno": "T",
+                    "mp_weno": "T",
+                    **{f"bc_{d}%{e}": -1 for d in "xy" for e in ("beg", "end")},
+                    **{
+                        f"patch_icpp({i})%{k}": v
+                        for i in range(1, 4)
+                        for k, v in [("x_centroid", box / 2), ("y_centroid", box / 2), ("length_x", box), ("length_y", box), ("vel(1)", 0.0), ("pres", 1.0), ("alpha_rho(1)", 1.0)]
+                    },
+                    "collision_model": 1,
+                    "coefficient_of_restitution": 0.9,
+                    "collision_time": 0.8,
+                    "ib_coefficient_of_friction": mu,
+                    "ib_friction_slip_eps": eps,
+                    **{
+                        f"patch_ib({i})%{k}": v
+                        for i, (x, y, ux, uy) in enumerate(bodies, 1)
+                        for k, v in [("geometry", 2), ("x_centroid", x), ("y_centroid", y), ("radius", 0.5), ("slip", "F"), ("moving_ibm", 2), ("mass", 1.0), ("vel(1)", ux), ("vel(2)", uy)]
+                    },
+                    **extra,
+                }
+
+            seam_pair = friction_box(20.0, [(9.35, 15.0, 0.3, 0.0), (10.65, 15.0, -0.3, 0.0)], 100, 0.003, 0.1)
             cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=3e-4))
+            # Wall site: a circle pressed into the slip wall y = 0 at 0.1 with a 1e-4 slide. Without ib_friction_slip_eps the friction
+            # force flips sign every step with magnitude mu*|F_n|; with it the slide dies out.
+            wall_slide = friction_box(10.0, [(5.0, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=3e-4))
             cases.append(
                 define_case_d(
                     stack,
