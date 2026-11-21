@@ -2259,7 +2259,7 @@ class CaseValidator:
         self.prohibit(amr_max_blocks is not None and amr_max_blocks < 1, "amr_max_blocks must be >= 1")
         self.prohibit(
             amr_max_grid_size is not None and amr_max_grid_size < 0,
-            "amr_max_grid_size must be >= 0 (0 derives the block size cap from the decomposition)",
+            "amr_max_grid_size must be >= 0 (0 is the default cap of 32 coarse cells)",
         )
         self.prohibit(
             amr_max_grid_size is not None and 0 < amr_max_grid_size < 2,
