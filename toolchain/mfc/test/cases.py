@@ -42,18 +42,18 @@ _CONVERGENCE_1D_PERIOD_SCHEMES = [
     ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [64, 128]),
     ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [64, 128]),
 ]
-# AMR, WENO5, one 2:1 block over the central half, period mode on one rank. The coarse/fine interface, not the scheme,
-# sets the order: the measured rate is 2.5-2.6 for a static block with either ghost fill (the quartic fill lowers the
-# error about 5x), lock-step or subcycled. With the blocks following the wave the rate is about 2 (linear) and above 4
-# (quartic), less regular because the regrid interval is fixed in steps.
+# AMR, WENO5, one 2:1 block over the central half, period mode on one rank. With the linear ghost fill the coarse/fine
+# interface sets the order: its second-order ghost values leave a second-order error in the few cells at the interface,
+# so the L2 rate is 2.5 for a static block (lock-step or subcycled) and about 2 with the blocks following the wave. The
+# quartic fill keeps the WENO5 rate for a static block and gives about 4 with regridding (fixed regrid interval in steps).
 _AMR_ARGS = ["--order", "5", "--cfl", "0.02", "--amr"]
 _CONVERGENCE_1D_AMR_SCHEMES = [
     ("AMR -> static linear", _AMR_ARGS, 2.5, 0.2, [32, 64, 128]),
-    ("AMR -> static quartic", _AMR_ARGS + ["--amr-prolong", "2"], 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> static quartic", _AMR_ARGS + ["--amr-prolong", "2"], 5, 0.3, [32, 64, 128]),
     ("AMR -> subcycle linear", _AMR_ARGS + ["--amr-subcycle"], 2.5, 0.2, [32, 64, 128]),
-    ("AMR -> subcycle quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-subcycle"], 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> subcycle quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-subcycle"], 5, 0.3, [32, 64, 128]),
     ("AMR -> regrid linear", _AMR_ARGS + ["--amr-regrid", "10"], 2.0, 0.3, [64, 128, 256]),
-    ("AMR -> regrid quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-regrid", "10"], 3.5, 0.5, [64, 128, 256]),
+    ("AMR -> regrid quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-regrid", "10"], 4.0, 0.5, [64, 128, 256]),
 ]
 
 _CONVERGENCE_2D_SCHEMES = [
@@ -3885,8 +3885,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
-                # Wall-bounded thermostat: its golden differed by up to 7e-3 between AMD and NVIDIA GPUs after five steps (the isothermal
-                # wall and the controller both go through the 1e-6 temperature solve), so it is checked by hand: the Nu = 7.541 runs.
+                # Registered below at its own size (the 25-cell cap does not fit the 32-cell gap); Nu = 7.541 is checked by check_nu.py.
                 "2D_thermal_channel",
                 "2D_spatial_reacting_mixing_layer",
                 "3D_reacting_mixing_layer",
@@ -4841,6 +4840,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 override_tol=1e-6,
             )
         )
+
+    # Thermally developed plane channel (mean_temp_wall), first 100 steps, 32 x 25 cells; the developed state and Nu = 7.541 (WENO5)
+    # are checked by examples/2D_thermal_channel/check_nu.py. The golden uses non-mapped WENO3 with weno_eps = 1e-6: with the
+    # example's mapped WENO5 and weno_eps = 1e-16, round-off in the weights moves the wall-row transverse momentum by 2-3 % between GNU
+    # -O3 and debug builds within 20 steps. With these settings GNU 13 double -O3, reldebug and debug agree to 5e-8 (-O3 repeats
+    # bitwise) and an AMD MI250X (Cray Fortran, OpenMP offload) run and an AMD CPU build (amdflang) differ from the GNU golden by 8e-8 and 6e-8, so 1e-6 leaves a factor 12.
+    # Single precision differs from double by 4e-4: skipped there (label "Chemistry", test.py).
+    channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "weno_avg": "F", "t_step_stop": 100, "t_step_save": 100}
+    cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=channel_mods, override_tol=1e-6))
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.

@@ -16,7 +16,7 @@ import rich.table
 from rich.panel import Panel
 
 from .. import common, sched
-from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
+from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, _compiler_version, build
 from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
 from ..gpu_diagnostics import (
     GPU_FAULT_MARKER,
@@ -271,6 +271,22 @@ def _filter_only(cases, skipped_cases):
     return cases, skipped_cases
 
 
+# Cases with a known GPU-only result difference on NVHPC < 25.11 (CPU builds and 25.11+ pass): the pinned Phoenix compiler
+# is 25.5. The cause is not identified, so the skip is reported per case and tolerances stay untouched. See
+# https://github.com/MFlowCode/MFC/issues/2181
+NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972"}
+NVHPC_GPU_FIXED_VERSION = (25, 11)
+
+
+def nvhpc_gpu_known_difference(uuid: str, gpu: str, fc_version: str) -> bool:
+    """True if `uuid` is a known difference for a GPU build with `fc_version` (first line of `FC --version`).
+
+    An unparsable or non-nvfortran version never matches, so the case runs.
+    """
+    match = re.match(r"nvfortran\s+(\d+)\.(\d+)", fc_version)
+    return uuid in NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS and gpu != "no" and bool(match) and (int(match[1]), int(match[2])) < NVHPC_GPU_FIXED_VERSION
+
+
 def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
     cases = cases_[:]
     selected_cases = []
@@ -362,6 +378,14 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
             skip = ["Gauss Seidel"]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
+
+    fc = os.environ.get("FC", "").split(maxsplit=1)
+    fc_version = _compiler_version(fc[0]) if fc and ARG("gpu") != "no" else ""
+    for case in cases[:]:
+        if nvhpc_gpu_known_difference(case.get_uuid(), ARG("gpu"), fc_version):
+            cons.print(f"[yellow]skipped {case.get_uuid()} ({case.trace}): known difference on NVHPC < 25.11 GPU, see #2181[/yellow]")
+            cases.remove(case)
+            skipped_cases.append(case)
 
     # Skip tests that fail under nvfortran in Docker (pass natively/Apptainer):
     #  - 3D_rayleigh_taylor_muscl: segfaults with nvfortran+MPI (seccomp/mprotect)
