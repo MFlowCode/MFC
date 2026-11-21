@@ -991,7 +991,7 @@ answer is wrong, or one backend diverges from all the others.
   in review of PR #2329 and was hardened. Give each private scalar a safe default, and clamp
   or guard any array index taken from a marker id that can be `<= 0`. To find candidates, run
   ``grep -nE 'if \(.*\) [a-z_]+ = ' src/simulation/*.fpp``; it over-matches (about 260 hits on
-  the tree at the time of writing, mostly host code), so each hit inside a GPU loop needs a
+  the tree at the time of writing), so each hit inside a GPU loop needs a
   human check of its context.
 - **Run `GPU_UPDATE(device=...)` and `GPU_ENTER_DATA` of static module data only after the
   rank is bound to its GPU.** `s_mpi_initialize` (`src/common/m_mpi_common.fpp`) updated
