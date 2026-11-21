@@ -4120,6 +4120,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # amr_tag_var = 6: the block starts away from the diaphragm (cell 24) and regrids onto its temperature jump.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Reactive Shocktube AMR -> Tag Temperature",
+                "examples/1D_reactive_shocktube/case.py",
+                [],
+                mods={**amr_chem_mods, "amr_block_beg(1)": 4, "amr_block_end(1)": 11, "amr_regrid_int": 2, "amr_buf": 2, "amr_tag_var": 6, "amr_max_grid_size": 64},
+                override_tol=10 ** (-8),
+            )
+        )
+
         # Chemistry diffusion AMR: species/energy diffusion flux reflux; at np=2 the block boundary is also a rank seam.
         for ppn, label in ((1, "Species Diffusion"), (2, "Species Diffusion -> 2 MPI Ranks")):
             cases.append(
@@ -6488,6 +6499,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         weak.update({"patch_icpp(1)%pres": 1.0, "patch_icpp(2)%pres": 1.2, "patch_icpp(3)%pres": 1.0, "amr_tag_eps": 0.05, "amr_tag_var": 4})
         stack.push("AMR -> 1D -> tag pressure", {**amr_1d_base, "amr_regrid_int": 2, "amr_buf": 2, **weak})
         cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        # Gresho vortex (hcid 202, uniform density) over the whole domain: tagged on the vorticity. The core and the outer ring reach
+        # past the initial block; level 2 (the sensor on the fine blocks) keeps the core only, where |curl u|*dx is largest.
+        vortex = {"patch_icpp(3)%x_centroid": 0.5, "patch_icpp(3)%length_x": 1.0, "patch_icpp(3)%alter_patch(1)": "T", "patch_icpp(3)%alter_patch(2)": "T"}
+        vortex.update({"patch_icpp(3)%hcid": 202, "patch_icpp(3)%alpha_rho(1)": 1.0, "patch_icpp(3)%vel(2)": 0.8})
+        vortex.update({"amr_tag_var": 5, "amr_tag_eps": 0.05, "amr_max_level": 2, "amr_max_blocks": 32})
+        stack.push("AMR -> 2D -> tag vorticity", {**amr_2d_base, **tag_regrid, **vortex})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}))
         stack.pop()
 
         # 3D paths the list above leaves out: the rank seam under regrid, the subcycled registers, and a two-level hierarchy

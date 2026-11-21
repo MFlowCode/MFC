@@ -748,6 +748,7 @@ def _load():
     _r("amr_tag_eps", REAL)
     _r("amr_tag_abs", LOG)
     _r("amr_tag_var", INT)
+    _r("amr_tag_species", INT)
     _r("amr_place_owner", LOG)
     _r("amr_buf", INT)
     _r("amr_snap", INT)
@@ -1599,6 +1600,7 @@ _nv(
     "amr_tag_eps",
     "amr_tag_abs",
     "amr_tag_var",
+    "amr_tag_species",
     "amr_place_owner",
     "amr_buf",
     "amr_snap",
