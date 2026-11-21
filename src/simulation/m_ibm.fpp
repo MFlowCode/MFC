@@ -246,8 +246,6 @@ contains
         $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad, &
                      & ib_smooth_contact, ib_slip_ccst]')
 
-        if (collision_model > 0) call s_initialize_collisions_module()
-
     end subroutine s_initialize_ibm_module
 
     !> Initializes the values of various IBM variables, such as ghost points and image points.
@@ -3249,7 +3247,7 @@ contains
         end if
 
         call nvtxStartRange("APPLY-COLLISION-FORCES")
-        call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+        call s_apply_IB_collisions(ghost_points, num_gps, ib_markers, forces, torques)
         call nvtxEndRange
 
         ! reduce the forces across local neighborhood ranks
@@ -4224,7 +4222,6 @@ contains
             @:DEALLOCATE(ib_markers_prev%sf)
         end if
         call s_finalize_ib_patches()
-        if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
         if (allocated(ib_nbrs)) deallocate (ib_nbrs, ib_send_counts, ib_reqs, ib_stats, ib_send_bufs, ib_recv_bufs)
 #endif

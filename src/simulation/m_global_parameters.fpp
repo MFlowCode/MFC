@@ -654,7 +654,7 @@ contains
         collision_temporal_resolution = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
-        ib_coefficient_of_friction = dflt_real
+        coefficient_of_friction = 0._wp
         ib_state_wrt = .false.
         rank_time_wrt = .false.
         amr = .false.
@@ -1295,7 +1295,7 @@ contains
 
         logical :: two_way, qs_fluct, added_mass
 
-        two_way = particle_params%coupling == coupling_two_way
+        two_way = particle_params%coupling /= coupling_one_way  ! four-way also projects sources onto the fluid
         qs_fluct = particle_params%qs_fluct_force
         added_mass = particle_params%added_mass_force > 0
 
