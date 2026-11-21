@@ -140,6 +140,8 @@ contains
         !            bub_pp guard, lag_params guard, chem_params guard
         #:include 'generated_bcast.fpp'
 
+        call s_mpi_bcast_icpp_patches
+
         ! manual: m_glb, n_glb, p_glb (computed in s_read_input_file, not namelist-bound)
         call MPI_BCAST(m_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(n_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)

@@ -57,7 +57,7 @@ module m_start_up
     use m_igr
     use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
     use m_amr_regrid, only: s_amr_regrid
-    use m_amr_stage, only: s_amr_relax_fine
+    use m_amr_stage, only: s_amr_relax_fine, s_amr_apply_ic_patches
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
@@ -67,10 +67,15 @@ module m_start_up
 
     private; public :: s_read_input_file, s_check_input_file, s_read_data_files, s_read_serial_data_files, &
         & s_read_parallel_data_files, s_initialize_internal_energy_equations, s_initialize_modules, s_initialize_gpu_vars, &
-        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics
+        & s_amr_start_fresh_blocks, s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, &
+        & s_save_performance_metrics
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
+
+    !> AMR: the fine level was prolonged from level 0 at start-up (no restart file), so the first step regrids onto the initial
+    !! features
+    logical :: amr_fresh_start = .false.
 
 contains
 
@@ -999,6 +1004,7 @@ contains
         ! restarts restore the saved fine state; otherwise prolong from coarse
         call s_read_amr_restart(amr_restored)
         if (.not. amr_restored) call s_populate_amr_fine(q_cons_ts(1)%vf)
+        amr_fresh_start = amr .and. .not. amr_restored
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
@@ -1209,6 +1215,23 @@ contains
         #:endif
 
     end subroutine s_initialize_gpu_vars
+
+    !> Fresh AMR run, before the first save: put the initial condition patches on the blocks and, under dynamic regrid, regrid once
+    !! per level, so each level is tagged on the one above it.
+    impure subroutine s_amr_start_fresh_blocks
+
+        integer :: i
+
+        if (.not. amr_fresh_start) return
+        call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+        if (amr_regrid_int > 0) then
+            do i = 1, amr_max_level
+                call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+            end do
+        end if
+
+    end subroutine s_amr_start_fresh_blocks
 
     !> Read the Lagrangian bubbles or particles this rank starts with: the input-file rows (and their global IDs) on a fresh start,
     !! otherwise the restart-file rows, which also reset mytime and dt.
@@ -1693,6 +1716,8 @@ contains
             do i = 1, n_nbrs
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                @:PROHIBIT(num_ibs + recv_counts(i) > num_local_ibs_max, &
+                           & "Owned plus neighboring IBs on a rank exceed num_local_ibs_max, which sizes ib_box and ib_face_ft. Use more ranks or increase num_local_ibs_max.")
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i))%owner_rank = nbr_ranks(i)
                 num_ibs = num_ibs + recv_counts(i)

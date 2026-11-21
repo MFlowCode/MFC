@@ -10,8 +10,17 @@ AMR adds refined rectangular blocks on top of the base grid (level 0) where the 
 interfaces, wakes, bodies. The base grid is advanced by the ordinary solver; refined blocks run the same solver on
 their own grids, nested up to `amr_max_level` levels at `amr_ref_ratio`:1 per level.
 
-With `amr_regrid_int > 0`, every `amr_regrid_int` steps the blocks are rebuilt around the cells where the density
-gradient exceeds `amr_tag_eps`. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the density gradient exceeds `amr_tag_eps`:
+once per level before the first step of a fresh run, so they start on the initial features, and then every
+`amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+
+On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
+that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
+smoothed initial condition, old data), the simulation prints a note and the blocks start from data interpolated from
+level 0. The step-0 files are pre_process's level-0 data: under a block the run starts from the average of the fine
+data instead, which differs from them where a patch varies within a coarse cell. For a smooth analytic profile
+sampled at cell centers that difference is second order in the cell width; an expression that is the exact cell
+average (it may use `dx`) agrees on every level.
 
 AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overlay the blocks. Internals:
 @subpage amr_implementation.
@@ -50,8 +59,9 @@ a uniform state stays uniform with regrid on. Interiors keep the WENO order; the
 order (linear) or higher (quartic). For a smooth wave crossing a static block, the measured global rate is about 2.5 with
 either fill (the quartic fill lowers the error about 5x), against 5 for WENO5 on a uniform grid; the
 `Convergence -> 1D -> AMR` tests track it. Results do not depend on message timing, and agree across rank counts to round-off
-when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the block size cap, and therefore the box set, depends
-on the decomposition).
+when `amr_max_grid_size` is set. With `amr_max_grid_size = 0` they also agree as long as half of every rank's subdomain
+holds the default 32-cell block; below that, and with immersed bodies, the block size cap and therefore the box set depend
+on the decomposition.
 
 ## Parallelism {#amr-parallel}
 
@@ -107,7 +117,7 @@ Full descriptions: @ref case.
 | `amr_buf` | 3 | Padding around tagged cells, coarse cells (>= 1 with regrid) |
 | `amr_cluster_eff` | 0.7 | Minimum tag efficiency of a clustered box |
 | `amr_blocking_factor` | 4 | Minimum box width, coarse cells |
-| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition |
+| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 is 32, or half the rank subdomain if that is smaller (with immersed bodies, half the rank subdomain) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
 | `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: one level only) |
@@ -157,14 +167,14 @@ against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lo
 - **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
   blast's 54% would need a far larger grid.
 - **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
-- **Accuracy.** In the droplet runs AMR halved the L1 difference from the uniform fine solution (2.5e-4 against 5.0e-4
-  at the 512^2 base), not more: the fine block's initial data is interpolated from level 0, so a sharp initial
-  interface starts at the coarse resolution.
+- **Accuracy.** In the droplet runs the AMR solution reproduces the uniform fine one: the L1 density difference from
+  it is 6.1e-8 at the 512^2 base, against 5.0e-4 for the uniform 512^2 grid. The blocks cover the interface from the
+  first step and start from the patches evaluated at the fine resolution.
 
 ## Limitations {#amr-limitations}
 
-- **Block size.** A block spans at most about half a rank's subdomain per dimension unless `amr_max_grid_size` is set;
-  larger features are covered by several blocks.
+- **Block size.** A block spans at most 32 coarse cells and at most about half a rank's subdomain per dimension unless
+  `amr_max_grid_size` is set; larger features are covered by several blocks.
 - **Restart.** `parallel_io` restarts work on any rank count when `amr_max_grid_size` is set; otherwise restart on no
   more ranks than wrote the checkpoint. The serial format needs the rank count that wrote it.
   The file header records `amr_ref_ratio`, `amr_max_level` and the storage precision, which must match (the level count may

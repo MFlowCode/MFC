@@ -265,6 +265,7 @@ module m_derived_types
         integer                             :: m, n, p                 !< Last cell index in each direction
         real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc        !< Cell centers, from index 0
         real(wp)                            :: dx_min, dy_min, dz_min  !< Smallest cell widths
+        logical                             :: hardcoded = .false.     !< The pre_process grid that hard-coded patches (hcid) assume
     end type ic_grid
 
     !> Defines parameters for a Model Patch

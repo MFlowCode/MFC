@@ -235,7 +235,7 @@ class TestCaseDictsIntegration(unittest.TestCase):
 
         # Verify target-specific filtering based on Fortran namelists
         self.assertIn("num_patches", pre_keys)
-        self.assertNotIn("num_patches", sim_keys)
+        self.assertIn("num_patches", sim_keys)
         self.assertNotIn("num_patches", post_keys)
 
         self.assertNotIn("run_time_info", pre_keys)
@@ -244,7 +244,8 @@ class TestCaseDictsIntegration(unittest.TestCase):
 
         # Verify indexed params are filtered correctly
         self.assertIn("patch_icpp(1)%geometry", pre_keys)
-        self.assertNotIn("patch_icpp(1)%geometry", sim_keys)
+        self.assertIn("patch_icpp(1)%geometry", sim_keys)
+        self.assertNotIn("patch_icpp(1)%geometry", post_keys)
 
         # Verify family params (patch_ib) work for simulation target
         self.assertIn("patch_ib(1)%geometry", sim_keys)

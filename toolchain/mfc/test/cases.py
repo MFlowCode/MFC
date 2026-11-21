@@ -4029,6 +4029,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_stl_test",
                 # Registered below at the resolution where the hot-wall NaN appears; the 25-cell cap would not reach it.
                 "3D_ibm_hot_rod",
+                # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
+                "2D_mibm_constant_acceleration",
+                "3D_mibm_wall_collision",
             ]
             if path in casesToSkip:
                 continue
@@ -4590,6 +4593,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
+    # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history
+    # (velocity and centroid) and the cons fields. Regenerate it whenever a default in the moving-body numerics changes (the first
+    # golden went stale when ib_mass_relax became the default for moving bodies, and every CI lane then differed from it by the same
+    # 3.6e-5). Against a golden generated on the current master, GNU, Intel, NVHPC and macOS CI lanes agree to 1e-13 absolute on the
+    # fields and 5e-9 relative on ib_forces entries, so 1e-6 is two to three orders above the observed spread and still fails a wrong
+    # stage weight (a 1e-3 position error). The checker script validates the physics; the golden is a regression guard. Skipped in the
+    # single-precision lane (see test.py).
+    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Constant Acceleration", "examples/2D_mibm_constant_acceleration/case.py", mods={"parallel_io": "F"}, override_tol=1e-6))
+
+    # Soft-sphere wall collision (collision_model = 1) in air at 1e5 Pa: a normal impact at e = 0.8 and a 50 degree impact that slides.
+    # The contact begins half a step into a step so no compiler can move it by one. The sticking regime is left to check_collision.py:
+    # where the contact point stops sliding, the friction direction is the sign of a velocity that goes to zero, so the rebound depends
+    # on round-off. Against goldens generated on the current master, the CI lanes agree to 1e-14 absolute on the fields and 5e-9
+    # relative on the contact force (1e-9 on tiny entries), so 1e-6 leaves two orders of margin and still fails a one-step shift of the
+    # contact (order 1e-2). Regenerate the goldens whenever a default in the moving-body numerics changes.
+    for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
+        cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
+
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
         define_case_f(
@@ -4624,6 +4646,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Thermal Layer",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
+            # the golden keeps seven decimals: one last-digit flip on a value near 750 is 1.3e-10 (seen with Intel)
+            override_tol=1e-9,
         )
     )
 
@@ -6059,6 +6083,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Force-driven (moving_ibm = 2): the body decelerates on that force, so its velocity in D/ib_forces.dat guards the same path
         force_driven = {"patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.0628, "ib_state_wrt": "T", "ib_force_wrt": "T"}
         cases.append(define_case_d(stack, "force-driven", force_driven))
+        # The same on two ranks: the block is owned whole by one rank and spans the rank boundary, so it has to fit in half a
+        # subdomain (hence the finer grid and smaller body)
+        two_rank = {"m": 127, "n": 127, "patch_ib(1)%radius": 0.05, "patch_ib(1)%mass": 0.0157}
+        two_rank.update({"amr_block_beg(1)": 50, "amr_block_end(1)": 73, "amr_block_beg(2)": 53, "amr_block_end(2)": 76})
+        cases.append(define_case_d(stack, "force-driven -> 2 MPI Ranks", {**force_driven, **two_rank}, ppn=2))
         # Two prescribed-motion bodies: exercises the multi-body fine-IB rebuild for moving bodies
         stack.push(
             "two bodies",
@@ -6518,6 +6547,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # m = 51: a 26-cell axis split over two ranks is below the WENO5 floor
         cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 51}, ppn=2))
         cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
+        # Two levels under regrid, through a restart. A level-2 child lies in its parent inset by amr_cpat_mar = 3 coarse cells
+        # per side, and a 26-cell axis caps a block at 13, so only the middle 7 cells of a parent can refine: the slabs' blocks
+        # are thinner than that in z, or tiled across the interface. Nested cubes (coarse cells 10..15 and 12..13) instead get one
+        # parent, 7..18, whose window is the outer cube.
+        cubes = {f"patch_icpp({i})%length_{d}": w / 26 for i, w in ((1, 26), (2, 6), (3, 2)) for d in "xyz"}
+        cubes.update({f"patch_icpp({i})%z_centroid": 0.5 for i in (1, 2, 3)})
+        cubes.update({f"patch_icpp({i})%alter_patch({j})": "T" for i, j in ((2, 1), (3, 1), (3, 2))})
+        cases.append(define_case_d(stack, "multi-level restart", {**cubes, "amr_max_level": 2}, restart_check=True))
         stack.pop()
         stack.push("AMR -> 3D -> multi-level static", {**amr_3d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))

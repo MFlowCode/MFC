@@ -228,8 +228,10 @@ The following variables are available in IC patch expressions:
 | `z`       | `z_cc(k)`                | `lz`      | The patch's `length_z`    | `zc`      | The patch's `z_centroid` |
 | `eps`     | The patch's `epsilon`    | `beta`    | The patch's `beta`        | `radii`   | The patch's `radii`      |
 | `tau_e`   | The patch's `tau_e`      | `r`       | The patch's `radius`      | `pi`      | \f$\pi\f$ (Fortran constant from `m_constants`) |
+| `dx`      | Smallest cell width in x | `dy`      | Smallest cell width in y  | `dz`      | Smallest cell width in z |
 
 where $(i,j,k)$ are the grid-indices of the current cell in each coordinate direction.
+`dx`, `dy` and `dz` are the widths of the grid being filled, so on an AMR fine block they are the block's.
 
 The allowed functions are the standard Fortran intrinsics:
 `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`,
@@ -966,7 +968,7 @@ uniform Cartesian grid.
 | `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
 | `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
 | `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |
-| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition (default 0) |
+| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 is 32, or half the rank subdomain if smaller (default 0) |
 | `amr_max_blocks`        | Integer | Maximum number of blocks (default 1024) |
 | `amr_max_level`         | Integer | Number of refined levels (default 1) |
 | `amr_ref_ratio`         | Integer | Refinement ratio, 2 or 4; 4 allows one level (default 2) |

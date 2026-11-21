@@ -1496,6 +1496,11 @@ _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "
 _nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
+# Initial condition patch inputs: read by pre_process and simulation, declared
+# everywhere because their defaults and broadcast live in common modules
+_IC_PATCH_INPUTS = ("num_patches", "patch_icpp", "sigV", "dist_type", "rhoRV", "mixlayer_vel_profile", "mixlayer_vel_coef", "files_dir", "file_extension")
+_nv(_PRE_SIM, *_IC_PATCH_INPUTS)
+_decl(_ALL, *_IC_PATCH_INPUTS)
 _nv(
     _SIM,
     "dt",
@@ -1644,12 +1649,7 @@ _nv(
     "loops_y",
     "loops_z",
     "n_start_old",
-    "num_patches",
-    "patch_icpp",
     "patch_bc",
-    "sigV",
-    "dist_type",
-    "rhoRV",
     "old_grid",
     "old_ic",
     "perturb_flow",
@@ -1658,8 +1658,6 @@ _nv(
     "perturb_sph",
     "perturb_sph_fluid",
     "fluid_rho",
-    "mixlayer_vel_profile",
-    "mixlayer_vel_coef",
     "mixlayer_perturb",
     "mixlayer_perturb_nk",
     "mixlayer_perturb_k0",
@@ -1667,8 +1665,6 @@ _nv(
     "elliptic_smoothing_iters",
     "simplex_perturb",
     "simplex_params",
-    "files_dir",
-    "file_extension",
     "viscous",
 )
 _nv(

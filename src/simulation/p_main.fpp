@@ -42,6 +42,7 @@ program p_main
 
     call nvtxStartRange("INIT-GPU-VARS")
     call s_initialize_gpu_vars()
+    call s_amr_start_fresh_blocks()
     call nvtxEndRange
 
     ! Setting the time-stepper to the first time-step mytime is set by s_initialize_modules
