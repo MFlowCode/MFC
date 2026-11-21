@@ -990,7 +990,8 @@ answer is wrong, or one backend diverges from all the others.
   `if (wc_on(c) == 1)`) turned up in the heat-booking loop of `s_accumulate_ib_face_fluxes`
   in review of PR #2329 and was hardened. Give each private scalar a safe default, and clamp
   or guard any array index taken from a marker id that can be `<= 0`. To find candidates, run
-  ``grep -nE 'if \(.*\) [a-z_]+ = ' src/simulation/*.fpp``; each hit inside a GPU loop needs a
+  ``grep -nE 'if \(.*\) [a-z_]+ = ' src/simulation/*.fpp``; it over-matches (about 260 hits on
+  the tree at the time of writing, mostly host code), so each hit inside a GPU loop needs a
   human check of its context.
 - **Run `GPU_UPDATE(device=...)` and `GPU_ENTER_DATA` of static module data only after the
   rank is bound to its GPU.** `s_mpi_initialize` (`src/common/m_mpi_common.fpp`) updated
@@ -1002,12 +1003,12 @@ answer is wrong, or one backend diverges from all the others.
   deterministic difference between `-g 0` and `-g 0 2`. AMD CI hides it because each rank sees
   one GPU and the binding is a no-op. Test a 2-rank GPU change with both ranks on one GPU and
   on two GPUs. The fix is #2371.
-- **A CI result that looks like a code failure can be the harness.** The Phoenix NVHPC lanes
-  timed out, rather than failed, for months: the suite needs about 7.5 h against a 3.5 h
-  limit. A Phoenix timeout or `Submitting batch file for Interactive failed` is no result for
-  the PR. An NVHPC version difference (25.5 vs 25.11) makes chemistry test `124D7972` differ
-  by 1.8% (issue #2181), so a new-compiler lane that disagrees with a golden file is not yet
-  evidence of a regression.
+- **A CI result that looks like a code failure can be the harness.** A Phoenix lane that hits
+  its Slurm time limit, or a launch failure such as `Submitting batch file for Interactive
+  failed`, is no result for the PR: check the job log for `TIMEOUT` before reading it as a code
+  failure. At the time of writing, NVHPC 25.5 and 25.11 differ by 1.8% on chemistry test
+  `124D7972` (issue #2181), so a lane on another compiler version that disagrees with a golden
+  file is not yet evidence of a regression.
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 
