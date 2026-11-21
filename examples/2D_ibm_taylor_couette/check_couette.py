@@ -12,8 +12,9 @@ on the inner body per unit depth T = -4 pi mu B (the outer wall receives +4 pi m
 Quantities: L2 = rms of (u_theta - exact) / (Omega R) over the fluid cells (centre more than half a cell from both walls); its
 azimuthal-mean part (error averaged in bins of one cell width in r) and the rest; the torque on each wall from the face fluxes
 (mean over the last 10 % of the force history) relative to the exact value; the wall angular velocity from a cubic fit to the
-cells within 0.5 to 4 cells of the inner wall, relative to Omega; the shear from the same fit, with and without the fit's own
-error on the exact profile ("net"); the change of u_theta over the last save interval. Exits 1 if L2 exceeds --tol.
+cells within 0.5 to 4 cells of the inner wall, relative to Omega; the inner-wall shear from local cubic fits at 96 wall points
+(rms relative error, the same fit applied to the exact profile, and their difference, "net"); the change of u_theta over the
+last save interval. Exits 1 if L2 exceeds --tol.
 """
 
 import argparse
@@ -70,11 +71,34 @@ def velocity_field(case_dir, step, dx):
     return rho[:, 0] - 0.5 * dx, rho[:, 1] - 0.5 * dx, rho[:, 2], mx[:, 2] / rho[:, 2], my[:, 2] / rho[:, 2]
 
 
-def wall_fit(s, w, dx, deg=3, lo=0.5, hi=4.0):
-    """Polynomial fit of w against the wall distance s over lo dx < s < hi dx; returns the value and slope at s = 0."""
-    k = (s > lo * dx) & (s < hi * dx)
-    c = np.polynomial.polynomial.polyfit(s[k], w[k], deg)
-    return c[0], c[1]
+BASIS = [(i, j) for i in range(4) for j in range(4) if i + j <= 3]  # cubic in the wall-normal and tangential distances
+
+
+def inner_wall_shear(x, y, ut, ut_exact, dx, s_exact, n_points=96):
+    """Shear S = r d(u_theta/r)/dr at the inner wall from local cubic least-squares fits to the fluid cells within 3.5 to 5 cells of
+    each of n_points wall points. Returns the rms over the points of (S - S_exact)/|S_exact| for the run and for the exact
+    profile (the fit's own error), and of their difference (the solution's own error; the fit is linear)."""
+    r, out = np.hypot(x, y), {"run": [], "exact": []}
+    fluid = (r > R) & (r < R2)
+    for a in (np.arange(n_points) + 0.5) * 2.0 * np.pi / n_points:
+        nx, ny = np.cos(a), np.sin(a)
+        xw, yw = R * nx, R * ny
+        for rho in (3.5, 4.0, 4.5, 5.0):  # grow the fit radius until the fit is well conditioned
+            m = fluid & (np.hypot(x - xw, y - yw) <= rho * dx)
+            if m.sum() < len(BASIS) + 4:
+                continue
+            s_, t_ = ((x[m] - xw) * nx + (y[m] - yw) * ny) / dx, (-(x[m] - xw) * ny + (y[m] - yw) * nx) / dx
+            design = np.stack([s_**i * t_**j for i, j in BASIS], axis=1)
+            if np.linalg.cond(design) < 1e5:
+                break
+        else:
+            continue
+        for key, field in (("run", ut), ("exact", ut_exact)):
+            c = np.linalg.lstsq(design, field[m], rcond=None)[0]
+            out[key].append((c[BASIS.index((1, 0))] / dx - c[0] / R - s_exact) / abs(s_exact))
+    run, exact = np.array(out["run"]), np.array(out["exact"])
+    rms = lambda v: math.sqrt(np.mean(v**2))
+    return rms(run), rms(exact), rms(run - exact)
 
 
 def analyze(case_dir):
@@ -98,14 +122,11 @@ def analyze(case_dir):
     prof = np.array([err[ok & (idx == b)].mean() if (ok & (idx == b)).any() else np.nan for b in range(nb)])
     out["L2_mean"] = math.sqrt(np.nanmean(prof**2))
     out["L2_rest"] = math.sqrt(np.mean((err[ok] - prof[idx[ok]]) ** 2))
-    # inner wall: angular velocity and shear from a cubic fit, on the run and on the exact profile (the fit's own error)
+    # inner wall: angular velocity from a cubic fit to the azimuthal-mean cells within 0.5 to 4 cells of it, and the local-fit shear
     w = ut / np.maximum(r, 1e-30)
-    we = A + B / np.maximum(r, 1e-30) ** 2
-    s_exact = -2.0 * B / R**2
-    (w0, dw), (w0e, dwe) = (wall_fit(r - R, f, dx) for f in (w, we))
-    out["w_wall_err"] = (w0 - om) / om
-    out["shear_err"] = R * dw / s_exact - 1.0
-    out["shear_net_err"] = R * (dw - dwe) / s_exact
+    near = (r - R > 0.5 * dx) & (r - R < 4.0 * dx)
+    out["w_wall_err"] = (np.polynomial.polynomial.polyfit(r[near] - R, w[near], 3)[0] - om) / om
+    out["shear_rms"], out["shear_fit_rms"], out["shear_net_rms"] = inner_wall_shear(x, y, ut, A * r + B / np.maximum(r, 1e-30), dx, -2.0 * B / R**2)
     if len(st) > 1:
         _, _, _, u0, v0 = velocity_field(case_dir, st[-2], dx)
         ut0 = (-u0 * y + v0 * x) / np.maximum(r, 1e-30)
@@ -126,7 +147,7 @@ if __name__ == "__main__":
     print(f"  L2 / (Omega R)          {o['L2']:.3e}  (azimuthal mean {o['L2_mean']:.3e}, rest {o['L2_rest']:.3e})")
     print(f"  torque error            inner {o['T_inner_err']:+.3e}  outer {o['T_outer_err']:+.3e}")
     print(f"  inner wall speed error  {o['w_wall_err']:+.3e}  (cubic fit)")
-    print(f"  inner wall shear error  {o['shear_err']:+.3e}  (cubic fit), net of the fit's own error {o['shear_net_err']:+.3e}")
+    print(f"  inner wall shear error  rms {o['shear_rms']:.3e} (local cubic fits at 96 wall points), the fit's own error {o['shear_fit_rms']:.3e}, net {o['shear_net_rms']:.3e}")
     if "change_last_save" in o:
         print(f"  change over the last save interval {o['change_last_save']:.2e} (steady state when small)")
     sys.exit(0 if o["L2"] <= a.tol else 1)
