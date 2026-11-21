@@ -913,5 +913,119 @@ class TestAssembleSiloVarFilter(unittest.TestCase):
             self.assertNotIn(other_vars[0], filtered.variables)
 
 
+# Tests: interactive.py helpers
+
+
+class TestLogTransform(unittest.TestCase):
+    def test_log_true_returns_log10_and_range(self):
+        import numpy as np
+
+        from . import interactive as m
+
+        tf, cmin, cmax = m._log_transform(True, 1.0, 1000.0)
+        np.testing.assert_array_equal(tf(np.array([-1.0, 0.0, 1.0, 100.0])), [np.nan, np.nan, 0.0, 2.0])
+        self.assertEqual((cmin, cmax), (0.0, 3.0))
+
+    def test_log_false_returns_identity(self):
+        import numpy as np
+
+        from . import interactive as m
+
+        arr = np.array([-1.0, 0.0, 5.0])
+        tf, cmin, cmax = m._log_transform(False, 2.0, 9.0)
+        self.assertIs(tf(arr), arr)
+        self.assertEqual((cmin, cmax), (2.0, 9.0))
+
+    def test_log_true_clamps_zero_vmin_to_floor(self):
+        import numpy as np
+
+        from . import interactive as m
+
+        self.assertEqual(m._LOG_FLOOR, 1e-300)
+        self.assertAlmostEqual(m._log_transform(True, 0.0, 1.0)[1], np.log10(m._LOG_FLOOR))
+
+
+class TestMesh3Key(unittest.TestCase):
+    ARGS = (1, "pres", "isosurface", True, 0.1, 0.9, 0.2, 0.8, 3, 0.0, 1.0)
+
+    def test_key_holds_the_11_fields_in_order(self):
+        from . import interactive as m
+
+        key = m._Mesh3Key(*self.ARGS)
+        self.assertEqual(key, self.ARGS)
+        self.assertEqual(hash(key), hash(self.ARGS))
+        self.assertEqual((key.step, key.var, key.iso_n, key.vol_max_frac), (1, "pres", 3, 1.0))
+
+    def test_changing_any_field_changes_the_key(self):
+        from . import interactive as m
+
+        base = m._Mesh3Key(*self.ARGS)
+        for i in range(len(self.ARGS)):
+            with self.subTest(field=i):
+                self.assertNotEqual(m._Mesh3Key(*self.ARGS[:i], object(), *self.ARGS[i + 1 :]), base)
+
+    def test_get_cached_mesh_takes_the_key(self):
+        from . import interactive as m
+
+        key = m._Mesh3Key(*self.ARGS)
+        with m._mesh3_lock:
+            m._mesh3_cache[key] = "mesh"
+        self.addCleanup(m._mesh3_cache.pop, key, None)
+        self.assertEqual(m._get_cached_3d_mesh(key), "mesh")
+
+    def test_prefetch_mesh_takes_the_key(self):
+        import time
+        import types
+
+        import numpy as np
+
+        from . import interactive as m
+
+        grid = np.arange(6, dtype=float)
+        ad = types.SimpleNamespace(variables={"v": np.linspace(0.1, 1.0, 216).reshape(6, 6, 6)}, x_cc=grid, y_cc=grid, z_cc=grid)
+        key = m._Mesh3Key(1, "v", "volume", False, 0.0, 1.0, 0.2, 0.8, 3, 0.25, 0.75)
+        for cache in (m._mesh3_cache, m._ds3_cache):
+            cache.clear()
+            self.addCleanup(cache.clear)
+        m._prefetch_3d_mesh(key, lambda s: ad)
+        deadline = time.time() + 10
+        while m._mesh3_in_flight and time.time() < deadline:
+            time.sleep(0.01)
+        result = m._mesh3_cache.get(key)
+        self.assertIsNotNone(result, "prefetch did not store a result under the key")
+        self.assertEqual(result[1:3], (0.25, 0.75))
+
+
+class TestStatusDiv(unittest.TestCase):
+    def test_children_text_and_colors(self):
+        from . import interactive as m
+
+        children = m._status_div(7, (4, 5), 1.5, 2.5).children
+        self.assertEqual(len(children), 7)
+        self.assertIsInstance(children[2], m.html.Br)
+        shown = [c for i, c in enumerate(children) if i != 2]
+        self.assertEqual([c.children for c in shown], ["step 7", "  ·  shape (4, 5)", "min ", "1.5", "  max ", "2.5"])
+        self.assertEqual([c.style["color"] for c in shown], [m._YELLOW, m._MUTED, m._MUTED, m._BLUE, m._MUTED, m._RED])
+
+    def test_min_max_use_4_significant_digits(self):
+        from . import interactive as m
+
+        children = m._status_div(0, (1,), 0.123456, 12345.6).children
+        self.assertEqual([children[4].children, children[6].children], ["0.1235", "1.235e+04"])
+
+
+class TestTurboJPEGFallback(unittest.TestCase):
+    def test_missing_native_library_falls_back_to_pillow(self):
+        import importlib
+        from unittest import mock
+
+        from . import interactive as m
+
+        self.addCleanup(importlib.reload, m)
+        with mock.patch("turbojpeg.TurboJPEG", side_effect=RuntimeError("Unable to locate turbojpeg library")):
+            importlib.reload(m)
+        self.assertIsNone(m._tj)
+
+
 if __name__ == "__main__":
     unittest.main()

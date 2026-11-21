@@ -15,7 +15,7 @@ import math
 import sys
 import threading
 import time
-from typing import Callable, List, Optional
+from typing import Callable, List, NamedTuple, Optional
 
 import numpy as np
 import plotly.graph_objects as go
@@ -32,13 +32,14 @@ logger = logging.getLogger(__name__)
 
 # PyTurboJPEG wraps libjpeg-turbo via ctypes. TurboJPEG() opens the native
 # shared library at instantiation time; on HPC clusters where libjpeg-turbo
-# is not in LD_LIBRARY_PATH it raises OSError even if the pip package is
-# installed. Fall back to Pillow in that case.
+# is not in LD_LIBRARY_PATH it raises OSError (RuntimeError in current
+# PyTurboJPEG) even if the pip package is installed. Fall back to Pillow in
+# that case.
 try:
     from turbojpeg import TurboJPEG as _TurboJPEG  # type: ignore[import]
 
     _tj = _TurboJPEG()
-except (ImportError, OSError):
+except (ImportError, OSError, RuntimeError):
     _tj = None
 
 # Fast PNG generation via 256-entry colormap LUT
@@ -68,6 +69,9 @@ _mesh3_lock = threading.Lock()
 _mesh3_in_flight: set = set()
 _mesh3_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
 _mesh3_pool_lock = threading.Lock()
+
+# Floor for log10 so non-positive values stay finite
+_LOG_FLOOR = 1e-300
 
 
 def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
@@ -264,6 +268,21 @@ def _get_ds3(step, var, raw, x_cc, y_cc, z_cc, max_total):
     return result
 
 
+def _log_transform(log: bool, vmin: float, vmax: float) -> tuple:
+    """Return (transform, cmin, cmax) for a log10 or identity color scale."""
+    if not log:
+
+        def _identity(arr):
+            return arr
+
+        return _identity, vmin, vmax
+
+    def _log10(arr):
+        return np.where(arr > 0, np.log10(np.maximum(arr, _LOG_FLOOR)), np.nan)
+
+    return _log10, float(np.log10(max(vmin, _LOG_FLOOR))), float(np.log10(max(vmax, _LOG_FLOOR)))
+
+
 def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool, max_nx=1200, max_ny=600):
     """Pre-encode JPEG for *step/var* in a background thread.
 
@@ -298,13 +317,8 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool, max_n
             vmax = float(vmax_in) if vmax_in is not None else float(np.nanmax(_rr))
             if vmax <= vmin:
                 vmax = vmin + 1e-10
-            if log_bool:
-                cmin = float(np.log10(max(vmin, 1e-300)))
-                cmax = float(np.log10(max(vmax, 1e-300)))
-                display = np.where(raw > 0, np.log10(np.maximum(raw, 1e-300)), np.nan)
-            else:
-                cmin, cmax = vmin, vmax
-                display = raw.astype(float)
+            _tf, cmin, cmax = _log_transform(log_bool, vmin, vmax)
+            display = _tf(raw) if log_bool else raw.astype(float)
             nx2, ny2 = display.shape
             _sx = max(1, nx2 // max_nx)
             _sy = max(1, ny2 // max_ny)
@@ -322,20 +336,23 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool, max_n
     _get_jpeg_pool().submit(_bg)
 
 
-def _prefetch_3d_mesh(
-    step,
-    var,
-    get_ad_fn,
-    mode,
-    log_bool,
-    vmin_in,
-    vmax_in,
-    iso_min_frac,
-    iso_max_frac,
-    iso_n,
-    vol_min_frac,
-    vol_max_frac,
-):
+class _Mesh3Key(NamedTuple):
+    """3D mesh cache key shared by the prefetch and the lookup."""
+
+    step: int
+    var: str
+    mode: str
+    log_bool: bool
+    vmin_in: Optional[float]
+    vmax_in: Optional[float]
+    iso_min_frac: float
+    iso_max_frac: float
+    iso_n: int
+    vol_min_frac: float
+    vol_max_frac: float
+
+
+def _prefetch_3d_mesh(key, get_ad_fn):
     """Pre-compute 3D isomesh or volume data for *step* in a background thread.
 
     Caches the result so the next playback frame can skip marching cubes.
@@ -347,7 +364,7 @@ def _prefetch_3d_mesh(
     callback recomputes at full 500K resolution.  The cache key omits
     the budget so the coarse entry is replaced on the full-res recompute.
     """
-    key = (step, var, mode, log_bool, vmin_in, vmax_in, iso_min_frac, iso_max_frac, iso_n, vol_min_frac, vol_max_frac)
+    step, var, mode, log_bool, vmin_in, vmax_in, iso_min_frac, iso_max_frac, iso_n, vol_min_frac, vol_max_frac = key
     with _mesh3_lock:
         if key in _mesh3_cache or key in _mesh3_in_flight:
             return
@@ -374,19 +391,7 @@ def _prefetch_3d_mesh(
             vmax = float(vmax_in) if vmax_in is not None else float(np.nanmax(_rr))
             if vmax <= vmin:
                 vmax = vmin + 1e-10
-            if log_bool:
-
-                def _tf(arr):
-                    return np.where(arr > 0, np.log10(np.maximum(arr, 1e-300)), np.nan)
-
-                cmin = float(np.log10(max(vmin, 1e-300)))
-                cmax = float(np.log10(max(vmax, 1e-300)))
-            else:
-
-                def _tf(arr):
-                    return arr
-
-                cmin, cmax = vmin, vmax
+            _tf, cmin, cmax = _log_transform(log_bool, vmin, vmax)
             rng = cmax - cmin if cmax > cmin else 1.0
 
             if mode == "isosurface":
@@ -415,21 +420,8 @@ def _prefetch_3d_mesh(
     _get_mesh3_pool().submit(_bg)
 
 
-def _get_cached_3d_mesh(
-    step,
-    var,
-    mode,
-    log_bool,
-    vmin_in,
-    vmax_in,
-    iso_min_frac,
-    iso_max_frac,
-    iso_n,
-    vol_min_frac,
-    vol_max_frac,
-):
+def _get_cached_3d_mesh(key):
     """Return cached 3D mesh result or None if not yet computed."""
-    key = (step, var, mode, log_bool, vmin_in, vmax_in, iso_min_frac, iso_max_frac, iso_n, vol_min_frac, vol_max_frac)
     with _mesh3_lock:
         return _mesh3_cache.get(key)
 
@@ -594,6 +586,21 @@ def _num(sid, placeholder="auto"):
             "boxSizing": "border-box",
             "colorScheme": "dark",
         },
+    )
+
+
+def _status_div(step, shape, dmin, dmax) -> html.Div:
+    """Return the status line: step, array shape, and data min/max."""
+    return html.Div(
+        [
+            html.Span(f"step {step}", style={"color": _YELLOW}),
+            html.Span(f"  ·  shape {shape}", style={"color": _MUTED}),
+            html.Br(),
+            html.Span("min ", style={"color": _MUTED}),
+            html.Span(f"{dmin:.4g}", style={"color": _BLUE}),
+            html.Span("  max ", style={"color": _MUTED}),
+            html.Span(f"{dmax:.4g}", style={"color": _RED}),
+        ]
     )
 
 
@@ -1736,6 +1743,21 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         log = bool(log_chk and "log" in log_chk)
         cmap = cmap or "viridis"
 
+        # 3D mesh cache key, shared by the prefetches and lookups below
+        mesh_key = _Mesh3Key(
+            step,
+            selected_var,
+            mode,
+            log,
+            vmin_in,
+            vmax_in,
+            float(iso_min_frac or 0.2),
+            float(iso_max_frac or 0.8),
+            int(iso_n or 3),
+            float(vol_min_frac or 0.0),
+            float(vol_max_frac or 1.0),
+        )
+
         # Eagerly pre-load the next steps in the background so that
         # navigation feels instant after the structure cache is warm.
         # prefetch_one is a no-op if the key is already cached or in-flight.
@@ -1771,20 +1793,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                         )
                     elif ad.ndim == 3 and mode in ("isosurface", "volume"):
                         _sv = selected_var
-                        _prefetch_3d_mesh(
-                            _ns,
-                            _sv,
-                            lambda s, sv=_sv: _step_cache.load((s, sv), lambda k: read_one_var_func(k[0], k[1])),
-                            mode,
-                            log,
-                            vmin_in,
-                            vmax_in,
-                            float(iso_min_frac or 0.2),
-                            float(iso_max_frac or 0.8),
-                            int(iso_n or 3),
-                            float(vol_min_frac or 0.0),
-                            float(vol_max_frac or 1.0),
-                        )
+                        _prefetch_3d_mesh(mesh_key._replace(step=_ns), lambda s, sv=_sv: _step_cache.load((s, sv), lambda k: read_one_var_func(k[0], k[1])))
             except (ValueError, IndexError):
                 pass
         else:
@@ -1803,20 +1812,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                             log,
                         )
                     elif ad.ndim == 3 and mode in ("isosurface", "volume"):
-                        _prefetch_3d_mesh(
-                            _ns,
-                            selected_var,
-                            lambda s: _step_cache.load(s, read_func),
-                            mode,
-                            log,
-                            vmin_in,
-                            vmax_in,
-                            float(iso_min_frac or 0.2),
-                            float(iso_max_frac or 0.8),
-                            int(iso_n or 3),
-                            float(vol_min_frac or 0.0),
-                            float(vol_max_frac or 1.0),
-                        )
+                        _prefetch_3d_mesh(mesh_key._replace(step=_ns), lambda s: _step_cache.load(s, read_func))
             except (ValueError, IndexError):
                 pass
 
@@ -1848,21 +1844,8 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         if vmax <= vmin:
             vmax = vmin + 1e-10
 
-        if log:
-
-            def _tf(arr):
-                return np.where(arr > 0, np.log10(np.maximum(arr, 1e-300)), np.nan)
-
-            cmin = float(np.log10(max(vmin, 1e-300)))
-            cmax = float(np.log10(max(vmax, 1e-300)))
-            cbar_title = f"log\u2081\u2080({selected_var})"
-        else:
-
-            def _tf(arr):
-                return arr
-
-            cmin, cmax = vmin, vmax
-            cbar_title = selected_var
+        _tf, cmin, cmax = _log_transform(log, vmin, vmax)
+        cbar_title = f"log\u2081\u2080({selected_var})" if log else selected_var
 
         _t_prep = time.perf_counter()
 
@@ -1886,23 +1869,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             try:
                 _kfig = go.Figure()
                 _iso_solid_k = (iso_solid_color or "#89b4fa") if (iso_solid_chk and "solid" in iso_solid_chk) else None
-                _cached_k = (
-                    _get_cached_3d_mesh(
-                        step,
-                        selected_var,
-                        mode,
-                        log,
-                        vmin_in,
-                        vmax_in,
-                        float(iso_min_frac or 0.2),
-                        float(iso_max_frac or 0.8),
-                        int(iso_n or 3),
-                        float(vol_min_frac or 0.0),
-                        float(vol_max_frac or 1.0),
-                    )
-                    if mode == "isosurface"
-                    else None
-                )
+                _cached_k = _get_cached_3d_mesh(mesh_key) if mode == "isosurface" else None
                 _ktrace, _ktitle = _build_3d(
                     ad,
                     raw,
@@ -1968,17 +1935,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f"  kaleido={_t_kal - _t_fig:.3f}s"
                     f"  total={_t_kal - _t0:.3f}s [KALEIDO][/dim]"
                 )
-                status_k = html.Div(
-                    [
-                        html.Span(f"step {step}", style={"color": _YELLOW}),
-                        html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                        html.Br(),
-                        html.Span("min ", style={"color": _MUTED}),
-                        html.Span(f"{dmin_k:.4g}", style={"color": _BLUE}),
-                        html.Span("  max ", style={"color": _MUTED}),
-                        html.Span(f"{dmax_k:.4g}", style={"color": _RED}),
-                    ]
-                )
+                status_k = _status_div(step, raw.shape, dmin_k, dmax_k)
                 _now_k = time.perf_counter()
                 _last_update_t[0] = _now_k
                 _server_k = _now_k - _t0
@@ -2022,19 +1979,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     ilo = cmin + rng3 * float(iso_min_frac or 0.2)
                     ihi = cmin + rng3 * max(float(iso_max_frac or 0.8), ilo + 0.01)
                     # Try pre-computed mesh first, fall back to computing now
-                    _cached = _get_cached_3d_mesh(
-                        step,
-                        selected_var,
-                        mode,
-                        log,
-                        vmin_in,
-                        vmax_in,
-                        float(iso_min_frac or 0.2),
-                        float(iso_max_frac or 0.8),
-                        int(iso_n or 3),
-                        float(vol_min_frac or 0.0),
-                        float(vol_max_frac or 1.0),
-                    )
+                    _cached = _get_cached_3d_mesh(mesh_key)
                     if _cached is not None:
                         vx, vy, vz, fi, fj, fk, intens = _cached
                         _cache_hit = True
@@ -2072,19 +2017,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     patch["data"][0]["opacity"] = float(iso_opacity or 1.0)
                 else:  # volume
                     # Try pre-computed volume data first
-                    _cached = _get_cached_3d_mesh(
-                        step,
-                        selected_var,
-                        mode,
-                        log,
-                        vmin_in,
-                        vmax_in,
-                        float(iso_min_frac or 0.2),
-                        float(iso_max_frac or 0.8),
-                        int(iso_n or 3),
-                        float(vol_min_frac or 0.0),
-                        float(vol_max_frac or 1.0),
-                    )
+                    _cached = _get_cached_3d_mesh(mesh_key)
                     if _cached is not None:
                         vf, vlo, vhi, _, _ = _cached
                         _cache_hit = True
@@ -2117,17 +2050,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f"  patch={_t_trace - _t_prep:.3f}s [PATCH-3D{'·HIT' if _cache_hit else ''}]"
                     f"  total={_t_trace - _t0:.3f}s[/dim]"
                 )
-                status = html.Div(
-                    [
-                        html.Span(f"step {step}", style={"color": _YELLOW}),
-                        html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                        html.Br(),
-                        html.Span("min ", style={"color": _MUTED}),
-                        html.Span(f"{dmin3:.4g}", style={"color": _BLUE}),
-                        html.Span("  max ", style={"color": _MUTED}),
-                        html.Span(f"{dmax3:.4g}", style={"color": _RED}),
-                    ]
-                )
+                status = _status_div(step, raw.shape, dmin3, dmax3)
                 _now = time.perf_counter()
                 _last_update_t[0] = _now
                 # Patch path: browser overhead is low (no figure rebuild).
@@ -2139,19 +2062,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             _iso_solid = (iso_solid_color or "#89b4fa") if (iso_solid_chk and "solid" in iso_solid_chk) else None
             _cached_primary = None
             if mode == "isosurface":
-                _cached_primary = _get_cached_3d_mesh(
-                    step,
-                    selected_var,
-                    mode,
-                    log,
-                    vmin_in,
-                    vmax_in,
-                    float(iso_min_frac or 0.2),
-                    float(iso_max_frac or 0.8),
-                    int(iso_n or 3),
-                    float(vol_min_frac or 0.0),
-                    float(vol_max_frac or 1.0),
-                )
+                _cached_primary = _get_cached_3d_mesh(mesh_key)
             # During playback, use a smaller cell budget for faster marching
             # cubes (~1s instead of ~4.5s).  Full resolution when paused.
             _iso_3d_budget = 50_000 if _playing else 500_000
@@ -2467,17 +2378,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f"  payload={len(png_src) // 1024}KB"
                     f"  total={_t_trace - _t0:.3f}s[/dim]"
                 )
-                status = html.Div(
-                    [
-                        html.Span(f"step {step}", style={"color": _YELLOW}),
-                        html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                        html.Br(),
-                        html.Span("min ", style={"color": _MUTED}),
-                        html.Span(f"{dmin:.4g}", style={"color": _BLUE}),
-                        html.Span("  max ", style={"color": _MUTED}),
-                        html.Span(f"{dmax:.4g}", style={"color": _RED}),
-                    ]
-                )
+                status = _status_div(step, raw.shape, dmin, dmax)
                 _last_update_t[0] = time.perf_counter()
                 return patch, status, no_update, _SRV_HIDE, _GRAPH_SHOW
 
@@ -2623,17 +2524,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             f"  layout={_t_layout - _t_trace:.3f}s"
             f"  total={_t_layout - _t0:.3f}s[/dim]"
         )
-        status = html.Div(
-            [
-                html.Span(f"step {step}", style={"color": _YELLOW}),
-                html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                html.Br(),
-                html.Span("min ", style={"color": _MUTED}),
-                html.Span(f"{dmin:.4g}", style={"color": _BLUE}),
-                html.Span("  max ", style={"color": _MUTED}),
-                html.Span(f"{dmax:.4g}", style={"color": _RED}),
-            ]
-        )
+        status = _status_div(step, raw.shape, dmin, dmax)
 
         _now = time.perf_counter()
         _last_update_t[0] = _now
