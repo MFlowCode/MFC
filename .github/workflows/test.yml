@@ -368,8 +368,8 @@ jobs:
     # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
     # fail without blocking PR merges.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
-    # Includes SLURM queue wait. Kept under 24h, when GITHUB_TOKEN expires.
-    timeout-minutes: 1380
+    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
+    timeout-minutes: 480
     strategy:
       fail-fast: false
       matrix:
@@ -517,8 +517,8 @@ jobs:
     needs: [lint-gate, file-changes]
     # Frontier is non-blocking for the same reason as the self job above.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
-    # Includes SLURM queue wait. Kept under 24h, when GITHUB_TOKEN expires.
-    timeout-minutes: 1380
+    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
+    timeout-minutes: 480
     strategy:
       fail-fast: false
       matrix:
@@ -615,9 +615,7 @@ jobs:
             prebuild-case-optimization-*.out
             run-case-optimization-*.out
 
-  # Phoenix (GT) runs on pushes to master, not on every PR push: its free GPU queue
-  # is preemptible and often hours long, and every PR already compiles with NVHPC
-  # above. A PR opts in with the 'ci:phoenix' label, read on its next push or reopen.
+  # Phoenix (GT) runs on pushes to master and on every non-draft PR, like Frontier.
   phoenix:
     name: "${{ matrix.kind == 'case-opt' && 'Case Opt | ' || '' }}Georgia Tech | Phoenix (NVHPC) (gpu-${{ matrix.interface }})"
     needs: [lint-gate, file-changes]
@@ -627,11 +625,9 @@ jobs:
       needs.file-changes.result == 'success' &&
       github.repository == 'MFlowCode/MFC' &&
       needs.file-changes.outputs.checkall == 'true' &&
-      (github.event_name != 'pull_request' ||
-       (github.event.pull_request.draft != true &&
-        contains(github.event.pull_request.labels.*.name, 'ci:phoenix')))
-    # Includes SLURM queue wait (hours even under the charged 'inferno' QOS when the GPUs are full). Kept under 24h, when GITHUB_TOKEN expires.
-    timeout-minutes: 1380
+      (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
+    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
+    timeout-minutes: 540
     strategy:
       fail-fast: false
       matrix:

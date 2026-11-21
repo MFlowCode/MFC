@@ -192,3 +192,18 @@ def test_compiler_fingerprint_tells_wrappers_apart_by_version(tmp_path, monkeypa
     gnu = compiler_fingerprint()
     monkeypatch.setenv("WRAPPED_COMPILER", "nvfortran")
     assert compiler_fingerprint() != gnu
+
+
+def test_compiler_fingerprint_probes_each_compiler_once(tmp_path, monkeypatch):
+    """Slugs are computed many times per case; a probe per call cost over an hour of a Phoenix CI job."""
+    calls = tmp_path / "calls"
+    wrapper = tmp_path / "mpifort"
+    wrapper.write_text(f'#!/bin/sh\necho x >> "{calls}"\necho "wrapped 1.0"\n')
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    monkeypatch.setenv("FC", "mpifort")
+    monkeypatch.delenv("CC", raising=False)
+    monkeypatch.delenv("CXX", raising=False)
+
+    assert len({compiler_fingerprint() for _ in range(3)}) == 1
+    assert calls.read_text().count("x") == 1
