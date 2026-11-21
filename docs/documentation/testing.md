@@ -19,6 +19,7 @@ A test is considered passing when our error tolerances are met in order to maint
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
 - `--no-examples` skips the testing of cases in the examples folder
 - `--no-chemistry` skips every case that uses chemistry (``chemistry = 'T'``), including reacting example cases
+- Cases with a known GPU-only difference on NVHPC < 25.11 (`NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS` in `toolchain/mfc/test/test.py`, tracked in #2181) are skipped on GPU builds with an old `nvfortran`, with a visible reason line; tolerances are not widened. CPU builds and other compilers run them.
 - `--no-build` runs against existing binaries without rebuilding. Some cases (chemistry, analytic initial conditions) need their own build, which `./mfc.sh build` does not produce; build everything the suite needs with `./mfc.sh test --dry-run <options>`. If any required binary is missing, `--no-build` stops before running any case and lists what is missing.
 - `--rdma-mpi` runs additional tests where RDMA MPI is enabled.
 

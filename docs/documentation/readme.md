@@ -8,6 +8,7 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 - @ref running "Running" - How to run simulations (interactive, batch, GPU)
 - @ref case "Case Files" - Setting up input files
 - @ref testing "Testing" - Running the test suite
+- @ref validation "Validation" - Comparisons with exact solutions and reference data
 
 ## Reference
 
