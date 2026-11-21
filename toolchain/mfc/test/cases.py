@@ -4098,7 +4098,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Constant-volume H2/air ignition (T0 = 1200 K) through the ignition and into the burnt state with the split integrator; the
         # uniform box has no fluxes, so the run is smooth and does not amplify cross-compiler round-off. compare_cantera.py checks the
         # ignition delay and T(t) against a Cantera reactor. Golden: GNU 13 double; NVHPC 25.11 (A100) agrees to 2e-12, NVHPC 25.5
-        # differs by 4.8e-4 relative in minor species (issue 2181).
+        # differs by up to 1e-3 relative in minor species (issue 2181; expected to differ on 25.5).
         cases.append(define_case_f("1D -> Chemistry -> H2-Air Ignition -> Split Reactions", "examples/1D_h2_air_ignition/case.py", ["--T0", "1200", "--dt", "2e-8", "--tend", "1e-4", "--nsaves", "5"]))
 
         # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
