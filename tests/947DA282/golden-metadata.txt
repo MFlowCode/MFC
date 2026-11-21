@@ -1,53 +1,19 @@
-This file was created on 2026-11-21 08:00:43.333530.
+This file was created on 2026-11-21 08:37:29.484402.
 
 mfc.sh:
 
-    Invocation: test --no-gpu --no-mpi --no-chemistry --single --generate -j 4 --only 947DA282 F935DA03
-    Lock:       mpi=No & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=Yes & mixed=No & fastmath=No
-    Git:        615348a25ad9624fd01d7426c5306c564216813a on f03-tsc-annulus (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.24.2 on tuolumne1029
-    
-        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
-        Fortran : LLVMFlang v24.0.0 (/p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : OFF
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /p/lustre5/bryngelson1/mfc-reacting/.worktrees/w96-f03/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
-        FC       : /p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --no-gpu --no-mpi --no-reldebug --no-chemistry --no-debug --single --generate -j 4 --only 947DA282 F935DA03
+    Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=Yes & mixed=No & fastmath=No
+    Git:        ba17875cb21767c1d9621987466a2d51db785173 on f03-tsc-annulus (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.24.2 on tuolumne1029
+        CMake v3.24.2 on tuolumne1025
     
-        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
-        Fortran : LLVMFlang v24.0.0 (/p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
+        C       : GNU v13.3.1 (/usr/tce/bin/gcc)
+        Fortran : GNU v13.3.1 (/usr/tce/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -63,13 +29,47 @@ pre_process:
         Fypp    : /p/lustre5/bryngelson1/mfc-reacting/.worktrees/w96-f03/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
-        FC       : /p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
+        CC       : /usr/tce/bin/gcc
+        CXX      : /usr/tce/bin/g++
+        FC       : /usr/tce/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tuolumne1025
+    
+        C       : GNU v13.3.1 (/usr/tce/bin/gcc)
+        Fortran : GNU v13.3.1 (/usr/tce/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /p/lustre5/bryngelson1/mfc-reacting/.worktrees/w96-f03/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/tce/bin/gcc
+        CXX      : /usr/tce/bin/g++
+        FC       : /usr/tce/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -78,10 +78,10 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.24.2 on tuolumne1029
+        CMake v3.24.2 on tuolumne1025
     
-        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
-        Fortran : LLVMFlang v24.0.0 (/p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
+        C       : GNU v13.3.1 (/usr/tce/bin/gcc)
+        Fortran : GNU v13.3.1 (/usr/tce/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -97,13 +97,13 @@ syscheck:
         Fypp    : /p/lustre5/bryngelson1/mfc-reacting/.worktrees/w96-f03/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
-        FC       : /p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
+        CC       : /usr/tce/bin/gcc
+        CXX      : /usr/tce/bin/g++
+        FC       : /usr/tce/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -129,7 +129,7 @@ CPU:
     CPU MHz:             3700.000
     CPU max MHz:         3700.0000
     CPU min MHz:         1500.0000
-    BogoMIPS:            7400.54
+    BogoMIPS:            7400.50
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K

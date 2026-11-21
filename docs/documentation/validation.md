@@ -78,6 +78,10 @@ python3 examples/3D_mibm_wall_collision/check_collision.py examples/3D_mibm_wall
 The small cases run in the test suite as `2D -> IBM -> Moving Circle -> Constant Acceleration` and `3D -> IBM -> Wall Collision -> Normal` and `-> Sliding Friction`.
 The tables above were measured with GNU 13.3 (CPU, one rank). The golden tolerance is 1e-6 for both. Against goldens generated on the current master, the GNU, Intel, NVHPC and macOS CI lanes agreed to 1e-13 absolute on the fields and 5e-9 relative on the contact force; the checker scripts validate the physics, and the golden is a regression guard. Both tests are skipped in the single-precision lane. The sticking case is checked by `check_collision.py` and is not a golden, because the friction direction there depends on round-off.
 
+## Other families
+
+- @ref validation_tsc_annulus "Isothermal conduction annulus": image-point interpolation (inverse distance and TSC) against the exact radial conduction solution.
+
 ## Adding a section
 
 One `##` section per family, with an anchor `{#sec-validation-<family>}`: status and code version, one setup table per check, the reference and how it was obtained, a results table with signed errors, and the limits.
