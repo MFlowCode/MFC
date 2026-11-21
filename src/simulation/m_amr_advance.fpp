@@ -80,7 +80,7 @@ contains
         call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
         loc_cur = amr_loc_of(amr_cur)
         call s_amr_br_load(loc_cur)
-        call s_ibm_correct_state(amr_cons_br, q_prim_b, pb_in, mv_in)
+        call s_ibm_correct_state(amr_cons_br, q_prim_b, pb_in, mv_in, amr_block_level(amr_cur))
         loc_cur = amr_loc_of(amr_cur)
         call s_amr_br_store(loc_cur)
         call s_ibm_restore_from_fine(amr_cur)
