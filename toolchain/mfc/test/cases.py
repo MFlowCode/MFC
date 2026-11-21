@@ -2813,6 +2813,52 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for _ in range(6):
                 stack.pop()
 
+        # Plane Poiseuille channel, no-slip walls, impulsive start, constant mu: weno_Re_flux_compact removes the wall-row velocity
+        # sawtooth of the WENO viscous gradient. The option-off behaviour is covered by the existing weno_Re_flux goldens.
+        if len(dimInfo[0]) == 2:
+            mu, ny, dy, u0 = 0.02, 32, 1.0 / 32, 0.02
+            channel = {
+                "m": 24,
+                "n": ny - 1,
+                "x_domain%end": 25 * dy,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "dt": 0.4 * dy / (1.0 + u0),
+                "t_step_stop": 440,
+                "t_step_save": 440,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -16,
+                "bc_y%end": -16,
+                "viscous": "T",
+                "weno_order": 5,
+                "mapped_weno": "T",
+                "weno_Re_flux": "T",
+                "weno_avg": "T",
+                "weno_Re_flux_compact": "T",
+                "riemann_solver": 1,
+                "fluid_pp(1)%gamma": 2.5,
+                "fluid_pp(1)%Re(1)": 1.0 / mu,
+                "mean_dpdx(1)": -12.0 * mu * u0,
+                **{
+                    f"patch_icpp({i})%{key}": val
+                    for i in (1, 2, 3)  # the three default patches all hold the same uniform state
+                    for key, val in {
+                        "geometry": 3,
+                        "x_centroid": 12.5 * dy,
+                        "y_centroid": 0.5,
+                        "length_x": 25 * dy,
+                        "length_y": 1.0,
+                        "vel(1)": u0,
+                        "vel(2)": 0.0,
+                        "pres": 1.0 / 1.4,
+                        "alpha_rho(1)": 1.0,
+                        "alpha(1)": 1.0,
+                    }.items()
+                },
+            }
+            cases.append(define_case_d(stack, "Viscous Channel -> weno_Re_flux -> weno_Re_flux_compact", channel, override_tol=1e-6))
+
     def alter_particles(dimInfo):
         # Lagrangian solid particles; input/particles.dat is written by create_input_particles
         ndims = len(dimInfo[0])

@@ -28,7 +28,8 @@ module m_viscous
     use m_hb_function
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
-        & s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, s_finalize_viscous_module
+        & s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, s_compact_normal_viscous_gradients, &
+        & s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -1205,6 +1206,52 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compact_ib_viscous_gradient
+
+    !> weno_Re_flux_compact: set the face-normal velocity gradient (direction id) on every face to the difference across the face.
+    !! The WENO chain (face values, cell gradient, reconstructed gradient, face mean) has zero damping at the checkerboard
+    !! wavenumber, which leaves a no-slip wall's odd-mirror forcing undamped. The face j+1/2 is read by the viscous flux from dqR(j)
+    !! and dqL(j+1), so both are set. Tangential gradients are unchanged.
+    subroutine s_compact_normal_viscous_gradients(q_prim_vf, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
+
+        type(scalar_field), dimension(sys_size), intent(in)                           :: q_prim_vf
+        integer, intent(in)                                                           :: id
+        type(scalar_field), dimension(eqn_idx%mom%beg:eqn_idx%mom%end), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
+        integer                                                                       :: i
+
+        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+            if (id == 1) call s_compact_normal_viscous_gradient(q_prim_vf(i), id, x_cc, dqL_x(i), dqR_x(i))
+            if (id == 2 .and. n > 0) call s_compact_normal_viscous_gradient(q_prim_vf(i), id, y_cc, dqL_y(i), dqR_y(i))
+            if (id == 3 .and. p > 0) call s_compact_normal_viscous_gradient(q_prim_vf(i), id, z_cc, dqL_z(i), dqR_z(i))
+        end do
+
+    end subroutine s_compact_normal_viscous_gradients
+
+    !> One velocity component of s_compact_normal_viscous_gradients; cc holds the cell centres along id.
+    subroutine s_compact_normal_viscous_gradient(q, id, cc, dqL, dqR)
+
+        type(scalar_field), intent(in)               :: q
+        integer, intent(in)                          :: id
+        real(wp), dimension(-buff_size:), intent(in) :: cc
+        type(scalar_field), intent(inout)            :: dqL, dqR
+        integer                                      :: j, k, l, ja, kb, lc, ic
+        real(wp)                                     :: g
+
+        ja = merge(1, 0, id == 1); kb = merge(1, 0, id == 2); lc = merge(1, 0, id == 3)
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ic, g]', copyin='[ja, kb, lc]')
+        do l = -lc, p
+            do k = -kb, n
+                do j = -ja, m
+                    ic = j*ja + k*kb + l*lc
+                    g = (q%sf(j + ja, k + kb, l + lc) - q%sf(j, k, l))/(cc(ic + 1) - cc(ic))
+                    dqR%sf(j, k, l) = g
+                    dqL%sf(j + ja, k + kb, l + lc) = g
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compact_normal_viscous_gradient
 
     !> Finalize the viscous module
     impure subroutine s_finalize_viscous_module()

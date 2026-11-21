@@ -500,6 +500,7 @@ contains
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
+        weno_Re_flux_compact = .false.
         riemann_hypo_ADC = .false.
         ADC_kappa = 1.0_wp
         hll_u_interface = .false.
