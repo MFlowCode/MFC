@@ -9,6 +9,8 @@ Every check has an example in `examples/` with a checker script and a README, an
 Status words: **validated** (agrees with the reference within the stated error), **partially validated** (agrees where measured; a regime or quantity is open), **open discrepancy** (disagrees, cause known or not), **comparison only** (reference data are qualitative).
 Errors are (MFC − reference)/reference.
 
+Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
+
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
 **Status:** validated. **Code:** `master` at 067f23074, with the stage-consistent position update of [#2040](https://github.com/MFlowCode/MFC/pull/2040). **Examples:** `examples/2D_mibm_constant_acceleration`, `examples/3D_mibm_wall_collision`.
