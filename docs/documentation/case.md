@@ -366,6 +366,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `ib_wall_order`       | Integer | Ghost velocity at no-slip walls: 1 default (wall value, with the `ib_second_order_vel` mirror if set), 2 two-probe quadratic wall-normal fill. |
 | `ib_mass_relax`       | Integer | Immersed-boundary mass conservation: N > 0 returns each body's spurious gas mass over about N steps; 0 off; -1 (default) auto, see below. |
 | `ib_uncover_fill`     | Logical | A cell a moving body uncovers takes the mean density, species and pressure of its fluid neighbours instead of its stale ghost state (`model_eqns = 2`, HLLC, Cartesian, no `amr`). |
+| `wall_column_dt_frac` | Real    | Wall columns: largest fraction of a near-wall cell's heat span a step's column drain may take, a time-step limit (`WCOL`; default 0.1). |
 | `ib_smooth_contact`   | Logical | HLLC only: blend the tangential interface velocity of the viscous work across the contact wave (the sign of the contact speed is arbitrary where it is round-off). |
 | `ib_visc_compact`     | Logical | With `weno_Re_flux`, compact velocity gradients on the viscous faces within two cells of a body. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
@@ -381,6 +382,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `rho_solid`, `cp_solid` | Real | Solid density [kg/m³] and heat capacity [J/kg/K] (`thermal_bc = 3`). |
 | `emissivity`, `T_rad` | Real   | Surface emissivity and radiative surroundings temperature [K] (`thermal_bc = 3`; default 0, no radiation). |
 | `heat_power`         | Real    | Heat supplied to the body [W; W/m per unit depth in 2D], e.g. Joule heating (`thermal_bc = 3`). |
+| `wall_column`        | Logical | Sub-grid wall conduction column per first-layer ghost of a fixed, inert `thermal_bc = 1` circle or sphere (default F). |
+| `wall_column_len`    | Real    | Column length L [m]; the column spans max(3h, L) (default 0: 0.15 `radius`). |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `mass`               | Real    | Body mass; must be > 0 for `moving_ibm = 2`, whose acceleration is force/mass. |
@@ -448,6 +451,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` (the initial temperature when `thermal_bc = 3`) and must be positive in that case. With chemistry it must also be within `T_surface_min` = 200 K and `T_surface_max` = 5000 K (`m_constants.fpp`), the range of the NASA polynomial fits.
 
 - `thermal_layer` = δ > 0 starts the gas around a `thermal_bc = 1` or `3` circle (geometry 2) or sphere (geometry 8) in the conduction solution for a wall brought to `Twall` (the initial `Twall` for `thermal_bc = 3`) a time t₀ = δ²/(4α) earlier: T = T∞ + (`Twall` − T∞)(R/r)^((d−1)/2) erfc((r − R)/δ), with pressure and composition unchanged. It is exact for a sphere and the leading-order term for a cylinder. Without it a hot wall meets ambient gas as a temperature step at t = 0, and the near-wall cells heat faster than they can expand; on coarse grids that transient can drive the state non-physical. Resolve δ with a few cells: the profile is evaluated at the cell centres, not cell-averaged, so the cell-mean density differs from it by O((h/δ)²), about 1 % at δ = 2 cells. Where layers overlap, the IB with the largest temperature change sets the cell, and periodic directions use the nearest image.
+
+- `wall_column` = T gives each first-layer ghost of the wall a one-dimensional low-Mach conduction column along the wall normal, from the wall at `Twall` to a distance max(3h, `wall_column_len`), with the body's curvature, frozen composition and the gas temperature and pressure at its top (a Lagrange probe). The ghost's conduction temperature (see `thermal_bc = 1` above) mirrors the first gas cell's temperature, which carries at most about 2λΔT/h through the face, far below the flux of a wall layer thinner than a cell. The column advances once per step from the state of the step's first stage; its step-mean wall flux enters the gas as one equivalent conduction temperature per ghost, with the diffusion flux's own face conductivity and the steady radial weight of each gas face. A one-sided guard cuts the drain of a gas cell colder than the column averaged over its own area (zero in steady state). With `ib_heat_wrt` the body books the column's flux: the gas faces' flux plus the guard's cut. `wall_column_dt_frac` adds a time-step limit (`WCOL`) that keeps a step's column drain within that fraction of a near-wall cell's heat span. The option requires `chemistry`, `chem_params%%diffusion`, `chem_params%%transport_model = 1`, `surface_reaction = 0`, fixed bodies, no AMR, and `cfl_adap_dt` or `cfl_const_dt`. The default F leaves every result unchanged.
 
 - `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 

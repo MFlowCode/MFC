@@ -696,6 +696,7 @@ contains
         ib_ip_interp = 1
         ib_wall_order = 1
         ib_mass_relax = -1
+        wall_column_dt_frac = 0.1_wp
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
         ib_uncover_fill = .false.
@@ -887,6 +888,8 @@ contains
             patch_ib(i)%emissivity = 0._wp
             patch_ib(i)%T_rad = 0._wp
             patch_ib(i)%heat_power = 0._wp
+            patch_ib(i)%wall_column = .false.
+            patch_ib(i)%wall_column_len = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp

@@ -57,6 +57,7 @@
             "m_particle_cloud",
             "m_igr",
             "m_ib_patches",
+            "m_ib_wall_column",
             "m_compute_levelset"
         ]
     },
