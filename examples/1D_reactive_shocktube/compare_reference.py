@@ -10,7 +10,7 @@ post_process first. At t = 170, 190 and 230 us it prints
   x_r   reaction front, the rightmost crossing of T = 1600 K
   L1    (1/L) int |T_MFC - T_ref| dx as a percentage of the 2400 K axis range of the reference panel
   T_w   temperature at the wall cell, and the mean MFC - reference temperature in the burnt gas behind the merged front
-against the curves in ref_T.csv.
+against the curves in ref_T.txt.
 """
 
 import argparse
@@ -46,7 +46,7 @@ def main():
     args = ap.parse_args()
     d = Path(args.case_dir)
     dt = json.loads(subprocess.run([sys.executable, "case.py", *args.case_args.split()], cwd=d, capture_output=True, text=True, check=True).stdout)["dt"]
-    ref = np.genfromtxt(Path(__file__).with_name("ref_T.csv"), delimiter=",", skip_header=4)
+    ref = np.genfromtxt(Path(__file__).with_name("ref_T.txt"), delimiter=",", skip_header=4)
     steps = {round(s * dt * 1e6): s for s in discover_timesteps(str(d), "silo")}
     print(f"{'t [us]':>7} {'x_s [mm]':>9} {'ref':>7} {'x_r [mm]':>9} {'ref':>7} {'L1 T [%]':>9} {'T_w [K]':>8} {'ref':>7} {'burnt dT [K]':>12}")
     for t in TIMES:
