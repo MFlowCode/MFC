@@ -501,19 +501,22 @@ contains
 
     !> Average over one half (xi < 0 left, > 0 right; |xi| = 1/4) of the middle of five cell averages q: the conservative quartic,
     !! or MC-limited linear where either half leaves the range of the three nearest averages. At a local extremum of the averages
-    !! that range is widened by their smallest second difference; where they are monotone it is not, so the children make no new
-    !! extremum (at the foot of a steep front that difference is as large as q(0)). Both halves are tested so the two children share
-    !! one reconstruction (their mean stays q(0)).
+    !! that range is widened by their smallest second difference c. Where they are monotone it is widened by c/4 times the ratio of
+    !! the smallest to the largest second difference, and never across zero: a smooth extremum in the next cell needs c/8 (without
+    !! it the fill is second order there) and has a ratio near one, while at the foot of a steep front c is as large as q(0) and the
+    !! ratio is small. Both halves are tested so the two children share one reconstruction (their mean stays q(0)).
     pure real(wp) function f_amr_quartic_half(q, xi) result(v)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: q(-2:2), xi
-        real(wp)             :: c, a, b, d, lo, hi
+        real(wp)             :: c, a, b, d, lo, hi, sm, sp
 
         d = (3._wp*(q(-2) - q(2)) - 22._wp*(q(-1) - q(1)))/128._wp
         a = q(1) - q(0); b = q(0) - q(-1)
-        c = 0._wp
-        if (a*b <= 0._wp) c = min(abs(q(-2) - 2._wp*q(-1) + q(0)), abs(a - b), abs(q(0) - 2._wp*q(1) + q(2)))
-        lo = min(q(-1), q(0), q(1)) - c; hi = max(q(-1), q(0), q(1)) + c
+        sm = abs(q(-2) - 2._wp*q(-1) + q(0)); sp = abs(q(0) - 2._wp*q(1) + q(2))
+        c = min(sm, abs(a - b), sp)
+        lo = min(q(-1), q(0), q(1)); hi = max(q(-1), q(0), q(1))
+        if (a*b > 0._wp) c = min(0.25_wp*c*c/max(sm, abs(a - b), sp, tiny(c)), max(lo, 0._wp, -hi))
+        lo = lo - c; hi = hi + c
         if (min(q(0) - abs(d), q(0) + abs(d)) >= lo .and. q(0) + abs(d) <= hi) then
             v = q(0) + sign(1._wp, xi)*d
         else
