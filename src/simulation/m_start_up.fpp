@@ -55,6 +55,7 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
+    use m_projection
     use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
     use m_amr_regrid, only: s_amr_regrid
     use m_amr_stage, only: s_amr_relax_fine
@@ -1046,6 +1047,7 @@ contains
         if (igr) then
             call s_initialize_igr_module()
         end if
+        if (proj_method) call s_initialize_projection_module()
         if (.not. igr) then
             if (recon_type == recon_type_weno) then
                 call s_initialize_weno_module()
@@ -1435,6 +1437,7 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
+        if (proj_method) call s_finalize_projection_module()
         if (igr) then
             call s_finalize_igr_module()
         else

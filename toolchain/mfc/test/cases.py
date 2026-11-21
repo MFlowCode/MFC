@@ -265,6 +265,17 @@ def get_bc_mods(bc: int, dimInfo):
     return params
 
 
+# Nearly pure phases on each side of the interface (patches 1-2 fluid 1, patch 3 fluid 2), outside interface compression's
+# [ic_eps, 1 - ic_eps] band, so THINC/MTHINC act only at the interface and not on round-off gradients in the bulk
+SHARP_IC_EPS = 1e-6
+SHARP_IC = {
+    **{f"patch_icpp({i})%{v}(1)": 1.0 - SHARP_IC_EPS for i in (1, 2) for v in ("alpha_rho", "alpha")},
+    **{f"patch_icpp({i})%{v}(2)": SHARP_IC_EPS for i in (1, 2) for v in ("alpha_rho", "alpha")},
+    **{f"patch_icpp(3)%{v}(1)": SHARP_IC_EPS for v in ("alpha_rho", "alpha")},
+    **{f"patch_icpp(3)%{v}(2)": 1.0 - SHARP_IC_EPS for v in ("alpha_rho", "alpha")},
+}
+
+
 def get_dimensions():
     r = []
 
@@ -556,6 +567,52 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_projection(dimInfo):
+        # The goldens hold the pressure solve the tests were made with: tight, without the coarse-correction scale or truncation
+        stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_mg_omega": 1.0, "proj_mg_trunc": 0.0})
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "Walls", get_bc_mods(-2, dimInfo)))
+        gravity = {**get_bc_mods(-2, dimInfo), "bf_x": "T", "g_x": -10.0, "k_x": 0.0, "w_x": 0.0, "p_x": 0.0}
+        cases.append(define_case_d(stack, "Gravity", gravity))
+        adap = {"cfl_adap_dt": "T", "cfl_target": 0.5, "n_start": 0, "t_save": 0.1, "t_stop": 0.1}
+        cases.append(define_case_d(stack, "cfl_adap_dt=T", {**adap, "proj_max_acfl": 5.0}))
+        cases.append(define_case_d(stack, ["Gravity", "cfl_adap_dt=T"], {**gravity, **adap}))
+        for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
+            cases.append(define_case_d(stack, f"int_comp={ic}", {**SHARP_IC, "int_comp": ic}))
+        viscous_mods = {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}
+        cases.append(define_case_d(stack, "Viscous", viscous_mods))
+        # Fluid 2 stiffened (gamma 4.4, pi_inf 1) so the phase moduli differ and Wood's and the frozen modulus do too
+        six = {
+            "model_eqns": 3,
+            "riemann_solver": 2,
+            "fluid_pp(2)%eos": "stiffened_gas",
+            "fluid_pp(2)%gamma": 1.0 / (4.4 - 1.0),
+            "fluid_pp(2)%pi_inf": 4.4 * 1.0 / (4.4 - 1.0),
+        }
+        cases.append(define_case_d(stack, "model_eqns=3", six))
+        cases.append(define_case_d(stack, ["model_eqns=3", "proj_woods_modulus=T"], {**six, "proj_woods_modulus": "T"}))
+        # Small enough for the explicit diffusion limit at the base dt
+        conduction = {"fluid_pp(1)%k_therm": 1.0e-4, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-4, "fluid_pp(2)%cv": 1.0}
+        cases.append(define_case_d(stack, "Conduction", conduction))
+        if len(dimInfo[0]) == 2:
+            # A ramped Dirichlet inflow at x = 0 and a pressure outlet at x = 1, between no-slip walls
+            inflow = {"bc_x%beg": -17, "bc_x%end": -3, "bc_y%beg": -16, "bc_y%end": -16, "bc_x%pres_out": 0.1, "bc_x%vel_in_ramp": 1e-3, "patch_icpp(1)%vel(1)": 0.5}
+            cases.append(define_case_d(stack, "Dirichlet inflow", inflow))
+        if len(dimInfo[0]) > 1:
+            capillary = {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 0.1, "surface_tension": "T"}
+            cases.append(define_case_d(stack, "capillary=T", capillary))
+            cases.append(define_case_d(stack, ["capillary=T", "surface_tension_model=2"], {**capillary, "surface_tension_model": 2}))
+            cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
+        if len(dimInfo[0]) == 2:
+            # The six-equation model with every coupling the projection allows, stacked into two cases: viscous no-slip walls,
+            # gravity, conduction, conservative surface tension, MTHINC and adaptive dt; then well-balanced surface tension
+            # with the Dirichlet inflow and pressure outlet on 2 ranks
+            physics = {**gravity, **viscous_mods, **conduction, **capillary, **SHARP_IC, "int_comp": 2, **adap}
+            cases.append(define_case_d(stack, ["model_eqns=3", "Viscous", "Gravity", "Conduction", "capillary=T", "int_comp=2", "cfl_adap_dt=T"], {**six, **physics}))
+            boundaries = {**inflow, **capillary, **SHARP_IC, "surface_tension_model": 2}
+            cases.append(define_case_d(stack, ["model_eqns=3", "Dirichlet inflow", "capillary=T", "surface_tension_model=2", "2 MPI Ranks"], {**six, **boundaries}, ppn=2))
+        stack.pop()
+
     def alter_igr(amr_variant=False):
         stack.push("IGR", {"igr": "T", "alf_factor": 10, "num_igr_iters": 10, "elliptic_smoothing": "T", "elliptic_smoothing_iters": 10, "num_igr_warm_start_iters": 10})
 
@@ -659,23 +716,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     def alter_int_comp(dimInfo):
-        eps = 1e-6
-        sharp_ic = {
-            "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
-            "patch_icpp(1)%alpha(1)": 1.0 - eps,
-            "patch_icpp(1)%alpha_rho(2)": eps,
-            "patch_icpp(1)%alpha(2)": eps,
-            "patch_icpp(2)%alpha_rho(1)": 1.0 - eps,
-            "patch_icpp(2)%alpha(1)": 1.0 - eps,
-            "patch_icpp(2)%alpha_rho(2)": eps,
-            "patch_icpp(2)%alpha(2)": eps,
-            "patch_icpp(3)%alpha_rho(1)": eps,
-            "patch_icpp(3)%alpha(1)": eps,
-            "patch_icpp(3)%alpha_rho(2)": 1.0 - eps,
-            "patch_icpp(3)%alpha(2)": 1.0 - eps,
-        }
-
-        stack.push("", sharp_ic)
+        stack.push("", SHARP_IC)
 
         stack.push("weno_order=5", {"weno_order": 5})
         cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
@@ -889,6 +930,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
+                alter_projection(dimInfo)
 
             if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
                 # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
@@ -3882,6 +3924,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
+                # Analytic initial conditions need their own build; the suite covers the projection's gravity
+                "2D_rising_bubble_projection",
+                "2D_rising_bubble_expansion",
+                "2D_rayleigh_benard_projection",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",

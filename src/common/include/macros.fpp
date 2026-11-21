@@ -163,6 +163,24 @@
 #endif
 #:enddef
 
+! Cray-specific GPU pointer setup for multigrid levels
+#:def ACC_SETUP_mg_levels(*args)
+#ifdef _CRAYFTN
+    block
+        @:LOG({'@:ACC_SETUP_mg_levels(${', '.join(args)}$)'})
+
+        #:for arg in args
+            $:GPU_ENTER_DATA(copyin=('[' + arg + ']'))
+            #:for VAR in ['diag', 'cond_x', 'cond_y', 'cond_z', 'corr', 'rhs', 'res', 'k_rhs', 'k_dir', 'k_Adir']
+                if (associated(${arg}$%${VAR}$)) then
+                    $:GPU_ENTER_DATA(copyin=('[' + arg + '%' + VAR + ']'))
+                end if
+            #:endfor
+        #:endfor
+    end block
+#endif
+#:enddef
+
 ! Whether stress index idx is a shear component. Spelled out because NVHPC 26.9 at -O2 vectorizes any(idx == shear_indices)
 ! inside a loop to always true, which doubled the normal-stress elastic energy.
 #:def IS_SHEAR(idx)

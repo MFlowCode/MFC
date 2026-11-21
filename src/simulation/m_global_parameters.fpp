@@ -520,6 +520,20 @@ contains
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
+        proj_method = .false.
+        proj_tol = 1.e-6_wp
+        proj_max_iters = 100
+        proj_max_acfl = 0._wp
+        proj_mg_omega = 1.8_wp
+        proj_mg_sweeps = 2
+        proj_mg_kcycle = -1
+        proj_mg_k_ranks = 1024
+        proj_mg_bottom = -1
+        proj_mg_cg_ranks = 8192
+        proj_mg_trunc = 1._wp
+        proj_lag_corr = 1
+        proj_woods_modulus = .false.
+        surface_tension_model = surface_tension_model_conservative
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.
@@ -796,6 +810,7 @@ contains
             bc_${dir}$%vel_in_ramp = 0._wp
             bc_${dir}$%vel_in_t0 = 0._wp
             bc_${dir}$%vel_in_frac0 = 0._wp
+            bc_${dir}$%pres_out = dflt_real
         #:endfor
 
         ! Lagrangian subgrid bubble model
