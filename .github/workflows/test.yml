@@ -627,7 +627,7 @@ jobs:
       needs.file-changes.outputs.checkall == 'true' &&
       (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
-    timeout-minutes: 480
+    timeout-minutes: 540
     strategy:
       fail-fast: false
       matrix:
