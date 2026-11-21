@@ -615,9 +615,7 @@ jobs:
             prebuild-case-optimization-*.out
             run-case-optimization-*.out
 
-  # Phoenix (GT) runs on pushes to master, not on every PR push: its free GPU queue
-  # is preemptible and often hours long, and every PR already compiles with NVHPC
-  # above. A PR opts in with the 'ci:phoenix' label, read on its next push or reopen.
+  # Phoenix (GT) runs on pushes to master and on every non-draft PR, like Frontier.
   phoenix:
     name: "${{ matrix.kind == 'case-opt' && 'Case Opt | ' || '' }}Georgia Tech | Phoenix (NVHPC) (gpu-${{ matrix.interface }})"
     needs: [lint-gate, file-changes]
@@ -627,9 +625,7 @@ jobs:
       needs.file-changes.result == 'success' &&
       github.repository == 'MFlowCode/MFC' &&
       needs.file-changes.outputs.checkall == 'true' &&
-      (github.event_name != 'pull_request' ||
-       (github.event.pull_request.draft != true &&
-        contains(github.event.pull_request.labels.*.name, 'ci:phoenix')))
+      (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     # Includes SLURM queue wait (hours even under the charged 'inferno' QOS when the GPUs are full). Kept under 24h, when GITHUB_TOKEN expires.
     timeout-minutes: 1380
     strategy:

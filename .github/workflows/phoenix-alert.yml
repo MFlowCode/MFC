@@ -1,7 +1,7 @@
 name: 'Phoenix Master Alert'
 
-# Phoenix runs only on master (see the phoenix job in test.yml). Keep one issue open
-# while it fails there, listing the merges since the last green run.
+# Keep one issue open while Phoenix fails on master, listing the merges since the last
+# green run.
 on:
   workflow_run:
     workflows: ['Test Suite']
