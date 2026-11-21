@@ -5,7 +5,7 @@ Compare a 2D_ibm_plane_poiseuille run with u = g y (H - y) / (2 nu).
     check_poiseuille.py CASE_DIR [--tol TOL]
 
 Reads the serial text output of the last save (CASE_DIR/D/cons.*.dat), CASE_DIR/D/ib_forces.dat and the parameters from
-CASE_DIR/simulation.inp (H = 1; the walls are at y = 0 and y = H; the wall offset does not enter the reference).
+CASE_DIR/pre_process.inp and simulation.inp (H = 1; the walls are at y = 0 and y = H; the wall offset does not enter the reference).
 Quantities, all relative to the exact value: L2 = rms of u - exact over the fluid cells, divided by u_max = g H^2 / (8 nu); Q = flow
 rate (sum of u dy over the fluid cells) against g H^3 / (12 nu); F = wall force from the IB face fluxes (mean over the last 10 % of
 the history) against g H Lx / 2 per wall (in steady state a body-force balance, so it does not separate the wall orders); u_wall =

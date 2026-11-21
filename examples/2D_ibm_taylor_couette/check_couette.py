@@ -5,7 +5,7 @@ Compare a 2D_ibm_taylor_couette run with the exact steady solution u_theta = A r
     check_couette.py CASE_DIR [--tol TOL]
 
 Reads the serial text output of the last save (CASE_DIR/D/cons.*.dat), CASE_DIR/D/ib_forces.dat and the case parameters from
-CASE_DIR/simulation.inp. Exact (incompressible, constant mu, inner radius R = 1, outer radius r2 = 2 R):
+CASE_DIR/pre_process.inp and simulation.inp. Exact (incompressible, constant mu, inner radius R = 1, outer radius r2 = 2 R):
 A = -Omega R^2 / (r2^2 - R^2), B = Omega R^2 r2^2 / (r2^2 - R^2), wall shear mu S with S = r d(u_theta / r)/dr = -2 B / r^2, torque
 on the inner body per unit depth T = -4 pi mu B (the outer wall receives +4 pi mu B).
 
@@ -29,12 +29,13 @@ R, R2 = 1.0, 2.0
 
 
 def read_inp(case_dir):
-    """Numeric entries of simulation.inp as a dict."""
+    """Numeric entries of pre_process.inp and simulation.inp as a dict (the domain extents are only in the first)."""
     out = {}
-    for line in open(os.path.join(case_dir, "simulation.inp")):
-        m = re.match(r"\s*([\w%().,]+)\s*=\s*([-+0-9.eEdD]+)\s*$", line)
-        if m:
-            out[m.group(1)] = float(m.group(2).replace("d", "e").replace("D", "e"))
+    for name in ("pre_process.inp", "simulation.inp"):
+        for line in open(os.path.join(case_dir, name)):
+            m = re.match(r"\s*([\w%().,]+)\s*=\s*([-+0-9.eEdD]+)\s*$", line)
+            if m:
+                out[m.group(1)] = float(m.group(2).replace("d", "e").replace("D", "e"))
     return out
 
 
