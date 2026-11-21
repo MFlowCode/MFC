@@ -1684,7 +1684,7 @@ contains
                         if (mk /= 0) then
                             call s_decode_patch_periodicity(mk, ib_tmp, xp, yp, zp)
                             call s_get_neighborhood_idx(ib_tmp, ib_id)
-                            if (ib_id > 0) g = ib_id
+                            g = max(ib_id, 0)  ! always assigned: a conditional store left g at 0 on NVHPC GPU
                         end if
                     end if
                     ib_shell%sf(j, k, l) = g
