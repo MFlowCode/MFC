@@ -42,18 +42,18 @@ _CONVERGENCE_1D_PERIOD_SCHEMES = [
     ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [64, 128]),
     ("TENO7", ["--order", "7", "--teno", "--teno-ct", "1e-9", "--cfl", "0.005"], 7, 0.5, [64, 128]),
 ]
-# AMR, WENO5, one 2:1 block over the central half, period mode on one rank. The coarse/fine interface, not the scheme,
-# sets the order: the measured rate is 2.5-2.6 for a static block with either ghost fill (the quartic fill lowers the
-# error about 5x), lock-step or subcycled. With the blocks following the wave the rate is about 2 (linear) and above 4
-# (quartic), less regular because the regrid interval is fixed in steps.
+# AMR, WENO5, one 2:1 block over the central half, period mode on one rank. With the linear ghost fill the coarse/fine
+# interface sets the order: its second-order ghost values leave a second-order error in the few cells at the interface,
+# so the L2 rate is 2.5 for a static block (lock-step or subcycled) and about 2 with the blocks following the wave. The
+# quartic fill keeps the WENO5 rate for a static block and gives about 4 with regridding (fixed regrid interval in steps).
 _AMR_ARGS = ["--order", "5", "--cfl", "0.02", "--amr"]
 _CONVERGENCE_1D_AMR_SCHEMES = [
     ("AMR -> static linear", _AMR_ARGS, 2.5, 0.2, [32, 64, 128]),
-    ("AMR -> static quartic", _AMR_ARGS + ["--amr-prolong", "2"], 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> static quartic", _AMR_ARGS + ["--amr-prolong", "2"], 5, 0.3, [32, 64, 128]),
     ("AMR -> subcycle linear", _AMR_ARGS + ["--amr-subcycle"], 2.5, 0.2, [32, 64, 128]),
-    ("AMR -> subcycle quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-subcycle"], 2.5, 0.2, [32, 64, 128]),
+    ("AMR -> subcycle quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-subcycle"], 5, 0.3, [32, 64, 128]),
     ("AMR -> regrid linear", _AMR_ARGS + ["--amr-regrid", "10"], 2.0, 0.3, [64, 128, 256]),
-    ("AMR -> regrid quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-regrid", "10"], 3.5, 0.5, [64, 128, 256]),
+    ("AMR -> regrid quartic", _AMR_ARGS + ["--amr-prolong", "2", "--amr-regrid", "10"], 4.0, 0.5, [64, 128, 256]),
 ]
 
 _CONVERGENCE_2D_SCHEMES = [
@@ -1686,10 +1686,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             uniform = {f"patch_icpp({i})%{k}": v for i in (1, 2, 3) for k, v in (("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0))}
             # The 2-rank variant puts the body on a rank seam and moves it across the seam in both directions: the moving-wall term
             # (proportional to the wall's normal velocity) reads the body cell's momentum from the neighbouring rank there.
-            for label, spin, ranks, vy in (
-                ("Translating Circle", 0.0, 1, 0.0),
-                ("Translating Spinning Circle", 3.0, 1, 0.0),
-                ("Translating Circle -> 2 MPI Ranks", 0.0, 2, 0.6),
+            # The periodic-edge variant (1 rank) straddles x = 1: its halo cells are filled by the periodic BC of the primitives only.
+            periodic_x = {"bc_x%beg": -1, "bc_x%end": -1, "patch_ib(1)%x_centroid": 0.9}
+            for label, spin, ranks, vy, extra in (
+                ("Translating Circle", 0.0, 1, 0.0, {}),
+                ("Translating Spinning Circle", 3.0, 1, 0.0, {}),
+                ("Translating Circle -> 2 MPI Ranks", 0.0, 2, 0.6, {}),
+                ("Translating Circle -> Periodic Edge", 0.0, 1, 0.6, periodic_x),
             ):
                 cases.append(
                     define_case_d(
@@ -1712,8 +1715,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "patch_ib(1)%vel(2)": vy,
                             "patch_ib(1)%angular_vel(3)": spin,
                             **uniform,
+                            **extra,
                         },
                         ppn=ranks,
+                        override_tol=1e-6 if extra else None,
                     )
                 )
             # A centroid exactly on the periodic domain end is owned by no rank until it is wrapped, so with 2 ranks the body lost its
@@ -3885,8 +3890,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
-                # Wall-bounded thermostat: its golden differed by up to 7e-3 between AMD and NVIDIA GPUs after five steps (the isothermal
-                # wall and the controller both go through the 1e-6 temperature solve), so it is checked by hand: the Nu = 7.541 runs.
+                # Registered below at its own size (the 25-cell cap does not fit the 32-cell gap); Nu = 7.541 is checked by check_nu.py.
                 "2D_thermal_channel",
                 "2D_spatial_reacting_mixing_layer",
                 "3D_reacting_mixing_layer",
@@ -4035,6 +4039,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Registered below at their own sizes (12 cells per radius, 8 cells across the gap): the 25-cell cap would change the wall resolution they test
                 "2D_ibm_taylor_couette",
                 "2D_ibm_plane_poiseuille",
+                # Registered below at 16 cells per diameter, where the body is resolved
+                "2D_ibm_cylinder_drag_nu",
             ]
             if path in casesToSkip:
                 continue
@@ -4125,6 +4131,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-8),
                 )
             )
+
+        # ./mfc.sh amr_check on the same block: 48 cells put the diaphragm on a coarse face (cell 24), inside the block. One
+        # step, so the core (7 cells from the block edges) is the two cells at the diaphragm. -j 4 is for the chemistry build.
+        chk = ConvergenceSpec(runner=run_amr_check, case_path="examples/1D_reactive_shocktube/case.py", expected_order=0.0, tol=1.0e-8)
+        chk.params = {**amr_chem_mods, "m": 47, "amr_max_grid_size": 64}
+        chk.extra_args = ["--", "-j", "4"]
+        cases.append(define_convergence_case("Convergence -> amr_check -> 1D -> chemistry", chk))
 
         # Chemistry diffusion AMR: species/energy diffusion flux reflux; at np=2 the block boundary is also a rank seam.
         for ppn, label in ((1, "Species Diffusion"), (2, "Species Diffusion -> 2 MPI Ranks")):
@@ -4596,6 +4609,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # Re 20 cylinder at Mach 0.2 (16 cells per diameter, 192 x 128 cells, 200 fixed steps, not steady): the face-flux force and heat
+    # histories (ib_forces.dat, ib_heat.dat) are in the golden. The checker script validates the physics; the golden is a regression guard.
+    # Golden: GNU 13 double on an x86 CPU. An AMD MI300A (OpenMP offload) run differs from it by up to 5e-5 (min of absolute and relative
+    # error; the y-momentum near zero and ib_heat.dat are the largest, the fields otherwise 3e-6), so 5e-4 is ten times that spread.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=5e-4))
+
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
     # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history
     # (velocity and centroid) and the cons fields. Regenerate it whenever a default in the moving-body numerics changes (the first
@@ -4620,7 +4639,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # from steady state (only the last step is saved), so the golden is a regression guard on the cons fields and the ib_forces.dat history; the accuracy against the
     # exact solutions is measured by check_couette.py and check_poiseuille.py (see the Validation page). The default order 1 is covered
     # by the viscous IBM tests above. The annulus has a rotating inner wall: its golden changes with the wall-point velocity fix
-    # (a rotating body's ghost-cell wall velocity evaluated at the wall point, not the ghost point; in preparation); the channel golden
+    # (#2383: a rotating body's ghost-cell wall velocity evaluated at the wall point, not the ghost point); the channel golden
     # does not. override_tol is TOL_PLACEHOLDER.
     cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
     cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
@@ -4844,6 +4863,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 override_tol=1e-6,
             )
         )
+
+    # Thermally developed plane channel (mean_temp_wall), first 100 steps, 32 x 25 cells; the developed state and Nu = 7.541 (WENO5)
+    # are checked by examples/2D_thermal_channel/check_nu.py. The golden uses non-mapped WENO3 with weno_eps = 1e-6: with the
+    # example's mapped WENO5 and weno_eps = 1e-16, round-off in the weights moves the wall-row transverse momentum by 2-3 % between GNU
+    # -O3 and debug builds within 20 steps. With these settings GNU 13 double -O3, reldebug and debug agree to 5e-8 (-O3 repeats
+    # bitwise) and an AMD MI250X (Cray Fortran, OpenMP offload) run and an AMD CPU build (amdflang) differ from the GNU golden by 8e-8 and 6e-8, so 1e-6 leaves a factor 12.
+    # Single precision differs from double by 4e-4: skipped there (label "Chemistry", test.py).
+    channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "weno_avg": "F", "t_step_stop": 100, "t_step_save": 100}
+    cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=channel_mods, override_tol=1e-6))
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.

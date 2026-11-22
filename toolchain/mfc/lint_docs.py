@@ -21,6 +21,7 @@ DOCS = [
     "docs/documentation/expectedPerformance.md",
     "docs/documentation/validation.md",
     "docs/documentation/validation_wall_order_couette.md",
+    "docs/documentation/validation_cyl_drag_nu.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]
