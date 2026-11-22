@@ -1104,7 +1104,7 @@ contains
 #endif
 #endif
 
-        ! After the device is bound: s_mpi_initialize ran earlier, so its update went to the default device
+        ! After the device is bound: the update in s_mpi_initialize went to the default device
         $:GPU_UPDATE(device='[num_procs, proc_rank]')
 
         if (proc_rank == 0) then
