@@ -136,4 +136,4 @@ Cite references with `\cite` keys from `docs/references.bib`.
 
 ## Keeping the goldens current
 
-The registered tests are regression guards: their goldens hold the output of the code at the time they were generated. When a default or an algorithm in the numerics a test exercises changes (for moving bodies, for example the `ib_mass_relax` default), regenerate the goldens with `./mfc.sh test --generate --only <UUID>` in the same change, and re-run the checker scripts to confirm the physics results above.
+The registered tests are regression guards: their goldens hold the output of the code at the time they were generated. When a default or an algorithm in the numerics a test exercises changes (for moving bodies, for example the `ib_mass_relax` default), regenerate the goldens with `./mfc.sh test --generate --only <UUID>` in the same change, and re-run the checker scripts to confirm the physics results above. A case whose tolerance must be looser than the default takes `override_tol` chosen from the spread between compiler and device lanes ([Testing](@ref testing)).

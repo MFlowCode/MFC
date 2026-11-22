@@ -187,6 +187,15 @@ When builds fail, isolate the problem by disabling features:
 ./mfc.sh build --mixed     # Mixed precision
 ```
 
+### Stale Remembered Configuration
+
+`./mfc.sh` stores the last build configuration (MPI, GPU, debug, reldebug, single, and so on) in
+`build/lock.yaml` and reuses it, so a `--debug` or `--single` from an earlier command applies to
+later `build`, `run` and `test` commands that do not repeat the flag. If a run is unexpectedly slow, a
+test tolerance or skip depends on precision, or binaries are rebuilt, check the `Switching from ...`
+line and state the options you want explicitly, for example `--no-debug --no-reldebug --no-single`.
+See [Building MFC](@ref getting-started).
+
 ### Clean Rebuild
 
 Sometimes a clean rebuild fixes issues:
@@ -272,16 +281,19 @@ To isolate parallel issues, try running with fewer MPI ranks:
 
 ### Running Specific Tests
 
-Run only a specific test by UUID:
+Run only a specific test by UUID (`./mfc.sh test -l` lists them):
 
 ```bash
-./mfc.sh test --only 3D_sphbubcollapse
+./mfc.sh test --only <UUID>
 ```
 
-Run multiple specific tests:
+Run several specific tests by passing several UUIDs, which are ORed:
 ```bash
-./mfc.sh test --only 3D_sphbubcollapse 2D_shockbubble
+./mfc.sh test --only <UUID1> <UUID2>
 ```
+
+Non-UUID terms are labels, and a case must carry all of them, so two unrelated labels select nothing
+(see [Selection and Execution Pitfalls](@ref selection-and-execution-pitfalls)).
 
 ### Serial Test Execution
 
@@ -324,6 +336,16 @@ Possible causes:
 2. **Compiler differences:** Different compilers produce slightly different results
 3. **Precision settings:** Single vs double precision
 4. **Platform differences:** CPU architecture, GPU differences
+
+**GPU test passes with both ranks on one GPU but differs on two:** a device-binding bug, such as
+device data updated before the rank is bound to its GPU. AMD CI can hide it. See
+[Silent-Failure Traps](@ref silent-failure-traps) and test a 2-rank GPU change both ways.
+
+**"Submitting batch file for Interactive failed"** (the name is the queue system, here the interactive
+launcher): the job script that `./mfc.sh run` generated returned a non-zero status. The message gives
+its path; run that script by hand and read its output (`./mfc.sh run ... -v` prints the submit command).
+In CI, a Slurm `TIMEOUT` or a launch failure like this is no result for the PR: see
+[Silent-Failure Traps](@ref silent-failure-traps).
 
 ---
 
