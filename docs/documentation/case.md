@@ -1008,7 +1008,7 @@ uniform Cartesian grid.
 | `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
 | `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
 | `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |
-| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition, tiling regrid boxes down to 32 cells until there are two per rank (default 0) |
+| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition, tiling regrid boxes down to 16 cells until there is one per rank (default 0) |
 | `amr_max_blocks`        | Integer | Maximum number of blocks (default 1024) |
 | `amr_max_level`         | Integer | Number of refined levels (default 1) |
 | `amr_ref_ratio`         | Integer | Refinement ratio, 2 or 4; 4 allows one level (default 2) |
