@@ -722,6 +722,7 @@ def _load():
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
     _r("ib_mass_relax", INT, {"ib"})
+    _r("wall_column_dt_frac", REAL, {"ib"})
     _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
     _r("ib_uncover_fill", LOG, {"ib"})
@@ -1082,6 +1083,8 @@ def _load():
         ("emissivity", REAL),
         ("T_rad", REAL),
         ("heat_power", REAL),
+        ("wall_column", LOG),
+        ("wall_column_len", REAL),
         ("v_blow", REAL),
         ("burn_rate_exp", REAL),
         ("burn_rate_pref", REAL),
@@ -1589,6 +1592,7 @@ _nv(
     "ib_ip_interp",
     "ib_wall_order",
     "ib_mass_relax",
+    "wall_column_dt_frac",
     "ib_smooth_contact",
     "ib_visc_compact",
     "ib_uncover_fill",
