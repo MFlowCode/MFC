@@ -112,4 +112,4 @@ python3 examples/2D_ibm_taylor_couette/check_couette.py examples/2D_ibm_taylor_c
 ```
 
 Each run writes into the example directory (clear `D/`, `restart_data/` and the `.inp` files between runs). Channel: `--offset 0.37`, `--wall_order 1`. Annulus: `--wall_order 1`, `--ip_interp 2`, `--visc_compact 1`, `--mach 0.01 --re 11 --ntau 4`.
-The CI-sized runs are the tests `2D -> IBM -> Taylor-Couette -> ib_wall_order=2` and `2D -> IBM -> Plane Poiseuille -> ib_wall_order=2` (regression goldens at 300 steps, GNU 13 double; the tolerance is @@TOL@@).
+The CI-sized runs are the tests `2D -> IBM -> Taylor-Couette -> ib_wall_order=2` and `2D -> IBM -> Plane Poiseuille -> ib_wall_order=2` (regression goldens, GNU 13 double: 100 steps for the annulus, 300 for the channel; the tolerance is 1e-10, three orders above the 1e-13 largest difference seen between the GNU, Intel, NVHPC and macOS CI lanes and an A100 run).
