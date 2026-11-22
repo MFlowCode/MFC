@@ -4643,8 +4643,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # by the viscous IBM tests above. The annulus has a rotating inner wall: its golden changes with the wall-point velocity fix
     # (#2383: a rotating body's ghost-cell wall velocity evaluated at the wall point, not the ghost point); the channel golden
     # does not. override_tol is TOL_PLACEHOLDER.
-    cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
-    cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
+    cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", mods={"t_step_save": 300}, override_tol=1e-16))
+    cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-16))
 
     # Isothermal conduction annulus (inner circle, outer STL ring) against the exact ln(r) profile, with inverse-distance and TSC
     # image points. 12 cells per radius (64 x 64) and 300 steps (about 3 conduction times). The gas starts on the exact profile, so the run
