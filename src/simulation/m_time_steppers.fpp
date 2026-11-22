@@ -741,6 +741,7 @@ contains
         real(wp) :: qv                               !< Cell-avg. fluid reference energy
         real(wp) :: c                                !< Cell-avg. sound speed
         real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp) :: Dth                              !< Cell thermal diffusivity (s_compute_cell_diffusivity)
         real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
         real(wp) :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
         real(wp), dimension(6) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap, WCOL)
@@ -773,8 +774,8 @@ contains
             if (amr .eqv. ${'.true.' if ON_AMR else '.false.'}$) then
                 $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, &
                                     & Re_size_loc2' + (', pw1, pw2, pw3' if ON_AMR else '') + ']', private='[vel, alpha, &
-                                    & alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, &
-                                    & Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
+                                    & alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, &
+                                    & Ys, Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
                                     & vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
                 do l = 0, p
                     do k = 0, n
@@ -824,7 +825,8 @@ contains
                                     Re = Re_chem
                                 end if
 
-                                call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+                                call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)
+                                call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, Dth, j, k, l)
                                 #:if ON_AMR
                                     rf = amr_cfl_rf(j, k, l)
                                     max_dt(1) = max_dt(1)/rf**pw1

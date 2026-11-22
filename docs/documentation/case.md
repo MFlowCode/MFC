@@ -798,7 +798,7 @@ restart data being resumed from. Pass `-t pre_process` explicitly (as in the res
 
 - `cfl_const_dt` enables constant `dt` time-stepping where `dt` results in a specified CFL for the initial condition
 
-- `cfl_target` specifies the target CFL value
+- `cfl_target` specifies the target CFL value. It bounds the acoustic number in each direction, and the diffusive numbers \f$D\,\Delta t\sum_d \Delta x_d^{-2}\f$ of viscosity (`VCFL`, \f$D = (4\mu/3 + \mu_b)/\rho\f$) and conduction (`TCFL`, \f$D = k/(\rho c_v)\f$). RK3 remains stable up to about 0.63 (0.5 for RK1 and RK2)
 
 - `ramp_ratio` limits how much the adaptive time step can grow from one time step to the next: `dt` is capped at `ramp_ratio` times the previous `dt`. Must be at least 1. When unset, the time step growth is unlimited.
 
