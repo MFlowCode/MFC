@@ -523,10 +523,14 @@ def run_isentropic_release(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
 
 
 def run_amr_check(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
-    """./mfc.sh amr_check on spec.params: the block core must match the uniform fine-grid run within spec.tol."""
+    """./mfc.sh amr_check on spec.params, applied over the case file spec.case_path if one is named: the block core must match
+    the uniform fine-grid run within spec.tol."""
+    params = spec.params
+    if spec.case_path:
+        params = {**json.loads(common.get_py_program_output(spec.case_path, ["--mfc", "{}"])[0]), **params}
     with tempfile.TemporaryDirectory() as tmpdir:
         case = os.path.join(tmpdir, "case.json")
-        common.file_write(case, json.dumps(spec.params))
+        common.file_write(case, json.dumps(params))
         run = subprocess.run([MFC, "amr_check", case, "--tol", str(spec.tol)] + spec.extra_args, capture_output=True, text=True, check=False)
     return run.returncode == 0, run.stdout[-3000:] + run.stderr[-1000:]
 

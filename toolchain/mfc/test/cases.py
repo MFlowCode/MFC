@@ -1686,10 +1686,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             uniform = {f"patch_icpp({i})%{k}": v for i in (1, 2, 3) for k, v in (("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0))}
             # The 2-rank variant puts the body on a rank seam and moves it across the seam in both directions: the moving-wall term
             # (proportional to the wall's normal velocity) reads the body cell's momentum from the neighbouring rank there.
-            for label, spin, ranks, vy in (
-                ("Translating Circle", 0.0, 1, 0.0),
-                ("Translating Spinning Circle", 3.0, 1, 0.0),
-                ("Translating Circle -> 2 MPI Ranks", 0.0, 2, 0.6),
+            # The periodic-edge variant (1 rank) straddles x = 1: its halo cells are filled by the periodic BC of the primitives only.
+            periodic_x = {"bc_x%beg": -1, "bc_x%end": -1, "patch_ib(1)%x_centroid": 0.9}
+            for label, spin, ranks, vy, extra in (
+                ("Translating Circle", 0.0, 1, 0.0, {}),
+                ("Translating Spinning Circle", 3.0, 1, 0.0, {}),
+                ("Translating Circle -> 2 MPI Ranks", 0.0, 2, 0.6, {}),
+                ("Translating Circle -> Periodic Edge", 0.0, 1, 0.6, periodic_x),
             ):
                 cases.append(
                     define_case_d(
@@ -1712,8 +1715,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "patch_ib(1)%vel(2)": vy,
                             "patch_ib(1)%angular_vel(3)": spin,
                             **uniform,
+                            **extra,
                         },
                         ppn=ranks,
+                        override_tol=1e-6 if extra else None,
                     )
                 )
             # A centroid exactly on the periodic domain end is owned by no rank until it is wrapped, so with 2 ranks the body lost its
@@ -4033,6 +4038,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_mibm_wall_collision",
                 # Registered below at 12 cells per radius: at the 25-cell cap the gap holds about 4 cells
                 "2D_ibm_conduction_annulus",
+                # Registered below at 16 cells per diameter, where the body is resolved
+                "2D_ibm_cylinder_drag_nu",
             ]
             if path in casesToSkip:
                 continue
@@ -4123,6 +4130,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-8),
                 )
             )
+
+        # ./mfc.sh amr_check on the same block: 48 cells put the diaphragm on a coarse face (cell 24), inside the block. One
+        # step, so the core (7 cells from the block edges) is the two cells at the diaphragm. -j 4 is for the chemistry build.
+        chk = ConvergenceSpec(runner=run_amr_check, case_path="examples/1D_reactive_shocktube/case.py", expected_order=0.0, tol=1.0e-8)
+        chk.params = {**amr_chem_mods, "m": 47, "amr_max_grid_size": 64}
+        chk.extra_args = ["--", "-j", "4"]
+        cases.append(define_convergence_case("Convergence -> amr_check -> 1D -> chemistry", chk))
 
         # Chemistry diffusion AMR: species/energy diffusion flux reflux; at np=2 the block boundary is also a rank seam.
         for ppn, label in ((1, "Species Diffusion"), (2, "Species Diffusion -> 2 MPI Ranks")):
@@ -4593,6 +4607,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-9,
         )
     )
+
+    # Re 20 cylinder at Mach 0.2 (16 cells per diameter, 192 x 128 cells, 200 fixed steps, not steady): the face-flux force and heat
+    # histories (ib_forces.dat, ib_heat.dat) are in the golden. The checker script validates the physics; the golden is a regression guard.
+    # Golden: GNU 13 double on an x86 CPU. An AMD MI300A (OpenMP offload) run differs from it by up to 5e-5 (min of absolute and relative
+    # error; the y-momentum near zero and ib_heat.dat are the largest, the fields otherwise 3e-6), so 5e-4 is ten times that spread.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=5e-4))
 
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
     # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history

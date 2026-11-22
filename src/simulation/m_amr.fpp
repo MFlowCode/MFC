@@ -107,13 +107,16 @@ contains
         ! max coarse block cells per dim; 1 for collapsed dims
         amr_maxc = merge(([m_glb, n_glb, p_glb] + 1)/amr_ref_ratio, 1, amr_dim)
 
-        ! Regrid box cap: amr_grid_cap, and without amr_max_grid_size also the min over ranks of the local half-extent (the scratch
-        ! is then local-sized). Every box is clamped to amr_maxc_fit, which sizes the fine/coord arrays.
+        ! Regrid box cap: min over ranks of the local half-extent, or the absolute amr_max_grid_size (rank-count-invariant box set,
+        ! scratch sized to the cap). Every box is clamped to amr_maxc_fit, which sizes the fine/coord arrays.
         amr_maxc_fit = amr_maxc
         do d = 1, num_dims
             call s_mpi_allreduce_integer_min((amr_ext(d) + 1)/amr_ref_ratio, fit_d)
-            if (amr_max_grid_size > 0) fit_d = amr_maxc(d)
-            amr_maxc_fit(d) = min(amr_maxc(d), fit_d, amr_grid_cap)
+            if (amr_max_grid_size > 0) then
+                amr_maxc_fit(d) = min(amr_maxc(d), amr_max_grid_size)
+            else
+                amr_maxc_fit(d) = min(amr_maxc(d), fit_d)
+            end if
         end do
 
         ! max fine extents and buffered bounds
@@ -149,9 +152,10 @@ contains
         if (amr_regrid_int == 0) print '(A)', &
             & ' [amr] NOTE: amr_regrid_int = 0 - the block set is STATIC and never adapts. ' &
             & // 'Set amr_regrid_int > 0 (4-8 is a reasonable start) for adaptive refinement.'
-        if (amr_max_grid_size == 0 .and. any(amr_dim .and. amr_maxc_fit < min(amr_maxc, amr_grid_cap))) print '(A)', &
-            & ' [amr] NOTE: the block cap is set by the rank subdomain, so the box set depends on the rank count. ' &
-            & // 'Set amr_max_grid_size to make it rank-invariant.'
+        if (amr_max_grid_size == 0 .and. num_procs > 1) print '(A)', &
+            & ' [amr] NOTE: amr_max_grid_size = 0 derives the block cap from the ' &
+            & // 'decomposition, so it SHRINKS as ranks are added and the box set depends on rank ' &
+            & // 'count. Pin it to make the box set rank-invariant.'
         if (amr_regrid_int > 0 .and. amr_regrid_int < 4) print '(A,I0,A)', ' [amr] NOTE: amr_regrid_int = ', amr_regrid_int, &
             & ' regrids often; the tag sweep is per-CELL and flat in box count. ' &
             & // 'Raise it unless the refined feature moves quickly.'
