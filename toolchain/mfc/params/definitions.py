@@ -646,6 +646,7 @@ def _load():
     for n in ["mapped_weno", "wenoz", "teno", "weno_avg", "mp_weno", "null_weights"]:
         _r(n, LOG, {"weno"})
     _r("weno_Re_flux", LOG, {"weno", "viscosity"})
+    _r("weno_Re_flux_compact", LOG, {"weno", "viscosity"})
 
     # Riemann solver
     for n in ["riemann_solver", "wave_speeds", "avg_state", "low_Mach"]:
@@ -1512,6 +1513,7 @@ _nv(
     "mp_weno",
     "weno_avg",
     "weno_Re_flux",
+    "weno_Re_flux_compact",
     "null_weights",
     "muscl_eps",
     "int_comp",

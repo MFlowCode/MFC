@@ -1870,6 +1870,8 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+        self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and not weno_Re_flux, "weno_Re_flux_compact requires weno_Re_flux")
+        self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "weno_Re_flux_compact requires Cartesian coordinates")
 
     def check_heat_conduction(self):
         """Checks constraints on Fourier heat conduction parameters (fluid_pp(i)%k_therm)"""

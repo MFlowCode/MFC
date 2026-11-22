@@ -67,6 +67,7 @@ DESCRIPTIONS = {
     "teno_CT": "TENO cutoff parameter",
     "mp_weno": "Enable monotonicity-preserving WENO",
     "weno_Re_flux": "Enable WENO for viscous fluxes",
+    "weno_Re_flux_compact": "With weno_Re_flux, take the face-normal velocity gradient of the viscous flux as the compact difference across the face",
     "weno_avg": "Enable WENO averaging",
     "null_weights": "Allow null WENO weights",
     # MUSCL reconstruction
