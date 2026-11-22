@@ -1186,7 +1186,7 @@ contains
             write (file_unit) num_local_ibs
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, f_ib_mass_bank(patch_ib(ib_idx)%gbl_patch_id))
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, patch_ib(ib_idx)%mass_bank)
 
                 write (file_unit) patch_ib(ib_idx)%gbl_patch_id
                 write (file_unit) ib_buf
@@ -1213,7 +1213,7 @@ contains
 
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, f_ib_mass_bank(patch_ib(ib_idx)%gbl_patch_id))
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, patch_ib(ib_idx)%mass_bank)
 
                 ! Global IB index determines position in file
                 disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(ib_state_nfields, MPI_OFFSET_KIND)*WP_MOK
@@ -1244,7 +1244,7 @@ contains
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
 
         do i = 1, num_ibs
-            call s_pack_ib_state(patch_ib(i), mytime, ib_buf, f_ib_mass_bank(patch_ib(i)%gbl_patch_id))
+            call s_pack_ib_state(patch_ib(i), mytime, ib_buf, patch_ib(i)%mass_bank)
 
             write (file_unit) ib_buf
         end do
@@ -1442,9 +1442,6 @@ contains
         integer, intent(in) :: time_step
 
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
-        if (ib_mass_relax > 0) then
-            $:GPU_UPDATE(host='[ib_mass_res]')
-        end if
 
         if (parallel_io) then
             call s_write_parallel_ib_state(time_step)
@@ -1452,6 +1449,7 @@ contains
             call s_write_serial_ib_state(time_step)
         end if
         call s_write_centroid_offsets(time_step)
+        if (chemistry .and. chem_params%diffusion) call s_write_ib_conduction_temperature(time_step)
 
     end subroutine s_write_ib_state_file
 

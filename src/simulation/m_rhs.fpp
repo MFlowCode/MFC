@@ -807,9 +807,9 @@ contains
                     ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
                     ! this direction's faces, on every AMR level with that level's markers.
                     if (amr_in_fine_advance) then
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
                     else
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
                     end if
 
                     ! Bubble dynamics source terms
@@ -865,9 +865,9 @@ contains
                 call nvtxEndRange
                 ! flux_rsx_vf holds the hat_L set and flux_hatR_rsx_vf the hat_R set, each the RHS's at its own faces
                 if (amr_in_fine_advance) then
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers_fine)
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
                 else
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, ib_markers)
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
                 end if
             end do
 
@@ -1117,6 +1117,9 @@ contains
                         & idwbuff(2), idwbuff(3))
                 end if
             end if
+            if (weno_Re_flux_compact) call s_compact_normal_viscous_gradients(q_prim_qp%vf, id, &
+                & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
             if (ib_visc_compact) call s_compact_ib_viscous_gradients(q_prim_qp%vf, ib_markers, id, &
                 & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
                 & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))

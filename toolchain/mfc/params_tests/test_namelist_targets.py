@@ -18,10 +18,17 @@ def test_sim_only_vars():
 def test_pre_only_vars():
     from mfc.params.definitions import NAMELIST_VARS
 
-    for var in ["old_grid", "old_ic", "patch_icpp", "simplex_params"]:
+    for var in ["old_grid", "old_ic", "patch_bc", "simplex_params"]:
         targets = NAMELIST_VARS.get(var, set())
         assert "pre" in targets, f"{var!r} not marked for pre"
         assert "sim" not in targets, f"{var!r} incorrectly in sim"
+
+
+def test_ic_patch_vars_in_pre_and_sim():
+    from mfc.params.definitions import NAMELIST_VARS
+
+    for var in ["num_patches", "patch_icpp"]:
+        assert NAMELIST_VARS.get(var, set()) == {"pre", "sim"}, f"{var!r} must be read by pre and sim only"
 
 
 def test_post_only_vars():

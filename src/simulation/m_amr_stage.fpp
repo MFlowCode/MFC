@@ -13,12 +13,19 @@ module m_amr_stage
     use m_phase_timing
     use m_amr_registers, only: s_amr_apply_reflux, amr_rk_c
     use m_phase_change, only: s_infinite_relaxation_k
+    use m_icpp_patches, only: s_apply_icpp_patches
+    use m_assign_variables, only: s_initialize_assign_variables_module
+    use m_variables_conversion, only: s_convert_primitive_to_conservative_variables
+    use m_mpi_common, only: s_mpi_allreduce_sum
     use m_amr
 
     implicit none
 
     private
-    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine
+    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine, s_amr_apply_ic_patches
+
+    !> Whether patch_icpp was compared with the level-0 initial data, and reproduces it
+    logical :: ic_checked = .false., ic_from_patches = .false.
 
 contains
 
@@ -294,5 +301,104 @@ contains
         call s_amr_restrict_fold(q_cons)
 
     end subroutine s_amr_relax_fine
+
+    !> Fresh start: set every owned fine block to the initial condition patches evaluated at its own cell centers, replacing the
+    !! data interpolated from level 0, then restrict. Skipped when the patches alone do not reproduce the level-0 data.
+    impure subroutine s_amr_apply_ic_patches(q_cons)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
+        integer                                                :: kk, nb, i
+
+        if (.not. ic_checked) call s_amr_check_ic_patches(q_cons)
+        if (.not. ic_from_patches) return
+        call s_amr_refresh_my_blocks()
+        nb = amr_bat_n; amr_bat_n = 1  ! one block's extents in the frame, not a batch slab
+        do kk = 1, amr_n_my
+            call s_amr_select_slot(amr_my_blk(kk))
+            call s_amr_fine_enter()
+            ! the patches run on the host and fill the interior only
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_cons_br(i)%sf]')
+            end do
+            call s_amr_ic_on_frame(amr_cons_br)
+            do i = 1, sys_size
+                $:GPU_UPDATE(device='[amr_cons_br(i)%sf]')
+            end do
+            call s_amr_fine_leave()
+        end do
+        amr_bat_n = nb
+        call s_amr_restrict_fold(q_cons)
+
+    end subroutine s_amr_apply_ic_patches
+
+    !> Compare the patches evaluated on level 0 with the loaded initial data. They differ when pre_process perturbed or smoothed the
+    !! patches or started from old data; hard-coded and STL patches are not evaluated in the simulation.
+    impure subroutine s_amr_check_ic_patches(q_cons)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
+        type(scalar_field), dimension(sys_size)                :: q_ic
+        real(wp)                                               :: bad, bad_glb, tol
+        integer                                                :: i
+
+        ic_checked = .true.
+        tol = 1.e3_wp*max(epsilon(1._wp), real(epsilon(1._stp), wp))
+        if (precision == 1) tol = max(tol, 1.e3_wp*real(epsilon(1._sp), wp))
+        bad = 1._wp
+        if (num_patches > 0) then
+            if (all(patch_icpp(1:num_patches)%hcid == dflt_int) .and. all(patch_icpp(1:num_patches)%geometry /= 21)) then
+                call s_initialize_assign_variables_module()
+                bad = 0._wp
+                do i = 1, sys_size
+                    allocate (q_ic(i)%sf(0:m,0:n,0:p))
+                    $:GPU_UPDATE(host='[q_cons(i)%sf]')
+                end do
+                call s_amr_ic_on_frame(q_ic)
+                do i = 1, sys_size
+                    if (maxval(abs(q_ic(i)%sf - real(q_cons(i)%sf(0:m,0:n,0:p), wp))) > tol*maxval(abs(q_ic(i)%sf))) bad = 1._wp
+                    deallocate (q_ic(i)%sf)
+                end do
+            end if
+        end if
+        call s_mpi_allreduce_sum(bad, bad_glb)
+        ic_from_patches = bad_glb < 0.5_wp
+        if (proc_rank == 0 .and. .not. ic_from_patches) print '(A)', &
+            & ' [amr] NOTE: patch_icpp alone does not reproduce the ' &
+            & // 'initial condition, so the fine blocks start from data interpolated from level 0.'
+
+    end subroutine s_amr_check_ic_patches
+
+    !> Evaluate the initial condition patches on the installed grid frame into the interior of q_cons, on the host.
+    impure subroutine s_amr_ic_on_frame(q_cons)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
+        type(scalar_field), dimension(sys_size)                :: q_prim
+        type(ic_grid)                                          :: g
+        integer                                                :: i
+
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), allocatable, dimension(:,:,:) :: patch_id_fp
+#else
+        integer, allocatable, dimension(:,:,:) :: patch_id_fp
+#endif
+
+        g%m = m; g%n = n; g%p = p
+        g%x_cc = x_cc; g%dx_min = minval(dx(0:m))
+        if (n > 0) then
+            g%y_cc = y_cc; g%dy_min = minval(dy(0:n))
+        end if
+        if (p > 0) then
+            g%z_cc = z_cc; g%dz_min = minval(dz(0:p))
+        end if
+        allocate (patch_id_fp(0:m,0:n,0:p)); patch_id_fp = 0
+        do i = 1, sys_size
+            allocate (q_prim(i)%sf(0:m,0:n,0:p)); q_prim(i)%sf = 0._wp
+        end do
+        call s_apply_icpp_patches(patch_id_fp, q_prim, g)
+        call s_convert_primitive_to_conservative_variables(q_prim, q_cons)
+        do i = 1, sys_size
+            deallocate (q_prim(i)%sf)
+        end do
+
+    end subroutine s_amr_ic_on_frame
 
 end module m_amr_stage

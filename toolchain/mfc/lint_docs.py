@@ -19,6 +19,9 @@ DOCS = [
     "docs/documentation/troubleshooting.md",
     "docs/documentation/visualization.md",
     "docs/documentation/expectedPerformance.md",
+    "docs/documentation/validation.md",
+    "docs/documentation/validation_tsc_annulus.md",
+    "docs/documentation/validation_cyl_drag_nu.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]
@@ -54,6 +57,9 @@ CASE_MD_SKIP = {
     "xc",
     "yc",
     "zc",
+    "dx",
+    "dy",
+    "dz",
     "x_cb",
     # Stress tensor component names (descriptive, not params)
     "tau_xx",

@@ -260,6 +260,14 @@ module m_derived_types
         real(wp) :: end
     end type bounds_info
 
+    !> Grid the initial condition patches are evaluated on
+    type ic_grid
+        integer                             :: m, n, p                 !< Last cell index in each direction
+        real(wp), allocatable, dimension(:) :: x_cc, y_cc, z_cc        !< Cell centers, from index 0
+        real(wp)                            :: dx_min, dy_min, dz_min  !< Smallest cell widths
+        logical                             :: hardcoded = .false.     !< The pre_process grid that hard-coded patches (hcid) assume
+    end type ic_grid
+
     !> Defines parameters for a Model Patch
     type ic_model_parameters
         character(LEN=pathlen_max) :: filepath   !< Path the STL file relative to case_dir.
@@ -403,6 +411,8 @@ module m_derived_types
         real(wp) :: rho_solid, cp_solid  !< Solid density [kg/m^3] and heat capacity [J/kg/K] (thermal_bc = 3)
         real(wp) :: emissivity, T_rad    !< Surface emissivity and radiative surroundings temperature [K] (thermal_bc = 3)
         real(wp) :: heat_power           !< Heat supplied to the body, e.g. Joule heating [W; W/m per unit depth in 2D]
+        logical  :: wall_column          !< Sub-grid wall-normal conduction column per first-layer ghost (m_ib_wall_column)
+        real(wp) :: wall_column_len      !< Column length [m]; 0 = 0.15 radius
 
         ! Heterogeneous surface reaction    0 = none    1 = enabled
         integer :: surface_reaction
@@ -414,8 +424,9 @@ module m_derived_types
         real(wp) :: mass, moment  !< mass and moment of inertia of object used to compute forces in 2-way coupling
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB
         !> Last step's gasification rate and face mass out [kg/s], and fluid heat in [W] (ib_heat_wrt; per unit depth in 2D)
-        real(wp)                 :: mdot, mdot_face, qdot
-        real(wp)                 :: mass_bank         !< ib_mass_relax bank read from a restart; only s_read_ib_restart_data sets it
+        real(wp) :: mdot, mdot_face, qdot
+        !> ib_mass_relax bank: set from a restart, advanced by the owner rank, moved with the body at a handoff
+        real(wp)                 :: mass_bank
         real(wp), dimension(1:3) :: vel
         real(wp), dimension(1:3) :: step_vel          !< velocity array used to store intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: angular_vel

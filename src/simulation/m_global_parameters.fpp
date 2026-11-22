@@ -496,6 +496,7 @@ contains
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
+        weno_Re_flux_compact = .false.
         riemann_hypo_ADC = .false.
         ADC_kappa = 1.0_wp
         hll_u_interface = .false.
@@ -540,6 +541,8 @@ contains
         chem_params%adap_substeps = .false.
         chem_params%reaction_substeps_max = 0
         chem_params%transport_dt = .false.
+
+        call s_assign_ic_patch_defaults
 
         num_bc_patches = 0
         bc_io = .false.
@@ -653,6 +656,7 @@ contains
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
+        ib_friction_slip_eps = 0._wp
         ib_state_wrt = .false.
         rank_time_wrt = .false.
         amr = .false.
@@ -690,6 +694,7 @@ contains
         ib_ip_interp = 1
         ib_wall_order = 1
         ib_mass_relax = -1
+        wall_column_dt_frac = 0.1_wp
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
         ib_uncover_fill = .false.
@@ -881,6 +886,8 @@ contains
             patch_ib(i)%emissivity = 0._wp
             patch_ib(i)%T_rad = 0._wp
             patch_ib(i)%heat_power = 0._wp
+            patch_ib(i)%wall_column = .false.
+            patch_ib(i)%wall_column_len = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp

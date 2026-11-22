@@ -140,6 +140,8 @@ contains
         !            bub_pp guard, lag_params guard, chem_params guard
         #:include 'generated_bcast.fpp'
 
+        call s_mpi_bcast_icpp_patches
+
         ! manual: m_glb, n_glb, p_glb (computed in s_read_input_file, not namelist-bound)
         call MPI_BCAST(m_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(n_glb, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
@@ -204,7 +206,8 @@ contains
         do i = 1, num_ibs
             #:for VAR in [ 'radius', 'length_x', 'length_y', 'length_z', &
                 & 'x_centroid', 'y_centroid', 'z_centroid', 'slip', 'mass', 'v_blow', &
-                & 'Twall', 'rho_solid', 'cp_solid', 'emissivity', 'T_rad', 'heat_power', 'burn_rate_exp', 'burn_rate_pref']
+                & 'Twall', 'rho_solid', 'cp_solid', 'emissivity', 'T_rad', 'heat_power', 'burn_rate_exp', 'burn_rate_pref', &
+                & 'wall_column_len']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
             #:for VAR in ['vel', 'angular_vel', 'angles', 'kin_hinge', 'kin_offset']
@@ -222,6 +225,7 @@ contains
             call MPI_BCAST(patch_ib(i)%inj_species, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%thermal_bc, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%surface_reaction, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(patch_ib(i)%wall_column, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         end do
 
         ! manual: ib_airfoil (kept manual alongside patch_ib)

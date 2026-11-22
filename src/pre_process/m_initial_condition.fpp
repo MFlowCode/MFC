@@ -111,13 +111,20 @@ contains
     !! converted to conservative ones.
     impure subroutine s_generate_initial_condition
 
-        integer :: i
+        integer       :: i
+        type(ic_grid) :: g
 
         if (old_ic) then
             call s_convert_conservative_to_primitive_variables(ic%q_cons_vf, ic%q_T_sf, ic%q_prim_vf, idwbuff)
         end if
 
-        call s_apply_icpp_patches(ic%patch_id_fp, ic%q_prim_vf)
+        g%m = m; g%n = n; g%p = p
+        g%hardcoded = .true.
+        g%dx_min = dx_min; g%dy_min = dy_min; g%dz_min = dz_min
+        g%x_cc = x_cc
+        if (n > 0) g%y_cc = y_cc
+        if (p > 0) g%z_cc = z_cc
+        call s_apply_icpp_patches(ic%patch_id_fp, ic%q_prim_vf, g)
 
         if (num_bc_patches > 0) call s_apply_boundary_patches(ic%q_prim_vf, ic%bc_type)
 

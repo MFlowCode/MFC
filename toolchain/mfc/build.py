@@ -692,17 +692,24 @@ def compiler_fingerprint() -> str:
     return ";".join(parts)
 
 
+_COMPILER_VERSIONS: typing.Dict[tuple, str] = {}
+
+
 def _compiler_version(exe: str) -> str:
     """First line of `exe --version`, or "" if it does not answer.
 
     Wrappers (Cray ftn/cc/CC under another PrgEnv, OpenMPI mpifort with OMPI_FC) resolve to the same path while selecting a
-    different compiler, so the path alone cannot tell them apart.
+    different compiler, so the path alone cannot tell them apart. Probed once per environment: a slug is computed many times
+    per case.
     """
-    try:
-        out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10, check=False).stdout
-    except (OSError, subprocess.SubprocessError):
-        return ""
-    return next((line.strip() for line in out.splitlines() if line.strip()), "")
+    key = (exe, tuple(sorted(os.environ.items())))
+    if key not in _COMPILER_VERSIONS:
+        try:
+            out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10, check=False).stdout
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        _COMPILER_VERSIONS[key] = next((line.strip() for line in out.splitlines() if line.strip()), "")
+    return _COMPILER_VERSIONS[key]
 
 
 _CMAKE_COMPILER_RE = re.compile(r"^CMAKE_(C|CXX|Fortran)_COMPILER:[A-Z]+=(.+)$")

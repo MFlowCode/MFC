@@ -40,7 +40,7 @@ def slurm(tmp_path):
     return tmp_path, binz, configure
 
 
-def run_script(tmp_path, binz, name, *args):
+def run_script(tmp_path, binz, name, *args, **extra_env):
     env = {
         **os.environ,
         "PATH": f"{binz}:{os.environ['PATH']}",
@@ -48,6 +48,7 @@ def run_script(tmp_path, binz, name, *args):
         # cost ~36s in every PR's Lint Gate.
         "MFC_MONITOR_POLL_SECONDS": "0",
         "MFC_MONITOR_RECHECK_SECONDS": "0",
+        **extra_env,
     }
     return subprocess.run(
         ["bash", str(SCRIPTS / name), *args],
@@ -143,3 +144,14 @@ def test_an_infrastructure_fault_still_outranks_the_state(slurm, state):
     tmp_path, binz, configure = slurm
     out = configure("77:0", state=state)
     assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 77
+
+
+def test_a_job_that_never_starts_is_cancelled_and_reported_as_queue_starvation(slurm):
+    """A pending job holds a CI runner slot; past the queue budget it is cancelled with exit 75."""
+    tmp_path, binz, configure = slurm
+    configure("0:0", state="PENDING")
+    _exe(binz / "squeue", "#!/bin/bash\necho PENDING\n")
+    _exe(binz / "scancel", f'#!/bin/bash\necho "$@" >> {tmp_path}/cancelled\n')
+    result = run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(tmp_path / "never.out"), SLURM_MAX_QUEUE_SECONDS="1")
+    assert result.returncode == 75
+    assert "1234" in (tmp_path / "cancelled").read_text()

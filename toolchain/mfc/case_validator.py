@@ -1053,6 +1053,21 @@ class CaseValidator:
                     f"patch_ib({i})%thermal_layer > 0 requires a circle (geometry 2) or sphere (geometry 8)",
                 )
 
+            # Sub-grid wall column: a radial conduction model on a fixed inert isothermal circle or sphere, whose flux reaches the gas
+            # through the mixture-averaged conduction flux. A step start's column flux sets the time step (wall_column_dt_frac).
+            self.prohibit((self.get(f"patch_ib({i})%wall_column_len", 0.0) or 0.0) < 0, f"patch_ib({i})%wall_column_len must be >= 0")
+            if self.get(f"patch_ib({i})%wall_column", "F") == "T":
+                pre = f"patch_ib({i})%wall_column"
+                self.prohibit(thermal_bc != 1, f"{pre} requires thermal_bc = 1")
+                self.prohibit(not chemistry or self.get("chem_params%diffusion", "F") != "T", f"{pre} requires chemistry = T and chem_params%diffusion = T")
+                self.prohibit(self.get("chem_params%transport_model", 1) != 1, f"{pre} requires chem_params%transport_model = 1")
+                self.prohibit(surface_reaction != 0, f"{pre} requires surface_reaction = 0")
+                self.prohibit(self.get(f"patch_ib({i})%geometry", 0) not in (2, 8), f"{pre} requires a circle (geometry 2) or sphere (geometry 8)")
+                self.prohibit(moving, f"{pre} requires every immersed boundary to be fixed (moving_ibm = 0)")
+                self.prohibit(self.get("amr", "F") == "T", f"{pre} is not supported with amr")
+                self.prohibit(self.get("cfl_adap_dt", "F") != "T" and self.get("cfl_const_dt", "F") != "T", f"{pre} requires cfl_adap_dt or cfl_const_dt (the WCOL time-step limit)")
+                self.prohibit(not 0 < (self.get("wall_column_dt_frac", 0.1) or 0.1) <= 1, "wall_column_dt_frac must be in (0, 1]")
+
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
                 self.prohibit(inj_species > 0, f"patch_ib({i})%surface_reaction = 1 cannot be combined with inj_species > 0")
@@ -1081,10 +1096,15 @@ class CaseValidator:
         moving_any = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in bodies)
         self.prohibit(ib_flux_wall and moving_any, "ib_flux_wall requires every immersed boundary to be fixed (moving_ibm = 0)")
         self.prohibit(ib_flux_wall and self.get("hypoelasticity", "F") == "T", "ib_flux_wall is not supported with hypoelasticity")
+        # the wall fields live on the coarse grid only
+        self.prohibit(ib_flux_wall and self.get("amr", "F") == "T", "ib_flux_wall is not supported with amr")
         for i in reacting:
             self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
         ib_second_order_vel = self.get("ib_second_order_vel", "F") == "T"
+        friction_eps = self.get("ib_friction_slip_eps")
+        self.prohibit(friction_eps is not None and friction_eps < 0, "ib_friction_slip_eps must be >= 0")
+        self.prohibit(friction_eps is not None and friction_eps > 0 and not self.get("collision_model"), "ib_friction_slip_eps requires collision_model > 0")
         ib_ip_min_dist = self.get("ib_ip_min_dist")
         self.prohibit(ib_second_order_vel and not ib, "ib_second_order_vel requires ib to be enabled")
         self.prohibit(ib_ip_min_dist is not None and not ib_second_order_vel, "ib_ip_min_dist requires ib_second_order_vel to be enabled")
@@ -1868,6 +1888,8 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+        self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and not weno_Re_flux, "weno_Re_flux_compact requires weno_Re_flux")
+        self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "weno_Re_flux_compact requires Cartesian coordinates")
 
     def check_heat_conduction(self):
         """Checks constraints on Fourier heat conduction parameters (fluid_pp(i)%k_therm)"""

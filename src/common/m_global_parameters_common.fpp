@@ -105,6 +105,15 @@ module m_global_parameters_common
     integer                 :: mpi_info_int
     !> @}
 
+    !> @name Set by pre_process only; read by the hard-coded initial conditions
+    !> @{
+    !> Global (pre-decomposition) domain bounds, needed by s_generate_serial_grid to stretch the grid using the full domain length
+    !! rather than a local processor's sub-domain length
+    type(bounds_info)         :: x_domain_glb, y_domain_glb, z_domain_glb
+    character(LEN=2*path_len) :: interface_file
+    real(wp)                  :: normFac, normMag, g0_ic, p0_ic
+    !> @}
+
 contains
 
     !> Initialize equation-index state (eqn_idx and sys_size) from the namelist parameters. This is the shared skeleton: it covers
@@ -423,5 +432,84 @@ contains
         dz_min = dflt_real
 
     end subroutine s_assign_common_defaults
+
+    !> Assign default values to the initial condition patch inputs (pre_process and simulation)
+    impure subroutine s_assign_ic_patch_defaults
+
+        integer :: i
+
+        num_patches = dflt_int
+        file_extension = '000000'
+        files_dir = './'
+        mixlayer_vel_profile = .false.
+        mixlayer_vel_coef = 1._wp
+        sigV = dflt_real
+        rhoRV = 0._wp
+        dist_type = dflt_int
+
+        do i = 1, num_patches_max
+            patch_icpp(i)%geometry = dflt_int
+            patch_icpp(i)%model_id = 0
+            patch_icpp(i)%x_centroid = dflt_real
+            patch_icpp(i)%y_centroid = dflt_real
+            patch_icpp(i)%z_centroid = dflt_real
+            patch_icpp(i)%length_x = dflt_real
+            patch_icpp(i)%length_y = dflt_real
+            patch_icpp(i)%length_z = dflt_real
+            patch_icpp(i)%radius = dflt_real
+            patch_icpp(i)%epsilon = dflt_real
+            patch_icpp(i)%beta = dflt_real
+            patch_icpp(i)%normal = dflt_real
+            patch_icpp(i)%radii = dflt_real
+            patch_icpp(i)%alter_patch = .false.
+            patch_icpp(i)%alter_patch(0) = .true.
+            patch_icpp(i)%smoothen = .false.
+            patch_icpp(i)%smooth_patch_id = i
+            patch_icpp(i)%smooth_coeff = dflt_real
+            patch_icpp(i)%alpha_rho = dflt_real
+            patch_icpp(i)%rho = dflt_real
+            patch_icpp(i)%vel = dflt_real
+            patch_icpp(i)%pres = dflt_real
+            patch_icpp(i)%alpha = dflt_real
+            patch_icpp(i)%gamma = dflt_real
+            patch_icpp(i)%pi_inf = dflt_real
+            patch_icpp(i)%cv = 0._wp
+            patch_icpp(i)%qv = 0._wp
+            patch_icpp(i)%qvp = 0._wp
+            patch_icpp(i)%tau_e = 0._wp
+            patch_icpp(i)%Bx = dflt_real
+            patch_icpp(i)%By = dflt_real
+            patch_icpp(i)%Bz = dflt_real
+            patch_icpp(i)%a(2) = dflt_real
+            patch_icpp(i)%a(3) = dflt_real
+            patch_icpp(i)%a(4) = dflt_real
+            patch_icpp(i)%a(5) = dflt_real
+            patch_icpp(i)%a(6) = dflt_real
+            patch_icpp(i)%a(7) = dflt_real
+            patch_icpp(i)%a(8) = dflt_real
+            patch_icpp(i)%a(9) = dflt_real
+            patch_icpp(i)%non_axis_sym = .false.
+            patch_icpp(i)%fourier_cos(:) = 0._wp
+            patch_icpp(i)%fourier_sin(:) = 0._wp
+            patch_icpp(i)%modal_clip_r_to_min = .false.
+            patch_icpp(i)%modal_r_min = 1.e-12_wp
+            patch_icpp(i)%modal_use_exp_form = .false.
+            patch_icpp(i)%sph_har_coeff(:,:) = 0._wp
+
+            ! should get all of r0's and v0's
+            patch_icpp(i)%r0 = dflt_real
+            patch_icpp(i)%v0 = dflt_real
+
+            patch_icpp(i)%p0 = dflt_real
+            patch_icpp(i)%m0 = dflt_real
+
+            patch_icpp(i)%hcid = dflt_int
+
+            if (chemistry) then
+                patch_icpp(i)%Y(:) = 0._wp
+            end if
+        end do
+
+    end subroutine s_assign_ic_patch_defaults
 
 end module m_global_parameters_common

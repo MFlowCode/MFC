@@ -354,7 +354,7 @@ contains
         integer, allocatable :: slo(:,:), shi(:,:), sts(:), ste(:), wt(:,:), sdep(:), sig(:), ovr(:)
         integer, allocatable :: kpos(:), kbat(:), bofs(:), blen(:), boff(:,:), bsig(:), bnov(:), bovr(:,:)
         logical, allocatable :: bwide(:)
-        integer              :: cap, mg, ng, pg, t, i, j, ncur, nnxt, nkeep, nbat, nbuf, novr, nsig, ntag, dep
+        integer              :: cap, mg, ng, pg, t, i, j, ncur, nnxt, nkeep, nbat, nbuf, novr, nsig, ntag, dep, near
         integer              :: blo0(3), bhi0(3), off(3), blo(3), bhi(3), ts, te, lo, sax, spos
         integer(8)           :: vol  !< a global-bbox first pass can exceed 2**31 cells
         logical              :: ok, force, mine
@@ -394,9 +394,9 @@ contains
                 call s_amr_box_sig(wt, sts(i), ste(i), blo0, bhi0, sig, off, nsig)
                 nkeep = nkeep + 1; kpos(nkeep) = i; kbat(nkeep) = 0
                 if (reduce .and. num_procs > 1 .and. novr > 1) then
-                    call s_amr_size_int(bsig, nbuf + nsig)
+                    call s_amr_size_int(bsig, nbuf + nsig + 1)
                     nbat = nbat + 1; kbat(nkeep) = nbat
-                    bofs(nbat) = nbuf; blen(nbat) = nsig; boff(:,nbat) = off
+                    bofs(nbat) = nbuf; blen(nbat) = nsig + 1; boff(:,nbat) = off  ! + the near-cap flag, set below
                     bnov(nbat) = novr; bwide(nbat) = (novr > amr_cl_wide)
                     bovr(1, nbat) = -1  ! defined for wide nodes too: Fortran does not promise .or. short-circuits
                     if (.not. bwide(nbat)) then
@@ -404,8 +404,15 @@ contains
                         bovr(1:novr,nbat) = ovr(1:novr)
                     end if
                     bsig(nbuf + 1:nbuf + nsig) = sig(1:nsig)
-                    nbuf = nbuf + nsig
+                    nbuf = nbuf + nsig + 1
                 end if
+            end do
+            ! Near the amr_max_blocks cap (every kept node splitting bounds the pass-2 count below) a node is accepted unsplit. A
+            ! shared node must get the same decision on every rank it overlaps, or their next-depth batches differ: each rank's
+            ! flag rides the node's reduction, and the node is forced if any of them is set.
+            near = merge(1, 0, nacc + 2*nkeep >= cap)
+            do j = 1, nbat
+                bsig(bofs(j) + blen(j)) = near
             end do
 #ifdef MFC_MPI
             call s_cl_reduce_depth(nbat, bsig, bofs, blen, bnov, bwide, bovr)
@@ -414,10 +421,13 @@ contains
             do j = 1, nkeep
                 i = kpos(j); blo = slo(:,i); bhi = shi(:,i); ts = sts(i); te = ste(i); dep = sdep(i)
                 blo0 = blo; bhi0 = bhi
+                ! guard against overflowing the amr_max_blocks cap: pending = rest of this depth + children queued so far
+                force = (nacc + (nkeep - j) + nnxt + 1 >= cap)
                 if (kbat(j) > 0) then
                     off = boff(:,kbat(j))
-                    sig(1:blen(kbat(j))) = bsig(bofs(kbat(j)) + 1:bofs(kbat(j)) + blen(kbat(j)))
-                    nsig = blen(kbat(j))
+                    nsig = blen(kbat(j)) - 1
+                    sig(1:nsig) = bsig(bofs(kbat(j)) + 1:bofs(kbat(j)) + nsig)
+                    force = bsig(bofs(kbat(j)) + nsig + 1) > 0
                 else
                     ! rank-local node: recompute (safe, pass 2 only partitions this node's own wt range)
                     call s_amr_box_sig(wt, ts, te, blo0, bhi0, sig, off, nsig)
@@ -428,8 +438,6 @@ contains
                 do t = 1, num_dims; vol = vol*int(bhi(t) - blo(t) + 1, 8); end do
                 eff = real(ntag, wp)/real(max(vol, 1_8), wp)
                 call s_amr_find_split_sig(sig(1:nsig), off, blo0, blo, bhi, sax, spos, ok)
-                ! guard against overflowing the amr_max_blocks cap: pending = rest of this depth + children queued so far
-                force = (nacc + (nkeep - j) + nnxt + 1 >= cap)
                 if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
                     if (nacc < cap) then; nacc = nacc + 1; alo(:,nacc) = blo; ahi(:,nacc) = bhi; end if
                     if (force .and. ok .and. eff < amr_cluster_eff) capped = .true.
@@ -474,12 +482,11 @@ contains
 
     end subroutine s_cl_morton_sort
 
-    !> Min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding box. The
-    !! fusion sequence is the linear walk (scan in list order, fuse the first too-close pair, restart), reproduced exactly with O(1)
-    !! unlinking and a binned candidate search: a too-close partner of i lies within the 3^d bins around i's lo when the bin width
-    !! is ext_max + thr, and the minimum surviving index among candidates is the first one a linear walk meets. After fusing (i, j)
-    !! only box i changed, so the walk re-tests earlier survivors (minimum index first), then later ones, then resumes at the
-    !! survivor's successor. Bins are rebuilt when a grown box outgrows the cell width.
+    !> Min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding box.
+    !! Fusing only shrinks gaps, so the fixed point (groups with mutually separated bounding boxes) does not depend on the fusion
+    !! order; a group keeps its lowest index, so the output order does not either. Each box in list order sweeps the 3^d bins around
+    !! its lo (bin width ext_max + thr holds every too-close partner), absorbs every later box found too close and is absorbed by
+    !! the lowest earlier one, until a sweep finds nothing. Bins are rebuilt when a grown box outgrows the cell width.
     impure subroutine s_cl_merge(alo, ahi, nacc)
 
         integer, intent(inout) :: alo(:,:), ahi(:,:), nacc
@@ -487,9 +494,8 @@ contains
         integer, allocatable   :: prv(:)          !< predecessor links
         integer, allocatable   :: bp(:), bidx(:)  !< bin back-links and current bin of each live box
         integer, allocatable   :: bh(:), bc(:)    !< bin heads and per-box chains
-        integer                :: head, nlive, thr, i, k, d, dirty, aa, jb2, jbest, extd
+        integer                :: head, nlive, thr, i, k, d, aa, nfused, extd
         integer                :: blo3(3), bhi3(3), nbmax, rng, ext_max, cellw, nbx, nby, nbz, nb_tot
-        logical                :: need_build
 
         thr = buff_size + 2*amr_buf
         allocate (nxt(max(nacc, 1)), prv(max(nacc, 1)), bp(max(nacc, 1)), bidx(max(nacc, 1)))
@@ -503,49 +509,33 @@ contains
         ! head must be 0 when nothing is tagged (nxt(1) is then unwritten)
         head = merge(1, 0, nacc >= 1); nlive = nacc
         cellw = 0
-        need_build = .true.
+        if (head /= 0) call s_mrg_build()
         i = head
-        outer: do while (i /= 0)
-            if (need_build) then
-                call s_mrg_build()
-                need_build = .false.
-            end if
-            jbest = f_mrg_qmin(i, .true.)
-            if (jbest /= 0) then
-                dirty = i
-                call s_mrg_fuse(dirty, jbest)
-                chain: do
-                    extd = 1
-                    do d = 1, num_dims
-                        extd = max(extd, ahi(d, dirty) - alo(d, dirty) + 1)
+        do while (i /= 0)
+            do
+                extd = 1
+                do d = 1, num_dims
+                    extd = max(extd, ahi(d, i) - alo(d, i) + 1)
+                end do
+                if (extd > cellw - thr) then
+                    do while (extd > cellw - thr)
+                        cellw = cellw*2
                     end do
-                    if (extd > cellw - thr) then
-                        do while (extd > cellw - thr)
-                            cellw = cellw*2
-                        end do
-                        call s_mrg_build()
-                    else if (f_mrg_binof(dirty) /= bidx(dirty)) then
-                        call s_mrg_binun(dirty)
-                        call s_mrg_binreg(dirty)
-                    end if
-                    aa = f_mrg_qmin(dirty, .false.)
-                    if (aa /= 0) then
-                        call s_mrg_fuse(aa, dirty)
-                        dirty = aa
-                        cycle chain
-                    end if
-                    jb2 = f_mrg_qmin(dirty, .true.)
-                    if (jb2 /= 0) then
-                        call s_mrg_fuse(dirty, jb2)
-                        cycle chain
-                    end if
-                    exit chain
-                end do chain
-                i = nxt(dirty)
-            else
-                i = nxt(i)
-            end if
-        end do outer
+                    call s_mrg_build()
+                else if (f_mrg_binof(i) /= bidx(i)) then
+                    call s_mrg_binun(i)
+                    call s_mrg_binreg(i)
+                end if
+                call s_mrg_sweep(i, aa, nfused)
+                if (aa /= 0) then
+                    call s_mrg_fuse(aa, i)
+                    i = aa
+                else if (nfused == 0) then
+                    exit
+                end if
+            end do
+            i = nxt(i)
+        end do
         k = 0  ! compact in list order
         i = head
         do while (i /= 0)
@@ -645,15 +635,16 @@ contains
 
         end subroutine s_mrg_fuse
 
-        !> Minimum-index too-close partner of box ii among the binned candidates above (above = .true.) or below it.
-        integer function f_mrg_qmin(ii, above) result(best)
+        !> One sweep of the bins around box ii: fuse every too-close later box into it (nfused of them) and return the lowest
+        !! too-close earlier box in below (0 if none). ii grows during the sweep, so the caller repeats until nothing is found.
+        subroutine s_mrg_sweep(ii, below, nfused)
 
-            integer, intent(in) :: ii
-            logical, intent(in) :: above
-            integer             :: b3(3), bx, by, bz, dx1, dy1, dz1, jj, d2, zl, zh, yl, yh
-            logical             :: tc
+            integer, intent(in)  :: ii
+            integer, intent(out) :: below, nfused
+            integer              :: b3(3), bx, by, bz, dx1, dy1, dz1, jj, jn, d2, zl, zh, yl, yh
+            logical              :: tc
 
-            best = 0
+            below = 0; nfused = 0
             b3 = merge((alo(:,ii) - blo3)/cellw, 0, amr_dim); bx = b3(1); by = b3(2); bz = b3(3)
             zl = 0; zh = 0; yl = 0; yh = 0
             if (p_glb > 0) then; zl = max(0, bz - 1); zh = min(nbz - 1, bz + 1); end if
@@ -663,20 +654,23 @@ contains
                     do dx1 = max(0, bx - 1), min(nbx - 1, bx + 1)
                         jj = bh(1 + dx1 + nbx*(dy1 + nby*dz1))
                         do while (jj /= 0)
-                            if (merge(jj > ii, jj < ii, above)) then
-                                tc = .true.
-                                do d2 = 1, num_dims
-                                    if (max(alo(d2, ii), alo(d2, jj)) - min(ahi(d2, ii), ahi(d2, jj)) - 1 >= thr) tc = .false.
-                                end do
-                                if (tc .and. (best == 0 .or. jj < best)) best = jj
+                            jn = bc(jj)  ! the fuse unlinks jj from its bin
+                            tc = jj /= ii
+                            do d2 = 1, num_dims
+                                if (max(alo(d2, ii), alo(d2, jj)) - min(ahi(d2, ii), ahi(d2, jj)) - 1 >= thr) tc = .false.
+                            end do
+                            if (tc .and. jj > ii) then
+                                call s_mrg_fuse(ii, jj); nfused = nfused + 1
+                            else if (tc .and. (below == 0 .or. jj < below)) then
+                                below = jj
                             end if
-                            jj = bc(jj)
+                            jj = jn
                         end do
                     end do
                 end do
             end do
 
-        end function f_mrg_qmin
+        end subroutine s_mrg_sweep
 
     end subroutine s_cl_merge
 

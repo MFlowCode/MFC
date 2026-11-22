@@ -10,8 +10,17 @@ AMR adds refined rectangular blocks on top of the base grid (level 0) where the 
 interfaces, wakes, bodies. The base grid is advanced by the ordinary solver; refined blocks run the same solver on
 their own grids, nested up to `amr_max_level` levels at `amr_ref_ratio`:1 per level.
 
-With `amr_regrid_int > 0`, every `amr_regrid_int` steps the blocks are rebuilt around the cells where the density
-gradient exceeds `amr_tag_eps`. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the density gradient exceeds `amr_tag_eps`:
+once per level before the first step of a fresh run, so they start on the initial features, and then every
+`amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+
+On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
+that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
+smoothed initial condition, old data), the simulation prints a note and the blocks start from data interpolated from
+level 0. The step-0 files are pre_process's level-0 data: under a block the run starts from the average of the fine
+data instead, which differs from them where a patch varies within a coarse cell. For a smooth analytic profile
+sampled at cell centers that difference is second order in the cell width; an expression that is the exact cell
+average (it may use `dx`) agrees on every level.
 
 AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overlay the blocks. Internals:
 @subpage amr_implementation.
@@ -27,8 +36,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   level-1 box).
 - **Prolongation.** New blocks and fine ghost cells are filled from the parent level by conservative minmod-limited
   linear interpolation (`amr_prolong = 1`) or conservative quartic interpolation (`amr_prolong = 2`). The quartic fill
-  falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (so a
-  monotone profile stays monotone; only at a local extremum is the range widened), and wherever it would give
+  falls back to limited linear in a cell whose children would leave the range of the neighbouring coarse averages (widened
+  only where the second differences share a sign: at a smooth local extremum and next to one, so a smooth extremum keeps
+  the quartic, a steep monotone front stays monotone, and an overshoot beside a front is not amplified), and wherever it would give
   non-positive density or internal energy. Volume fractions are
   renormalized to sum to one and species mass fractions to `sum(Y) = 1, Y >= 0`. A block that survives a regrid
   keeps its own fine solution.
@@ -36,8 +46,8 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   limit. With a CFL-based time step (`cfl_adap_dt`, `cfl_const_dt`) each coarse cell's limit is that of the finest cell
   covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
   aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
-  largest stable `dt`. With regrid on, start-up also warns if `dt` would exceed that limit were the fastest cells
-  refined to `amr_max_level`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  largest stable `dt`. With regrid on, start-up also aborts if `dt` would exceed that limit were the fastest cells
+  refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
   cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
@@ -47,11 +57,11 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 
 Conservation across coarse/fine faces holds to round-off for single- and multi-fluid, viscous and chemistry cases, and
 a uniform state stays uniform with regrid on. Interiors keep the WENO order; the coarse/fine ghost fill is second
-order (linear) or higher (quartic). For a smooth wave crossing a static block, the measured global rate is about 2.5 with
-either fill (the quartic fill lowers the error about 5x), against 5 for WENO5 on a uniform grid; the
-`Convergence -> 1D -> AMR` tests track it. Results do not depend on message timing, and agree across rank counts to round-off
-when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the block size cap, and therefore the box set, depends
-on the decomposition).
+order (linear) or fifth order (quartic). For a smooth wave crossing a static block, the measured global L2 rate is 2.5 with
+the linear fill (its second-order ghost values leave a second-order error in the few cells at each interface) and 5 with
+the quartic fill, as for WENO5 on a uniform grid; the `Convergence -> 1D -> AMR` tests track it. Results do not depend on
+message timing, and agree across rank counts to round-off when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the
+block size cap, and therefore the box set, depends on the decomposition).
 
 ## Parallelism {#amr-parallel}
 
@@ -157,9 +167,9 @@ against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lo
 - **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
   blast's 54% would need a far larger grid.
 - **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
-- **Accuracy.** In the droplet runs AMR halved the L1 difference from the uniform fine solution (2.5e-4 against 5.0e-4
-  at the 512^2 base), not more: the fine block's initial data is interpolated from level 0, so a sharp initial
-  interface starts at the coarse resolution.
+- **Accuracy.** In the droplet runs the AMR solution reproduces the uniform fine one: the L1 density difference from
+  it is 6.1e-8 at the 512^2 base, against 5.0e-4 for the uniform 512^2 grid. The blocks cover the interface from the
+  first step and start from the patches evaluated at the fine resolution.
 
 ## Limitations {#amr-limitations}
 

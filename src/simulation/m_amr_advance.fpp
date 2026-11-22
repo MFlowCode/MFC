@@ -80,13 +80,23 @@ contains
         call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
         loc_cur = amr_loc_of(amr_cur)
         call s_amr_br_load(loc_cur)
-        call s_ibm_correct_state(amr_cons_br, q_prim_b, pb_in, mv_in)
+        call s_ibm_correct_state(amr_cons_br, q_prim_b, pb_in, mv_in, amr_block_level(amr_cur))
         loc_cur = amr_loc_of(amr_cur)
         call s_amr_br_store(loc_cur)
         call s_ibm_restore_from_fine(amr_cur)
         call s_amr_restore_coarse()
 
     end subroutine s_amr_ib_correct_fine
+
+    !> The clamps after the IB correction on the current fine block; the species cleanup's report reads the block's own markers.
+    impure subroutine s_amr_fine_hooks_post_ib()
+
+        call s_amr_fine_enter()
+        if (chemistry .and. ib) call s_ibm_load_fine_markers(1, [amr_cur], reshape([m, n, p], [3, 1]), 1, 0)
+        call s_stage_hooks_post_ib(amr_cons_br, amr_block_level(amr_cur))
+        call s_amr_fine_leave()
+
+    end subroutine s_amr_fine_hooks_post_ib
 
     !> Rebuild the current fine block's IB state from the moving body's position (prescribed motion, moving_ibm==1) by reusing the
     !! coarse s_update_mib on the swapped-in slot. Must precede s_amr_ib_correct_fine.
@@ -302,11 +312,7 @@ contains
                 call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
                 call s_amr_ib_correct_fine(amr_scr_prim_blk, pb_in, mv_in)
             end if
-            if (post .and. amr_rank_owns_block) then
-                call s_amr_fine_enter()
-                call s_stage_hooks_post_ib(amr_cons_br, tally=.false.)
-                call s_amr_fine_leave()
-            end if
+            if (post .and. amr_rank_owns_block) call s_amr_fine_hooks_post_ib()
         end do
         amr_bat_n = nb
 
@@ -412,11 +418,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
             call s_amr_ib_correct_fine(amr_scr_prim_blk, pb_in, mv_in)
-            if (post) then
-                call s_amr_fine_enter()
-                call s_stage_hooks_post_ib(amr_cons_br, tally=.false.)
-                call s_amr_fine_leave()
-            end if
+            if (post) call s_amr_fine_hooks_post_ib()
         end do
         amr_bat_n = 0
         amr_ibp_n = 0

@@ -48,6 +48,11 @@ def test_a_cleanup_that_moves_real_mass_fails():
         _assert_species_bounds(_case(), _pack([[0.25, 1.0], [0.75, 0.0]]), CLEAN + "Species cleanup at step 9: 40 cell cleanings, sum |d rho| =  3.2E-03\n")
 
 
+def test_a_cleanup_on_an_amr_fine_level_is_checked_too():
+    with pytest.raises(MFCException, match="clean-up at step 9"):
+        _assert_species_bounds(_case(), _pack([[0.25, 1.0], [0.75, 0.0]]), "Species cleanup at step 9, AMR level 2: 40 cell cleanings, sum |d rho| =  3.2E-03\n")
+
+
 def test_missing_output_is_an_error_not_a_pass():
     with pytest.raises(MFCException, match="no D/cons"):
         _assert_species_bounds(_case(), Pack(), "")

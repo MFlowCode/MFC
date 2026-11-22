@@ -66,8 +66,11 @@ else:
         **({"teno_CT": args.teno_ct} if args.teno else {}),
     }
 
+# AMR fills each level from this expression, so it is the exact cell average there: point values differ between levels.
+rho_ic = "1.0 + 0.2 * sin(2.0 * pi * x / lx)"
 amr_params = {}
 if args.amr:
+    rho_ic += " * sin(pi * dx / lx) / (pi * dx / lx)"
     amr_params = {
         "amr": "T",
         "amr_block_beg(1)": N // 4,
@@ -114,7 +117,7 @@ print(
             "patch_icpp(1)%length_x": L,
             "patch_icpp(1)%vel(1)": 1.0,
             "patch_icpp(1)%pres": 1.0,
-            "patch_icpp(1)%alpha_rho(1)": "1.0 + 0.2 * sin(2.0 * pi * x / lx)",
+            "patch_icpp(1)%alpha_rho(1)": rho_ic,
             "patch_icpp(1)%alpha(1)": 1.0,
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
             "fluid_pp(1)%eos": "ideal_gas",
