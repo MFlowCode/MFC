@@ -4039,6 +4039,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Registered below at their own sizes (12 cells per radius, 8 cells across the gap): the 25-cell cap would change the wall resolution they test
                 "2D_ibm_taylor_couette",
                 "2D_ibm_plane_poiseuille",
+                # Registered below at 12 cells per radius: at the 25-cell cap the gap holds about 4 cells
+                "2D_ibm_conduction_annulus",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
             ]
@@ -4643,6 +4645,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # does not. override_tol is TOL_PLACEHOLDER.
     cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
     cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-6))
+
+    # Isothermal conduction annulus (inner circle, outer STL ring) against the exact ln(r) profile, with inverse-distance and TSC
+    # image points. 12 cells per radius (64 x 64) and 300 steps (about 3 conduction times). The gas starts on the exact profile, so the run
+    # stays close to the steady state and the golden is a regression guard; check_annulus.py validates the physics. Golden generated with
+    # GNU 13 (CPU, double); AMD MI300A amdflang (GPU) and GNU debug agree to 1e-14 absolute and 1e-11 relative. override_tol = 1e-6 leaves
+    # room for the other CPU architectures of the CI lanes (cf. the moving-body tests); the single-precision lane passes against the
+    # double golden.
+    for label, args in (("Inverse Distance", []), ("TSC", ["--interp", "2"])):
+        cases.append(
+            define_case_f(f"2D -> IBM -> Conduction Annulus -> {label}", "examples/2D_ibm_conduction_annulus/case.py", args=[*args, "--steps", "300"], mods={"parallel_io": "F"}, override_tol=1e-6)
+        )
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
