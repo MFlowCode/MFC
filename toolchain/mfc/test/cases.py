@@ -1803,6 +1803,53 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "IBM -> Periodic Bodies -> many_ib_patch_parallelism", ibs))
 
         if len(dimInfo[0]) == 2 and not viscous:
+            # Soft-sphere friction across the x = 10 rank seam: two circles close head-on, so the slip is round-off. With
+            # ib_friction_slip_eps = 0 that round-off sets a full mu*|F_n| force whose direction depends on the rank layout (the
+            # y force of 1 and 2 ranks has opposite sign from step 80, 0.13 apart); with it both stay ~1e-4. A seam transient in the
+            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. override_tol: the golden is
+            # from Cray Fortran; the GNU/Intel/macOS CI lanes agree with each other to 1e-13 and differ from it by up to 3.2e-5
+            # (1 fluid) and 9.1e-6 (2 fluids), abs, in the energy; 3e-4 is ~10x that and far below the 0.13 sign flip it guards.
+            def friction_box(box, bodies, steps, eps, mu, **extra):
+                # still uniform gas in a periodic box of side box (0.25 cells), soft-sphere circles (x, y, vx, vy), mass 1
+                cells = round(box / 0.25) - 1
+                return {
+                    "ib": "T",
+                    "num_ibs": len(bodies),
+                    "fd_order": 2,
+                    "x_domain%end": box,
+                    "y_domain%end": box,
+                    "m": cells,
+                    "n": cells,
+                    "dt": 0.04,
+                    "t_step_stop": steps,
+                    "t_step_save": steps,
+                    "mapped_weno": "T",
+                    "mp_weno": "T",
+                    **{f"bc_{d}%{e}": -1 for d in "xy" for e in ("beg", "end")},
+                    **{
+                        f"patch_icpp({i})%{k}": v
+                        for i in range(1, 4)
+                        for k, v in [("x_centroid", box / 2), ("y_centroid", box / 2), ("length_x", box), ("length_y", box), ("vel(1)", 0.0), ("pres", 1.0), ("alpha_rho(1)", 1.0)]
+                    },
+                    "collision_model": 1,
+                    "coefficient_of_restitution": 0.9,
+                    "collision_time": 0.8,
+                    "ib_coefficient_of_friction": mu,
+                    "ib_friction_slip_eps": eps,
+                    **{
+                        f"patch_ib({i})%{k}": v
+                        for i, (x, y, ux, uy) in enumerate(bodies, 1)
+                        for k, v in [("geometry", 2), ("x_centroid", x), ("y_centroid", y), ("radius", 0.5), ("slip", "F"), ("moving_ibm", 2), ("mass", 1.0), ("vel(1)", ux), ("vel(2)", uy)]
+                    },
+                    **extra,
+                }
+
+            seam_pair = friction_box(20.0, [(9.35, 15.0, 0.3, 0.0), (10.65, 15.0, -0.3, 0.0)], 100, 0.003, 0.1)
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=3e-4))
+            # Wall site: a circle pressed into the slip wall y = 0 at 0.1 with a 1e-4 slide. Without ib_friction_slip_eps the friction
+            # force flips sign every step with magnitude mu*|F_n|; with it the slide dies out.
+            wall_slide = friction_box(10.0, [(5.0, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=3e-4))
             cases.append(
                 define_case_d(
                     stack,
@@ -2817,6 +2864,52 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             for _ in range(6):
                 stack.pop()
+
+        # Plane Poiseuille channel, no-slip walls, impulsive start, constant mu: weno_Re_flux_compact removes the wall-row velocity
+        # sawtooth of the WENO viscous gradient. The option-off behaviour is covered by the existing weno_Re_flux goldens.
+        if len(dimInfo[0]) == 2:
+            mu, ny, dy, u0 = 0.02, 32, 1.0 / 32, 0.02
+            channel = {
+                "m": 24,
+                "n": ny - 1,
+                "x_domain%end": 25 * dy,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "dt": 0.4 * dy / (1.0 + u0),
+                "t_step_stop": 440,
+                "t_step_save": 440,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -16,
+                "bc_y%end": -16,
+                "viscous": "T",
+                "weno_order": 5,
+                "mapped_weno": "T",
+                "weno_Re_flux": "T",
+                "weno_avg": "T",
+                "weno_Re_flux_compact": "T",
+                "riemann_solver": 1,
+                "fluid_pp(1)%gamma": 2.5,
+                "fluid_pp(1)%Re(1)": 1.0 / mu,
+                "mean_dpdx(1)": -12.0 * mu * u0,
+                **{
+                    f"patch_icpp({i})%{key}": val
+                    for i in (1, 2, 3)  # the three default patches all hold the same uniform state
+                    for key, val in {
+                        "geometry": 3,
+                        "x_centroid": 12.5 * dy,
+                        "y_centroid": 0.5,
+                        "length_x": 25 * dy,
+                        "length_y": 1.0,
+                        "vel(1)": u0,
+                        "vel(2)": 0.0,
+                        "pres": 1.0 / 1.4,
+                        "alpha_rho(1)": 1.0,
+                        "alpha(1)": 1.0,
+                    }.items()
+                },
+            }
+            cases.append(define_case_d(stack, "Viscous Channel -> weno_Re_flux -> weno_Re_flux_compact", channel, override_tol=1e-6))
 
     def alter_particles(dimInfo):
         # Lagrangian solid particles; input/particles.dat is written by create_input_particles
@@ -4693,6 +4786,34 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
             # the golden keeps seven decimals: one last-digit flip on a value near 750 is 1.3e-10 (seen with Intel)
             override_tol=1e-9,
+        )
+    )
+
+    # The sub-grid wall conduction column (patch_ib%wall_column) on an inert isothermal cylinder in the same example: the column's
+    # wall flux, its time-step limit (wall_column_dt_frac) and its heat booking (ib_heat_wrt).
+    wall_column = {
+        "m": 24,
+        "n": 24,
+        "parallel_io": "F",
+        "t_stop": 2.0e-5,
+        "t_save": 2.0e-5,
+        "patch_ib(1)%surface_reaction": 0,
+        "patch_ib(1)%wall_column": "T",
+        "ib_heat_wrt": "T",
+    }
+    # 1e-4: the golden was generated with nvhpc on an A100. The amdflang MI300A run differs from it by up to 4e-8 relative in the
+    # energy and 1e-7 absolute in a mole fraction, and the Intel CPU run by 2e-6 relative in a conservative variable (1.2e-6 in
+    # another, 1.2e-6 absolute in a 7e-5 mole fraction): the column's implicit solves and the time-step limit pass roundoff on.
+    cases.append(define_case_f("2D -> Chemistry -> IBM Reacting Surface -> Wall Column", "examples/2D_ibm_reacting_surface/case.py", mods=wall_column, override_tol=1e-4))
+    # 1e-3: with the limit binding, the end state follows the step sequence to first order (a 0.1 % change of wall_column_dt_frac moves
+    # a momentum entry by 1.6e-3). Against the nvhpc A100 golden, a CCE CPU run agrees to 1.5e-10 relative, but the Intel (ifx) release
+    # CPU run differs by up to 1.5e-4 absolute (7.7e-4 relative at a near-zero entry); the Intel reldebug run passes at 1e-4.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Wall Column -> Time-Step Limit",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={**wall_column, "wall_column_dt_frac": 1.0e-3},
+            override_tol=1e-3,
         )
     )
 

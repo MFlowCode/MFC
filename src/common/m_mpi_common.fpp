@@ -138,6 +138,11 @@ contains
         proc_rank = 0
 #endif
 
+        ! First device operation, on the default device: with NVHPC OpenMP offload a rank's first one must come before
+        ! omp_set_default_device moves it to another GPU, or its later allocations fail with CUDA_ERROR_INVALID_CONTEXT. The
+        ! bound device gets its own copy in s_initialize_mpi_domain.
+        $:GPU_UPDATE(device='[num_procs, proc_rank]')
+
     end subroutine s_mpi_initialize
 
     !> Set up MPI I/O data views and variable pointers for parallel file output.

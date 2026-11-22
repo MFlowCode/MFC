@@ -411,6 +411,8 @@ module m_derived_types
         real(wp) :: rho_solid, cp_solid  !< Solid density [kg/m^3] and heat capacity [J/kg/K] (thermal_bc = 3)
         real(wp) :: emissivity, T_rad    !< Surface emissivity and radiative surroundings temperature [K] (thermal_bc = 3)
         real(wp) :: heat_power           !< Heat supplied to the body, e.g. Joule heating [W; W/m per unit depth in 2D]
+        logical  :: wall_column          !< Sub-grid wall-normal conduction column per first-layer ghost (m_ib_wall_column)
+        real(wp) :: wall_column_len      !< Column length [m]; 0 = 0.15 radius
 
         ! Heterogeneous surface reaction    0 = none    1 = enabled
         integer :: surface_reaction

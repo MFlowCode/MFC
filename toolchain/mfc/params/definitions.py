@@ -646,6 +646,7 @@ def _load():
     for n in ["mapped_weno", "wenoz", "teno", "weno_avg", "mp_weno", "null_weights"]:
         _r(n, LOG, {"weno"})
     _r("weno_Re_flux", LOG, {"weno", "viscosity"})
+    _r("weno_Re_flux_compact", LOG, {"weno", "viscosity"})
 
     # Riemann solver
     for n in ["riemann_solver", "wave_speeds", "avg_state", "low_Mach"]:
@@ -712,6 +713,7 @@ def _load():
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
     _r("ib_coefficient_of_friction", REAL, {"ib"})
+    _r("ib_friction_slip_eps", REAL, {"ib"})
     _r("many_ib_patch_parallelism", LOG, {"ib"})
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
@@ -720,6 +722,7 @@ def _load():
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
     _r("ib_mass_relax", INT, {"ib"})
+    _r("wall_column_dt_frac", REAL, {"ib"})
     _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
     _r("ib_uncover_fill", LOG, {"ib"})
@@ -1080,6 +1083,8 @@ def _load():
         ("emissivity", REAL),
         ("T_rad", REAL),
         ("heat_power", REAL),
+        ("wall_column", LOG),
+        ("wall_column_len", REAL),
         ("v_blow", REAL),
         ("burn_rate_exp", REAL),
         ("burn_rate_pref", REAL),
@@ -1512,6 +1517,7 @@ _nv(
     "mp_weno",
     "weno_avg",
     "weno_Re_flux",
+    "weno_Re_flux_compact",
     "null_weights",
     "muscl_eps",
     "int_comp",
@@ -1576,6 +1582,7 @@ _nv(
     "coefficient_of_restitution",
     "collision_time",
     "ib_coefficient_of_friction",
+    "ib_friction_slip_eps",
     "ib_neighborhood_radius",
     "many_ib_patch_parallelism",
     "ib_second_order_vel",
@@ -1585,6 +1592,7 @@ _nv(
     "ib_ip_interp",
     "ib_wall_order",
     "ib_mass_relax",
+    "wall_column_dt_frac",
     "ib_smooth_contact",
     "ib_visc_compact",
     "ib_uncover_fill",
