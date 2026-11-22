@@ -27,6 +27,7 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 
 - @ref architecture "Code Architecture" - How the source code is organized, data flow, and module map
 - @ref expectedPerformance "Performance" - Optimization and benchmarks
+- @ref ibm "Immersed Boundaries" - Overview of the immersed-boundary options and where each is documented
 - @ref amr "Adaptive Mesh Refinement" - Block-structured AMR: algorithm, physics support, and parameters
 - @ref gpuParallelization "GPU Parallelization" - GPU macro API (developer reference)
 - @ref docker "Containers" - Docker usage
