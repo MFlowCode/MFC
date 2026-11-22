@@ -56,8 +56,9 @@
 - **Performant at exascale** - Ideal weak scaling to 43K+ GPUs. Near compute-roofline behavior. [Compile-time case optimization](https://mflowcode.github.io/documentation/running.html) for ~10x speedup.
 - **Compact code** - ~40K lines of Fortran with [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming. Small enough to read and modify; powerful enough for [Gordon Bell](https://awards.acm.org/bell).
 - **Native multi-phase** - 4, 5, and 6-equation models, phase change, surface tension, bubble dynamics, and Euler-Lagrange particle tracking, all built in.
+- **Particle-resolved** - Immersed boundaries with two-way coupled moving bodies, collisions, and heat transfer, checked against exact and reference solutions on the [validation page](https://mflowcode.github.io/documentation/validation.html).
 - **Portable** - NVIDIA and AMD GPUs, CPUs, laptops to exascale. Docker, Codespaces, Homebrew, and [16+ HPC system templates](https://mflowcode.github.io/documentation/running.html).
-- **Tested** - 600+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) on GNU, Intel, Cray, NVIDIA, and AMD compilers.
+- **Tested** - 900+ regression tests per PR with line-level [coverage](https://app.codecov.io/gh/MFlowCode/MFC) on GNU, Intel, Cray, NVIDIA, and AMD compilers.
 - **Easy to shape** - If MFC is missing something you need, do not get stuck maintaining an old private copy. Open a PR and make your feature, fix, machine support, or workflow part of the maintained codebase.
 - **Open** - MIT license, active [Slack](https://join.slack.com/t/mflowcode/shared_invite/zt-y75wibvk-g~zztjknjYkK1hFgCuJxVw), and a responsive development team.
 
@@ -141,6 +142,8 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 	* 1-3D Cartesian, cylindrical, axisymmetric.
 	* Arbitrary grid stretching for multiple domain regions.
 	* Complex/arbitrary geometries via immersed boundary method
+		* Moving and rotating rigid bodies, two-way coupled, with soft-sphere body-body and body-wall collisions (Coulomb friction)
+		* Isothermal and lumped-solid walls, with heat output; opt-in TSC image-point interpolation and quadratic wall-normal ghost velocity
 	* STL geometry files supported
    	* Adaptive Mesh Refinement (AMR), block structured w/ load balancing (GPU and CPU)
 * Surface tension (multi-material)
@@ -151,6 +154,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
  	* Support for bubbles. Nascent support for particles.
 * Viscous effects (high-order accurate representations)
 	* Newtonian and non-Newtonian rheology (Herschel-Bulkley: power-law, Bingham, and yield-stress fluids)
+	* Opt-in compact face-normal velocity gradient for the viscous flux (`weno_Re_flux_compact`)
 * Solid-like material models
 	* Hypoelastic
  	* Hyperelastic
@@ -159,6 +163,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 * Sound wave generation (one- and two-way sources)
 * Chemistry and multi-species transport via MFC-owned Fortran generation from Cantera mechanisms
 	* Stiff time-integration support 
+	* Operator-split reaction substeps (`reaction_substeps`)
 * Magnetohydrodynamics (MHD)
 	* Includes non- and standard-relativistic (RMHD)
 
@@ -188,7 +193,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 
 ### Large-scale and accelerated simulation
 
-* GPU compatible on NVIDIA ([P/V/A/H]100, GH200, etc.) and AMD (MI[1/2/3]00+) GPU and APU hardware
+* GPU compatible on NVIDIA ([P/V/A/H]100, H200, GH200, etc.) and AMD (MI[1/2/3]00+) GPU and APU hardware
 * Ideal weak scaling to 100% of the largest GPU and superchip supercomputers
     * \>43K AMD APUs (MI300A) on [LLNL El Capitan](https://hpc.llnl.gov/hardware/compute-platforms/el-capitan)
     * \>3K AMD APUs (MI300A) on [LLNL Tuolumne](https://hpc.llnl.gov/hardware/compute-platforms/tuolumne)
@@ -204,7 +209,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 
 * [Fypp](https://fypp.readthedocs.io/en/stable/fypp.html) metaprogramming for code readability, performance, and portability
 * Continuous Integration (CI)
-	* \>600 Regression tests with each PR.
+	* \>900 Regression tests with each PR.
  		* Performed with GNU (GCC), Intel (oneAPI), Cray (CCE), and NVIDIA (NVHPC) compilers on NVIDIA and AMD GPUs.
 		* Line-level test coverage reports via [Codecov](https://app.codecov.io/gh/MFlowCode/MFC) and `gcov`
 	* Benchmarking to avoid performance regressions and identify speed-ups
