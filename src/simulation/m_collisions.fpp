@@ -42,6 +42,38 @@ module m_collisions
 
 contains
 
+    !> @brief inverse effective tangential mass of a sphere or circle at its contact point: 1/m + r^2/I
+    function f_inv_tangential_mass(patch) result(inv_mass)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        type(ib_patch_parameters), intent(in) :: patch
+        real(wp)                              :: inv_mass
+
+        inv_mass = 1._wp/patch%mass
+        if (patch%moment > 0._wp) inv_mass = inv_mass + patch%radius**2/patch%moment
+
+    end function f_inv_tangential_mass
+
+    !> @brief scales the slip velocity into the friction direction, -F_t = mu*|F_n|*v_t/max(|v_t|, eps). With ib_friction_slip_eps >
+    !! 0, eps is floored at the stick limit mu*|F_n|*dt/m_t, which keeps the explicit update stable. With 0 it is v_t/|v_t|, left
+    !! unscaled at exactly zero slip.
+    subroutine s_ib_friction_direction(tangential_vector, normal_force_mag, inv_mass_t)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(inout) :: tangential_vector(3)
+        real(wp), intent(in)    :: normal_force_mag, inv_mass_t
+        real(wp)                :: slip
+
+        slip = norm2(tangential_vector)
+        if (ib_friction_slip_eps > 0._wp) then
+            tangential_vector = tangential_vector/max(slip, ib_friction_slip_eps, &
+                & ib_coefficient_of_friction*normal_force_mag*dt*inv_mass_t)
+        else if (.not. f_approx_equal(slip, 0._wp)) then
+            tangential_vector = tangential_vector/slip
+        end if
+
+    end subroutine s_ib_friction_direction
+
     subroutine s_initialize_collisions_module()
 
         real(wp) :: e
@@ -59,7 +91,7 @@ contains
         wall_overlap_distances = 0
         collisions_active = .false.
         $:GPU_UPDATE(device='[wall_overlap_distances]')
-        $:GPU_UPDATE(device='[ib_coefficient_of_friction]')
+        $:GPU_UPDATE(device='[ib_coefficient_of_friction, ib_friction_slip_eps]')
 
     end subroutine s_initialize_collisions_module
 
@@ -174,11 +206,11 @@ contains
 
                     normal_velocity = dot_product(vel1 - vel2, normal_vector)*normal_vector
                     tangential_vector = (vel1 - vel2) - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangential_vector), &
-                        & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
 
                     ! compute force and torque
                     normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
+                    call s_ib_friction_direction(tangential_vector, norm2(normal_force), &
+                                                 & f_inv_tangential_mass(patch_ib(pid1)) + f_inv_tangential_mass(patch_ib(pid2)))
                     tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
                     call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangential_force, torque)
 
@@ -250,9 +282,8 @@ contains
                     ! standard soft-sphere collision  with the wall
                     normal_velocity = dot_product(velocity, normal_vector)*normal_vector
                     tangential_vector = velocity - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangential_vector), &
-                        & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
                     normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
+                    call s_ib_friction_direction(tangential_vector, norm2(normal_force), f_inv_tangential_mass(patch_ib(patch_id)))
                     tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
                     call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangential_force, torque)
 
