@@ -26,6 +26,8 @@ import sys
 import cantera as ct
 import numpy as np
 
+trapezoid = getattr(np, "trapezoid", None) or np.trapz  # np.trapezoid needs NumPy >= 2
+
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("runs", nargs="+", help="One run directory, or the hot and the cold run directory.")
 parser.add_argument("--win", type=float, default=0.1, help="Averaging window, fraction of the mean_temp.dat rows (default 0.1).")
@@ -58,7 +60,7 @@ def nu_exact(pe_h, n=400):
     psi = np.concatenate([[0.0], v[:m, i].real, [0.0]])
     psi /= psi[n // 2]
     uu = 6.0 * eta * (1.0 - eta)
-    psi_m = np.trapezoid(uu * psi, eta) / np.trapezoid(uu, eta)
+    psi_m = trapezoid(uu * psi, eta) / trapezoid(uu, eta)
     return 2.0 * (-3.0 * psi[0] + 4.0 * psi[1] - psi[2]) / (2.0 * h) / psi_m, w[i].real
 
 
@@ -81,7 +83,15 @@ def analyze(d):
 
     # wall gradient from the last save: T from the conservative state through the mechanism
     last = max(glob.glob(os.path.join(d, "p_all", "p0", "*")), key=lambda s: int(os.path.basename(s)))
-    q = [np.fromfile(os.path.join(last, f"q_cons_vf{i}.dat"), dtype=args.dtype, offset=4, count=nx * ny).reshape(ny, nx) for i in range(1, 6 + gas.n_species)]
+
+    def read_cons(i):
+        # one Fortran unformatted record per file: a 4-byte marker, nx*ny values, a 4-byte marker
+        path = os.path.join(last, f"q_cons_vf{i}.dat")
+        if os.path.getsize(path) != 8 + nx * ny * np.dtype(args.dtype).itemsize:
+            sys.exit(f"{path}: size does not match one {nx} x {ny} record of {args.dtype} (wrong --dtype or grid?)")
+        return np.fromfile(path, dtype=args.dtype, offset=4, count=nx * ny).reshape(ny, nx)
+
+    q = [read_cons(i) for i in range(1, 6 + gas.n_species)]
     rho, e_tot = q[0], q[3]
     kin = 0.5 * (q[1] ** 2 + q[2] ** 2) / rho**2
     temp = np.empty_like(rho)

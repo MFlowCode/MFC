@@ -1066,7 +1066,7 @@ class CaseValidator:
                 self.prohibit(moving, f"{pre} requires every immersed boundary to be fixed (moving_ibm = 0)")
                 self.prohibit(self.get("amr", "F") == "T", f"{pre} is not supported with amr")
                 self.prohibit(self.get("cfl_adap_dt", "F") != "T" and self.get("cfl_const_dt", "F") != "T", f"{pre} requires cfl_adap_dt or cfl_const_dt (the WCOL time-step limit)")
-                self.prohibit(not 0 < (self.get("wall_column_dt_frac", 0.1) or 0.1) <= 1, "wall_column_dt_frac must be in (0, 1]")
+                self.prohibit(not 0 < self.get("wall_column_dt_frac", 0.1) <= 1, "wall_column_dt_frac must be in (0, 1]")
 
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")

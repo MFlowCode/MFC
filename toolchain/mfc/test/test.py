@@ -287,6 +287,11 @@ def nvhpc_gpu_known_difference(uuid: str, gpu: str, fc_version: str) -> bool:
     return uuid in NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS and gpu != "no" and bool(match) and (int(match[1]), int(match[2])) < NVHPC_GPU_FIXED_VERSION
 
 
+def gpu_fc_version(fc_version: str, probe=lambda: _compiler_version("nvfortran")) -> str:
+    """`fc_version` unless it names no known compiler (a wrapper such as mpifort or ftn that hides it): then `nvfortran --version`."""
+    return fc_version if re.search(r"\b(nvfortran|gnu|cray|ifx|ifort|flang|clang)", fc_version, re.I) else probe()
+
+
 def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
     cases = cases_[:]
     selected_cases = []
@@ -380,7 +385,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 cases.remove(case)
 
     fc = os.environ.get("FC", "").split(maxsplit=1)
-    fc_version = _compiler_version(fc[0]) if fc and ARG("gpu") != "no" else ""
+    fc_version = gpu_fc_version(_compiler_version(fc[0]) if fc else "") if ARG("gpu") != "no" else ""
     for case in cases[:]:
         if nvhpc_gpu_known_difference(case.get_uuid(), ARG("gpu"), fc_version):
             cons.print(f"[yellow]skipped {case.get_uuid()} ({case.trace}): known difference on NVHPC < 25.11 GPU, see #2181[/yellow]")
