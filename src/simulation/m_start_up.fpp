@@ -1106,7 +1106,7 @@ contains
 #endif
 #endif
 
-        ! After the device is bound: s_mpi_initialize ran earlier, so its update went to the default device
+        ! After the device is bound: the update in s_mpi_initialize went to the default device
         $:GPU_UPDATE(device='[num_procs, proc_rank]')
 
         if (proc_rank == 0) then
@@ -1532,6 +1532,8 @@ contains
         ib_patch%emissivity = 0._wp
         ib_patch%T_rad = 0._wp
         ib_patch%heat_power = 0._wp
+        ib_patch%wall_column = .false.
+        ib_patch%wall_column_len = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0

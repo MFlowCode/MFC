@@ -120,6 +120,14 @@ python3 examples/2D_thermal_channel/check_nu.py <hot run directory> <cold run di
 
 The cold run uses `--tw 270` in a copy of the directory (the output is written next to `case.py`). The tables were measured with GNU 13.3 (CPU, one rank, `-O3`). The suite runs the first 100 steps of the hot case as `2D -> Chemistry -> Thermal Channel -> Wall Temperature`; its golden holds the conservative fields, and the tolerance is 1e-6 (GNU 13 double -O3, reldebug and debug agree to 5e-8, AMD MI250X and an AMD CPU build to 8e-8 and 6e-8; single precision differs from double by 4e-4, so the test is skipped in that lane).
 
+## Circular cylinder drag and Nusselt number {#sec-validation-cyl-drag-nu}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_cylinder_drag_nu`. The face-flux immersed-boundary force and the face heat of a no-slip isothermal cylinder at Re 20, 40 and 100 against Dennis and Chang, Williamson and the Nusselt-number correlations, with a momentum balance as an independent drag. Results and limits: @ref validation_cyl_drag_nu.
+
+## Other families
+
+- @ref validation_tsc_annulus "Isothermal conduction annulus": image-point interpolation (inverse distance and TSC) against the exact radial conduction solution.
+
 ## Adding a section
 
 One `##` section per family, with an anchor `{#sec-validation-<family>}`: status and code version, one setup table per check, the reference and how it was obtained, a results table with signed errors, and the limits.
@@ -128,4 +136,4 @@ Cite references with `\cite` keys from `docs/references.bib`.
 
 ## Keeping the goldens current
 
-The registered tests are regression guards: their goldens hold the output of the code at the time they were generated. When a default or an algorithm in the numerics a test exercises changes (for moving bodies, for example the `ib_mass_relax` default), regenerate the goldens with `./mfc.sh test --generate --only <UUID>` in the same change, and re-run the checker scripts to confirm the physics results above.
+The registered tests are regression guards: their goldens hold the output of the code at the time they were generated. When a default or an algorithm in the numerics a test exercises changes (for moving bodies, for example the `ib_mass_relax` default), regenerate the goldens with `./mfc.sh test --generate --only <UUID>` in the same change, and re-run the checker scripts to confirm the physics results above. A case whose tolerance must be looser than the default takes `override_tol` chosen from the spread between compiler and device lanes ([Testing](@ref testing)).

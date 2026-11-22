@@ -72,6 +72,7 @@ SIM_GPU_DECL_VARS = {
     "hypoelasticity",
     "ib",
     "ib_coefficient_of_friction",
+    "ib_friction_slip_eps",
     "ic_beta",
     "ic_eps",
     "igr",

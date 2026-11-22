@@ -437,6 +437,8 @@ module m_derived_types
         real(wp) :: rho_solid, cp_solid  !< Solid density [kg/m^3] and heat capacity [J/kg/K] (thermal_bc = 3)
         real(wp) :: emissivity, T_rad    !< Surface emissivity and radiative surroundings temperature [K] (thermal_bc = 3)
         real(wp) :: heat_power           !< Heat supplied to the body, e.g. Joule heating [W; W/m per unit depth in 2D]
+        logical  :: wall_column          !< Sub-grid wall-normal conduction column per first-layer ghost (m_ib_wall_column)
+        real(wp) :: wall_column_len      !< Column length [m]; 0 = 0.15 radius
 
         ! Heterogeneous surface reaction    0 = none    1 = enabled
         integer :: surface_reaction
@@ -448,8 +450,9 @@ module m_derived_types
         real(wp) :: mass, moment  !< mass and moment of inertia of object used to compute forces in 2-way coupling
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB
         !> Last step's gasification rate and face mass out [kg/s], and fluid heat in [W] (ib_heat_wrt; per unit depth in 2D)
-        real(wp)                 :: mdot, mdot_face, qdot
-        real(wp)                 :: mass_bank         !< ib_mass_relax bank read from a restart; only s_read_ib_restart_data sets it
+        real(wp) :: mdot, mdot_face, qdot
+        !> ib_mass_relax bank: set from a restart, advanced by the owner rank, moved with the body at a handoff
+        real(wp)                 :: mass_bank
         real(wp), dimension(1:3) :: vel
         real(wp), dimension(1:3) :: step_vel          !< velocity array used to store intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: angular_vel
