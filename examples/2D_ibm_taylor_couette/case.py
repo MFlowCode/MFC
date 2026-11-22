@@ -25,6 +25,7 @@ parser.add_argument("--cells_per_R", type=int, default=12, help="Cells per inner
 parser.add_argument("--wall_order", type=int, default=2, help="ib_wall_order (1 mirror, 2 two-probe quadratic).")
 parser.add_argument("--ip_interp", type=int, default=1, help="ib_ip_interp (1 inverse distance, 2 TSC).")
 parser.add_argument("--visc_compact", type=int, default=0, help="ib_visc_compact: compact viscous gradients next to a body (needs weno_Re_flux).")
+parser.add_argument("--smooth_contact", type=int, default=0, help="ib_smooth_contact: smooth the tangential contact velocity in the viscous work (CPU and GPU agree).")
 parser.add_argument("--mach", type=float, default=0.05, help="Tip Mach number Omega R / c.")
 parser.add_argument("--re", type=float, default=10.0, help="Re = Omega R^2 / nu.")
 parser.add_argument("--sign", type=float, default=1.0, help="Sign of the inner-wall rotation.")
@@ -127,5 +128,8 @@ if args.ip_interp != 1:
     case["ib_ip_interp"] = args.ip_interp
 if args.visc_compact:
     case["ib_visc_compact"] = "T"
+
+if args.smooth_contact:
+    case["ib_smooth_contact"] = "T"
 
 print(json.dumps(case))
