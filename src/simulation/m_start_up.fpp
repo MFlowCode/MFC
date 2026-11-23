@@ -629,6 +629,7 @@ contains
         call s_phase_step_tic()
         if (t_step == t_step_start) then
             call s_amr_check_fixed_dt()
+            call s_check_fixed_dt_viscous()
             if (amr_regrid_int > 0) call s_amr_check_fixed_dt(reach=.true.)
         end if
         if (cfl_dt) then

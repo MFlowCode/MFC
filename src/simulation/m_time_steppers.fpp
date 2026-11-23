@@ -56,6 +56,7 @@ module m_time_steppers
     integer, private                              :: num_probe_ts
     !> Max dt*(species loss rate) of the explicit reaction source over the run
     real(wp), private :: chem_stiff_max = 0._wp
+    logical, private  :: visc_cap_warned = .false.  !< The one-time notice that visc_dt_cap limits the step was printed
     logical, private  :: chem_stiff_warned = .false.
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
@@ -875,6 +876,12 @@ contains
 
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
+        if (dt_limiter == 'VCFL' .and. cfl_target > visc_dt_cap .and. .not. visc_cap_warned) then
+            visc_cap_warned = .true.
+            if (proc_rank == 0) print '(A,ES11.4,A,F5.2,A,I0,A,F5.2,A)', ' WARNING: viscous step limited to dt = ', dt, &
+                & ' (nu dt/dx^2 = ', visc_dt_cap, ', stability limit of ' // trim(visc_dt_stencil) // ' in ', num_dims, &
+                & 'D); cfl_target = ', cfl_target, ' exceeds it'
+        end if
 
         ! limit how much the time step can grow relative to the previous step
         if (ramp_ratio > 0._wp .and. dt_prev > 0._wp .and. ramp_ratio*dt_prev < dt) then
@@ -892,7 +899,6 @@ contains
 
         logical, intent(in), optional :: reach
         real(wp), dimension(6)        :: dt_cand
-        real(wp)                      :: cfl_save
         real(wp), allocatable         :: rf_save(:,:,:)
         logical                       :: all_fine
         character(len=256)            :: msg
@@ -905,11 +911,7 @@ contains
             rf_save = amr_cfl_rf; amr_cfl_rf = real(amr_ref_ratio**amr_max_level, wp)
             $:GPU_UPDATE(device='[amr_cfl_rf]')
         end if
-        cfl_save = cfl_target; cfl_target = 1._wp
-        $:GPU_UPDATE(device='[cfl_target]')
-        call s_compute_dt(dt_cand)
-        cfl_target = cfl_save
-        $:GPU_UPDATE(device='[cfl_target]')
+        call s_compute_dt_limits(dt_cand)
         if (all_fine) then
             amr_cfl_rf = rf_save
             $:GPU_UPDATE(device='[amr_cfl_rf]')
@@ -927,6 +929,43 @@ contains
         call s_mpi_abort(trim(msg))
 
     end subroutine s_amr_check_fixed_dt
+
+    !> The dt candidates of s_compute_dt at cfl_target = 1: the stability limits of the current state
+    impure subroutine s_compute_dt_limits(dt_cand)
+
+        real(wp), dimension(6), intent(out) :: dt_cand
+        real(wp)                            :: cfl_save
+
+        cfl_save = cfl_target; cfl_target = 1._wp
+        $:GPU_UPDATE(device='[cfl_target]')
+        call s_compute_dt(dt_cand)
+        cfl_target = cfl_save
+        $:GPU_UPDATE(device='[cfl_target]')
+
+    end subroutine s_compute_dt_limits
+
+    !> Fixed dt with viscosity: warn at start-up if dt exceeds the viscous stability limit (visc_dt_cap) of the stencil. The
+    !! chemistry temperature is the Newton guess of the next conversion, so it is restored and the run stays bitwise unchanged.
+    impure subroutine s_check_fixed_dt_viscous()
+
+        real(wp), dimension(6) :: dt_cand
+        real(stp), allocatable :: T_save(:,:,:)
+
+        if (cfl_dt .or. .not. viscous .or. relativity) return
+        if (chemistry) then
+            $:GPU_UPDATE(host='[q_T_sf%sf]')
+            T_save = q_T_sf%sf
+        end if
+        call s_compute_dt_limits(dt_cand)
+        if (chemistry) then
+            q_T_sf%sf = T_save
+            $:GPU_UPDATE(device='[q_T_sf%sf]')
+        end if
+        if (proc_rank == 0 .and. dt > dt_cand(2)) print '(A,ES11.4,A,F7.3,A,I0,A,ES11.4,A)', ' WARNING: dt = ', dt, ' is ', &
+            & dt/dt_cand(2), ' times the viscous stability limit of ' // trim(visc_dt_stencil) // ' in ', num_dims, &
+            & 'D (stable up to dt = ', dt_cand(2), '); the run may diverge. Reduce dt or set cfl_adap_dt.'
+
+    end subroutine s_check_fixed_dt_viscous
 
     !> Abort with the location of a fluid cell whose state admits no valid time step (NaN or non-positive inviscid dt).
     impure subroutine s_abort_on_bad_dt_cell(idx)

@@ -764,7 +764,7 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_Re_flux_compact` (requires `weno_Re_flux`, Cartesian coordinates) replaces, on every face, the face-normal velocity gradient of the viscous flux by the difference across the face, `(u_{j+1} - u_j)/(x_{j+1} - x_j)`, the gradient that `weno_Re_flux = F` uses. The tangential and cross gradients keep the WENO chain, and the default `F` leaves every result unchanged.
   The WENO chain (face values, divergence-theorem cell gradient, reconstruction of that gradient, face mean) has a damping rate of exactly zero at the checkerboard wavenumber: a periodic box with a seeded u(y) = (-1)^j mode decays at rate 0.000 with `weno_Re_flux`, at 4 nu/dy^2 (20.5 at nu = 0.005, 32 cells) with `weno_Re_flux = F` or this option, and a smooth mode decays at the exact nu k^2 either way.
   At a no-slip wall (`bc_y%%beg = -16`) the odd-mirror ghost forces that band, and the velocity next to the wall alternates about the exact profile (up to 6 % of the bulk velocity in the first four cells of a 32-cell channel with HLLC, 12 % in the hot-wall thermal channel); the option removes it.
-  The face difference brings the explicit viscous time-step limit of `weno_Re_flux = F`, about nu dt/dy^2 below 0.25 to 0.4 (a 128-cell channel with nu dt/dy^2 = 0.47 diverged, 0.23 was stable), which the WENO chain does not impose at this scale.
+  The face difference has the explicit viscous time-step limit of `weno_Re_flux = F` (nu dt/dx^2 = 0.27 in 2D with SSP-RK3, 0.6 to 0.7 for the WENO chain), which caps the adaptive viscous step (see `cfl_target`).
   It does not touch the tangential and cross terms or the immersed-boundary walls (use `ib_visc_compact`, whose band covers faces near a body; the two can be combined). `weno_avg = F` with `weno_Re_flux` reads a cell's own two reconstructed face values, so it does not see a jump between two cells (an impulsive start next to a wall gives zero wall shear at the first step), and the validator warns on that combination; set `weno_avg = T`.
 
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
@@ -824,7 +824,12 @@ restart data being resumed from. Pass `-t pre_process` explicitly (as in the res
 
 - `cfl_const_dt` enables constant `dt` time-stepping where `dt` results in a specified CFL for the initial condition
 
-- `cfl_target` specifies the target CFL value
+- `cfl_target` specifies the target CFL value. It sets the inviscid (`ICFL`) and the viscous (`VCFL`, ν dt/Δx_min²) adaptive time-step candidates.
+  The viscous candidate is capped at the SSP-RK3 stability limit of the viscous stencil in use, ν dt/Δx_min² = min(`cfl_target`, cap): about 0.9 of the largest value measured stable in MFC (periodic box with seeded noise, 1D/2D/3D):
+  0.42/0.23/0.16 for the face-difference gradient (`weno_Re_flux = F`, `weno_Re_flux_compact`; linear limit 0.47/0.27/0.19), 0.25/0.18 (2D/3D) for `ib_visc_compact`, and 1.1/0.55/0.36 for the WENO chain of `weno_Re_flux`.
+  The stiffest mode is a velocity component's grid-scale mode in all d directions, diffusing at 4/3 ν (+ ν_bulk) along the component and ν across it, so bulk viscosity (`fluid_pp%%Re(2)`) scales the cap by (d + 1/3)/(d + 4/3).
+  Below the cap the step is ν dt/Δx² = `cfl_target`, as before; when the cap sets the step a one-time warning says so. `chem_params%%transport_dt` and `igr` keep their own limits (no cap).
+  With a fixed `dt` the simulation prints a warning at start-up when dt exceeds the capped viscous step of the initial state. The VCFL column of `run_time.inf` (and its abort above 1) is ν dt/Δx².
 
 - `ramp_ratio` limits how much the adaptive time step can grow from one time step to the next: `dt` is capped at `ramp_ratio` times the previous `dt`. Must be at least 1. When unset, the time step growth is unlimited.
 

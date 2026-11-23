@@ -275,14 +275,14 @@ contains
             if (p > 0) then
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
+                    vcfl_dt = min(cfl_target, visc_dt_cap)*(min(dx(j), dy(k), fltr_dtheta)**2._wp)/maxval(1/(rho*Re_l))
                 else
-                    vcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)/maxval(1/(rho*Re_l))
+                    vcfl_dt = min(cfl_target, visc_dt_cap)*(min(dx(j), dy(k), dz(l))**2._wp)/maxval(1/(rho*Re_l))
                 end if
             else if (n > 0) then
-                vcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
+                vcfl_dt = min(cfl_target, visc_dt_cap)*(min(dx(j), dy(k))**2._wp)/maxval((1/Re_l)/rho)
             else
-                vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
+                vcfl_dt = min(cfl_target, visc_dt_cap)*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
             max_dt(2) = vcfl_dt
         end if
