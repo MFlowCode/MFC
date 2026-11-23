@@ -1,12 +1,12 @@
-This file was created on 2026-11-22 07:42:27.101928.
+This file was created on 2026-11-22 20:50:53.431831.
 
 mfc.sh:
 
-    Invocation: test --generate --only E2C4CBC6 --no-gpu --no-mpi -j 1
+    Invocation: test --generate --only E2C4CBC6 --no-gpu --no-mpi -j 1 --no-build
     Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=Yes & mixed=No & fastmath=No
-    Git:        954fbe31e7045478f4710da72e75806e37dee824 on f04-wall-order-couette (dirty)
+    Git:        b55e97214052193b048073bbc4394c5f67ca630e on chk (dirty)
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -15,10 +15,10 @@ pre_process:
         C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -74,7 +74,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -83,10 +83,10 @@ syscheck:
         C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -126,7 +126,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      33%
+    CPU(s) scaling MHz:                      37%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
