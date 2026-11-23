@@ -3051,6 +3051,7 @@ contains
         real(wp)                      :: probe1_dist, probe2_dist  !< Distances of the probes from the wall along wall_normal
         real(wp)                      :: probe1_fluid_frac, probe2_fluid_frac  !< Fraction of each probe's TSC weight on fluid cells
         real(wp)                      :: cell_vol
+        real(wp), dimension(3)        :: probe_loc  !< Named, not an expression argument (see the Silent-Failure Traps)
         real(wp)                      :: reach  !< Largest probe offset from the ghost, in its cell widths, inside the halo
         real(wp), dimension(3)        :: width  !< Cell widths at the ghost
         logical                       :: in1, in2  !< Each probe's stencil lies inside the halo
@@ -3067,8 +3068,10 @@ contains
         wall_loc(1) = x_cc(gp%loc(1)); wall_loc(2) = y_cc(gp%loc(2))
         if (p > 0) wall_loc(3) = z_cc(gp%loc(3))
         wall_loc = wall_loc + ghost_depth*wall_normal
-        call s_tsc_weights(ib_markers, wall_loc + probe1_dist*wall_normal, wf%ic1, wf%wd1, probe1_fluid_frac)
-        call s_tsc_weights(ib_markers, wall_loc + probe2_dist*wall_normal, wf%ic2, wf%wd2, probe2_fluid_frac)
+        probe_loc = wall_loc + probe1_dist*wall_normal
+        call s_tsc_weights(ib_markers, probe_loc, wf%ic1, wf%wd1, probe1_fluid_frac)
+        probe_loc = wall_loc + probe2_dist*wall_normal
+        call s_tsc_weights(ib_markers, probe_loc, wf%ic2, wf%wd2, probe2_fluid_frac)
 
         ! A deep ghost's probe can lie beyond the halo, where its stencil is clamped and the fill would depend on the domain
         ! decomposition. Decided from the ghost's own geometry, so every decomposition drops the same ghosts a tier.
