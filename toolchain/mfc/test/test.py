@@ -275,7 +275,8 @@ def _filter_only(cases, skipped_cases):
 # is 25.5. The cause is not identified, so the skip is reported per case and tolerances stay untouched. See
 # https://github.com/MFlowCode/MFC/issues/2181
 # 009447E8 (uniform-box H2/air ignition) shows it without any flow: species differ by up to 1e-3 from the CPU result; it needs -O1 or higher.
-NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972", "009447E8"}
+# 8994884D (1D CJ detonation front formation) differs by 2e-2 relative and 1E0EF4E5 (2D flame-vortex pair) by 1e-3 in a minor species on 25.5; both agree to 2e-6 on 25.11.
+NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972", "009447E8", "8994884D", "1E0EF4E5"}
 NVHPC_GPU_FIXED_VERSION = (25, 11)
 
 

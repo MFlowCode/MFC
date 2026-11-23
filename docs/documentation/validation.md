@@ -10,6 +10,7 @@ Status words: **validated** (agrees with the reference within the stated error),
 Errors are (MFC − reference)/reference.
 
 Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
+Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
 
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
