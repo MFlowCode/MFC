@@ -40,3 +40,12 @@ face-heat value at Tw/T_inf = 1.1, with the film conductivity from Cantera at Pr
 
 Two limits are visible in the table. L/D is first order and low (the ghost-cell wall sits up to a cell inside the surface), and
 Cd_CV depends on the box at Re 100 in the smaller domain (1.344, 1.332, 1.302 for 1, 2 and 4 D).
+
+## Lumped-temperature cooling
+
+`--thermal_bc 3 --rho_cs <J/m^3/K>` replaces the isothermal wall by a lumped solid temperature (`thermal_bc = 3`) that starts at
+`--tw_ratio` times the free-stream temperature and relaxes toward the adiabatic-wall temperature. With the two fixed-wall twins
+(`--tw_ratio 1` and `1.1`, same Re and grid), `check_lumped_cooling.py <lumped run> --cold <cold run> --hot <hot run> --tmin <t U/D>`
+compares the fitted decay with the time constant `rho_s c_s D^2 / (4 Nu k_f)` that the twins' Nusselt number implies, and the lumped
+body's heat rate with the twins' law at the same wall temperature. `--parallel_io F` is for a build without MPI. The results are on the
+@ref validation_wall_thermal page.

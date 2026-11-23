@@ -16,13 +16,14 @@ module m_amr_nest
     use m_global_parameters
     use m_amr_cluster, only: s_amr_cluster
     use m_eos, only: s_compute_mixture_coefficients, f_pressure
+    use m_thermochem, only: num_species, get_temperature
     use m_amr, only: amr_slots, amr_cons_st, amr_loc_of, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, &
         & amr_cpat_mar, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_boxes_overlap
 
     implicit none
 
     private
-    public :: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind
+    public :: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_vort_sf, f_amr_tag_ind
 
     !> Nested children were dropped for lack of block capacity (warn once per regrid)
     logical :: amr_child_dropped = .false.
@@ -500,7 +501,8 @@ contains
     end subroutine s_amr_tag_child_from_fine
 
     !> The tagged variable at one cell (amr_tag_var): 1 total density (sum of the continuity variables), 2 volume fraction of fluid
-    !! 1, 3 velocity magnitude, 4 pressure (five-equation mixture). `_st` reads the flat store, `_sf` the level-0 field.
+    !! 1, 3 velocity magnitude, 4 pressure (five-equation mixture), 6 temperature (as s_compute_q_T_sf), 7 mass fraction of species
+    !! amr_tag_species. `_st` reads the flat store, `_sf` the level-0 field. The vorticity (5) has its own stencil, f_amr_tag_vort.
     #:for RSFX, RSRC in [('st', 'amr_cons_st'), ('sf', '')]
         #:set RARG = 'loc' if RSRC else 'q'
         #:set RHO = 'f_amr_tag_val_' + RSFX
@@ -514,7 +516,8 @@ contains
                 type(scalar_field), dimension(:), intent(in) :: q
             #:endif
             integer, intent(in) :: ci, cj, ck
-            real(wp)            :: r, u2, gam, pinf, qv
+            real(wp)            :: r, u2, gam, pinf, qv, T
+            real(wp)            :: Ys(num_species)
             integer             :: f
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
                 real(wp), dimension(3) :: ar, al
@@ -531,12 +534,24 @@ contains
                 r = r + ${QPRE}$f${QPOST}$
             end do
             if (amr_tag_var < 3) return
+            if (amr_tag_var == 7) then
+                r = ${QPRE}$eqn_idx%species%beg + amr_tag_species - 1${QPOST}$/max(r, 1.e-30_wp)
+                return
+            end if
             u2 = 0._wp
             do f = eqn_idx%mom%beg, eqn_idx%mom%end
                 u2 = u2 + ${QPRE}$f${QPOST}$**2
             end do
             if (amr_tag_var == 3) then
                 r = sqrt(u2)/max(r, 1.e-30_wp)
+                return
+            end if
+            if (amr_tag_var == 6) then
+                do f = 1, num_species
+                    Ys(f) = ${QPRE}$eqn_idx%species%beg + f - 1${QPOST}$/r
+                end do
+                call get_temperature((${QPRE}$eqn_idx%E${QPOST}$ - 0.5_wp*u2/r)/r, dflt_T_guess, Ys, .true., T)
+                r = T
                 return
             end if
             ar = 0._wp; al = 0._wp
@@ -548,10 +563,46 @@ contains
             r = f_pressure(${QPRE}$eqn_idx%E${QPOST}$ - 0.5_wp*u2/max(r, 1.e-30_wp), gam, pinf, qv)
 
         end function f_amr_tag_val_${RSFX}$
+
+        !> Cell-scaled vorticity magnitude |curl u|*dx at cell c (amr_tag_var = 5), from the velocity differences between its
+        !! neighbours im and ip along each direction (im = ip - 1 at a clamped block edge: a one-sided difference).
+        function f_amr_tag_vort_${RSFX}$(${RARG}$, c, im, ip) result(w)
+
+            #:if RSRC
+                integer, intent(in) :: loc  !< flat-store slot
+            #:else
+                type(scalar_field), dimension(:), intent(in) :: q
+            #:endif
+            integer, intent(in) :: c(3), im(3), ip(3)
+            real(wp)            :: w, rho, wt, hr(3)
+            real(wp)            :: du(3, 3)  !< du(a, d) = dx*d(u_a)/d(x_d)
+            integer             :: a, d, s, f, ci, cj, ck, e(3)
+
+            hr = 1._wp
+            if (n_glb > 0) hr(2) = dx(0)/dy(0)
+            if (p_glb > 0) hr(3) = dx(0)/dz(0)
+            du = 0._wp
+            do d = 1, num_dims
+                do s = -1, 1, 2
+                    e = c; e(d) = merge(ip(d), im(d), s > 0)
+                    ci = e(1); cj = e(2); ck = e(3)
+                    rho = 0._wp
+                    do f = eqn_idx%cont%beg, eqn_idx%cont%end
+                        rho = rho + ${QPRE}$f${QPOST}$
+                    end do
+                    wt = real(s, wp)*hr(d)/(real(ip(d) - im(d), wp)*max(rho, 1.e-30_wp))
+                    do a = 1, min(3, eqn_idx%mom%end - eqn_idx%mom%beg + 1)
+                        du(a, d) = du(a, d) + wt*${QPRE}$eqn_idx%mom%beg + a - 1${QPOST}$
+                    end do
+                end do
+            end do
+            w = sqrt((du(3, 2) - du(2, 3))**2 + (du(1, 3) - du(3, 1))**2 + (du(2, 1) - du(1, 2))**2)
+
+        end function f_amr_tag_vort_${RSFX}$
     #:endfor
 
-    !> Tag indicator (jump of the amr_tag_var variable) at one cell of a block in the flat store, max over the active dimensions.
-    !! The stencil is clamped to the block (fm1:fm3 = block extents) since its ghosts are stale.
+    !> Tag indicator (jump of the amr_tag_var variable, or the cell-scaled vorticity) at one cell of a block in the flat store, max
+    !! over the active dimensions. The stencil is clamped to the block (fm1:fm3 = block extents) since its ghosts are stale.
     function f_amr_tag_grad_st(loc, ci, cj, ck, fm1, fm2, fm3) result(g)
 
         integer, intent(in) :: loc, fm1, fm2, fm3
@@ -560,6 +611,10 @@ contains
         integer             :: ip(3), im(3)
 
         ip = min([ci, cj, ck] + 1, [fm1, fm2, fm3]); im = max([ci, cj, ck] - 1, 0)
+        if (amr_tag_var == 5) then
+            g = f_amr_tag_vort_st(loc, [ci, cj, ck], im, ip)
+            return
+        end if
         r0 = f_amr_tag_val_st(loc, ci, cj, ck)
         g = f_amr_tag_ind(f_amr_tag_val_st(loc, ip(1), cj, ck), r0, f_amr_tag_val_st(loc, im(1), cj, ck))
         if (n_glb > 0) g = max(g, f_amr_tag_ind(f_amr_tag_val_st(loc, ci, ip(2), ck), r0, f_amr_tag_val_st(loc, ci, im(2), ck)))
