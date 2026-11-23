@@ -380,10 +380,7 @@ contains
             real(wp), dimension(num_fluids) :: alpha_L, alpha_R
         #:endif
         real(wp), dimension(2) :: Re_L, Re_R
-        integer                :: i, j, k, l, Re_size_loc1, Re_size_loc2
-
-        Re_size_loc1 = Re_size(1)
-        Re_size_loc2 = Re_size(2)
+        integer                :: i, j, k, l
 
         #:for NORM_DIR, STENCIL_VAR, COORDS in &
                 [(1, 'j', '{STENCIL_IDX}, k, l'), &
@@ -392,8 +389,7 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (id == ${NORM_DIR}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_L, alpha_R, Re_L, Re_R]', &
-                                    & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_L, alpha_R, Re_L, Re_R]')
                 do l = face_bounds(3, ${NORM_DIR}$)%beg, face_bounds(3, ${NORM_DIR}$)%end
                     do k = face_bounds(2, ${NORM_DIR}$)%beg, face_bounds(2, ${NORM_DIR}$)%end
                         do j = face_bounds(1, ${NORM_DIR}$)%beg, face_bounds(1, ${NORM_DIR}$)%end
@@ -403,8 +399,8 @@ contains
                                     alpha_L(i) = qL_prim_rsx_vf(j, k, l, eqn_idx%adv%beg + i - 1)
                                     alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
                                 end do
-                                call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
-                                call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                                call s_compute_interface_reynolds(alpha_L, Re_L)
+                                call s_compute_interface_reynolds(alpha_R, Re_R)
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, 2
                                     Re_avg_rsx_vf(j, k, l, i) = 2._wp/(1._wp/Re_L(i) + 1._wp/Re_R(i))
@@ -1035,7 +1031,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        call s_populate_F_igr_buffers(bc_type, p_solved_sf)
+        call s_populate_scalar_buffers(bc_type, p_solved_sf)
         if (any(has_pres_out)) call s_pout_ghosts()
 
     end subroutine s_pressure_solve

@@ -274,7 +274,8 @@ def _filter_only(cases, skipped_cases):
 # Cases with a known GPU-only result difference on NVHPC < 25.11 (CPU builds and 25.11+ pass): the pinned Phoenix compiler
 # is 25.5. The cause is not identified, so the skip is reported per case and tolerances stay untouched. See
 # https://github.com/MFlowCode/MFC/issues/2181
-NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972"}
+# 009447E8 (uniform-box H2/air ignition) shows it without any flow: species differ by up to 1e-3 from the CPU result; it needs -O1 or higher.
+NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972", "009447E8"}
 NVHPC_GPU_FIXED_VERSION = (25, 11)
 
 
@@ -285,6 +286,11 @@ def nvhpc_gpu_known_difference(uuid: str, gpu: str, fc_version: str) -> bool:
     """
     match = re.match(r"nvfortran\s+(\d+)\.(\d+)", fc_version)
     return uuid in NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS and gpu != "no" and bool(match) and (int(match[1]), int(match[2])) < NVHPC_GPU_FIXED_VERSION
+
+
+def gpu_fc_version(fc_version: str, probe=lambda: _compiler_version("nvfortran")) -> str:
+    """`fc_version` unless it names no known compiler (a wrapper such as mpifort or ftn that hides it): then `nvfortran --version`."""
+    return fc_version if re.search(r"\b(nvfortran|gnu|cray|ifx|ifort|flang|clang)", fc_version, re.I) else probe()
 
 
 def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
@@ -368,6 +374,10 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 # Double builds agree to 1e-12 across O0, O3 and reldebug.
                 "Constant Acceleration",
                 "Wall Collision",
+                # WENO5 weights acting on a near-uniform gas amplify single-precision round-off: the moving-circle mass budget and the
+                # bow-shock stand-off differ from the double golden by up to 9e-3 (absolute) after 100-150 steps, against the 1e-4 tolerance.
+                "Mass Budget",
+                "Bow Shock Standoff",
             ]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
@@ -380,7 +390,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 cases.remove(case)
 
     fc = os.environ.get("FC", "").split(maxsplit=1)
-    fc_version = _compiler_version(fc[0]) if fc and ARG("gpu") != "no" else ""
+    fc_version = gpu_fc_version(_compiler_version(fc[0]) if fc else "") if ARG("gpu") != "no" else ""
     for case in cases[:]:
         if nvhpc_gpu_known_difference(case.get_uuid(), ARG("gpu"), fc_version):
             cons.print(f"[yellow]skipped {case.get_uuid()} ({case.trace}): known difference on NVHPC < 25.11 GPU, see #2181[/yellow]")

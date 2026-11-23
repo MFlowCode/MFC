@@ -24,6 +24,8 @@ import re
 
 import numpy as np
 
+trapezoid = getattr(np, "trapezoid", None) or np.trapz  # np.trapezoid needs NumPy >= 2
+
 # Reference values as tabulated in the papers (see the validation page for the citations)
 CD_REF = {20: {"Dennis & Chang": 2.05, "Fornberg": 2.00}, 40: {"Dennis & Chang": 1.52, "Fornberg": 1.50}, 100: {"Henderson": 1.35, "Park et al.": 1.33}}
 LD_REF = {20: 0.94, 40: 2.35}  # Dennis & Chang
@@ -119,6 +121,8 @@ def fields(run, info, avg):
     from mfc.viz.silo_reader import assemble_silo
 
     steps = sorted(int(os.path.basename(f)[:-5]) for f in glob.glob(os.path.join(run, "silo_hdf5", "p0", "*.silo")) if os.path.basename(f)[:-5].isdigit())
+    if not steps:
+        raise SystemExit(f"{run}/silo_hdf5/p0 holds no *.silo saves (run with --silo and post_process)")
     use = [s for s in steps if s >= (1 - avg) * steps[-1]] or steps[-1:]
     cvs = []
     for s in use:
@@ -143,7 +147,7 @@ def cv_drag(xs, V, info, half):
     for j in range(2):  # face normal
         flux = rho * vel[0] * vel[j] - mu * (g[0][j] + g[j][0]) + (p + 2 / 3 * mu * div) * (j == 0)
         for end, sign in ((-1, 1.0), (0, -1.0)):
-            total += sign * np.trapezoid(np.take(flux, end, axis=j), xb[1 - j])
+            total += sign * trapezoid(np.take(flux, end, axis=j), xb[1 - j])
     return -total / info["q"]
 
 

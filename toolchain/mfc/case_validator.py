@@ -1079,7 +1079,7 @@ class CaseValidator:
                 self.prohibit(moving, f"{pre} requires every immersed boundary to be fixed (moving_ibm = 0)")
                 self.prohibit(self.get("amr", "F") == "T", f"{pre} is not supported with amr")
                 self.prohibit(self.get("cfl_adap_dt", "F") != "T" and self.get("cfl_const_dt", "F") != "T", f"{pre} requires cfl_adap_dt or cfl_const_dt (the WCOL time-step limit)")
-                self.prohibit(not 0 < (self.get("wall_column_dt_frac", 0.1) or 0.1) <= 1, "wall_column_dt_frac must be in (0, 1]")
+                self.prohibit(not 0 < self.get("wall_column_dt_frac", 0.1) <= 1, "wall_column_dt_frac must be in (0, 1]")
 
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
@@ -2469,14 +2469,20 @@ class CaseValidator:
             "amr_tag_eps must be > 0 when amr_regrid_int > 0",
         )
         amr_tag_var = self.get("amr_tag_var", 1)
-        self.prohibit(amr_tag_var not in (1, 2, 3, 4), "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1), 3 (velocity magnitude) or 4 (pressure)")
+        self.prohibit(
+            amr_tag_var not in range(1, 8),
+            "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1), 3 (velocity magnitude), 4 (pressure), 5 (vorticity), 6 (temperature) or 7 (species mass fraction)",
+        )
+        self.prohibit(amr_tag_var == 5 and (self.get("n") or 0) == 0, "amr_tag_var = 5 (vorticity) vanishes in 1D: it requires n > 0")
+        self.prohibit(amr_tag_var in (6, 7) and self.get("chemistry", "F") != "T", "amr_tag_var = 6 (temperature) and 7 (species mass fraction) require chemistry = T")
+        self.prohibit(amr_tag_var == 7 and self.get("amr_tag_species", 1) < 1, "amr_tag_species must be >= 1 (and <= the mechanism's species count, checked at run time)")
         self.prohibit(
             amr_tag_var == 4 and (self.get("model_eqns") != 2 or any(self.get(k, "F") == "T" for k in ("chemistry", "mhd", "bubbles_euler", "hypoelasticity"))),
             "amr_tag_var = 4 (pressure) uses the five-equation mixture pressure: it requires model_eqns = 2 without chemistry, mhd, bubbles_euler or hypoelasticity",
         )
         self.prohibit(
-            amr_tag_var == 3 and self.get("amr_tag_abs", "F") != "T",
-            "amr_tag_var = 3 (velocity magnitude) requires amr_tag_abs = T: a relative jump is undefined where the fluid is at rest",
+            amr_tag_var in (3, 7) and self.get("amr_tag_abs", "F") != "T",
+            f"amr_tag_var = {amr_tag_var} (velocity magnitude, species mass fraction) requires amr_tag_abs = T: a relative jump is undefined where the variable vanishes",
         )
         self.prohibit(
             (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,

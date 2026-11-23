@@ -30,7 +30,7 @@ Re 20 and 40 and Henderson (mean Cd 1.35) for Re 100.
 | 20 | 10 | 1.982 | 1.983 | 0.721 | not run |
 | 20 | 20 | 2.029 (-1.0 %) | 2.029 | 0.818 (ref 0.94) | 2.442 (Lange +1.4 %) |
 | 40 | 10 | 1.500 | 1.498 | 1.932 | not run |
-| 40 | 20 | 1.521 (+0.1 %) | 1.519 | 2.064 (ref 2.35) | 3.243 (Lange -1.1 %) |
+| 40 | 20 | 1.521 (+0.1 %) | 1.519 | 2.064 (ref 2.35) | 3.243 (Lange -1.2 %) |
 | 100 | 20 | 1.354 (+0.3 %) | 1.332 | shedding | 4.962 (Lange -3.2 %) |
 
 Re 100 used a smaller domain ([-8 D, 16 D] x [-8 D, 8 D], 6 % blockage) and `t U / D` = 120: Cl amplitude 0.287 (references
