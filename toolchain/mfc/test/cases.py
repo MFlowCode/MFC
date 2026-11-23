@@ -4137,6 +4137,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_conduction_annulus",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
+                # Registered below at 24 cells per diameter (the moving body crosses cells), 6 (sphere) and 16 (stand-off)
+                "2D_ibm_moving_mass_budget",
+                "3D_ibm_sphere_drag_nu",
+                "2D_ibm_cylinder_standoff",
             ]
             if path in casesToSkip:
                 continue
@@ -4716,6 +4720,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # Golden: GNU 13 double on an x86 CPU. An AMD MI300A (OpenMP offload) run differs from it by up to 5e-5 (min of absolute and relative
     # error; the y-momentum near zero and ib_heat.dat are the largest, the fields otherwise 3e-6), so 5e-4 is ten times that spread.
     cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=5e-4))
+
+    # Moving circle in a closed periodic box (examples/2D_ibm_moving_mass_budget): the gas mass it creates with the solver-default
+    # ib_mass_relax (30 for a moving body), and its viscous isothermal twin (cold wall, Re 40). 24 cells per diameter, 100 steps (a
+    # quarter of a diameter of travel), TSC image points: with the default inverse-distance points an A100 (NVHPC 25.11) differs from
+    # GNU 13 on a CPU by 1e-4 (4e-4 with ib_mass_relax = 0) in the energy of this case, TSC agrees to 4e-12 (the cold-wall twin: 2e-11, the
+    # stand-off case below: 2e-12; an NVHPC CPU build agrees with GNU to 3e-11). The checker script holds the physics; the goldens are
+    # regression guards, so 1e-6 is several orders above the observed spread. Skipped in the single-precision lane (see test.py).
+    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Mass Budget", "examples/2D_ibm_moving_mass_budget/case.py", args=["--ip_interp", "2"], mods={"parallel_io": "F"}, override_tol=1e-6))
+    cases.append(
+        define_case_f(
+            "2D -> IBM -> Moving Circle -> Mass Budget -> Cold Wall",
+            "examples/2D_ibm_moving_mass_budget/case.py",
+            args=["--Re", "40", "--Twall", "0.9", "--ip_interp", "2"],
+            mods={"parallel_io": "F"},
+            override_tol=1e-6,
+        )
+    )
+
+    # Sphere at Re 20, Mach 0.2, 6 cells per diameter (25 x 25 x 25 cells, 30 fixed steps, not steady): a smoke-level body that runs the
+    # 3D face-flux force and heat (ib_forces.dat, ib_heat.dat) in the golden. The table runs of the example are at 12 cells per diameter.
+    # Golden: GNU 13 double on an x86 CPU. An NVIDIA A100 (NVHPC 25.11 and 25.5, OpenACC) differs from it by up to 3e-4 (min of absolute and
+    # relative error, in the y-momentum, which is near zero), so 3e-3 is ten times that spread; the CPU compilers agree to 1e-11 on
+    # the other IBM goldens of this family. Chemistry tests are skipped in the single-precision lane.
+    cases.append(define_case_f("3D -> Chemistry -> IBM -> Sphere Drag Nu", "examples/3D_ibm_sphere_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=3e-3))
+
+    # Mach 2 bow shock of a cylinder, 16 cells per diameter, 150 fixed steps (before the shock has settled).
+    cases.append(define_case_f("2D -> IBM -> Bow Shock Standoff", "examples/2D_ibm_cylinder_standoff/case.py", mods={"parallel_io": "F"}, override_tol=1e-6))
 
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
     # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history
