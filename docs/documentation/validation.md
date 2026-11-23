@@ -138,6 +138,18 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 **Status:** partially validated. **Examples:** `examples/2D_ibm_cylinder_drag_nu` (lumped cooling) and `examples/2D_ibm_cold_wall_transient`. The decay of a lumped-temperature cylinder in a cross flow against the time constant its fixed-wall Nusselt number implies, and the heat a cold isothermal cylinder absorbs from quiescent hot gas with and without the sub-grid wall conduction column against a body-fitted 1D reference. Results and limits: @ref validation_wall_thermal.
 
+## Moving-body gas-mass budget and Galilean twin {#sec-validation-moving-body-budget}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_moving_mass_budget`. The gas mass a translating circle creates in a closed periodic box, with and without `ib_mass_relax`, and the conducted heat and force of the moving body against the same body held in the same relative flow. Results and limits: @ref validation_moving_body_budget.
+
+## Sphere drag and Nusselt number {#sec-validation-sphere-drag-nu}
+
+**Status:** partially validated. **Example:** `examples/3D_ibm_sphere_drag_nu`. The face-flux drag and face heat of a no-slip isothermal sphere at Mach 0.2 and Re 20-300 against Schiller-Naumann, Ranz-Marshall and Whitaker, with a momentum balance as an independent drag. Results and limits: @ref validation_sphere_drag_nu.
+
+## Bow-shock stand-off {#sec-validation-standoff}
+
+**Status:** open discrepancy (resolution-limited). **Example:** `examples/2D_ibm_cylinder_standoff`. The detached-shock distance of a cylinder and a sphere at Mach 1.5-3 against Billig's correlation and a body-fitted Euler solution. Results and limits: @ref validation_standoff.
+
 ## Other families
 
 - @ref validation_tsc_annulus "Isothermal conduction annulus": image-point interpolation (inverse distance and TSC) against the exact radial conduction solution.
