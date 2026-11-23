@@ -433,7 +433,8 @@ contains
     !> Owner-aware placement (amr_place_owner) of one level's na blocks (slots aidx, weights wt, Morton keys key): each block goes
     !! to the rank owning most of the coarse cells under it. A rank above (1 + place_tol) x the mean sheds its last blocks in Morton
     !! order, first to the least-loaded rank next to the block, then to the least-loaded rank anywhere, never pushing the receiver
-    !! above the cap. Replicated inputs in a fixed order, so every rank computes the same owners.
+    !! above the cap (or above the block's own weight, when one block exceeds it). Replicated inputs in a fixed order, so every rank
+    !! computes the same owners.
     impure subroutine s_amr_place_owner(key, wt, aidx, na, own)
 
         integer, intent(in)         :: na, aidx(na)
@@ -482,7 +483,8 @@ contains
                         m = minloc(load, 1) - 1
                     end if
                     if (m < 0) cycle
-                    if (load(m) + wt(a) > cap) cycle
+                    ! a block heavier than the cap may land on a rank it alone fills; never a move that does not lower the max
+                    if (load(m) + wt(a) > max(cap, wt(a)) .or. load(m) + wt(a) >= load(r)) cycle
                     own(a) = m; load(r) = load(r) - wt(a); load(m) = load(m) + wt(a)
                 end do
             end do
