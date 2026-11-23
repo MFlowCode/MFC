@@ -986,7 +986,7 @@ uniform Cartesian grid.
 | `amr_prolong`           | Integer | Prolongation: 1 limited linear, 2 quartic with a positivity fallback (default 1) |
 | `amr_place_owner`       | Logical | Place each block on the rank owning most of its coarse cells (default F) |
 | `amr_snap`              | Integer | Regrid hysteresis in coarse cells, <= `amr_buf - 2` (default 0; set by the toolchain under regrid) |
-| `amr_device_pack`       | Logical | Fused device pack/unpack of the coarse-patch exchange (default F; set by the toolchain when `amr_max_grid_size <= 64`) |
+| `amr_device_pack`       | Logical | Fused device pack/unpack of the coarse-patch exchange (default F; set by the toolchain for every AMR case) |
 
 Each save writes the block hierarchy and fine solution next to the level-0 restart data; a restart reads the block
 geometry from it, not from `amr_block_beg`/`amr_block_end`.

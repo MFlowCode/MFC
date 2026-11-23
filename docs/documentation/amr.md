@@ -73,7 +73,7 @@ owner and the ranks it overlaps. All exchanges are posted in a fixed order, so r
 
 On GPUs every block array is device-resident. A rank advances its blocks of equal level in batches stacked along the
 last dimension, one solver call per batch; this is why AMR needs a uniform Cartesian grid. The toolchain enables
-`amr_device_pack` (fused exchange kernels) when `amr_max_grid_size <= 64` and sets `amr_snap = min(2, amr_buf - 2)`
+`amr_device_pack` (fused exchange kernels) and sets `amr_snap = min(2, amr_buf - 2)`
 (regrid hysteresis) under dynamic regrid, unless they are set explicitly.
 
 `rank_time_wrt = T` prints a per-phase time budget of the AMR step, the block-balance report, and at the end of the run

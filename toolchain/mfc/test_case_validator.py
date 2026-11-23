@@ -541,10 +541,11 @@ class TestAmrDefaults(unittest.TestCase):
     def test_admissible_amr_case_gets_defaults(self):
         p = dict(self.AMR)
         self.assertTrue(apply_amr_defaults(p))
-        self.assertEqual(p["amr_device_pack"], "T")  # cap 16 <= DEVICE_PACK_MAX_CAP
-        q = {**self.AMR, "amr_max_grid_size": 96}
-        self.assertFalse(apply_amr_defaults(q))  # static block above the cap: nothing to derive
-        self.assertNotIn("amr_device_pack", q)
+        self.assertEqual(p["amr_device_pack"], "T")
+        for cap in (96, 0):  # large or rank-derived blocks get the fused kernels too
+            q = {**self.AMR, "amr_max_grid_size": cap}
+            self.assertTrue(apply_amr_defaults(q))
+            self.assertEqual(q["amr_device_pack"], "T")
         r = {**self.AMR, "amr_device_pack": "F"}
         self.assertTrue(apply_amr_defaults(r))
         self.assertEqual(r["amr_device_pack"], "F")
