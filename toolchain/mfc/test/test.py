@@ -380,7 +380,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 skipped_cases.append(case)
 
     for case in cases[:]:
-        if ARG("gpu"):
+        if ARG("gpu") != "no":
             skip = ["Gauss Seidel"]
             if any(label in case.trace for label in skip):
                 cases.remove(case)

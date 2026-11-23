@@ -260,6 +260,13 @@ export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c $compiler_flag -m $module_mode
 
+# GPU model, compute capability and driver, and the NVHPC version: a GPU partition list lands on mixed generations
+if [ "\$job_device" = "gpu" ] && command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi -L || true
+    nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv || true
+    if command -v nvfortran >/dev/null 2>&1; then nvfortran --version | head -2 || true; fi
+fi
+
 $sbatch_script_contents
 
 EOT
