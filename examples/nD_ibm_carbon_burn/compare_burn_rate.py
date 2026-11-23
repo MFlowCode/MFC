@@ -6,6 +6,7 @@ Burn rate and flame of nD_ibm_carbon_burn against the 1D radial reference (ref_c
 
 Burn rate: CASE_DIR/D/ib_heat.dat column 4 (face mass outflow) and column 3 (surface-solve gasification rate), averaged over +-0.5 us
 around each time, against the reference 2 pi R sum W_k s_k (4 pi R^2 sum W_k s_k for the sphere); error = MFC/reference - 1.
+Compare at times at least 0.5 us before the end of the run: the window is cut off at the last row and the burn rate falls steeply, so a final-time value reads high.
 Flame (needs the Silo output of post_process; skipped without it): T_max of the temperature binned in r (bin width dx) and its radius,
 at the last save, against the reference at the same time. Exits 1 if |column 4 error| > --tol at any time.
 """
@@ -52,7 +53,8 @@ def main():
     ap.add_argument("--tol", type=float, default=0.05)
     args = ap.parse_args()
     ref = np.loadtxt(os.path.join(HERE, "ref_cylinder.txt" if args.ndim == 2 else "ref_sphere.txt"))
-    h = np.loadtxt(glob.glob(os.path.join(args.case_dir, "D", "ib_heat.dat"))[0])
+    rows = [ln.split() for ln in open(glob.glob(os.path.join(args.case_dir, "D", "ib_heat.dat"))[0])]
+    h = np.array([r for r in rows if len(r) == 6], dtype=float)  # a run in progress may end on a partial row
     t_us, c3, c4 = h[:, 1] * 1e6, h[:, 2], h[:, 3]
     worst = 0.0
     print("t [us]   reference     column 4     error     column 3     error")

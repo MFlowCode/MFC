@@ -2,7 +2,7 @@
 
 # Burning carbon body validation
 
-**Status:** cylinder burn rate against a 1D radial reference: partially validated (within 2 % at 12 cells per diameter and 1 % at 24, converging with the grid; the earlier study's 0.2 % at 24 cells per diameter is not reproduced on `master`); sphere: open discrepancy on `master` at 12 cells per diameter (+6 to +7 %). **Code:** `master` at 0cdfdf02a. **Example:** `examples/nD_ibm_carbon_burn`. See also @ref validation.
+**Status:** cylinder burn rate against a 1D radial reference: validated with `ib_ip_interp = 2` at 24 cells per diameter (+0.3 % at 10 us, +0.2 % at 20 us), +0.8 to +1.4 % at 12; with the default image points +0.6 to +0.9 % at 24 and +1.3 to +1.9 % at 12; sphere: partially validated with `ib_ip_interp = 2` (+2.5 to +4 % at 12 cells per diameter), +6 to +9 % with the default. **Code:** `master` at 0cdfdf02a. **Example:** `examples/nD_ibm_carbon_burn`. See also @ref validation.
 
 A carbon body at fixed temperature gasifies in hot, high-pressure moist air with a CO flame off the surface. The reference is an independent 1D radially symmetric transient solution of the same model (`ref1d.py`, shipped), so the comparison checks the immersed-boundary surface chemistry (`ib_flux_wall`, the surface solve's species fluxes through the wall faces) and the reacting transport around a staircase body, with the mechanisms (`2D_ibm_reacting_surface`) shared. Tables marked "earlier" were measured on a pre-merge build and were not repeated.
 
@@ -20,7 +20,7 @@ A carbon body at fixed temperature gasifies in hot, high-pressure moist air with
 
 ### Cylinder
 
-Burn rate \f$\dot m'\f$ [kg/(m s)] against the reference (column 4 of `ib_heat.dat`, error = MFC/reference - 1; column 3 in parentheses). Measured on `master` at 0cdfdf02a with NVHPC 25.11 on an NVIDIA A100 (12 cells per diameter to 60 us, 24 cells per diameter to 30 us); the 12-cell run on the CPU (NVHPC 25.11) agrees with the A100 to 1e-5 relative and the 24-cell run at 10 us to 1e-4. The right-hand columns are the errors of the earlier study (pre-merge build whose defaults differed from `master`: triangular-shaped-cloud image points and the compact viscous face gradient).
+Burn rate \f$\dot m'\f$ [kg/(m s)] against the reference (default settings of `master`) (column 4 of `ib_heat.dat`, error = MFC/reference - 1; column 3 in parentheses). Measured on `master` at 0cdfdf02a with NVHPC 25.11 on an NVIDIA A100 (12 cells per diameter to 60 us, 24 cells per diameter to 30 us); the 12-cell run on the CPU (NVHPC 25.11) agrees with the A100 to 1e-5 relative and the 24-cell run at 10 us to 1e-4. The right-hand columns are the errors of the earlier study (pre-merge build whose defaults differed from `master`: triangular-shaped-cloud image points and the compact viscous face gradient).
 
 | t [us] | reference | 12 cells/D | 24 cells/D | earlier, 12 / 24 |
 | ---: | ---: | ---: | ---: | ---: |
@@ -31,7 +31,27 @@ Burn rate \f$\dot m'\f$ [kg/(m s)] against the reference (column 4 of `ib_heat.d
 
 Flame: the peak of the temperature binned in r is 2404.5 K at r = 2.09 R at 60 us on 12 cells per diameter (reference 2399.1 K at 2.04 R) and 2308.0 K at 1.80 R at 30 us on 24 cells per diameter (reference 2305.6 K at 1.79 R).
 
-On `master` the burn rate sits 1.3 to 1.9 % above the reference at 12 cells per diameter and 0.6 to 0.9 % above it at 24, falling by about 2 between the grids at 10 us (+1.87 to +0.86 %), where the earlier study measured -0.1 to +0.9 %. Two options of the earlier build were tried at 12 cells per diameter (CPU, to 20 us): triangular-shaped-cloud image points (`ib_ip_interp = 2`) give +1.39 % and +1.25 % at 10 and 20 us, and the compact viscous face gradient (`weno_Re_flux_compact = T`) +1.86 % and +1.85 %; neither closes the gap to the earlier numbers. The cause of the remaining difference is not identified.
+The cause of the gap to the earlier study was traced by rerunning the 12-cell cylinder with each default set back one at a time (CPU, 10 and 20 us; a run is compared at times at least 0.5 us before its end, since the averaging window of `compare_burn_rate.py` is cut off at the last row):
+
+| Build and setting (12 cells/D) | 10 us | 20 us |
+| :--- | ---: | ---: |
+| earlier study | +0.92 % | +0.08 % |
+| the earlier study's build (pre-merge, `ib_ip_interp = 2` by default), this case, GNU 13 CPU | +0.92 % | +0.08 % |
+| `master`, defaults | +1.87 % | +1.36 % |
+| `master`, `ib_ip_interp = 2` (TSC image points) | +1.39 % | +0.80 % |
+| `master`, `ib_smooth_contact = T` | +1.87 % | not run |
+| `master`, `ib_mass_relax = 30` or `1` | +1.86 % | not run |
+| `master`, `weno_Re_flux_compact = T` | +1.86 % | +1.85 % (end of run) |
+| `master` before #2248 (wall conduction through the unbounded mirror temperature) | burn rate equal to `master` to 5 digits through 5 us | |
+
+The earlier study's build reproduces its numbers exactly with this case file, so the case and the reference are not the difference. The default that moves the burn rate is the image-point interpolation: the earlier build used triangular-shaped-cloud weights (`ib_ip_interp = 2`), `master` uses inverse-distance weights (`ib_ip_interp = 1`). Setting it recovers about half of the gap at 12 cells per diameter and nearly all of it at 24 (below). The other options of the earlier build do not matter here (`ib_smooth_contact`, `ib_mass_relax`, which the flux wall makes redundant, `weno_Re_flux_compact`). What remains at 12 cells per diameter (+0.5 and +0.7 percentage points at 10 and 20 us) comes from changes of the earlier build that are not in `master` (for example the mirrored temperature of the advected ghost of an isothermal or reacting wall); this was not isolated. The recommended setting for these cases is `--set ib_ip_interp=2`.
+
+With `ib_ip_interp = 2` (A100, NVHPC 25.11):
+
+| t [us] | 12 cells/D | 24 cells/D | earlier, 12 / 24 |
+| ---: | ---: | ---: | ---: |
+| 10 | +1.39 % | +0.32 % | +0.92 % / +0.16 % |
+| 20 | +0.80 % | +0.16 % | +0.08 % / -0.11 % |
 
 ### Sphere
 
@@ -43,9 +63,7 @@ Same setup in 3D (`--ndim 3`), 12 cells per diameter (72 x 72 x 72 cells) to 30 
 | 20 | 1.5750e-8 | 1.6730e-8 | +6.22 % | 1.6785e-8 | +6.57 % |
 | 30 | 1.4490e-8 | 1.5416e-8 | +6.39 % | 1.5464e-8 | +6.72 % |
 
-The flame peak is 2247.5 K at r = 1.59 R at 30 us (reference 2236.1 K at 1.61 R). The earlier study (pre-merge build, one flux-wall share rule not yet merged) measured the burn rate within 0.9 to 2 % of the reference at 12 to 16 cells per diameter and 0.3 % at 24; this is not reproduced on `master`: the 3D burn rate is 6 to 7 % above the reference at 12 cells per diameter, with columns 3 and 4 within 0.6 % of each other. Finer grids and the options of the earlier build were not run (a 24-cell sphere is 144^3 cells). Status: open discrepancy on `master` at this resolution; the cylinder shows the same sign with a smaller error.
-
-
+With TSC image points (`ib_ip_interp = 2`, the recommended setting) the error is +4.05 % at 5 us, +3.17 % at 10 us and +2.49 % at 20 us (default: +9.14 %, +7.35 %, +6.22 %), against +2.07 %, +1.14 % (10, 20 us) of the earlier study (pre-merge build with `ib_ip_interp = 2` as the default and an older flux-wall face rule). The flame peak is 2247.5 K at r = 1.59 R at 30 us with the default settings (reference 2236.1 K at 1.61 R). The remaining 1 to 1.3 percentage points are not isolated (see the cylinder). Finer grids were not run (a 24-cell sphere is 144^3 cells). Status: partially validated with `ib_ip_interp = 2` (within 3.2 % at 12 cells per diameter), open discrepancy with the default image points.
 
 ## Known limitations {#sec-validation-burning-body-limits}
 
