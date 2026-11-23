@@ -823,12 +823,10 @@ contains
         real(wp), dimension(2) :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
         integer :: fl
-        integer :: Re_size_loc1, Re_size_loc2  !< host copies; amdflang reads Re_size stale cross-TU
 
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
                             & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const, &
-                            & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                            & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
@@ -885,7 +883,7 @@ contains
                             ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
                             alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
                         end do
-                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn, Re_size_loc1, Re_size_loc2)
+                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if
 
                     ! Get Re numbers and interface velocity for viscous work
@@ -1025,25 +1023,23 @@ contains
             real(wp), dimension(num_dims, num_dims) :: current_tau_bulk  !< Current bulk stress tensor.
             real(wp), dimension(num_dims)           :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
         #:endif
-        integer, dimension(3)           :: idx_right_phys              !< Physical (j,k,l) indices for right state.
-        real(wp)                        :: Re_shear                    !< Interface shear Reynolds number.
-        real(wp)                        :: Re_bulk                     !< Interface bulk Reynolds number.
-        integer                         :: j_loop                      !< Physical x-index loop iterator.
-        integer                         :: k_loop                      !< Physical y-index loop iterator.
-        integer                         :: l_loop                      !< Physical z-index loop iterator.
-        integer                         :: i_dim                       !< Generic dimension/component iterator.
-        integer                         :: vel_comp_idx                !< Velocity component iterator (1=u, 2=v, 3=w).
-        real(wp)                        :: divergence_v                !< Velocity divergence at interface.
+        integer, dimension(3)           :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+        real(wp)                        :: Re_shear        !< Interface shear Reynolds number.
+        real(wp)                        :: Re_bulk         !< Interface bulk Reynolds number.
+        integer                         :: j_loop          !< Physical x-index loop iterator.
+        integer                         :: k_loop          !< Physical y-index loop iterator.
+        integer                         :: l_loop          !< Physical z-index loop iterator.
+        integer                         :: i_dim           !< Generic dimension/component iterator.
+        integer                         :: vel_comp_idx    !< Velocity component iterator (1=u, 2=v, 3=w).
+        real(wp)                        :: divergence_v    !< Velocity divergence at interface.
         real(wp)                        :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
         real(wp), dimension(2)          :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
         integer                         :: fl
-        integer                         :: Re_size_loc1, Re_size_loc2  !< host copies; amdflang reads Re_size stale cross-TU
 
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
                             & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx, gamma_dot, D_xx, D_yy, &
-                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
         do l_loop = isz%beg, isz%end
             do k_loop = isy%beg, isy%end
                 do j_loop = isx%beg, isx%end
@@ -1097,7 +1093,7 @@ contains
                             ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
                             alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
                         end do
-                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn, Re_size_loc1, Re_size_loc2)
+                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if
 
                     divergence_v = 0.0_wp
@@ -1229,7 +1225,7 @@ contains
 
     !> Compute the shear and volume Reynolds numbers of one Riemann state by inverse-weighting the fluid Reynolds numbers with the
     !! volume fractions.
-    subroutine s_compute_interface_reynolds(alpha_K, Re_K, Re_size_loc1, Re_size_loc2)
+    subroutine s_compute_interface_reynolds(alpha_K, Re_K)
 
         $:GPU_ROUTINE(function_name='s_compute_interface_reynolds', parallelism='[seq]', cray_inline=True)
 
@@ -1239,18 +1235,16 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha_K
         #:endif
         real(wp), dimension(2), intent(out) :: Re_K
-        !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
-        integer, intent(in) :: Re_size_loc1, Re_size_loc2
-        integer             :: i, q  !< Loop iterators
+        integer                             :: i, q  !< Loop iterators
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, 2
             Re_K(i) = dflt_real
 
-            if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_K(i) = 0._wp
+            if (Re_size(i) > 0) Re_K(i) = 0._wp
 
             $:GPU_LOOP(parallelism='[seq]')
-            do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
+            do q = 1, Re_size(i)
                 Re_K(i) = alpha_K(Re_idx(i, q))/Res_gs(i, q) + Re_K(i)
             end do
 
