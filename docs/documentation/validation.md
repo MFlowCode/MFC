@@ -126,6 +126,18 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 **Status:** partially validated. **Example:** `examples/2D_ibm_cylinder_drag_nu`. The face-flux immersed-boundary force and the face heat of a no-slip isothermal cylinder at Re 20, 40 and 100 against Dennis and Chang, Williamson and the Nusselt-number correlations, with a momentum balance as an independent drag. Results and limits: @ref validation_cyl_drag_nu.
 
+## Periodic particle arrays {#sec-validation-particle-array}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_periodic_array`. Random arrays of fixed no-slip isothermal cylinders and spheres in a periodic box at a held mass flux: the global momentum balance (closes to 1e-4), the mean drag of 20-sphere arrays against Tenneti et al. (within 4 % at Re_m 20, +10 to +14 % at Re_m 100), the per-body force spread and the Nusselt number. Results and limits: @ref validation_particle_array.
+
+## Shock through a dense particle curtain {#sec-validation-shock-curtain}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_shock_curtain`. The unsteady drag of a sphere after a Mach 1.22 shock against Mehta et al. (peak within 3 %), and the Favre-averaged gas velocity through a Mach 1.66 curtain of spheres at a solid fraction of 0.2 against a published particle-resolved DNS (0.04 to 0.05 of the post-shock velocity), with the wall-model comparison. Results and limits: @ref validation_shock_curtain.
+
+## Accuracy limits of the ghost-cell immersed boundary {#sec-validation-ib-limits}
+
+**Status:** open discrepancy (measured limits, no example). Wall value about second order, wall-normal gradient first order or worse, rotating-wall shear plateau near 2 %, and the options that help or do not: @ref ib_accuracy_limits.
+
 ## Other families
 
 - @ref validation_tsc_annulus "Isothermal conduction annulus": image-point interpolation (inverse distance and TSC) against the exact radial conduction solution.

@@ -4137,6 +4137,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_conduction_annulus",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
+                # Registered below at their own sizes: the 25-cell cap would leave the bodies unresolved (12 cylinders need about 96 cells)
+                "2D_ibm_periodic_array",
+                "2D_ibm_shock_curtain",
             ]
             if path in casesToSkip:
                 continue
@@ -4716,6 +4719,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # Golden: GNU 13 double on an x86 CPU. An AMD MI300A (OpenMP offload) run differs from it by up to 5e-5 (min of absolute and relative
     # error; the y-momentum near zero and ib_heat.dat are the largest, the fields otherwise 3e-6), so 5e-4 is ten times that spread.
     cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=5e-4))
+
+    # Fixed random array of 12 no-slip cylinders (phi 0.2, Re_m 20, 96 x 96 cells, 200 steps) held at a bulk mass flux by the
+    # mean_mflux controller, on 2 ranks (one seam through the bodies). The flow is far from steady: the golden is a regression
+    # guard for the periodic bodies, the controller and the force record; check_array.py validates the physics offline.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Periodic Array", "examples/2D_ibm_periodic_array/case.py", ppn=2, override_tol=1e-6))
+    # Ms 1.66 shock entering a curtain of 12 fixed no-slip cylinders (inviscid, 240 x 96 cells, 300 steps: the shock is inside the curtain).
+    cases.append(define_case_f("2D -> IBM -> Shock Curtain", "examples/2D_ibm_shock_curtain/case.py", override_tol=1e-6))
 
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order
     # reconstruction keeps the run free of WENO weights, which amplify round-off. The golden holds the ib_forces.dat history

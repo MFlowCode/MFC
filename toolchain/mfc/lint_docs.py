@@ -23,6 +23,9 @@ DOCS = [
     "docs/documentation/validation_gas_chemistry.md",
     "docs/documentation/validation_tsc_annulus.md",
     "docs/documentation/validation_cyl_drag_nu.md",
+    "docs/documentation/validation_particle_array.md",
+    "docs/documentation/validation_shock_curtain.md",
+    "docs/documentation/ib_accuracy_limits.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]
