@@ -354,6 +354,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 
 ### 4. Immersed Boundary Patches {#sec-immersed-boundary-patches}
 
+The measured accuracy of the wall value and wall-normal gradient, and which options help, are on @ref ib_accuracy_limits.
+
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
 | `num_ibs`            | Integer | Number of immersed boundary patches |
