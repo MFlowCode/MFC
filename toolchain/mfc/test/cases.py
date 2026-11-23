@@ -4137,6 +4137,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_conduction_annulus",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
+                # Registered below with its own sizes: the 25-cell cap and 50 steps would stop them before the physics
+                "1D_cj_detonation",
+                "2D_flame_vortex_pair",
+                "nD_ibm_carbon_burn",
+                # Docs-only: pre_process writes a uniform state and ic3d.py overwrites the restart file, so a one-command run cannot start it
+                "3D_flame_vortex_ring",
             ]
             if path in casesToSkip:
                 continue
@@ -4203,6 +4209,43 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # ignition delay and T(t) against a Cantera reactor. Golden: GNU 13 double; NVHPC 25.11 (A100) agrees to 2e-12, NVHPC 25.5
         # differs by up to 1e-3 relative in minor species (issue 2181); skipped on NVHPC < 25.11 GPU builds (test.py).
         cases.append(define_case_f("1D -> Chemistry -> H2-Air Ignition -> Split Reactions", "examples/1D_h2_air_ignition/case.py", ["--T0", "1200", "--dt", "2e-8", "--tend", "1e-4", "--nsaves", "5"]))
+
+        # Front formation of a 1D detonation in 2H2 + O2 + 7Ar (100 kPa): a driver slug of equilibrium products initiates a wave that
+        # couples within 300 steps (200 cells, 2.5 per induction length, the front 3 mm from the wall). check_cj.py measures the front
+        # speed against the equilibrium CJ solution on long runs; this is the regression guard for the split reaction integrator at the
+        # front. Golden: GNU 13 (CPU, double). Largest relative difference from it: 2e-6 on NVHPC 25.11 (A100), 1.5e-7 on NVHPC 25.11
+        # (CPU); NVHPC 25.5 (A100) differs by 2e-2 (known chemistry difference, issue 2181; skipped there, see test.py).
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> CJ Detonation -> Front Formation",
+                "examples/1D_cj_detonation/case.py",
+                ["--ppi", "2.5", "--L", "0.0061", "--steps", "300", "--nsave", "1"],
+                mods={"parallel_io": "F"},
+                override_tol=1e-5,
+            )
+        )
+
+        # Premixed H2/air flame hit by a vortex pair on 64 x 64 cells (hcid 274 initial condition written to IC/ by case.py), 100 fixed
+        # steps with the characteristic outflow (bc_x%end = -8, GRCBC). GNU 13 golden; NVHPC 25.11 (A100) agrees to 1e-12, NVHPC 25.11
+        # (CPU) differs by 3e-7 relative; NVHPC 25.5 (A100) by 1e-3 in a minor species (issue 2181; skipped there, see test.py).
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Flame Vortex Pair", "examples/2D_flame_vortex_pair/case.py", ["--N", "64"], mods={"parallel_io": "F", "t_step_stop": 100, "t_step_save": 100}, override_tol=3e-6
+            )
+        )
+
+        # Burning carbon cylinder in quiescent hot air (ib_flux_wall, isothermal wall, CO flame) at 12 cells per diameter, 5e-7 s: the
+        # 1D radial reference of compare_burn_rate.py checks the burn rate on long runs. GNU 13 golden; the largest relative differences
+        # are 4e-7 (NVHPC 25.11, A100), 3e-7 (NVHPC 25.5, A100) and 6e-7 (NVHPC 25.11, CPU).
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> IBM Carbon Cylinder -> Burn Rate",
+                "examples/nD_ibm_carbon_burn/case.py",
+                ["--cells_per_D", "12"],
+                mods={"parallel_io": "F", "t_stop": 5.0e-7, "t_save": 5.0e-7},
+                override_tol=3e-6,
+            )
+        )
 
         # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
         for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
