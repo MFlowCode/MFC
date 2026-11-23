@@ -12,16 +12,17 @@ ghost velocity, default) and `ib_wall_order = 2` (two-probe quadratic) do at a c
 
 | cells per R | wall order | L2 / Omega R | azimuthal-mean part | inner torque error | outer torque error | wall speed error (fit) |
 |---:|---:|---:|---:|---:|---:|---:|
-| 10 | 1 | 1.66e-2 | 5.3e-3 | -3.0e-3 | -1.5e-2 | -5.4e-2 |
-| 10 | 2 | 1.23e-2 | 5.2e-3 | -1.7e-3 | -9.7e-3 | -3.9e-2 |
-| 20 | 1 | 1.09e-2 | 8.3e-3 | -1.2e-2 | -1.9e-2 | -6.3e-2 |
-| 20 | 2 | 6.5e-3 | 4.2e-3 | -3.7e-3 | -5.8e-3 | -3.8e-2 |
-| 40 | 1 | 8.1e-3 | 8.5e-3 | -1.6e-2 | -1.9e-2 | -7.2e-2 |
-| 40 | 2 | 4.7e-3 | 4.9e-3 | -6.6e-3 | -8.8e-3 | -3.4e-2 |
+| 10 | 1 | 1.48e-2 | 1.31e-2 | -1.9e-2 | -3.2e-2 | -5.7e-2 |
+| 10 | 2 | 1.36e-3 | 1.23e-3 | -2.7e-4 | -2.3e-3 | -7.4e-3 |
+| 20 | 1 | 8.0e-3 | 7.7e-3 | -1.28e-2 | -1.90e-2 | -4.4e-2 |
+| 20 | 2 | 3.3e-4 | 3.2e-4 | +7.6e-4 | -3.8e-4 | -2.2e-3 |
+| 40 | 1 | 5.8e-3 | 6.3e-3 | -1.29e-2 | -1.56e-2 | -4.7e-2 |
+| 40 | 2 | 9.6e-5 | 1.0e-4 | +1.4e-4 | -4.4e-5 | -7.2e-4 |
 
-Order 2 lowers the velocity error by 26 to 42 % at every resolution and about halves the torque error from 20 cells per radius.
-Neither order converges cleanly on current master, which evaluates a rotating body's ghost-cell wall velocity at the ghost point, not at the wall point (fix: #2383); the azimuthal-mean error stays near 4e-3 to 9e-3 and the fitted inner wall speed stays 3 to 7 %
-low. The measurement, its limits and the rotating-wall variants are on the page @ref validation_wall_order_couette.
+Order 2 converges at about second order (observed 2.0 and 1.8) and is 11 to 60 times below order 1, which converges at 0.5 to 0.9
+order and keeps a 4 to 6 % wall-speed deficit. The wall shear from local near-wall fits stays near 2 % with order 2 at this Mach
+number and Reynolds number and does not converge (cause not identified). The measurement, its limits and the rotating-wall variants
+are on the page @ref validation_wall_order_couette.
 
 ## Run
 
@@ -38,6 +39,7 @@ between runs. The output is serial text, so use one rank. `ring_stl.py` writes t
 
 ## Limits
 
-2D only, one Mach number and Reynolds number, one machine and compiler for the table (NVIDIA A100, NVHPC 25.11, double
-precision). The wall shear read from the near-wall cells does not converge for either order. Mean density rises by up to 2 %
-over the run because the immersed boundary does not conserve mass; this is part of the plateau and is not quantified here.
+2D only, two Mach numbers, one machine and compiler for the table (NVIDIA A100, NVHPC 25.11, double precision). The tables use
+`master` with #2383 (a rotating body's ghost-cell wall velocity at the wall point). The wall shear read from the near-wall cells does
+not converge with order 1, and stays near 2 % with order 2 at Mach 0.05. Mean density rises by up to 2 % over the run because the
+immersed boundary does not conserve mass; this is not quantified here.

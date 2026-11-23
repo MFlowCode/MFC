@@ -2,9 +2,9 @@
 
 # Wall-Normal Ghost Velocity at Viscous Walls
 
-**Status:** partially validated (the gain of `ib_wall_order = 2` is measured on a flat and a curved wall; two limits are not explained).
-**Code:** `master` at dd9778b26 (contains #2176 `ib_wall_order`, #2169 centripetal ghost pressure, #2165 TSC image points, #2212 compact viscous gradients), unmodified. NVIDIA A100, NVHPC 25.11, OpenACC, double precision, one rank.
-**Last run:** 2026-11-21. **Examples:** `examples/2D_ibm_plane_poiseuille`, `examples/2D_ibm_taylor_couette`.
+**Status:** partially validated (`ib_wall_order = 2` is measured on a flat wall and on a rotating curved wall; 2D only, two grids per regime beyond the first, and the Mach 0.05 wall shear is open).
+**Code:** channel: `master` at dd9778b26; annulus: `master` at 13b4d8b (contains #2176 `ib_wall_order`, #2169 centripetal ghost pressure, #2165 TSC image points, #2212 compact viscous gradients and #2383 wall-point ghost velocity), unmodified. NVIDIA A100, NVHPC 25.11, OpenACC, double precision, one rank.
+**Last run:** 2026-11-22. **Examples:** `examples/2D_ibm_plane_poiseuille`, `examples/2D_ibm_taylor_couette`.
 
 #2176 added `ib_wall_order = 2`, a two-probe quadratic wall-normal ghost velocity at no-slip walls, and reported no accuracy gain against an exact solution. This page measures it against two exact viscous solutions, for `ib_wall_order` 1 (the default mirror) and 2, and records what happens at a rotating curved wall.
 
@@ -57,50 +57,52 @@ Wall on a cell face (offset 0) and 0.37 cell inside it. Errors are signed (MFC m
 
 | Cells per R | Order | L2 / Omega R | Azimuthal mean | Rest | Inner torque | Outer torque | Wall speed (fit) |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 | 1 | 1.66e-2 | 5.3e-3 | 1.60e-2 | -3.0e-3 | -1.48e-2 | -5.4e-2 |
-| 10 | 2 | 1.23e-2 | 5.2e-3 | 1.14e-2 | -1.7e-3 | -9.7e-3 | -3.9e-2 |
-| 20 | 1 | 1.09e-2 | 8.3e-3 | 8.5e-3 | -1.19e-2 | -1.87e-2 | -6.3e-2 |
-| 20 | 2 | 6.5e-3 | 4.2e-3 | 5.6e-3 | -3.7e-3 | -5.8e-3 | -3.8e-2 |
-| 40 | 1 | 8.1e-3 | 8.5e-3 | 3.8e-3 | -1.63e-2 | -1.94e-2 | -7.2e-2 |
-| 40 | 2 | 4.7e-3 | 4.9e-3 | 2.0e-3 | -6.6e-3 | -8.8e-3 | -3.4e-2 |
+| 10 | 1 | 1.48e-2 | 1.31e-2 | 9.3e-3 | -1.9e-2 | -3.2e-2 | -5.7e-2 |
+| 10 | 2 | 1.36e-3 | 1.23e-3 | 7.7e-4 | -2.7e-4 | -2.3e-3 | -7.4e-3 |
+| 20 | 1 | 8.0e-3 | 7.7e-3 | 4.7e-3 | -1.28e-2 | -1.90e-2 | -4.4e-2 |
+| 20 | 2 | 3.3e-4 | 3.2e-4 | 1.9e-4 | +7.6e-4 | -3.8e-4 | -2.2e-3 |
+| 40 | 1 | 5.8e-3 | 6.3e-3 | 2.4e-3 | -1.29e-2 | -1.56e-2 | -4.7e-2 |
+| 40 | 2 | 9.6e-5 | 1.0e-4 | 4.1e-5 | +1.4e-4 | -4.4e-5 | -7.2e-4 |
 
-- The velocity error is 26 to 42 % lower with order 2 at every resolution. Both converge at only about 0.4 to 0.5 order between 20 and 40 cells per R (order 1 1.09e-2 to 8.1e-3, order 2 6.5e-3 to 4.7e-3).
-- The azimuthal-mean part does not converge for either order (order 1: 5.3e-3, 8.3e-3, 8.5e-3; order 2: 5.2e-3, 4.2e-3, 4.9e-3). It is a deficit of angular velocity near the inner wall: the fitted wall speed is 5 to 7 % low for order 1 and 3 to 4 % low for order 2, with no trend with resolution.
-- The torque from the face fluxes is within 2 % of the exact value for both orders, with order 2 about 2 to 3 times closer at 20 and 40 cells per R. It does not converge monotonically, and the inner and outer torque differ by up to 1.2e-2, so the run is not exactly steady or the angular momentum is not exactly conserved.
-- The change of the azimuthal velocity over the last save interval is below 1.3e-5 of Omega R in these runs.
+- With order 2 the velocity error is 11, 24 and 60 times lower than with order 1 at 10, 20 and 40 cells per R, and converges at about second order (1.36e-3, 3.3e-4, 9.6e-5: observed orders 2.0 and 1.8). Order 1 converges at 0.9 and then 0.5 order (1.48e-2, 8.0e-3, 5.8e-3).
+- The azimuthal-mean part dominates the error for both orders. With order 1 the fitted wall speed stays 4 to 6 % low and the torque 1.3 to 3 % off at every resolution; with order 2 the wall speed deficit falls from 0.7 % to 0.07 % and the torque error from 0.2 % to 0.01 % (inner) at 10 to 40 cells per R.
+- The inner-wall shear from local cubic fits at 96 wall points, net of the fit's own error: order 2 gives 1.9e-2, 2.0e-2 and 1.9e-2 at 10, 20 and 40 cells per R (the fit's own error is 1.9e-2, 3.2e-3 and 4.5e-4 on the exact profile); order 1 gives 0.12, 0.20 and 0.98. The order 2 shear does not converge at this Mach and Reynolds number (about 2 %); the cause is not identified (not verified). At Mach 0.01 it is 0.4 to 0.6 % (next section).
+- The change of the azimuthal velocity over the last save interval is below 1.1e-5 of Omega R in these runs.
 
 ### Rotating inner wall with the optional wall treatments, Mach 0.01
 
-These numbers were measured on `master` with the ghost-velocity defect described below (the rotating body's wall velocity is evaluated at the ghost point, not at the wall point). They are not the expected accuracy of a rotating wall. Same annulus at tip Mach 0.01 and Re = 11, run for 4 slowest viscous times, `ib_wall_order = 1` unless noted. The centripetal ghost pressure of #2169 is always on for a spinning body; `ib_ip_interp = 2` (TSC) and `ib_visc_compact = T` (compact viscous gradients next to a body) are opt-in. Shear is the inner-wall shear \f$S = r\,d(u_\theta/r)/dr\f$ from local cubic fits at 96 wall points (3.5 to 5 cells), rms relative error; the fit applied to the exact profile gives 3.2e-3 (20 cells per R) and 9.2e-4 (30).
+Same annulus at tip Mach 0.01 and Re = 11, run for 4 slowest viscous times from rest, `ib_wall_order = 1` unless noted. The centripetal ghost pressure of #2169 is always on for a spinning body; `ib_ip_interp = 2` (TSC) and `ib_visc_compact = T` (compact viscous gradients next to a body) are opt-in. Shear is the inner-wall shear \f$S = r\,d(u_\theta/r)/dr\f$ from local cubic fits at 96 wall points (3.5 to 5 cells), rms relative error; the same fit applied to the exact profile gives 3.2e-3 (20 cells per R) and 9.2e-4 (30). The runs are not fully steady (the velocity changes by 1.7e-3 to 1.9e-3 of Omega R over the last save interval).
 
 | Cells per R | Options | L2 / Omega R | Azimuthal mean | Wall speed (fit) | Inner torque | Shear rms |
 | ---: | :--- | ---: | ---: | ---: | ---: | ---: |
-| 20 | default | 1.34e-2 | 8.5e-3 | -3.5e-2 | +3.8e-2 | 0.47 |
-| 20 | TSC | 1.34e-2 | 8.4e-3 | -3.4e-2 | +3.7e-2 | 0.47 |
-| 20 | TSC, compact | 1.35e-2 | 9.9e-3 | -2.0e-2 | +3.6e-2 | 0.47 |
-| 20 | TSC, compact, order 2 | 9.6e-3 | 7.8e-3 | -6.6e-3 | +2.9e-2 | 0.38 |
-| 30 | default | 7.7e-3 | 4.3e-3 | -4.4e-2 | +1.5e-2 | 0.47 |
-| 30 | TSC | 7.8e-3 | 4.3e-3 | -4.4e-2 | +1.4e-2 | 0.47 |
-| 30 | TSC, compact | 6.5e-3 | 3.3e-3 | -1.8e-2 | +1.5e-2 | 0.35 |
-| 30 | TSC, compact, order 2 | 4.1e-3 | 2.5e-3 | -6.4e-3 | +1.4e-2 | 0.28 |
+| 20 | default | 9.6e-3 | 7.7e-3 | -2.9e-2 | +1.3e-2 | 0.21 |
+| 20 | TSC | 9.7e-3 | 7.8e-3 | -2.9e-2 | +1.2e-2 | 0.21 |
+| 20 | TSC, compact | 8.5e-3 | 6.8e-3 | -1.3e-2 | +1.1e-2 | 0.18 |
+| 20 | TSC, compact, order 2 | 4.0e-3 | 4.0e-3 | -5.7e-4 | +8.4e-3 | 3.8e-3 |
+| 30 | default | 8.2e-3 | 7.8e-3 | -3.2e-2 | +5.0e-3 | 0.29 |
+| 30 | TSC | 8.3e-3 | 7.8e-3 | -3.2e-2 | +4.6e-3 | 0.29 |
+| 30 | TSC, compact | 7.1e-3 | 6.7e-3 | -1.2e-2 | +4.2e-3 | 0.13 |
+| 30 | TSC, compact, order 2 | 3.9e-3 | 3.9e-3 | -2.9e-4 | +8.9e-3 | 6.4e-3 |
 
-- TSC alone changes nothing here. Compact viscous gradients cut the wall-speed deficit by about half, and adding order 2 brings it to 0.6 %; at 30 cells per R the velocity error is then 1.9 times smaller than the default (4.1e-3 against 7.7e-3).
-- The inner-wall shear from local fits stays at 28 to 47 % for every option and does not converge with resolution. Cause (found by comparing with an earlier build): in `s_compute_ghost_point_velocity` (`src/simulation/m_ibm.fpp`), `master` evaluates a rotating body's wall velocity at the ghost point instead of at the wall point, so the imposed wall speed is \f$\Omega(R-|\phi|)\f$ with \f$\phi\f$ the level set at the ghost point, not \f$\Omega R\f$. The error is up to one cell of radius, about 5 % of the wall speed at 20 cells per R, and about 100 % of the wall shear over the first cell. The ghost pressure routine already uses the wall point. The fix is #2383. With it and `ib_wall_order = 2`, `ib_ip_interp = 2` and `ib_visc_compact = T`, a scratch build gave an inner shear rms of 0.0065 at 20 and 0.0019 at 30 cells per R (second order), against 0.38 and 0.28 above, and an inner torque error of 0.06 % against 2.6 % (a trial of the fix that was not run through this page's checker and is not part of this PR). Ruled out earlier: the estimator (the script that gave the earlier 0.2 to 2 % band, applied to these runs, reproduces `check_couette.py` to four digits), the fit's own error (3.2e-3 at 20 and 9.2e-4 at 30 cells per R on the exact profile) and the start-up (the exact field as initial condition gives the same shear, 0.47 and 0.38).
-- The torque is within 4 % of the exact value for every option, with no trend between options.
+- TSC alone changes nothing here. Compact viscous gradients halve the wall-speed deficit and the shear error, and adding order 2 removes the deficit (0.06 % and 0.03 %) and takes the shear to 0.4 % (20 cells per R) and 0.6 % (30), which agrees with the 0.2 to 2 % range measured earlier on a build that already evaluated the wall velocity at the wall point. The shear does not fall from 20 to 30 cells per R here (3.8e-3 to 6.4e-3); the runs are short and not fully steady, so this is not a convergence measurement.
+- The inner torque stays within 1.3 % with order 1 and 0.9 % with order 2; the outer torque is 1.8 to 3.3 % low for every option.
+- Before #2383, `master` evaluated a rotating body's wall velocity at the ghost point instead of the wall point (in `s_compute_ghost_point_velocity`), so the imposed wall speed was \f$\Omega(R-|\phi|)\f$, not \f$\Omega R\f$. The same runs on that build gave an inner shear of 28 to 47 % for every option, which is why #2383 was made. The numbers above are with #2383.
 
 ## Assessment
 
 - **Flat wall:** order 2 is a large gain in the velocity profile and the flow rate (8 to 17 times at 8 to 32 cells across). The default order leaves a large first-order error because the no-slip acts about 0.75 cell outside the wall.
-- **Curved rotating wall:** the gain is modest (26 to 42 % in the velocity, 2 to 3 times in the torque). Neither order converges cleanly, because of a wall-speed deficit at the rotating inner wall that order 2 halves but does not remove. The ghost-velocity defect above produces a deficit of this kind; the Mach 0.05 tables were not re-run with the fix, so how much of the deficit it explains there is not verified.
+- **Curved rotating wall (with #2383):** order 2 gives second-order convergence of the velocity (1.4e-3, 3.3e-4, 9.6e-5), 11 to 60 times below order 1, and removes the wall-speed deficit. Order 1 converges at 0.5 to 0.9 order and keeps a 4 to 6 % wall-speed deficit.
+- **Wall shear:** from near-wall cells it does not converge for order 1, and for order 2 it stays near 2 % at Mach 0.05 and Re 10. At Mach 0.01 with order 2, TSC and compact gradients it is 0.4 to 0.6 %. The flow rate (channel) and the torque (annulus) are the integral measures that converge.
 - Order 2 is not uniformly better: it splits the wall force unevenly between two walls when a wall lies inside a cell.
 
 ## Known limitations and open issues
 
 - The default order acts about 0.75 cell outside a flat wall; the same code path acts less far out at the curved fixed wall. The cause is not identified (not verified).
-- The rotating inner wall keeps a 3 to 7 % wall-speed deficit and a non-converging mean error for both orders on `master`. The ghost-velocity defect above is the identified cause of the rotating-wall shear plateau; the golden of the annulus test changes when the fix merges.
-- The wall shear read from near-wall cells (a three-cell quadratic fit in the channel, a cubic fit in the annulus) does not converge for either order. Use the flow rate (channel) and the torque (annulus) as the integral measures.
-- 2D, one Mach number and Reynolds number per problem, one machine and compiler. A third grid beyond 40 cells per R and 3D are not measured, so the status stays "partially validated". High-Reynolds-number boundary layers, moving flat walls and slip walls are not measured.
+- The order 2 inner-wall shear at Mach 0.05 and Re 10 stays near 2 % from 10 to 40 cells per R. The cause is not identified (not verified).
+- The wall shear read from near-wall cells (a three-cell quadratic fit in the channel, a cubic fit in the annulus) does not converge for the channel with either order.
+- 2D, two Mach numbers and Reynolds numbers, one machine and compiler. A third grid beyond 40 cells per R and 3D are not measured, so the status stays "partially validated". High-Reynolds-number boundary layers, moving flat walls and slip walls are not measured. The Mach 0.01 runs are not fully steady.
 - The rigid-rotation check (an inviscid circle in gas already in rigid rotation) was not reproduced for this page: it needs an initial condition that no case-file patch provides.
+- On an NVIDIA A100 the registered tests differ from the CPU golden by 5e-6 (annulus) and 1.5e-5 (channel) in density, the known CPU/GPU gap of the viscous immersed-boundary work (#2419), so their tolerance is 1e-4.
 
 ## Reproduce
 
@@ -112,4 +114,4 @@ python3 examples/2D_ibm_taylor_couette/check_couette.py examples/2D_ibm_taylor_c
 ```
 
 Each run writes into the example directory (clear `D/`, `restart_data/` and the `.inp` files between runs). Channel: `--offset 0.37`, `--wall_order 1`. Annulus: `--wall_order 1`, `--ip_interp 2`, `--visc_compact 1`, `--mach 0.01 --re 11 --ntau 4`.
-The CI-sized runs are the tests `2D -> IBM -> Taylor-Couette -> ib_wall_order=2` and `2D -> IBM -> Plane Poiseuille -> ib_wall_order=2` (regression goldens, GNU 13 double: 100 steps for the annulus, 300 for the channel; the tolerance is 1e-4: the GNU, Intel, NVHPC and macOS CI lanes agree to 1e-13, but an A100 run differs from the CPU golden by 5e-6 and 1.5e-5 in density, the known CPU/GPU gap of the viscous immersed-boundary work).
+The CI-sized runs are the tests `2D -> IBM -> Taylor-Couette -> ib_wall_order=2` and `2D -> IBM -> Plane Poiseuille -> ib_wall_order=2` (regression goldens, GNU 13 double: 100 steps for the annulus, 300 for the channel; the tolerance is 1e-4: the GNU, Intel, NVHPC and macOS CI lanes agree to 1e-13, but an A100 run differs from the CPU golden by 5e-6 and 1.5e-5 in density, the CPU/GPU gap of the viscous immersed-boundary work tracked in #2419).
