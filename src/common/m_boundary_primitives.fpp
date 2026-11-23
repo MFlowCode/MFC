@@ -1274,11 +1274,11 @@ contains
 
     end subroutine s_color_function_ghost_cell_extrapolation
 
-    !> Apply periodic boundary conditions to the IGR Jacobian field by copying values from the opposite domain boundary.
-    subroutine s_F_igr_periodic(jac_sf, bc_dir, bc_loc, k, l)
+    !> Apply periodic boundary conditions to a scalar field by copying values from the opposite domain boundary.
+    subroutine s_scalar_periodic(scalar_sf, bc_dir, bc_loc, k, l)
 
-        $:GPU_ROUTINE(function_name='s_F_igr_periodic', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        $:GPU_ROUTINE(function_name='s_scalar_periodic', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: scalar_sf
         integer, intent(in)                              :: bc_dir, bc_loc
         integer, intent(in)                              :: k, l
         integer                                          :: j
@@ -1286,42 +1286,42 @@ contains
         if (bc_dir == 1) then
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(m - j + 1, k, l)
+                    scalar_sf(1)%sf(-j, k, l) = scalar_sf(1)%sf(m - j + 1, k, l)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(j - 1, k, l)
+                    scalar_sf(1)%sf(m + j, k, l) = scalar_sf(1)%sf(j - 1, k, l)
                 end do
             end if
         else if (bc_dir == 2) then
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, n - j + 1, l)
+                    scalar_sf(1)%sf(k, -j, l) = scalar_sf(1)%sf(k, n - j + 1, l)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, j - 1, l)
+                    scalar_sf(1)%sf(k, n + j, l) = scalar_sf(1)%sf(k, j - 1, l)
                 end do
             end if
         else
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, p - j + 1)
+                    scalar_sf(1)%sf(k, l, -j) = scalar_sf(1)%sf(k, l, p - j + 1)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, j - 1)
+                    scalar_sf(1)%sf(k, l, p + j) = scalar_sf(1)%sf(k, l, j - 1)
                 end do
             end if
         end if
 
-    end subroutine s_F_igr_periodic
+    end subroutine s_scalar_periodic
 
-    !> Apply reflective boundary conditions to the IGR Jacobian field by mirroring values across the boundary.
-    subroutine s_F_igr_reflective(jac_sf, bc_dir, bc_loc, k, l)
+    !> Apply reflective boundary conditions to a scalar field by mirroring values across the boundary.
+    subroutine s_scalar_reflective(scalar_sf, bc_dir, bc_loc, k, l)
 
-        $:GPU_ROUTINE(function_name='s_F_igr_reflective', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        $:GPU_ROUTINE(function_name='s_scalar_reflective', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: scalar_sf
         integer, intent(in)                              :: bc_dir, bc_loc
         integer, intent(in)                              :: k, l
         integer                                          :: j
@@ -1329,42 +1329,42 @@ contains
         if (bc_dir == 1) then
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(j - 1, k, l)
+                    scalar_sf(1)%sf(-j, k, l) = scalar_sf(1)%sf(j - 1, k, l)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m - (j - 1), k, l)
+                    scalar_sf(1)%sf(m + j, k, l) = scalar_sf(1)%sf(m - (j - 1), k, l)
                 end do
             end if
         else if (bc_dir == 2) then
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, j - 1, l)
+                    scalar_sf(1)%sf(k, -j, l) = scalar_sf(1)%sf(k, j - 1, l)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n - (j - 1), l)
+                    scalar_sf(1)%sf(k, n + j, l) = scalar_sf(1)%sf(k, n - (j - 1), l)
                 end do
             end if
         else
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, j - 1)
+                    scalar_sf(1)%sf(k, l, -j) = scalar_sf(1)%sf(k, l, j - 1)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p - (j - 1))
+                    scalar_sf(1)%sf(k, l, p + j) = scalar_sf(1)%sf(k, l, p - (j - 1))
                 end do
             end if
         end if
 
-    end subroutine s_F_igr_reflective
+    end subroutine s_scalar_reflective
 
-    !> Extrapolate the IGR Jacobian field into ghost cells by copying boundary values.
-    subroutine s_F_igr_ghost_cell_extrapolation(jac_sf, bc_dir, bc_loc, k, l)
+    !> Extrapolate a scalar field into ghost cells by copying boundary values.
+    subroutine s_scalar_ghost_cell_extrapolation(scalar_sf, bc_dir, bc_loc, k, l)
 
-        $:GPU_ROUTINE(function_name='s_F_igr_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        $:GPU_ROUTINE(function_name='s_scalar_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), dimension(1:), intent(inout) :: scalar_sf
         integer, intent(in)                              :: bc_dir, bc_loc
         integer, intent(in)                              :: k, l
         integer                                          :: j
@@ -1372,36 +1372,36 @@ contains
         if (bc_dir == 1) then
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(-j, k, l) = jac_sf(1)%sf(0, k, l)
+                    scalar_sf(1)%sf(-j, k, l) = scalar_sf(1)%sf(0, k, l)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(m + j, k, l) = jac_sf(1)%sf(m, k, l)
+                    scalar_sf(1)%sf(m + j, k, l) = scalar_sf(1)%sf(m, k, l)
                 end do
             end if
         else if (bc_dir == 2) then
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, -j, l) = jac_sf(1)%sf(k, 0, l)
+                    scalar_sf(1)%sf(k, -j, l) = scalar_sf(1)%sf(k, 0, l)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, n + j, l) = jac_sf(1)%sf(k, n, l)
+                    scalar_sf(1)%sf(k, n + j, l) = scalar_sf(1)%sf(k, n, l)
                 end do
             end if
         else
             if (bc_loc == -1) then
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, l, -j) = jac_sf(1)%sf(k, l, 0)
+                    scalar_sf(1)%sf(k, l, -j) = scalar_sf(1)%sf(k, l, 0)
                 end do
             else
                 do j = 1, buff_size
-                    jac_sf(1)%sf(k, l, p + j) = jac_sf(1)%sf(k, l, p)
+                    scalar_sf(1)%sf(k, l, p + j) = scalar_sf(1)%sf(k, l, p)
                 end do
             end if
         end if
 
-    end subroutine s_F_igr_ghost_cell_extrapolation
+    end subroutine s_scalar_ghost_cell_extrapolation
 
     subroutine s_beta_periodic(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
 

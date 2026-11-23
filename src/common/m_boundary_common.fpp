@@ -19,7 +19,7 @@ module m_boundary_common
     implicit none
 
     private; public :: s_initialize_boundary_common_module, s_populate_variables_buffers, s_populate_capillary_buffers, &
-        & s_populate_F_igr_buffers, s_populate_grid_variables_buffers, s_finalize_boundary_common_module, s_populate_beta_buffers
+        & s_populate_scalar_buffers, s_populate_grid_variables_buffers, s_finalize_boundary_common_module, s_populate_beta_buffers
 
     public :: bc_buffers
 
@@ -274,39 +274,39 @@ contains
 
     end subroutine s_populate_capillary_bc_direction
 
-    !> Populate ghost cell buffers for the Jacobian scalar field used in the IGR elliptic solver.
-    impure subroutine s_populate_F_igr_buffers(bc_type, jac_sf)
+    !> Populate ghost cell buffers of a single scalar field (physical boundaries and MPI halos).
+    impure subroutine s_populate_scalar_buffers(bc_type, scalar_sf)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(scalar_field), dimension(1:), intent(inout)           :: jac_sf
+        type(scalar_field), dimension(1:), intent(inout)           :: scalar_sf
 
-        call s_populate_F_igr_bc_direction(1, -1, bc_x, bc_type(1, 1), jac_sf)
-        call s_populate_F_igr_bc_direction(1, 1, bc_x, bc_type(1, 2), jac_sf)
+        call s_populate_scalar_bc_direction(1, -1, bc_x, bc_type(1, 1), scalar_sf)
+        call s_populate_scalar_bc_direction(1, 1, bc_x, bc_type(1, 2), scalar_sf)
 
         if (n == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            call s_populate_F_igr_bc_direction(2, -1, bc_y, bc_type(2, 1), jac_sf)
-            call s_populate_F_igr_bc_direction(2, 1, bc_y, bc_type(2, 2), jac_sf)
+            call s_populate_scalar_bc_direction(2, -1, bc_y, bc_type(2, 1), scalar_sf)
+            call s_populate_scalar_bc_direction(2, 1, bc_y, bc_type(2, 2), scalar_sf)
         #:endif
 
         if (p == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            call s_populate_F_igr_bc_direction(3, -1, bc_z, bc_type(3, 1), jac_sf)
-            call s_populate_F_igr_bc_direction(3, 1, bc_z, bc_type(3, 2), jac_sf)
+            call s_populate_scalar_bc_direction(3, -1, bc_z, bc_type(3, 1), scalar_sf)
+            call s_populate_scalar_bc_direction(3, 1, bc_z, bc_type(3, 2), scalar_sf)
         #:endif
 
-    end subroutine s_populate_F_igr_buffers
+    end subroutine s_populate_scalar_buffers
 
-    !> Populate ghost cell buffers for one IGR Jacobian BC direction and location, via MPI exchange for processor boundaries or by
-    !! dispatching the per-cell IGR Jacobian BC routines over the boundary face.
-    impure subroutine s_populate_F_igr_bc_direction(bc_dir, bc_loc, bc_bounds, bc_type_edge, jac_sf)
+    !> Populate ghost cell buffers of a scalar field for one BC direction and location, via MPI exchange for processor boundaries or
+    !! by dispatching the per-cell scalar BC routines over the boundary face.
+    impure subroutine s_populate_scalar_bc_direction(bc_dir, bc_loc, bc_bounds, bc_type_edge, scalar_sf)
 
         integer, intent(in)                              :: bc_dir, bc_loc
         type(int_bounds_info), intent(in)                :: bc_bounds
         type(integer_field), intent(in)                  :: bc_type_edge
-        type(scalar_field), dimension(1:), intent(inout) :: jac_sf
+        type(scalar_field), dimension(1:), intent(inout) :: scalar_sf
         integer                                          :: bc_edge, k_beg, k_end, l_beg, l_end, k, l, j, bc_code
 
         if (bc_loc == -1) then
@@ -316,7 +316,7 @@ contains
         end if
 
         if (bc_edge >= 0) then
-            call s_mpi_sendrecv_variables_buffers(jac_sf, bc_dir, bc_loc, 1)
+            call s_mpi_sendrecv_variables_buffers(scalar_sf, bc_dir, bc_loc, 1)
             return
         end if
 
@@ -341,17 +341,17 @@ contains
 
                 select case (bc_code)
                 case (BC_PERIODIC)
-                    call s_F_igr_periodic(jac_sf, bc_dir, bc_loc, k, l)
+                    call s_scalar_periodic(scalar_sf, bc_dir, bc_loc, k, l)
                 case (BC_REFLECTIVE)
-                    call s_F_igr_reflective(jac_sf, bc_dir, bc_loc, k, l)
+                    call s_scalar_reflective(scalar_sf, bc_dir, bc_loc, k, l)
                 case default
-                    call s_F_igr_ghost_cell_extrapolation(jac_sf, bc_dir, bc_loc, k, l)
+                    call s_scalar_ghost_cell_extrapolation(scalar_sf, bc_dir, bc_loc, k, l)
                 end select
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_populate_F_igr_bc_direction
+    end subroutine s_populate_scalar_bc_direction
 
     !> Populate the buffers of the grid variables, which are constituted of the cell-boundary locations and cell-width
     !! distributions, based on the boundary conditions.
