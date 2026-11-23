@@ -47,6 +47,8 @@ contains
             ! lint: runtime-check num_procs is the MPI rank count, not a case-file value
             @:PROHIBIT(amr_max_level > 1 .and. ib .and. num_procs > 1, &
                        & "multi-level AMR (amr_max_level > 1) with immersed boundaries is only supported at num_procs = 1 (the fine-IB image-point stencil is not decomposition-exact across a rank seam)")
+            ! lint: runtime-check num_species is populated by Cantera, not read from the case file
+            @:PROHIBIT(amr_tag_var == 7 .and. amr_tag_species > num_species, "amr_tag_species must be <= num_species")
         end if
 
         if (ib) then

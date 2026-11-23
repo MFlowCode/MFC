@@ -117,8 +117,6 @@ contains
             integer                :: fw_o           !< its body cell's offset from the face's left cell (0 or 1)
             real(wp)               :: fw_a, fw_m     !< signed share of the wall rates, their mass flux
             integer                :: i, j, k, l, q  !< Generic loop iterators
-            !> host copy of Re_size; amdflang reads the declare-target original stale cross-TU
-            integer :: Re_size_loc1, Re_size_loc2
 
             ! HLLC star-state helpers
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -169,8 +167,6 @@ contains
 
             call s_initialize_riemann_solver(norm_dir)
 
-            Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
-
             #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
                      (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2', 'is1', 'is3'), &
@@ -190,7 +186,7 @@ contains
                                             & vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, &
                                             & rho_Star, E_Star, p_Star, p_K_Star, vel_K_star, s_L, s_R, s_M, s_P, s_S, xi_M, &
                                             & xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, alpha_K_star, alpha_rho_K_star, &
-                                            & p_isen_L, p_isen_R, e_K_star]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                            & p_isen_L, p_isen_R, e_K_star]')
                         do l = ${Z_BND}$%beg, ${Z_BND}$%end
                             do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                 do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -263,8 +259,8 @@ contains
                                     call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                                     if (viscous) then
-                                        call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
-                                        call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                                        call s_compute_interface_reynolds(alpha_L, Re_L)
+                                        call s_compute_interface_reynolds(alpha_R, Re_R)
                                     end if
 
                                     call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
@@ -500,8 +496,7 @@ contains
                                             & pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, c_avg, vel_L_rms, vel_R_rms, &
                                             & vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, &
                                             & s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, nbub_L, nbub_R, &
-                                            & PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar]', &
-                                            & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                            & PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar]')
                         do l = ${Z_BND}$%beg, ${Z_BND}$%end
                             do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                 do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -539,11 +534,11 @@ contains
                                                 Re_L(i) = dflt_real
                                                 Re_R(i) = dflt_real
 
-                                                if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_L(i) = 0._wp
-                                                if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_R(i) = 0._wp
+                                                if (Re_size(i) > 0) Re_L(i) = 0._wp
+                                                if (Re_size(i) > 0) Re_R(i) = 0._wp
 
                                                 $:GPU_LOOP(parallelism='[seq]')
-                                                do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
+                                                do q = 1, Re_size(i)
                                                     Re_L(i) = (1._wp - qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + Re_idx(i, &
                                                          & q)))/Res_gs(i, q) + Re_L(i)
                                                     Re_R(i) = (1._wp - qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + Re_idx(i, &
@@ -907,13 +902,14 @@ contains
                                 #:set _hllc_arr = '[' + ', '.join(_hllc_a1 + _hllc_a2) + ']'
                             #:endif
                             ! Identical calls on purpose: offload kernels are named by the .fpp line of their GPU_PARALLEL_LOOP, so
-                            ! a shared call gives both emissions one name and amdflang launches the wrong one. Do not merge.
+                            ! a shared call gives both emissions one name and amdflang launches the wrong one (still on AFAR 24.4:
+                            ! merged, non-hypo cases fault in this kernel). Do not merge.
                             #:if HYPO
-                                $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, privateArrays=_hllc_arr, copyin='[is1, is2, &
-                                                    & is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, privateArrays=_hllc_arr, &
+                                                    & copyin='[is1, is2, is3]')
                             #:else
-                                $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, privateArrays=_hllc_arr, copyin='[is1, is2, &
-                                                    & is3]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, privateArrays=_hllc_arr, &
+                                                    & copyin='[is1, is2, is3]')
                             #:endif
                             do l = ${Z_BND}$%beg, ${Z_BND}$%end
                                 do k = ${Y_BND}$%beg, ${Y_BND}$%end
@@ -1013,8 +1009,8 @@ contains
                                                                             & qv_R)
 
                                         if (viscous) then
-                                            call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
-                                            call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                                            call s_compute_interface_reynolds(alpha_L, Re_L)
+                                            call s_compute_interface_reynolds(alpha_R, Re_R)
                                         end if
 
                                         if (chemistry) then

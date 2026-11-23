@@ -10,6 +10,7 @@ Status words: **validated** (agrees with the reference within the stated error),
 Errors are (MFC − reference)/reference.
 
 Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
+Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
 
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
@@ -137,6 +138,30 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 ## Accuracy limits of the ghost-cell immersed boundary {#sec-validation-ib-limits}
 
 **Status:** open discrepancy (measured limits, no example). Wall value about second order, wall-normal gradient first order or worse, rotating-wall shear plateau near 2 %, and the options that help or do not: @ref ib_accuracy_limits.
+
+## Slip immersed walls {#sec-validation-slip-walls}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_slip_cylinder`. The gas mass of a fixed slip cylinder in a periodic box with and without `ib_mass_relax`, and the near-wall pressure and velocity error of an exact steady vortex for the curvature term, TSC image-point weights and `ib_slip_ccst`. Slip walls in a shock curtain and in close approach do not work and are recorded there. Results and limits: @ref validation_slip_walls.
+
+## Species diffusion, conduction and the transport time step {#sec-validation-species-transport}
+
+**Status:** partially validated. **Example:** `examples/1D_diffusion_verification`. Trace-species diffusion and heat conduction against the erfc solution (second order), a multicomponent mixing layer against an independent 1D solver, and the stability threshold of `chem_params%%transport_dt` for both transport models. Results and limits: @ref validation_species_transport.
+
+## Solid-wall thermal models {#sec-validation-wall-thermal}
+
+**Status:** partially validated. **Examples:** `examples/2D_ibm_cylinder_drag_nu` (lumped cooling) and `examples/2D_ibm_cold_wall_transient`. The decay of a lumped-temperature cylinder in a cross flow against the time constant its fixed-wall Nusselt number implies, and the heat a cold isothermal cylinder absorbs from quiescent hot gas with and without the sub-grid wall conduction column against a body-fitted 1D reference. Results and limits: @ref validation_wall_thermal.
+
+## Moving-body gas-mass budget and Galilean twin {#sec-validation-moving-body-budget}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_moving_mass_budget`. The gas mass a translating circle creates in a closed periodic box, with and without `ib_mass_relax`, and the conducted heat and force of the moving body against the same body held in the same relative flow. Results and limits: @ref validation_moving_body_budget.
+
+## Sphere drag and Nusselt number {#sec-validation-sphere-drag-nu}
+
+**Status:** partially validated. **Example:** `examples/3D_ibm_sphere_drag_nu`. The face-flux drag and face heat of a no-slip isothermal sphere at Mach 0.2 and Re 20-300 against Schiller-Naumann, Ranz-Marshall and Whitaker, with a momentum balance as an independent drag. Results and limits: @ref validation_sphere_drag_nu.
+
+## Bow-shock stand-off {#sec-validation-standoff}
+
+**Status:** open discrepancy (resolution-limited). **Example:** `examples/2D_ibm_cylinder_standoff`. The detached-shock distance of a cylinder and a sphere at Mach 1.5-3 against Billig's correlation and a body-fitted Euler solution. Results and limits: @ref validation_standoff.
 
 ## Other families
 

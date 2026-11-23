@@ -26,6 +26,8 @@ parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help
 parser.add_argument("--Re", type=float, default=20.0, help="Re_D = rho U D / mu at the free stream.")
 parser.add_argument("--mach", type=float, default=0.2, help="Free-stream Mach number.")
 parser.add_argument("--tw_ratio", type=float, default=1.0, help="Wall temperature over free-stream temperature.")
+parser.add_argument("--thermal_bc", type=int, default=1, choices=(1, 3), help="1: isothermal wall; 3: lumped solid temperature starting at Tw (cooling run).")
+parser.add_argument("--rho_cs", type=float, default=2.75e4, help="thermal_bc = 3: solid heat capacity rho_s c_s [J/m^3/K].")
 parser.add_argument("--cells_per_D", type=float, default=16.0, help="Cells across the diameter.")
 parser.add_argument("--xu", type=float, default=4.0, help="Upstream extent [D].")
 parser.add_argument("--xd", type=float, default=8.0, help="Downstream extent [D].")
@@ -36,6 +38,7 @@ parser.add_argument("--cfl", type=float, default=0.4, help="CFL number of the fi
 parser.add_argument("--frames", type=int, default=10, help="Saves of the adaptive run (a fixed-step run saves once, at the end).")
 parser.add_argument("--stride", type=int, default=20, help="ib_force_stride: steps between force and heat rows.")
 parser.add_argument("--ib_ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance, the default).")
+parser.add_argument("--parallel_io", default="T", choices=("T", "F"), help="parallel_io (F for a build without MPI).")
 parser.add_argument("--silo", action="store_true", help="Write density, pressure and velocity for post_process (the momentum-balance check).")
 args = parser.parse_args()
 
@@ -118,7 +121,7 @@ case = {
     "patch_ib(1)%y_centroid": dx / 5.0,
     "patch_ib(1)%radius": 0.5 * D,
     "patch_ib(1)%slip": "F",
-    "patch_ib(1)%thermal_bc": 1,
+    "patch_ib(1)%thermal_bc": args.thermal_bc,
     "patch_ib(1)%Twall": args.tw_ratio * T_inf,
     "ib_ip_interp": args.ib_ip_interp,
     "ib_state_wrt": "T",
@@ -129,11 +132,13 @@ case = {
     "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / mu,
-    "parallel_io": "T",
+    "parallel_io": args.parallel_io,
     "format": "silo",
     "precision": "double",
     "prim_vars_wrt": "F",
 }
+if args.thermal_bc == 3:
+    case.update({"patch_ib(1)%rho_solid": 1000.0, "patch_ib(1)%cp_solid": args.rho_cs / 1000.0})
 for i, y in enumerate(gas.Y):
     case[f"patch_icpp(1)%Y({i + 1})"] = float(y)
     case[f"chem_wrt_Y({i + 1})"] = "F"

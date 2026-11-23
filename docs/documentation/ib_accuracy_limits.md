@@ -63,7 +63,7 @@ The options are described in @ref ibm "the immersed-boundary overview". Resoluti
   in Python, not shipped) that removed the cap converged at second order on the curved wall, which would explain the first-order curved-wall error. This was *not verified in MFC*:
   the ghost rule changed with [#2248](https://github.com/MFlowCode/MFC/pull/2248), and no `master` run isolates the cap. Treat the cause of the curved-wall first-order error as open.
 - **A conservation-only volume-fraction approach for moving bodies** (cut-cell volume fractions that book the displaced gas once, after Seo and Mittal \cite SeoMittal2011) was investigated and is not part of MFC.
-  The variants tried did not keep a uniform free stream exact (one variant had a free-stream error of 0.26, from the investigation's write-up) and the claimed heat gain on a moving twin
+  The variants tried did not keep a uniform free stream exact and the claimed heat gain on a moving twin
   (a cylinder translating through still gas against the same cylinder fixed in the same relative flow) was not reproduced. Exact free stream together with local conservation with level-set
   fractions would need face apertures, i.e. a full cut-cell method, which this IB does not have. No code ships.
 
