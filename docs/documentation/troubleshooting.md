@@ -450,6 +450,15 @@ Verify: `mpirun --version`
 
 **Fix:** Build from a checkout with a shorter path.
 
+### `--no-gpu` build still uses NVHPC
+
+**Cause:** CMake takes its compilers from `FC`, `CC` and `CXX`. An NVHPC module that sets `FC=nvfortran` therefore makes every build an NVHPC build; `--no-gpu` only turns off GPU offload.
+
+**Fix:** for a GNU build, name the compilers explicitly (and use an MPI built with them):
+```bash
+CC=gcc CXX=g++ FC=gfortran ./mfc.sh build --no-gpu
+```
+
 ### "Module not found" on HPC
 
 **Cause:** Required modules not loaded.
@@ -514,6 +523,15 @@ Common issues:
 2. Try with fewer ranks: `./mfc.sh run case.py -n 1`
 3. Check for incompatible MPI/compiler combinations
 4. On clusters, ensure you're using the correct MPI for the interconnect
+
+### hcoll initialisation error at start-up with NVHPC's Open MPI
+
+**Symptom:** with the HPC-X Open MPI bundled with NVHPC, a run with more than one rank aborts at start-up with an `hcoll` initialisation error; one rank runs.
+
+**Fix:** disable the hcoll collectives component:
+```bash
+export OMPI_MCA_coll_hcoll_enable=0
+```
 
 ---
 

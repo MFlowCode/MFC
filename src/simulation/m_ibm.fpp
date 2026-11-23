@@ -363,7 +363,7 @@ contains
         ! body must still take part in its allreduce.
         call s_mpi_allreduce_integer_sum(int(count(patch_ib(1:num_ibs)%thermal_bc == 3), 8), n_lumped)
         ib_exchange = n_lumped > 0 .or. ib_heat_wrt .or. ib_mass_relax > 0
-        ib_mass_only = ib_mass_relax > 0 .and. n_lumped == 0 .and. .not. (ib_heat_wrt .or. ib_state_wrt &
+        ib_mass_only = ib_mass_relax > 0 .and. n_lumped == 0 .and. .not. (ib_heat_wrt .or. ib_state_wrt .or. ib_force_wrt &
             & .or. moving_immersed_boundary_flag .or. amr)
         record_surface = ib_surface_wrt .or. ib_exchange
         $:GPU_UPDATE(device='[record_surface]')
@@ -3572,7 +3572,7 @@ contains
         integer :: j0, k0, l0, fj, fk, fl, ibm, jl, kl, ll, sd, bw, cov, nc, sh, c
         logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR, fine, heat, covd
 
-        do_ft = moving_immersed_boundary_flag .or. ib_state_wrt
+        do_ft = moving_immersed_boundary_flag .or. ib_state_wrt .or. ib_force_wrt
         if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
         if (ib_mass_only) then
             call s_accumulate_ib_mass(idir, stage)
