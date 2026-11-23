@@ -8,14 +8,17 @@ A fixed carbon body (D = 100 um) held at 2000 K gasifies in quiescent moist air 
 
 `compare_burn_rate.py` prints the burn rate (`D/ib_heat.dat` column 4, the face mass the flux wall passes to the gas, and column 3, the surface-solve rate) against the reference at 10, 20, 30 and 60 us, and the flame peak at the last save. `case.py` takes `--ndim`, `--D`, `--p_atm`, `--T`, `--H_over_R`, `--cells_per_D`, `--tend`, `--frames`, `--cfl` and `--set KEY=VAL`.
 
-Measured on `master` at 0cdfdf02a, NVIDIA A100 (NVHPC 25.11), error = (MFC - reference)/reference of the burn rate (`ib_heat.dat` column 4):
+Measured on `master` at 0cdfdf02a, NVIDIA A100 (NVHPC 25.11), error = (MFC - reference)/reference of the burn rate (`ib_heat.dat` column 4). The recommended setting is `--set ib_ip_interp=2` (triangular-shaped-cloud image points, the default of the earlier study's build); the suite test keeps the default.
 
-| Body | cells per D | 10 us | 20 us | 30 us | 60 us |
-| :--- | ---: | ---: | ---: | ---: | ---: |
-| cylinder | 12 | +1.87 % | +1.36 % | +1.34 % | +1.39 % |
-| cylinder | 24 | +0.86 % | +0.64 % | +0.93 % | not run |
-| sphere | 12 | +7.35 % | +6.22 % | +6.39 % | not run |
+| Body | cells per D | image points | 10 us | 20 us |
+| :--- | ---: | :--- | ---: | ---: |
+| cylinder | 12 | default | +1.87 % | +1.36 % |
+| cylinder | 12 | `ib_ip_interp=2` | +1.39 % | +0.80 % |
+| cylinder | 24 | default | +0.86 % | +0.64 % |
+| cylinder | 24 | `ib_ip_interp=2` | +0.32 % | +0.16 % |
+| sphere | 12 | default | +7.35 % | +6.22 % |
+| sphere | 12 | `ib_ip_interp=2` | +3.17 % | +2.49 % |
 
-The 12-cell cylinder on the CPU agrees with the A100 to 1e-5; the flame peak is within 5 K of the reference (cylinder, 60 us: 2404.5 K against 2399.1 K; sphere, 30 us: 2247.5 K against 2236.1 K). The earlier pre-merge study measured the cylinder within 0.15 % from 24 cells per diameter and the sphere within 2 % from 12; neither is reproduced on `master` (see the page below).
+The earlier pre-merge study measured the 12 and 24-cell cylinders at +0.92 and +0.16 % (10 us) and the 12-cell sphere at +2.07 %. Compare at times at least 0.5 us before the end of the run: the burn rate falls steeply and the averaging window of `compare_burn_rate.py` is cut off at the last row. See the page below for the settings tried and what remains.
 
 The suite registers `2D -> Chemistry -> IBM Carbon Cylinder -> Burn Rate` (12 cells per diameter, 5e-7 s). Results and limits: @ref validation_burning_body.
