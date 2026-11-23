@@ -207,3 +207,20 @@ def test_compiler_fingerprint_probes_each_compiler_once(tmp_path, monkeypatch):
 
     assert len({compiler_fingerprint() for _ in range(3)}) == 1
     assert calls.read_text().count("x") == 1
+
+
+def test_compiler_fingerprint_ignores_the_build_hosts_cpu(tmp_path, monkeypatch):
+    """nvfortran --version names the host CPU (-tp); a build on one node type must find its binaries on another."""
+    wrapper = tmp_path / "mpifort"
+    wrapper.write_text('#!/bin/sh\necho ""\necho "nvfortran 25.5-0 64-bit target on x86-64 Linux -tp $HOST_CPU "\n')
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    monkeypatch.setenv("FC", "mpifort")
+    monkeypatch.delenv("CC", raising=False)
+    monkeypatch.delenv("CXX", raising=False)
+
+    monkeypatch.setenv("HOST_CPU", "cascadelake")
+    build_node = compiler_fingerprint()
+    monkeypatch.setenv("HOST_CPU", "emeraldrapids")
+    assert compiler_fingerprint() == build_node
+    assert "nvfortran 25.5-0" in build_node
