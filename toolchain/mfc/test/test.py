@@ -375,6 +375,9 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 # Double builds agree to 1e-12 across O0, O3 and reldebug.
                 "Constant Acceleration",
                 "Wall Collision",
+                # A Mach 1.66 shock on 12 cells per diameter: single-precision round-off moves the front by about 1e-4 relative at 100,
+                # 200 and 300 steps alike (measured 1.0e-4 to 1.1e-4 against the 1e-4 tolerance), (WENO-JS too).
+                "Shock Curtain",
                 # Single precision moves the near-zero momentum entries of the flow past a slip cylinder (|rho v| of 0.5 against 3e2 in the
                 # bulk) by 2e-4 relative after 50 steps; the lane allows 1e-4. Double builds agree to 1e-7 across GNU and NVHPC on an A100.
                 "Slip Cylinder",
