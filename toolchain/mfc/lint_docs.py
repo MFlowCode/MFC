@@ -20,6 +20,7 @@ DOCS = [
     "docs/documentation/visualization.md",
     "docs/documentation/expectedPerformance.md",
     "docs/documentation/validation.md",
+    "docs/documentation/validation_wall_order_couette.md",
     "docs/documentation/validation_gas_chemistry.md",
     "docs/documentation/validation_detonation.md",
     "docs/documentation/validation_flame_vortex.md",

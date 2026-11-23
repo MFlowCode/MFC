@@ -9,6 +9,7 @@ Every check has an example in `examples/` with a checker script and a README, an
 Status words: **validated** (agrees with the reference within the stated error), **partially validated** (agrees where measured; a regime or quantity is open), **open discrepancy** (disagrees, cause known or not), **comparison only** (reference data are qualitative).
 Errors are (MFC − reference)/reference.
 
+Separate pages: @ref validation_wall_order_couette "Wall-normal ghost velocity at viscous walls" (`ib_wall_order` against plane Poiseuille and Taylor-Couette flow).
 Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
 Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
 

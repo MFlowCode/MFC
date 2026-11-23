@@ -4133,6 +4133,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
                 "2D_mibm_constant_acceleration",
                 "3D_mibm_wall_collision",
+                # Registered below at their own sizes (12 cells per radius, 8 cells across the gap): the 25-cell cap would change the wall resolution they test
+                "2D_ibm_taylor_couette",
+                "2D_ibm_plane_poiseuille",
                 # Registered below at 12 cells per radius: at the 25-cell cap the gap holds about 4 cells
                 "2D_ibm_conduction_annulus",
                 # Registered below at 16 cells per diameter, where the body is resolved
@@ -4865,6 +4868,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # contact (order 1e-2). Regenerate the goldens whenever a default in the moving-body numerics changes.
     for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
         cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
+
+    # Wall-normal ghost velocity (ib_wall_order = 2) at viscous no-slip walls whose exact solutions are known: a rotating inner circle with
+    # an STL outer ring (Taylor-Couette, 100 steps: the reldebug lanes take minutes per 100 steps) and two flat rectangle walls (plane
+    # Poiseuille, 300 steps). Both run at their CI size, far from steady state, and save only the last step, so the golden is a regression
+    # guard on the cons fields and the ib_forces.dat history; the accuracy against the exact solutions is measured by check_couette.py and
+    # check_poiseuille.py (see the Validation page). The default order 1 is covered by the viscous IBM tests above. The annulus has a
+    # rotating inner wall: its golden changes with the wall-point velocity fix (#2383, merged: a rotating body's ghost-cell wall velocity
+    # evaluated at the wall point, not the ghost point; this golden has it); the channel golden does not. Against goldens generated with GNU 13 (CPU, double), the GNU,
+    # Intel, NVHPC and macOS CI lanes differ by at most 1e-13 absolute on the first entries that exceed 1e-16. An A100 NVHPC GPU run
+    # differs by 5e-6 (annulus, 100 steps) and 1.5e-5 (channel, 300 steps) in density, the CPU/GPU gap of the viscous IBM work
+    # (#2419; unchanged by ib_smooth_contact), so override_tol = 1e-4 admits the GPU lanes and still fails a change of order 1e-3.
+    cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", args=["--steps", "100"], mods={"t_step_save": 100}, override_tol=1e-4))
+    cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-4))
 
     # Isothermal conduction annulus (inner circle, outer STL ring) against the exact ln(r) profile, with inverse-distance and TSC
     # image points. 12 cells per radius (64 x 64) and 300 steps (about 3 conduction times). The gas starts on the exact profile, so the run
