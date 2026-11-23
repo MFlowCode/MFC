@@ -145,7 +145,8 @@ Full descriptions: @ref case.
 ```
 
 Complete cases: `examples/2D_amr_droplet` (a tracked interface), `examples/2D_amr_blast_multilevel` (two refined
-levels), `examples/2D_amr_ibm_cylinder` (an immersed body) and `examples/3D_amr_blast` (3D, subcycled).
+levels), `examples/2D_amr_ibm_cylinder` (an immersed body), `examples/3D_amr_blast` (3D, subcycled) and
+`examples/1D_amr_reactive_shocktube` (chemistry: the blocks follow a reacting front tagged on temperature).
 
 ## When AMR pays {#amr-payoff}
 

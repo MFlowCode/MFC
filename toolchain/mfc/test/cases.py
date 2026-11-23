@@ -4076,6 +4076,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_phasechange_bubble",
                 # An AMR block needs >= buff_size cells inside the domain, which the capped 25x25 grid cannot hold;
                 # covered by amr_golden_tests.
+                "1D_amr_reactive_shocktube",
                 "2D_amr_droplet",
                 "2D_amr_blast_multilevel",
                 "2D_amr_ibm_cylinder",
