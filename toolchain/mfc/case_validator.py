@@ -1053,6 +1053,21 @@ class CaseValidator:
                     f"patch_ib({i})%thermal_layer > 0 requires a circle (geometry 2) or sphere (geometry 8)",
                 )
 
+            # Sub-grid wall column: a radial conduction model on a fixed inert isothermal circle or sphere, whose flux reaches the gas
+            # through the mixture-averaged conduction flux. A step start's column flux sets the time step (wall_column_dt_frac).
+            self.prohibit((self.get(f"patch_ib({i})%wall_column_len", 0.0) or 0.0) < 0, f"patch_ib({i})%wall_column_len must be >= 0")
+            if self.get(f"patch_ib({i})%wall_column", "F") == "T":
+                pre = f"patch_ib({i})%wall_column"
+                self.prohibit(thermal_bc != 1, f"{pre} requires thermal_bc = 1")
+                self.prohibit(not chemistry or self.get("chem_params%diffusion", "F") != "T", f"{pre} requires chemistry = T and chem_params%diffusion = T")
+                self.prohibit(self.get("chem_params%transport_model", 1) != 1, f"{pre} requires chem_params%transport_model = 1")
+                self.prohibit(surface_reaction != 0, f"{pre} requires surface_reaction = 0")
+                self.prohibit(self.get(f"patch_ib({i})%geometry", 0) not in (2, 8), f"{pre} requires a circle (geometry 2) or sphere (geometry 8)")
+                self.prohibit(moving, f"{pre} requires every immersed boundary to be fixed (moving_ibm = 0)")
+                self.prohibit(self.get("amr", "F") == "T", f"{pre} is not supported with amr")
+                self.prohibit(self.get("cfl_adap_dt", "F") != "T" and self.get("cfl_const_dt", "F") != "T", f"{pre} requires cfl_adap_dt or cfl_const_dt (the WCOL time-step limit)")
+                self.prohibit(not 0 < self.get("wall_column_dt_frac", 0.1) <= 1, "wall_column_dt_frac must be in (0, 1]")
+
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
                 self.prohibit(inj_species > 0, f"patch_ib({i})%surface_reaction = 1 cannot be combined with inj_species > 0")
@@ -1087,6 +1102,9 @@ class CaseValidator:
             self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
         ib_second_order_vel = self.get("ib_second_order_vel", "F") == "T"
+        friction_eps = self.get("ib_friction_slip_eps")
+        self.prohibit(friction_eps is not None and friction_eps < 0, "ib_friction_slip_eps must be >= 0")
+        self.prohibit(friction_eps is not None and friction_eps > 0 and not self.get("collision_model"), "ib_friction_slip_eps requires collision_model > 0")
         ib_ip_min_dist = self.get("ib_ip_min_dist")
         self.prohibit(ib_second_order_vel and not ib, "ib_second_order_vel requires ib to be enabled")
         self.prohibit(ib_ip_min_dist is not None and not ib_second_order_vel, "ib_ip_min_dist requires ib_second_order_vel to be enabled")
@@ -1870,6 +1888,8 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+        self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and not weno_Re_flux, "weno_Re_flux_compact requires weno_Re_flux")
+        self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "weno_Re_flux_compact requires Cartesian coordinates")
 
     def check_heat_conduction(self):
         """Checks constraints on Fourier heat conduction parameters (fluid_pp(i)%k_therm)"""
@@ -2372,14 +2392,20 @@ class CaseValidator:
             "amr_tag_eps must be > 0 when amr_regrid_int > 0",
         )
         amr_tag_var = self.get("amr_tag_var", 1)
-        self.prohibit(amr_tag_var not in (1, 2, 3, 4), "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1), 3 (velocity magnitude) or 4 (pressure)")
+        self.prohibit(
+            amr_tag_var not in range(1, 8),
+            "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1), 3 (velocity magnitude), 4 (pressure), 5 (vorticity), 6 (temperature) or 7 (species mass fraction)",
+        )
+        self.prohibit(amr_tag_var == 5 and (self.get("n") or 0) == 0, "amr_tag_var = 5 (vorticity) vanishes in 1D: it requires n > 0")
+        self.prohibit(amr_tag_var in (6, 7) and self.get("chemistry", "F") != "T", "amr_tag_var = 6 (temperature) and 7 (species mass fraction) require chemistry = T")
+        self.prohibit(amr_tag_var == 7 and self.get("amr_tag_species", 1) < 1, "amr_tag_species must be >= 1 (and <= the mechanism's species count, checked at run time)")
         self.prohibit(
             amr_tag_var == 4 and (self.get("model_eqns") != 2 or any(self.get(k, "F") == "T" for k in ("chemistry", "mhd", "bubbles_euler", "hypoelasticity"))),
             "amr_tag_var = 4 (pressure) uses the five-equation mixture pressure: it requires model_eqns = 2 without chemistry, mhd, bubbles_euler or hypoelasticity",
         )
         self.prohibit(
-            amr_tag_var == 3 and self.get("amr_tag_abs", "F") != "T",
-            "amr_tag_var = 3 (velocity magnitude) requires amr_tag_abs = T: a relative jump is undefined where the fluid is at rest",
+            amr_tag_var in (3, 7) and self.get("amr_tag_abs", "F") != "T",
+            f"amr_tag_var = {amr_tag_var} (velocity magnitude, species mass fraction) requires amr_tag_abs = T: a relative jump is undefined where the variable vanishes",
         )
         self.prohibit(
             (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,

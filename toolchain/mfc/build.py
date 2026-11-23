@@ -687,7 +687,8 @@ def compiler_fingerprint() -> str:
         value = os.environ.get(var, "").split(maxsplit=1)
         if value:
             value[0] = os.path.realpath(shutil.which(value[0]) or value[0])
-            version = _compiler_version(value[0])
+            # nvfortran names the build host's CPU (-tp cascadelake); a binary built on one node type must be found on another
+            version = re.sub(r"\s+-tp\s+\S+", "", _compiler_version(value[0]))
             parts.append(f"{var}={' '.join(value)}" + (f" ({version})" if version else ""))
     return ";".join(parts)
 

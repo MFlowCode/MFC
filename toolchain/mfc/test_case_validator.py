@@ -572,7 +572,21 @@ class TestAmrDefaults(unittest.TestCase):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 4}, "simulation")
-        for bad, msg in (({"amr_tag_var": 5}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T"), ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2")):
+        validate_case_constraints({**self.AMR, "amr_tag_var": 5, "n": 32, "bc_y%beg": -3, "bc_y%end": -3, "amr_block_beg(2)": 10, "amr_block_end(2)": 20}, "simulation")
+        chem = {**self.AMR, "chemistry": "T", "cantera_file": "h2o2.yaml"}
+        validate_case_constraints({**chem, "amr_tag_var": 6}, "simulation")
+        validate_case_constraints({**chem, "amr_tag_var": 7, "amr_tag_species": 2, "amr_tag_abs": "T"}, "simulation")
+        bads = (
+            ({"amr_tag_var": 8}, "amr_tag_var must be"),
+            ({"amr_tag_var": 3}, "requires amr_tag_abs = T"),
+            ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2"),
+            ({"amr_tag_var": 5}, "vanishes in 1D"),
+            ({"amr_tag_var": 6}, "require chemistry"),
+            ({"amr_tag_var": 7, "amr_tag_abs": "T"}, "require chemistry"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7}, "requires amr_tag_abs = T"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7, "amr_tag_abs": "T", "amr_tag_species": 0}, "amr_tag_species must be >= 1"),
+        )
+        for bad, msg in bads:
             with self.assertRaises(CaseConstraintError) as ctx:
                 validate_case_constraints({**self.AMR, **bad}, "simulation")
             self.assertIn(msg, str(ctx.exception))
@@ -925,6 +939,24 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**body, "patch_ib(1)%emissivity": 0.9}, "T_rad must be > 0 when emissivity > 0")
         self.assertRejects({**body, "patch_ib(1)%emissivity": 1.5, "patch_ib(1)%T_rad": 300.0}, "emissivity must be in [0, 1]")
         self.assertAccepts({**body, "patch_ib(1)%emissivity": 0.9, "patch_ib(1)%T_rad": 300.0, "patch_ib(1)%heat_power": 5.0})
+
+    def test_a_wall_column_needs_a_fixed_inert_isothermal_circle_or_sphere(self):
+        col = {
+            **self.case(thermal_bc=1, Twall=300.0, wall_column="T", wall_column_len=1.0e-3),
+            "chemistry": "T",
+            "chem_params%diffusion": "T",
+            "cfl_adap_dt": "T",
+        }
+        self.assertAccepts(col)
+        self.assertRejects({**col, "patch_ib(1)%thermal_bc": 3, "patch_ib(1)%rho_solid": 1.0, "patch_ib(1)%cp_solid": 1.0}, "wall_column requires thermal_bc = 1")
+        self.assertRejects({**col, "patch_ib(1)%surface_reaction": 1, "surface_cantera_file": "s.yaml", "surface_phase": "surf"}, "requires surface_reaction = 0")
+        self.assertRejects({**col, "patch_ib(1)%moving_ibm": 2}, "requires every immersed boundary to be fixed")
+        self.assertRejects({**col, "chem_params%diffusion": "F"}, "requires chemistry = T and chem_params%diffusion = T")
+        self.assertRejects({**col, "chem_params%transport_model": 2}, "requires chem_params%transport_model = 1")
+        self.assertRejects({**col, "cfl_adap_dt": "F"}, "requires cfl_adap_dt or cfl_const_dt")
+        self.assertRejects({**col, "wall_column_dt_frac": 2.0}, "wall_column_dt_frac must be in (0, 1]")
+        self.assertRejects({**col, "wall_column_dt_frac": 0.0}, "wall_column_dt_frac must be in (0, 1]")
+        self.assertRejects({**col, "patch_ib(1)%wall_column_len": -1.0}, "wall_column_len must be >= 0")
 
     def test_the_energy_balance_needs_a_reacting_surface(self):
         self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")

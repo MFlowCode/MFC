@@ -366,6 +366,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `ib_wall_order`       | Integer | Ghost velocity at no-slip walls: 1 default (wall value, with the `ib_second_order_vel` mirror if set), 2 two-probe quadratic wall-normal fill. |
 | `ib_mass_relax`       | Integer | Immersed-boundary mass conservation: N > 0 returns each body's spurious gas mass over about N steps; 0 off; -1 (default) auto, see below. |
 | `ib_uncover_fill`     | Logical | A cell a moving body uncovers takes the mean density, species and pressure of its fluid neighbours instead of its stale ghost state (`model_eqns = 2`, HLLC, Cartesian, no `amr`). |
+| `wall_column_dt_frac` | Real    | Wall columns: largest fraction of a near-wall cell's heat span a step's column drain may take, a time-step limit (`WCOL`; default 0.1). |
 | `ib_smooth_contact`   | Logical | HLLC only: blend the tangential interface velocity of the viscous work across the contact wave (the sign of the contact speed is arbitrary where it is round-off). |
 | `ib_visc_compact`     | Logical | With `weno_Re_flux`, compact velocity gradients on the viscous faces within two cells of a body. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
@@ -381,6 +382,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `rho_solid`, `cp_solid` | Real | Solid density [kg/m³] and heat capacity [J/kg/K] (`thermal_bc = 3`). |
 | `emissivity`, `T_rad` | Real   | Surface emissivity and radiative surroundings temperature [K] (`thermal_bc = 3`; default 0, no radiation). |
 | `heat_power`         | Real    | Heat supplied to the body [W; W/m per unit depth in 2D], e.g. Joule heating (`thermal_bc = 3`). |
+| `wall_column`        | Logical | Sub-grid wall conduction column per first-layer ghost of a fixed, inert `thermal_bc = 1` circle or sphere (default F). |
+| `wall_column_len`    | Real    | Column length L [m]; the column spans max(3h, L) (default 0: 0.15 `radius`). |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `mass`               | Real    | Body mass; must be > 0 for `moving_ibm = 2`, whose acceleration is force/mass. |
@@ -402,6 +405,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
 | `collision_temporal_resolution`     | Integer    | Minimum number of adaptive time steps used to resolve each collision |
 | `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
+| `ib_friction_slip_eps`     | Real    | Slip speed below which collision friction ramps to zero (0 = off) |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
@@ -449,6 +453,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `thermal_layer` = δ > 0 starts the gas around a `thermal_bc = 1` or `3` circle (geometry 2) or sphere (geometry 8) in the conduction solution for a wall brought to `Twall` (the initial `Twall` for `thermal_bc = 3`) a time t₀ = δ²/(4α) earlier: T = T∞ + (`Twall` − T∞)(R/r)^((d−1)/2) erfc((r − R)/δ), with pressure and composition unchanged. It is exact for a sphere and the leading-order term for a cylinder. Without it a hot wall meets ambient gas as a temperature step at t = 0, and the near-wall cells heat faster than they can expand; on coarse grids that transient can drive the state non-physical. Resolve δ with a few cells: the profile is evaluated at the cell centres, not cell-averaged, so the cell-mean density differs from it by O((h/δ)²), about 1 % at δ = 2 cells. Where layers overlap, the IB with the largest temperature change sets the cell, and periodic directions use the nearest image.
 
+- `wall_column` = T gives each first-layer ghost of the wall a one-dimensional low-Mach conduction column along the wall normal, from the wall at `Twall` to a distance max(3h, `wall_column_len`), with the body's curvature, frozen composition and the gas temperature and pressure at its top (a Lagrange probe). The ghost's conduction temperature (see `thermal_bc = 1` above) mirrors the first gas cell's temperature, which carries at most about 2λΔT/h through the face, far below the flux of a wall layer thinner than a cell. The column advances once per step from the state of the step's first stage; its step-mean wall flux enters the gas as one equivalent conduction temperature per ghost, with the diffusion flux's own face conductivity and the steady radial weight of each gas face. A one-sided guard cuts the drain of a gas cell colder than the column averaged over its own area (zero in steady state). With `ib_heat_wrt` the body books the column's flux: the gas faces' flux plus the guard's cut. `wall_column_dt_frac` adds a time-step limit (`WCOL`) that keeps a step's column drain within that fraction of a near-wall cell's heat span. The option requires `chemistry`, `chem_params%%diffusion`, `chem_params%%transport_model = 1`, `surface_reaction = 0`, fixed bodies, no AMR, and `cfl_adap_dt` or `cfl_const_dt`. With `cfl_const_dt` the limit is evaluated once, at the first step, from the column's initial (semi-infinite-wall) flux estimate, and stays in the constant dt: conservative, possibly much smaller than needed. The default F leaves every result unchanged.
+
 - `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 
 - For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
@@ -478,6 +484,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `collision_temporal_resolution` restricts the adaptive time step (`cfl_adap_dt`) to at most `collision_time / collision_temporal_resolution` while any collision is occurring, so that each collision is resolved with at least that many time steps. Pairing it with `ramp_ratio` limits how quickly the time step grows back once the collision ends.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
+
+- `ib_friction_slip_eps` regularises the collision friction direction. The Coulomb force is \f$-\mu |F_n|\, v_t/|v_t|\f$ with \f$v_t\f$ the tangential slip velocity of the contact, and a roundoff-sized \f$v_t\f$ then produces a full-magnitude force in an arbitrary direction, so contacts split across MPI ranks (where the body order and summation order differ) disagree with the single-rank result. With `ib_friction_slip_eps` \f$= \epsilon > 0\f$ the force becomes \f$-\mu |F_n|\, v_t/\max(|v_t|, \epsilon_{\rm eff})\f$: the Coulomb force for \f$|v_t| \ge \epsilon_{\rm eff}\f$ and a linear ramp to zero below it. The width is floored at the stick limit, \f$\epsilon_{\rm eff} = \max(\epsilon, \mu |F_n|\,\Delta t/m_t)\f$, where \f$m_t\f$ is the effective tangential mass of the contact (translation plus rotation of the bodies involved). Below the floor the ramp is the stick force \f$m_t v_t/\Delta t\f$, which cannot overshoot, so a value that is too small is raised to the floor instead of making the contact chatter; \f$\epsilon\f$ mainly sets the smoothing width at larger \f$|v_t|\f$. A good value is about \f$10^{-3}\f$ to \f$10^{-2}\f$ of the impact speed. In single precision it must stay well above the roundoff of the body velocities. The default 0 keeps the previous behaviour exactly (the floor is not applied); the parameter requires `collision_model > 0`.
 
 - `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept and replaces the interpolation scheme with a bilinear weight interpolation.
 
@@ -610,6 +618,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
 | `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro09)	 |
 | `weno_Re_flux`             | Logical | Compute velocity gradient using scalar divergence theorem	 |
+| `weno_Re_flux_compact`     | Logical | With `weno_Re_flux`, take the face-normal velocity gradient as the difference across the face |
 | `weno_avg`          	     | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 | `dt`                       | Real    | Time step size |
 | `t_step_start`             | Integer | Simulation starting time step |
@@ -725,6 +734,12 @@ Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate 
 
 - `weno_Re_flux` activates the scalar divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
 If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
+
+- `weno_Re_flux_compact` (requires `weno_Re_flux`, Cartesian coordinates) replaces, on every face, the face-normal velocity gradient of the viscous flux by the difference across the face, `(u_{j+1} - u_j)/(x_{j+1} - x_j)`, the gradient that `weno_Re_flux = F` uses. The tangential and cross gradients keep the WENO chain, and the default `F` leaves every result unchanged.
+  The WENO chain (face values, divergence-theorem cell gradient, reconstruction of that gradient, face mean) has a damping rate of exactly zero at the checkerboard wavenumber: a periodic box with a seeded u(y) = (-1)^j mode decays at rate 0.000 with `weno_Re_flux`, at 4 nu/dy^2 (20.5 at nu = 0.005, 32 cells) with `weno_Re_flux = F` or this option, and a smooth mode decays at the exact nu k^2 either way.
+  At a no-slip wall (`bc_y%%beg = -16`) the odd-mirror ghost forces that band, and the velocity next to the wall alternates about the exact profile (up to 6 % of the bulk velocity in the first four cells of a 32-cell channel with HLLC, 12 % in the hot-wall thermal channel); the option removes it.
+  The face difference brings the explicit viscous time-step limit of `weno_Re_flux = F`, about nu dt/dy^2 below 0.25 to 0.4 (a 128-cell channel with nu dt/dy^2 = 0.47 diverged, 0.23 was stable), which the WENO chain does not impose at this scale.
+  It does not touch the tangential and cross terms or the immersed-boundary walls (use `ib_visc_compact`, whose band covers faces near a body; the two can be combined). `weno_avg = F` with `weno_Re_flux` reads a cell's own two reconstructed face values, so it does not see a jump between two cells (an impulsive start next to a wall gives zero wall shear at the first step); this is a separate observation.
 
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
@@ -959,7 +974,8 @@ uniform Cartesian grid.
 | `amr_regrid_int`        | Integer | Steps between regrids; 0 keeps the initial block (default 0) |
 | `amr_tag_eps`           | Real    | Tagging threshold on the normalized density jump; > 0 with regrid (default 0.1) |
 | `amr_tag_abs`           | Logical | Tag on the absolute jump; `amr_tag_eps` then has the units of the tagged variable (default F) |
-| `amr_tag_var`           | Integer | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model) (default 1) |
+| `amr_tag_var`           | Integer | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model), 5 vorticity (magnitude times the cell size against `amr_tag_eps`; 2D/3D), 6 temperature (chemistry), 7 mass fraction of species `amr_tag_species` (chemistry, needs `amr_tag_abs`) (default 1) |
+| `amr_tag_species`       | Integer | Species index tagged by `amr_tag_var = 7` (default 1) |
 | `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
 | `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
 | `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |

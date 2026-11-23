@@ -67,6 +67,7 @@ DESCRIPTIONS = {
     "teno_CT": "TENO cutoff parameter",
     "mp_weno": "Enable monotonicity-preserving WENO",
     "weno_Re_flux": "Enable WENO for viscous fluxes",
+    "weno_Re_flux_compact": "With weno_Re_flux, take the face-normal velocity gradient of the viscous flux as the compact difference across the face",
     "weno_avg": "Enable WENO averaging",
     "null_weights": "Allow null WENO weights",
     # MUSCL reconstruction
@@ -124,7 +125,8 @@ DESCRIPTIONS = {
     "amr_regrid_int": "Steps between AMR regrid events (0 = static block)",
     "amr_place_owner": "Place each refined block on the rank owning most of the coarse cells under it (load-capped at 5% above the mean) instead of the cost-weighted SFC cut",
     "amr_tag_abs": "Tag on the largest absolute density face jump (AMReX/PeleC dengrad) instead of the relative central difference; amr_tag_eps is then a density",
-    "amr_tag_var": "Variable whose jump tags cells for refinement: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs amr_tag_abs), 4 pressure",
+    "amr_tag_var": "Tags on: 1 density, 2 volume fraction of fluid 1, 3 speed, 4 pressure, 5 vorticity times dx, 6 temperature, 7 mass fraction of species amr_tag_species (3, 7 need amr_tag_abs)",
+    "amr_tag_species": "Species index (1 to the mechanism's species count) whose mass fraction is tagged with amr_tag_var = 7",
     "amr_tag_eps": "Density-gradient tagging threshold: a cell is tagged when max over axes of |rho(i+1)-rho(i-1)|/(2 rho_i) exceeds it (dimensionless; halves per grid-doubling for a smooth field)",
     "amr_buf": "Coarse-cell padding around tagged cells when regridding",
     "amr_snap": "Regrid hysteresis in coarse cells per face: a new box this close to a live same-level block takes its box (0 = off)",
@@ -175,6 +177,7 @@ DESCRIPTIONS = {
     "ib_smooth_contact": "Blend the left and right HLLC tangential interface velocity across the contact wave in the viscous work next to an immersed body",
     "ib_visc_compact": "Compact velocity gradients on the viscous faces next to an immersed body when weno_Re_flux is on",
     "ib_uncover_fill": "A cell a moving immersed boundary uncovers takes the mean density, species and pressure of its fluid neighbours instead of its stale ghost state (off by default)",
+    "wall_column_dt_frac": "Wall columns: largest fraction of a near-wall cell's heat span one step's column drain may take (time-step limit WCOL; default 0.1)",
     "ib_ip_interp": "Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud weights over 3x3(x3) cells",
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
@@ -328,6 +331,7 @@ DESCRIPTIONS = {
     "collision_time": "Amount of simulation time each collision will take to resolve",
     "ramp_ratio": "Maximum factor by which the adaptive time step may grow from one time step to the next",
     "ib_coefficient_of_friction": "coefficient of friction used in IB collisions",
+    "ib_friction_slip_eps": "Slip speed below which IB collision friction ramps linearly to zero (0 = off)",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters

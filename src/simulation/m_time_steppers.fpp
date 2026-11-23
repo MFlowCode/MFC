@@ -614,6 +614,12 @@ contains
 
                 ! update the ghost fluid properties point values based on IB state
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, 0)
+
+                ! Wall columns advance once per step, from the first stage's RHS state, and set each stage's conduction temperature
+                if (ib_wall_col) then
+                    if (s == 1) call s_ibm_advance_wall_columns(q_cons_ts(1)%vf, q_prim_vf, q_T_sf, dt)
+                    call s_wall_column_tcond(q_cons_ts(1)%vf, q_prim_vf, q_T_sf)
+                end if
             end if
 
             call s_stage_hooks_post_ib(q_cons_ts(1)%vf, 0)
@@ -663,14 +669,15 @@ contains
         if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
 
         if (ib) then
+            ! Before the handoff: ib_heat and ib_shell are indexed by the patch_ib slots the stages used
+            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
+            if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
             if (moving_immersed_boundary_flag) then
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
             else if (ib_state_wrt) then
                 call s_compute_ib_forces()
             end if
-            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
-            if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
         end if
 
         ! Adaptive dt: final stage
@@ -712,11 +719,11 @@ contains
 
     !> Compute the global time step size from CFL stability constraints across all cells
     !> Sets dt from the CFL criteria, each limited by the finest cell over the coarse cell under AMR. With dt_cand it only returns
-    !! the global candidates at cfl_target (ICFL, VCFL, CCFL, TCFL, collision cap) and leaves dt alone.
+    !! the global candidates at cfl_target (ICFL, VCFL, CCFL, TCFL, collision cap, WCOL) and leaves dt alone.
     impure subroutine s_compute_dt(dt_cand)
 
-        real(wp), dimension(5), intent(out), optional :: dt_cand
-        real(wp), dimension(5)                        :: dt_candidates_glb
+        real(wp), dimension(6), intent(out), optional :: dt_cand
+        real(wp), dimension(6)                        :: dt_candidates_glb
         real(wp)                                      :: dt_prev
         real(wp)                                      :: rho  !< Cell-avg. density
 
@@ -727,26 +734,24 @@ contains
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:endif
-        real(wp)                         :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)                         :: pres  !< Cell-avg. pressure
-        real(wp)                         :: gamma  !< Cell-avg. sp. heat ratio
-        real(wp)                         :: pi_inf  !< Cell-avg. liquid stiffness function
-        real(wp)                         :: qv  !< Cell-avg. fluid reference energy
-        real(wp)                         :: c  !< Cell-avg. sound speed
-        real(wp), dimension(2)           :: Re  !< Cell-avg. Reynolds numbers
-        real(wp), dimension(4)           :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
-        real(wp)                         :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
-        real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)                         :: rf, pw1, pw2, pw3  !< amr_cfl_rf of the cell, amr_cfl_pow (scalars for the kernel)
-        real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
-        real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
-        real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
-        logical                          :: is_fluid_cell  !< Cell lies outside every immersed boundary
-        integer                          :: bad_cell  !< 1 + linear index of a fluid cell with no valid dt, 0 if none
-        integer                          :: j, k, l  !< Generic loop iterators
-        integer                          :: fl  !< Fluid loop iterator
-        !> Host copies; amdflang reads Re_size stale cross-TU
-        integer :: Re_size_loc1, Re_size_loc2
+        real(wp) :: vel_sum                          !< Cell-avg. velocity sum
+        real(wp) :: pres                             !< Cell-avg. pressure
+        real(wp) :: gamma                            !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf                           !< Cell-avg. liquid stiffness function
+        real(wp) :: qv                               !< Cell-avg. fluid reference energy
+        real(wp) :: c                                !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp) :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(6) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap, WCOL)
+        real(wp) :: rf, pw1, pw2, pw3                !< amr_cfl_rf of the cell, amr_cfl_pow (scalars for the kernel)
+        real(wp), dimension(num_species) :: Ys       !< Cell mass fractions, for chem_params%transport_dt
+        real(wp), dimension(2) :: Re_chem            !< Transport-limited Reynolds numbers, for chem_params%transport_dt
+        real(wp) :: T_cell                           !< Cell temperature, passed as a scalar (array elements are misaddressed)
+        logical :: is_fluid_cell                     !< Cell lies outside every immersed boundary
+        integer :: bad_cell                          !< 1 + linear index of a fluid cell with no valid dt, 0 if none
+        integer :: j, k, l                           !< Generic loop iterators
+        integer :: fl                                !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -759,13 +764,11 @@ contains
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         pw1 = amr_cfl_pow(1); pw2 = amr_cfl_pow(2); pw3 = amr_cfl_pow(3)
         ! One loop body, two kernels: without amr it is the plain CFL loop, so the non-AMR dt does not depend on the AMR terms
         #:for ON_AMR in [False, True]
             if (amr .eqv. ${'.true.' if ON_AMR else '.false.'}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, &
-                                    & Re_size_loc2' + (', pw1, pw2, pw3' if ON_AMR else '') + ']', private='[vel, alpha, &
+                $:GPU_PARALLEL_LOOP(collapse=3, firstprivate=('[pw1, pw2, pw3]' if ON_AMR else None), private='[vel, alpha, &
                                     & alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, &
                                     & Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
                                     & vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
@@ -780,10 +783,10 @@ contains
                             if (is_fluid_cell) then
                                 if (igr) then
                                     call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, &
-                                                              & vel, vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
+                                                              & vel, vel_sum, qv, j, k, l)
                                 else
                                     call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
-                                                              & vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
+                                                              & vel_sum, qv, j, k, l)
                                 end if
 
                                 ! Compute mixture sound speed
@@ -856,6 +859,8 @@ contains
         dt_candidates_loc(3) = ccfl_dt_local
         dt_candidates_loc(4) = tcfl_dt_local
         dt_candidates_loc(5) = coll_dt_local
+        dt_candidates_loc(6) = huge(1.0_wp)
+        if (ib_wall_col) dt_candidates_loc(6) = f_wall_column_dt(q_prim_vf, q_T_sf)
 
         if (num_procs == 1) then
             dt_candidates_glb = dt_candidates_loc
@@ -886,7 +891,7 @@ contains
     impure subroutine s_amr_check_fixed_dt(reach)
 
         logical, intent(in), optional :: reach
-        real(wp), dimension(5)        :: dt_cand
+        real(wp), dimension(6)        :: dt_cand
         real(wp)                      :: cfl_save
         real(wp), allocatable         :: rf_save(:,:,:)
         logical                       :: all_fine
