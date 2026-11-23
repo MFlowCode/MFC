@@ -4905,6 +4905,8 @@ contains
         if (allocated(wc_T)) then
             @:DEALLOCATE(wc_T, wc_w, wc_g, wc_ext, wc_q, wc_cut, wc_on, wc_gp)
         end if
+        n_wc = 0
+        wc_ready = .false.
         call s_finalize_ib_patches()
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI

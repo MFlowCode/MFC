@@ -11,7 +11,7 @@ number. The force goes to D/ib_forces.dat (ib_force_wrt, from the face fluxes) a
     python3 examples/2D_ibm_cylinder_drag_nu/check_cylinder.py <case directory> [--hot <heated run directory>]
 
 Defaults are a CI-sized run (Re 20, 16 cells per D, a 12 D x 8 D domain, 200 fixed steps: the flow is not steady). Production-like
-values for a table run: --xu 15 --xd 25 --hy 16 (blockage 3 %), --cells_per_D 20 or 40, --tstar 50 (Re 20 and 40) or 200 (Re 100),
+values for a table run: --xu 15 --xd 25 --hy 16 (blockage 3 %), --cells_per_D 20 or 40, --tstar 50 (Re 20 and 40) or 120 (Re 100),
 with the adaptive time step (--tstar sets it); the README lists the commands.
 """
 
@@ -32,7 +32,7 @@ parser.add_argument("--xd", type=float, default=8.0, help="Downstream extent [D]
 parser.add_argument("--hy", type=float, default=4.0, help="Lateral half width [D]; the blockage is 1/(2 hy).")
 parser.add_argument("--steps", type=int, default=200, help="Fixed number of steps (CI-sized run); 0 selects the adaptive step with --tstar.")
 parser.add_argument("--tstar", type=float, default=50.0, help="Run length t U / D when --steps is 0.")
-parser.add_argument("--cfl", type=float, default=0.4, help="CFL number of the fixed step or the adaptive step.")
+parser.add_argument("--cfl", type=float, default=0.4, help="CFL number of the fixed step (the adaptive step uses cfl_target, set from Re and --cells_per_D).")
 parser.add_argument("--frames", type=int, default=10, help="Saves of the adaptive run (a fixed-step run saves once, at the end).")
 parser.add_argument("--stride", type=int, default=20, help="ib_force_stride: steps between force and heat rows.")
 parser.add_argument("--ib_ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance, the default).")
