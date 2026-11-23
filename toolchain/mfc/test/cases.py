@@ -4126,6 +4126,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_stl_test",
                 # Registered below at the resolution where the hot-wall NaN appears; the 25-cell cap would not reach it.
                 "3D_ibm_hot_rod",
+                # Registered below with its own arguments: the 50-step cap would stop it before the ignition
+                "1D_h2_air_ignition",
+                # Docs-only: 165 thousand steps at the coarsest grid, and it writes its Cantera profile into IC/ at run time
+                "1D_h2_air_flame_speed",
                 # Registered below at their own sizes: the 25-cell cap would move the body by a fraction of a cell
                 "2D_mibm_constant_acceleration",
                 "3D_mibm_wall_collision",
@@ -4194,6 +4198,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # Constant-volume H2/air ignition (T0 = 1200 K) through the ignition and into the burnt state with the split integrator; the
+        # uniform box has no fluxes, so the run is smooth and does not amplify cross-compiler round-off. compare_cantera.py checks the
+        # ignition delay and T(t) against a Cantera reactor. Golden: GNU 13 double; NVHPC 25.11 (A100) agrees to 2e-12, NVHPC 25.5
+        # differs by up to 1e-3 relative in minor species (issue 2181); skipped on NVHPC < 25.11 GPU builds (test.py).
+        cases.append(define_case_f("1D -> Chemistry -> H2-Air Ignition -> Split Reactions", "examples/1D_h2_air_ignition/case.py", ["--T0", "1200", "--dt", "2e-8", "--tend", "1e-4", "--nsaves", "5"]))
+
         # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
         for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
             cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
@@ -4223,6 +4233,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-8),
                 )
             )
+
+        # amr_tag_var = 6: the block starts away from the diaphragm (cell 24) and regrids onto its temperature jump.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Reactive Shocktube AMR -> Tag Temperature",
+                "examples/1D_reactive_shocktube/case.py",
+                [],
+                mods={**amr_chem_mods, "amr_block_beg(1)": 4, "amr_block_end(1)": 11, "amr_regrid_int": 2, "amr_buf": 2, "amr_tag_var": 6, "amr_max_grid_size": 64},
+                override_tol=10 ** (-8),
+            )
+        )
 
         # ./mfc.sh amr_check on the same block: 48 cells put the diaphragm on a coarse face (cell 24), inside the block. One
         # step, so the core (7 cells from the block edges) is the two cells at the diaphragm. -j 4 is for the chemistry build.
@@ -6672,6 +6693,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         weak.update({"patch_icpp(1)%pres": 1.0, "patch_icpp(2)%pres": 1.2, "patch_icpp(3)%pres": 1.0, "amr_tag_eps": 0.05, "amr_tag_var": 4})
         stack.push("AMR -> 1D -> tag pressure", {**amr_1d_base, "amr_regrid_int": 2, "amr_buf": 2, **weak})
         cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        # Gresho vortex (hcid 202, uniform density) over the whole domain: tagged on the vorticity. The core and the outer ring reach
+        # past the initial block; level 2 (the sensor on the fine blocks) keeps the core only, where |curl u|*dx is largest.
+        vortex = {"patch_icpp(3)%x_centroid": 0.5, "patch_icpp(3)%length_x": 1.0, "patch_icpp(3)%alter_patch(1)": "T", "patch_icpp(3)%alter_patch(2)": "T"}
+        vortex.update({"patch_icpp(3)%hcid": 202, "patch_icpp(3)%alpha_rho(1)": 1.0, "patch_icpp(3)%vel(2)": 0.8})
+        vortex.update({"amr_tag_var": 5, "amr_tag_eps": 0.05, "amr_max_level": 2, "amr_max_blocks": 32})
+        stack.push("AMR -> 2D -> tag vorticity", {**amr_2d_base, **tag_regrid, **vortex})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}))
         stack.pop()
 
         # 3D paths the list above leaves out: the rank seam under regrid, the subcycled registers, and a two-level hierarchy

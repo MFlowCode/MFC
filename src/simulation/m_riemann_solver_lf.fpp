@@ -69,11 +69,9 @@ contains
             real(wp)                             :: ptilde_L, ptilde_R
             real(wp)                             :: vel_L_rms, vel_R_rms
             real(wp)                             :: alpha_L_sum, alpha_R_sum
-            real(wp)                             :: pcorr       !< low Mach number correction
-            integer                              :: i, j, k, l  !< Generic loop iterators
-            !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
-            integer               :: Re_size_loc1, Re_size_loc2
-            integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+            real(wp)                             :: pcorr           !< low Mach number correction
+            integer                              :: i, j, k, l      !< Generic loop iterators
+            integer, dimension(3)                :: idx_right_phys  !< Physical (j,k,l) indices for right state.
             ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary
             ! conditions
 
@@ -82,7 +80,6 @@ contains
 
             ! Reshaping inputted data based on dimensional splitting direction
             call s_initialize_riemann_solver(norm_dir)
-            Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
             #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
                      (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2', 'is1', 'is3'), &
@@ -95,8 +92,7 @@ contains
                                         & vel_grad_R, idx_right_phys]', private='[i, j, k, l, s_L, s_R, pcorr, vel_L_rms, &
                                         & vel_R_rms, alpha_L_sum, alpha_R_sum, pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, &
                                         & pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, Gamm_L, Gamm_R, E_L, E_R, ptilde_L, ptilde_R, &
-                                        & s_M, s_P, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]', &
-                                        & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & s_M, s_P, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -157,8 +153,8 @@ contains
                                 call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                                 if (viscous) then
-                                    call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
-                                    call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                                    call s_compute_interface_reynolds(alpha_L, Re_L)
+                                    call s_compute_interface_reynolds(alpha_R, Re_R)
                                 end if
 
                                 if (chemistry) then
@@ -342,8 +338,7 @@ contains
 
             if (viscous) then
                 $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, vel_L, &
-                                    & vel_R, Re_L, Re_R]', private='[i, j, k, l]', copyin='[norm_dir]', &
-                                    & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & vel_R, Re_L, Re_R]', private='[i, j, k, l]', copyin='[norm_dir]')
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -389,8 +384,8 @@ contains
                                 end do
                             end if
 
-                            call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
-                            call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                            call s_compute_interface_reynolds(alpha_L, Re_L)
+                            call s_compute_interface_reynolds(alpha_R, Re_R)
 
                             if (shear_stress) then
                                 $:GPU_LOOP(parallelism='[seq]')

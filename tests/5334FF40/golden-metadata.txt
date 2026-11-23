@@ -1,10 +1,10 @@
-This file was created on 2026-11-18 01:36:27.347765.
+This file was created on 2026-11-21 15:53:52.272985.
 
 mfc.sh:
 
-    Invocation: test --gpu acc --mpi --no-build -j 3 -g 0 --max-attempts 1 --only 09FDDC81 1E62093F 28D037A7 43A1D3C6 4F5A5E32 5173E637 5334FF40 540C72F1 5C04A681 6ED50013 7DCA9229 997E2B0E B204C86E D7E7DE04 DE954FAA ED2D5C0A F3ECE90B F60D6594 FB3F47C0 2440B4AE --generate
-    Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:         on  (dirty)
+    Invocation: test --generate --no-gpu --no-mpi -j 32 --no-examples
+    Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        308444d5d0a555e52193dc13c5105c0ef8633377 on ibm-wall-point-velocity (dirty)
 
 simulation:
 
@@ -22,11 +22,11 @@ simulation:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
-        OpenACC : ON
+        MPI     : OFF
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/w45mr/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w108-wv/fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -56,11 +56,11 @@ pre_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
-        OpenACC : ON
+        MPI     : OFF
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/w45mr/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w108-wv/fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -90,11 +90,45 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
-        OpenACC : ON
+        MPI     : OFF
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/w45mr/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w108-wv/fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
+        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
+        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
+        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /fastscratch/sbryngelson3/w108-wv/fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -126,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      30%
+    CPU(s) scaling MHz:                      35%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00

@@ -572,7 +572,21 @@ class TestAmrDefaults(unittest.TestCase):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 4}, "simulation")
-        for bad, msg in (({"amr_tag_var": 5}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T"), ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2")):
+        validate_case_constraints({**self.AMR, "amr_tag_var": 5, "n": 32, "bc_y%beg": -3, "bc_y%end": -3, "amr_block_beg(2)": 10, "amr_block_end(2)": 20}, "simulation")
+        chem = {**self.AMR, "chemistry": "T", "cantera_file": "h2o2.yaml"}
+        validate_case_constraints({**chem, "amr_tag_var": 6}, "simulation")
+        validate_case_constraints({**chem, "amr_tag_var": 7, "amr_tag_species": 2, "amr_tag_abs": "T"}, "simulation")
+        bads = (
+            ({"amr_tag_var": 8}, "amr_tag_var must be"),
+            ({"amr_tag_var": 3}, "requires amr_tag_abs = T"),
+            ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2"),
+            ({"amr_tag_var": 5}, "vanishes in 1D"),
+            ({"amr_tag_var": 6}, "require chemistry"),
+            ({"amr_tag_var": 7, "amr_tag_abs": "T"}, "require chemistry"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7}, "requires amr_tag_abs = T"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7, "amr_tag_abs": "T", "amr_tag_species": 0}, "amr_tag_species must be >= 1"),
+        )
+        for bad, msg in bads:
             with self.assertRaises(CaseConstraintError) as ctx:
                 validate_case_constraints({**self.AMR, **bad}, "simulation")
             self.assertIn(msg, str(ctx.exception))
@@ -941,6 +955,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**col, "chem_params%transport_model": 2}, "requires chem_params%transport_model = 1")
         self.assertRejects({**col, "cfl_adap_dt": "F"}, "requires cfl_adap_dt or cfl_const_dt")
         self.assertRejects({**col, "wall_column_dt_frac": 2.0}, "wall_column_dt_frac must be in (0, 1]")
+        self.assertRejects({**col, "wall_column_dt_frac": 0.0}, "wall_column_dt_frac must be in (0, 1]")
         self.assertRejects({**col, "patch_ib(1)%wall_column_len": -1.0}, "wall_column_len must be >= 0")
 
     def test_the_energy_balance_needs_a_reacting_surface(self):

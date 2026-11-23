@@ -102,8 +102,7 @@ contains
     end subroutine s_compute_visc_diffusivity
 
     !> Computes the mixture coefficients, velocity and pressure of one cell
-    subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l, &
-                                    & Re_size_loc1, Re_size_loc2)
+    subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
 
         $:GPU_ROUTINE(function_name='s_compute_cell_state',parallelism='[seq]', cray_inline=True)
 
@@ -118,7 +117,6 @@ contains
         real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, pres
         real(wp), intent(out)                 :: qv
         integer, intent(in)                   :: j, k, l
-        integer, intent(in)                   :: Re_size_loc1, Re_size_loc2
         real(wp), dimension(2), intent(inout) :: Re
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: Gs
@@ -131,11 +129,9 @@ contains
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
         if (hypoelasticity) then
-            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs, &
-                & Re_size_loc1, Re_size_loc2)
+            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
         else
-            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, &
-                & Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
+            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
         end if
 
         if (igr) then
