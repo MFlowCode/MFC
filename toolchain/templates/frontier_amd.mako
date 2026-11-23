@@ -39,14 +39,21 @@ cd "${MFC_ROOT_DIR}"
 cd - > /dev/null
 echo
 
+% if gpu_enabled:
+    export MPICH_GPU_SUPPORT_ENABLED=1
+% else:
+    export MPICH_GPU_SUPPORT_ENABLED=0
+% endif
+
 ulimit -s unlimited
 
 % for target in targets:
     ${helpers.run_prologue(target)}
 
     % if engine == 'batch':
-        # Broadcast binary to compute nodes
-        sbcast --send-libs -pf ${target.get_install_binpath(case)} /mnt/bb/$USER/${target.name}
+        # Broadcast binary to compute nodes; libraries load from their install paths, since an HSA runtime loaded from a
+        # --send-libs copy breaks multi-node GPU runs (OpenMP image load, GPU-aware MPI)
+        sbcast --send-libs=no -pf ${target.get_install_binpath(case)} /mnt/bb/$USER/${target.name}
     % endif
 
     % if not mpi:

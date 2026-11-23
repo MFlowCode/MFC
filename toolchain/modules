@@ -63,6 +63,7 @@ famd    OLCF Frontier AMD
 famd-all python cmake
 famd-all PrgEnv-amd
 famd-all cpe/26.03
+famd-gpu craype-accel-amd-gfx90a
 
 amdfund    AMD HPCFund
 amdfund-all gnu12 openmpi4/4.1.8 cmake rocm/7.2.0
