@@ -364,7 +364,7 @@ contains
         call s_mpi_allreduce_integer_sum(int(count(patch_ib(1:num_ibs)%thermal_bc == 3), 8), n_lumped)
         ib_exchange = n_lumped > 0 .or. ib_heat_wrt .or. ib_mass_relax > 0
         ib_mass_only = ib_mass_relax > 0 .and. n_lumped == 0 .and. .not. (ib_heat_wrt .or. ib_state_wrt &
-            & .or. moving_immersed_boundary_flag .or. amr)
+            & .or. moving_immersed_boundary_flag .or. amr .or. hypo_nc_mode == hypo_nc_mode_dual_pass)
         record_surface = ib_surface_wrt .or. ib_exchange
         $:GPU_UPDATE(device='[record_surface]')
         if (record_surface) then
@@ -3494,17 +3494,16 @@ contains
 
     end function f_ib_stage_weight
 
-    !> The mass part of s_accumulate_ib_face_fluxes alone: ib_mass_relax on fixed bodies with no forces, heat output, lumped body or
-    !! AMR. A kernel's launch cost grows with the arrays it names (about 0.5 ms on an MI300A for the general one), so this one names
-    !! only what the mass sum needs.
+    !> The mass part of s_accumulate_ib_face_fluxes alone: ib_mass_relax on fixed bodies with no forces, heat output, lumped body,
+    !! AMR or dual-pass HLLD. A kernel's launch cost grows with the arrays it names (about 0.5 ms on an MI300A for the general one),
+    !! so this one names only what the mass sum needs. It reads flux_rsx_vf itself: f_ib_face_mass, which NVHPC did not inline here,
+    !! returned the fluxes of the first RHS evaluation at every step on an A100 (#2414).
     subroutine s_accumulate_ib_mass(idir, stage)
 
         integer, intent(in) :: idir, stage
         real(wp)            :: w, area, f_m
         integer             :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, sh, j0, k0, l0
-        logical             :: hatR, dual_pass
 
-        dual_pass = hypo_nc_mode == hypo_nc_mode_dual_pass
         w = f_ib_stage_weight(stage)
         j0 = 0; k0 = 0; l0 = 0
         if (idir == 1) j0 = -1
@@ -3512,7 +3511,7 @@ contains
         if (idir == 3) l0 = -1
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, sh, &
-                            & area, f_m, hatR]', firstprivate='[w, dual_pass]')
+                            & area, f_m]', firstprivate='[w]')
         do l = l0, p
             do k = k0, n
                 do j = j0, m
@@ -3531,7 +3530,6 @@ contains
                         side = 1
                     end if
                     if (side /= 0) then
-                        hatR = dual_pass .and. side == -1
                         ci = jn; cj = kn; ck = ln
                         if (side == -1) then
                             ci = j; cj = k; ck = l
@@ -3540,7 +3538,10 @@ contains
                         call s_get_neighborhood_idx(ib_tmp, ib_id)
                         if (ib_id > 0) then
                             area = f_ib_face_area(idir, j, k, l)
-                            f_m = f_ib_face_mass(hatR, j, k, l)
+                            f_m = 0._wp
+                            do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                                f_m = f_m + flux_rsx_vf(j, k, l, i)
+                            end do
                             g = ib_id
                             sh = f_ib_shard(j, k, l)
                             $:GPU_ATOMIC(atomic='update')

@@ -1006,6 +1006,15 @@ answer is wrong, or one backend diverges from all the others.
   ``grep -nE 'if \(.*\) [a-z_]+ = ' src/simulation/*.fpp``; it over-matches (about 260 hits on
   the tree at the time of writing), so each hit inside a GPU loop needs a
   human check of its context.
+- **A device routine that NVHPC leaves as a call can read a module array stale.**
+  `s_accumulate_ib_mass` (`src/simulation/m_ibm.fpp`) took the face mass flux through
+  `f_ib_face_mass`, which reads the module array `flux_rsx_vf`. NVHPC 25.11 inlined the subroutine
+  into its caller and, in that copy, called `f_ib_face_mass` instead of inlining it (`-Minfo=accel`
+  lists what each kernel inlined). With OpenACC on an A100 the call returned the fluxes of the first
+  RHS evaluation at every step, while `flux_rsx_vf(j, k, l, 1)` in the same kernel read the current
+  ones, so `ib_mass_relax` did nothing for a fixed body without IB output (#2414; NVHPC 25.5 OpenACC
+  the same, OpenMP offload correct). The larger kernel of `s_accumulate_ib_face_fluxes` inlines the
+  same routine and was correct. The fix reads the array in the kernel body.
 - **Run `GPU_UPDATE(device=...)` and `GPU_ENTER_DATA` of static module data only after the
   rank is bound to its GPU.** `s_mpi_initialize` (`src/common/m_mpi_common.fpp`) updated
   `num_procs` and `proc_rank` on the device before `s_initialize_mpi_domain`
