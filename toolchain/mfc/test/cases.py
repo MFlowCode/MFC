@@ -4140,6 +4140,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_conduction_annulus",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
+                # Registered below at their own sizes: the 25-cell cap would leave the bodies unresolved (12 cylinders need about 96 cells)
+                "2D_ibm_periodic_array",
+                "2D_ibm_shock_curtain",
+                # Registered below with its own sizes: the 25-cell cap and 50 steps would stop them before the physics
+                "1D_cj_detonation",
+                "2D_flame_vortex_pair",
+                "nD_ibm_carbon_burn",
+                # Docs-only: pre_process writes a uniform state and ic3d.py overwrites the restart file, so a one-command run cannot start it
+                "3D_flame_vortex_ring",
+                # Registered below at their own sizes: the 25-cell, 50-step cap leaves the erf front a fraction of a cell, the
+                # cylinder under a cell, and the heat transient too short to absorb anything
+                "1D_diffusion_verification",
+                "2D_ibm_slip_cylinder",
+                "2D_ibm_cold_wall_transient",
                 # Registered below at 24 cells per diameter (the moving body crosses cells), 6 (sphere) and 16 (stand-off)
                 "2D_ibm_moving_mass_budget",
                 "3D_ibm_sphere_drag_nu",
@@ -4210,6 +4224,54 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # ignition delay and T(t) against a Cantera reactor. Golden: GNU 13 double; NVHPC 25.11 (A100) agrees to 2e-12, NVHPC 25.5
         # differs by up to 1e-3 relative in minor species (issue 2181); skipped on NVHPC < 25.11 GPU builds (test.py).
         cases.append(define_case_f("1D -> Chemistry -> H2-Air Ignition -> Split Reactions", "examples/1D_h2_air_ignition/case.py", ["--T0", "1200", "--dt", "2e-8", "--tend", "1e-4", "--nsaves", "5"]))
+
+        # Front formation of a 1D detonation in 2H2 + O2 + 7Ar (100 kPa): a driver slug of equilibrium products initiates a wave that
+        # couples within 300 steps (200 cells, 2.5 per induction length, the front 3 mm from the wall). check_cj.py measures the front
+        # speed against the equilibrium CJ solution on long runs; this is the regression guard for the split reaction integrator at the
+        # front. Golden: GNU 13 (CPU, double). Largest relative difference from it: 2e-6 on NVHPC 25.11 (A100), 1.5e-7 on NVHPC 25.11
+        # (CPU); NVHPC 25.5 (A100) differs by 2e-2 (known chemistry difference, issue 2181; skipped there, see test.py).
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> CJ Detonation -> Front Formation",
+                "examples/1D_cj_detonation/case.py",
+                ["--ppi", "2.5", "--L", "0.0061", "--steps", "300", "--nsave", "1"],
+                mods={"parallel_io": "F"},
+                override_tol=1e-5,
+            )
+        )
+
+        # Premixed H2/air flame hit by a vortex pair on 64 x 64 cells (hcid 274 initial condition written to IC/ by case.py), 100 fixed
+        # steps with the characteristic outflow (bc_x%end = -8, GRCBC). GNU 13 golden; NVHPC 25.11 (A100) agrees to 1e-12, NVHPC 25.11
+        # (CPU) differs by 3e-7 relative; NVHPC 25.5 (A100) by 1e-3 in a minor species (issue 2181; skipped there, see test.py).
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Flame Vortex Pair", "examples/2D_flame_vortex_pair/case.py", ["--N", "64"], mods={"parallel_io": "F", "t_step_stop": 100, "t_step_save": 100}, override_tol=3e-6
+            )
+        )
+
+        # Burning carbon cylinder in quiescent hot air (ib_flux_wall, isothermal wall, CO flame) at 12 cells per diameter, 5e-7 s: the
+        # 1D radial reference of compare_burn_rate.py checks the burn rate on long runs. GNU 13 golden; the largest relative differences
+        # are 4e-7 (NVHPC 25.11, A100), 3e-7 (NVHPC 25.5, A100) and 6e-7 (NVHPC 25.11, CPU).
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> IBM Carbon Cylinder -> Burn Rate",
+                "examples/nD_ibm_carbon_burn/case.py",
+                ["--cells_per_D", "12"],
+                mods={"parallel_io": "F", "t_stop": 5.0e-7, "t_save": 5.0e-7},
+                override_tol=3e-6,
+            )
+        )
+        # Species diffusion and heat conduction against the erfc solution of a step, and the transport-limited dt on a one-cell temperature
+        # spike. check_diffusion.py validates the physics; the goldens are regression guards. Golden: GNU 13 double on the AMD host CPU of
+        # an MI300A node. An A100 (NVHPC 25.11 and 25.5) agrees to 4e-11 and a GNU 13 build on an Intel Ice Lake CPU to 4e-11, so 1e-6 is the
+        # usual start for a checker-validated golden until CI shows the spread of the GitHub runners. Chemistry cases are skipped in the
+        # single-precision lane.
+        for name, args in (
+            ("Species Erf", ["--mode", "erf_species"]),
+            ("Heat Erf", ["--mode", "erf_heat"]),
+            ("Unity-Lewis Transport-Limited dt", ["--mode", "stab", "--tm", "2"]),
+        ):
+            cases.append(define_case_f(f"1D -> Chemistry -> Diffusion Verification -> {name}", "examples/1D_diffusion_verification/case.py", args, override_tol=1e-6))
 
         # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
         for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
@@ -4735,6 +4797,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # error; the y-momentum near zero and ib_heat.dat are the largest, the fields otherwise 3e-6), so 5e-4 is ten times that spread.
     cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=5e-4))
 
+    # Fixed random array of 12 no-slip cylinders (phi 0.2, Re_m 20, 96 x 96 cells, 200 steps) held at a bulk mass flux by the
+    # mean_mflux controller, on 2 ranks (one seam through the bodies). The flow is far from steady: the golden is a regression
+    # guard for the periodic bodies, the controller and the force record; check_array.py validates the physics offline. Golden: GNU 13 double,
+    # 2 ranks (x86 CPU). An NVIDIA A100 (NVHPC 25.11 and 25.5, both ranks on one GPU or on two) differs by 1.1e-10 (min of absolute and relative
+    # error), so 1e-6 is four orders above the spread; a chemistry test, so the single-precision lane skips it.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Periodic Array", "examples/2D_ibm_periodic_array/case.py", ppn=2, override_tol=1e-6))
+    # Ms 1.66 shock entering a curtain of 12 fixed no-slip cylinders (inviscid, 240 x 96 cells, 300 steps: the shock is inside the curtain).
+    # Golden: GNU 13 double (x86 CPU). An NVIDIA A100 (NVHPC 25.11 and 25.5) differs by 1.4e-8, so 1e-6 is about 70 times the spread. Skipped in
+    # the single-precision lane (see test.py).
+    cases.append(define_case_f("2D -> IBM -> Shock Curtain", "examples/2D_ibm_shock_curtain/case.py", override_tol=1e-6))
+    # Fixed slip cylinder in a fully periodic box (uniform Mach 0.5 flow, 8 cells per R, 100 steps, default ib_mass_relax: no return for a
+    # fixed body), so the gas mass drifts: check_slip.py reads it from the saves. Skipped in the single-precision lane (see test.py).
+    # Golden: GNU 13 double on the AMD host CPU of an MI300A node. An A100 (NVHPC 25.11 and 25.5) differs from it by up to 1.4e-7 and a GNU
+    # build on an Intel Ice Lake CPU by 1.0e-7, so 1e-6 is seven times the larger. The ib_mass_relax = 1 case is not registered: on an A100
+    # the relaxation-only path does nothing in this periodic box (page validation_slip_walls); "IBM -> Fixed Circle -> Slip ->
+    # ib_mass_relax" covers the option on CPU and does not discriminate on a GPU.
+    cases.append(define_case_f("2D -> IBM -> Slip Cylinder -> Mass Budget", "examples/2D_ibm_slip_cylinder/case.py", override_tol=1e-6))
+
+    # Cold cylinder in quiescent 1500 K air with the sub-grid wall conduction column (12 cells per R, to 0.03 R^2/alpha, 99 steps): the heat
+    # the body takes (ib_heat.dat) is in the golden; check_heat.py compares it with a body-fitted 1D reference. Golden: GNU 13 double on the
+    # AMD host CPU of an MI300A node; an A100 (NVHPC 25.11 and 25.5 identical) agrees to 1.4e-8 (min of absolute and relative error). A GNU 13
+    # build on an Intel Ice Lake CPU differs from both by 2.0e-2 (density 1e-3, momentum 1.6e-2 relative, ib_heat 7e-4): the transient starts
+    # from a near-step layer and amplifies the architecture's round-off, as the withdrawn cold-wall case of issue 1892 did across
+    # compilers; the cause is not identified. 5e-2 is 2.5 times that gap, so the test catches a broken column or time-step limit, not
+    # round-off; tighten it when CI shows whether the Intel lanes follow the AMD or the Ice Lake result.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cold Wall Transient -> Wall Column", "examples/2D_ibm_cold_wall_transient/case.py", override_tol=5e-2))
     # Moving circle in a closed periodic box (examples/2D_ibm_moving_mass_budget): the gas mass it creates with the solver-default
     # ib_mass_relax (30 for a moving body), and its viscous isothermal twin (cold wall, Re 40). 24 cells per diameter, 100 steps (a
     # quarter of a diameter of travel), TSC image points: with the default inverse-distance points an A100 (NVHPC 25.11) differs from
