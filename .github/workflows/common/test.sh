@@ -44,15 +44,15 @@ esac
 if [ "$job_device" = "gpu" ]; then
     source .github/scripts/detect-gpus.sh
 
-    # Tests mostly wait on launch and file I/O, not the GPU. 100 mixed 1D-3D tests on a Frontier node:
-    # 8 GPUs, -j 8/16/24 -> 8.6/3.0/2.8 min; 2 GPUs, -j 4/8/12 -> 12.7/9.6/4.4 min.
     case "$job_cluster" in
         phoenix)
+            # 6 per GPU left NVHPC OpenMP seeing no device in most launches (#2423).
             device_opts="-g $gpu_ids"
-            n_test_threads=$((ngpus * 6))
+            n_test_threads=$((ngpus * 2))
             ;;
         *)
             # Frontier: --gpu flag is already in $build_opts; no extra device opts needed
+            # Tests mostly wait on launch and file I/O: 100 mixed tests on 8 GPUs, -j 8/16/24 -> 8.6/3.0/2.8 min.
             device_opts=""
             n_test_threads=$((ngpus * 2))
             ;;
