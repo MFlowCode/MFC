@@ -28,7 +28,7 @@ module m_amr_distribution
     public :: f_amr_overlap_count, f_amr_rank_overlaps, s_amr_adopt_block_owners, s_amr_assign_block_owners, s_amr_body_bbox, &
         & s_amr_box_isect, s_amr_compute_isect, s_amr_expand_box_over_bodies, s_amr_rank_coarse_range, s_amr_rank_decomp, &
         & s_amr_rank_interior, s_amr_ranks_overlapping, s_amr_refresh_lists, s_amr_refresh_my_blocks, s_amr_sfc_cut, &
-        & s_amr_sort_by_key, s_amr_tile_box, s_amr_validate_decomp, s_amr_validate_owner
+        & s_amr_sort_by_key, s_amr_tile_box, f_amr_rank_tile, s_amr_validate_decomp, s_amr_validate_owner
 
 contains
 
@@ -436,7 +436,8 @@ contains
     !> Owner-aware placement (amr_place_owner) of one level's na blocks (slots aidx, weights wt, Morton keys key): each block goes
     !! to the rank owning most of the coarse cells under it. A rank above (1 + place_tol) x the mean sheds its last blocks in Morton
     !! order, first to the least-loaded rank next to the block, then to the least-loaded rank anywhere, never pushing the receiver
-    !! above the cap. Replicated inputs in a fixed order, so every rank computes the same owners.
+    !! above the cap (or above the block's own weight, when one block exceeds it). Replicated inputs in a fixed order, so every rank
+    !! computes the same owners.
     impure subroutine s_amr_place_owner(key, wt, aidx, na, own)
 
         integer, intent(in)         :: na, aidx(na)
@@ -485,7 +486,8 @@ contains
                         m = minloc(load, 1) - 1
                     end if
                     if (m < 0) cycle
-                    if (load(m) + wt(a) > cap) cycle
+                    ! a block heavier than the cap may land on a rank it alone fills; never a move that does not lower the max
+                    if (load(m) + wt(a) > max(cap, wt(a)) .or. load(m) + wt(a) >= load(r)) cycle
                     own(a) = m; load(r) = load(r) - wt(a); load(m) = load(m) + wt(a)
                 end do
             end do
@@ -730,6 +732,30 @@ contains
         end do
 
     end subroutine s_amr_expand_box_over_bodies
+
+    !> Tile size for the level-1 regrid boxes: amr_maxc_fit, halved (not below amr_rank_tile_min cells) until the boxes make
+    !! amr_rank_tiles tiles per rank, so a small refined region still gives every rank work while blocks stay as large as that
+    !! allows. amr_maxc_fit as is with amr_max_grid_size set or on one rank. Replicated input: rank-invariant.
+    pure function f_amr_rank_tile(boxes, nboxes) result(tc)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes
+        integer, parameter      :: amr_rank_tile_min = 32, amr_rank_tiles = 2
+        integer                 :: tc(3), k
+        integer(8)              :: n
+
+        tc = amr_maxc_fit
+        if (amr_max_grid_size > 0 .or. num_procs == 1) return
+        do
+            n = 0_8
+            do k = 1, nboxes
+                n = n + product(int((boxes(k)%hi - boxes(k)%lo + tc)/tc, 8))
+            end do
+            if (n >= int(amr_rank_tiles, 8)*num_procs .or. all(.not. amr_dim .or. tc <= amr_rank_tile_min)) return
+            tc = merge(max(tc/2, min(tc, amr_rank_tile_min)), tc, amr_dim)
+        end do
+
+    end function f_amr_rank_tile
 
     !> Split box [lo:hi] into an even grid of adjacent sub-boxes each <= amr_maxc_fit per dim (the max a rank can whole-own),
     !! appended to out(nt+1:); sets capped=1 and stops if the cap is hit. Collapsed dims stay [0:0].

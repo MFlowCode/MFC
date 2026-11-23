@@ -351,6 +351,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 
 ### 4. Immersed Boundary Patches {#sec-immersed-boundary-patches}
 
+The measured accuracy of the wall value and wall-normal gradient, and which options help, are on @ref ib_accuracy_limits.
+
 | Parameter            | Type    | Description |
 | ---:                 | :----:  | :---                |
 | `num_ibs`            | Integer | Number of immersed boundary patches |
@@ -979,7 +981,7 @@ uniform Cartesian grid.
 | `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
 | `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
 | `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |
-| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition (default 0) |
+| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition, tiling regrid boxes down to 32 cells until there are two per rank (default 0) |
 | `amr_max_blocks`        | Integer | Maximum number of blocks (default 1024) |
 | `amr_max_level`         | Integer | Number of refined levels (default 1) |
 | `amr_ref_ratio`         | Integer | Refinement ratio, 2 or 4; 4 allows one level (default 2) |
@@ -987,7 +989,7 @@ uniform Cartesian grid.
 | `amr_prolong`           | Integer | Prolongation: 1 limited linear, 2 quartic with a positivity fallback (default 1) |
 | `amr_place_owner`       | Logical | Place each block on the rank owning most of its coarse cells (default F) |
 | `amr_snap`              | Integer | Regrid hysteresis in coarse cells, <= `amr_buf - 2` (default 0; set by the toolchain under regrid) |
-| `amr_device_pack`       | Logical | Fused device pack/unpack of the coarse-patch exchange (default F; set by the toolchain when `amr_max_grid_size <= 64`) |
+| `amr_device_pack`       | Logical | Fused device pack/unpack of the coarse-patch exchange (default F; set by the toolchain for every AMR case) |
 
 Each save writes the block hierarchy and fine solution next to the level-0 restart data; a restart reads the block
 geometry from it, not from `amr_block_beg`/`amr_block_end`.

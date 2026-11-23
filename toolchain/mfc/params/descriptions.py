@@ -134,7 +134,7 @@ DESCRIPTIONS = {
     "amr_prolong": "Fine ghost and regrid-seed prolongation: 1 (default) minmod-limited linear, 2 conservative quartic with an MC-limited linear fallback near discontinuities (amr_ref_ratio = 2)",
     "amr_device_pack": "Pack/unpack the per-stage coarse-patch gather (F1/F2) as ONE fused device kernel per family per stage over the plan's flat transfer list, not one launch per transfer",
     "amr_max_blocks": "Number of fixed refined-block slots preallocated for multi-block AMR (each sized max-block; N slots ~ N x device memory)",
-    "amr_max_grid_size": "Absolute cap on a refined block's coarse-cell extent per dim; 0 (default) derives it from the decomposition. Set it to make the box set rank-independent",
+    "amr_max_grid_size": "Absolute cap on a refined block's coarse-cell extent per dim; 0 (default): half the rank subdomain, tiled at regrid (down to 32) to two blocks per rank",
     "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Multi-level (>= 2) supported: static (amr_regrid_int=0) up to 2, dynamic regrid (>0) deeper",
     "amr_cluster_eff": "Berger-Rigoutsos min tag efficiency (tagged/total) a clustered block box must reach before splitting stops (0 < eff <= 1)",
     "amr_blocking_factor": "Minimum block-box extent in coarse cells the Berger-Rigoutsos bisection may produce; stops over-generation (>= 1, default 1 = none)",
