@@ -824,7 +824,7 @@ After the lint gate passes:
 
 - **GitHub-hosted:** Ubuntu and macOS, GNU and Intel (Ubuntu only), MPI, `reldebug` and no-debug, plus one single-precision lane
 - **NVHPC containers:** CPU build and test, GPU build only. PRs build the oldest and newest version in the matrix (currently 25.5 and 26.3); pushes to master build every version from 25.5 to 26.3
-- **HPC runners:** Frontier (GPU only: Cray ftn OpenACC/OpenMP, AMD flang OpenMP) and Phoenix (NVHPC GPU with OpenACC and OpenMP) on PRs and on pushes to master; Frontier is non-blocking. While Phoenix fails on master, an issue titled "Phoenix CI failing on master" lists the failed and no-result (cancelled or timed out) jobs and the merges since the last green run, and closes on the next green run. HPC and case-optimization jobs skip draft PRs
+- **HPC runners:** Frontier (GPU only: Cray ftn OpenACC/OpenMP, AMD flang OpenMP) and Phoenix (NVHPC GPU with OpenACC and OpenMP; the test suite is sharded in two per interface, plus a case-optimization job) on non-draft PRs and on pushes to master; Frontier is non-blocking. While Phoenix fails on master, an issue titled "Phoenix CI failing on master" lists the failed and no-result (cancelled or timed out) jobs and the merges since the last green run, and closes on the next green run. HPC and case-optimization jobs skip draft PRs
 - **Retries:** Tests get up to 3 attempts before failing
 - **Cleanliness check:** Compiler warnings are compared against master and reported, not enforced
 

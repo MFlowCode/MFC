@@ -941,6 +941,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**col, "chem_params%transport_model": 2}, "requires chem_params%transport_model = 1")
         self.assertRejects({**col, "cfl_adap_dt": "F"}, "requires cfl_adap_dt or cfl_const_dt")
         self.assertRejects({**col, "wall_column_dt_frac": 2.0}, "wall_column_dt_frac must be in (0, 1]")
+        self.assertRejects({**col, "wall_column_dt_frac": 0.0}, "wall_column_dt_frac must be in (0, 1]")
         self.assertRejects({**col, "patch_ib(1)%wall_column_len": -1.0}, "wall_column_len must be >= 0")
 
     def test_the_energy_balance_needs_a_reacting_surface(self):

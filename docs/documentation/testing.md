@@ -31,6 +31,12 @@ where `<computer name>` could be `phoenix` or any of the others in the [template
 You can create new templates with the appropriate run commands or omit this option.
 The use of `--` in the above command passes options to the `./mfc.sh run` command underlying the `./mfc.sh test`.
 
+The comparison tolerance is set per case in `compute_tolerance` (`toolchain/mfc/test/case.py`): a default of 1e-12, looser for cases whose physics amplifies round-off (examples, hypoelasticity, IBM, bubbles and others), and `override_tol` on a `define_case_d` call for a single case. Set an `override_tol` from the spread seen across compiler and device lanes, not from one machine, and in single precision it is floored at the default single-precision tolerance. When a default or an algorithm changes, regenerate the affected goldens in the same change (see [Keeping the goldens current](@ref validation)).
+
+The build configuration is remembered between commands (`build/lock.yaml`), so pass `--no-debug --no-reldebug --no-single` explicitly when you need a plain build after a debug or single-precision one.
+
+CI runs the test suite on GitHub-hosted runners, in NVHPC containers and on cluster runners; see the CI section of [Contributing](@ref contributing). A GPU change that involves more than one MPI rank should be tested with both ranks on one GPU and on two GPUs ([Silent-Failure Traps](@ref silent-failure-traps)).
+
 Besides the golden comparison, every case with ``chemistry = 'T'`` must keep its saved species mass fractions in [0, 1] and must not let the species clean-up fallback move more than roundoff-scale density (`Species cleanup at step ...` in the output); a failure names the step or variable.
 
 ### Creating Tests
