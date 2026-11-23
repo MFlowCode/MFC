@@ -4722,9 +4722,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     # Fixed random array of 12 no-slip cylinders (phi 0.2, Re_m 20, 96 x 96 cells, 200 steps) held at a bulk mass flux by the
     # mean_mflux controller, on 2 ranks (one seam through the bodies). The flow is far from steady: the golden is a regression
-    # guard for the periodic bodies, the controller and the force record; check_array.py validates the physics offline.
+    # guard for the periodic bodies, the controller and the force record; check_array.py validates the physics offline. Golden: GNU 13 double,
+    # 2 ranks (x86 CPU). An NVIDIA A100 (NVHPC 25.11 and 25.5, both ranks on one GPU or on two) differs by 1.1e-10 (min of absolute and relative
+    # error), so 1e-6 is four orders above the spread; a chemistry test, so the single-precision lane skips it.
     cases.append(define_case_f("2D -> Chemistry -> IBM -> Periodic Array", "examples/2D_ibm_periodic_array/case.py", ppn=2, override_tol=1e-6))
     # Ms 1.66 shock entering a curtain of 12 fixed no-slip cylinders (inviscid, 240 x 96 cells, 300 steps: the shock is inside the curtain).
+    # Golden: GNU 13 double (x86 CPU). An NVIDIA A100 (NVHPC 25.11 and 25.5) differs by 1.4e-8, so 1e-6 is about 70 times the spread. Skipped in
+    # the single-precision lane (see test.py).
     cases.append(define_case_f("2D -> IBM -> Shock Curtain", "examples/2D_ibm_shock_curtain/case.py", override_tol=1e-6))
 
     # Exact kinematics of a two-way body: a circle under a body force moves as g t^2 / 2 while the gas falls with it. First-order

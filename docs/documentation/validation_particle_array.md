@@ -57,6 +57,18 @@ All from `check_array.py` on the run directory (`D/ib_forces.dat`, `D/ib_heat.da
 | 100 | 2 | 16 | 14.337 | 12.605 | +13.7 % | 1.0001 | 0.24 |
 | 100 | 1 | 24 | 13.894 | 12.606 | +10.2 % | 1.0000 | 0.25 |
 
+### Nusselt number
+
+Thermally developed state (`--thermostat`: `mean_temp_wall` at the body temperature, mixing-cup temperature held at 300 K), 20 spheres at \f$\phi\f$ = 0.2, \f$\mathrm{Re}_m\f$ = 20, 16 cells/D, Mach 0.1, \f$tW/D\f$ = 8, last 30 %, bodies at 290 K and 310 K (seed 1). Gunn gives 5.995 and the Sun et al. correlation 3.39 on the same (surface-area) basis, from the equation as fitted to their data (a mixing-cup Nusselt number per cross-section perimeter, times \f$\pi/4\f$).
+
+| bodies | Nu | Gunn | difference | F/F_St |
+| ---: | ---: | ---: | ---: | ---: |
+| 290 K (cold) | 6.647 | 5.995 | +10.9 % | 7.359 |
+| 310 K (hot) | 5.039 | 5.998 | -16.0 % | 7.430 |
+| mean of the pair | 5.84 | 5.996 | -2.6 % | |
+
+The hot and cold runs disagree by 28 %, so the pair mean (5.84, which cancels the viscous heating to first order) is the quotable number: 2.6 % below Gunn and 1.7 times the Sun et al. value. The drag does not depend on the temperature difference (7.36 and 7.43).
+
 ### Burning array (not repeated on `master`)
 
 A reacting array (carbon spheres in hot air, the Bradley-Chelliah surface mechanism of `examples/2D_ibm_reacting_surface`, lumped solid wall `thermal_bc = 3`, `mean_temp` thermostat) was run in earlier development builds, not on `master`, and is not part of the example or the suite (11-species chemistry is too heavy for the suite). The measurements are quoted with their settings: 64 spheres at \f$\phi\f$ = 0.10 in a cube of 6.96 D, 2000 K and 10 atm air, Re_m 100 held by `mean_mflux`, 24 cells/D, `ib_ip_interp = 2`, one realization, two flow-throughs.
@@ -78,7 +90,7 @@ The single-body closed-box budget is reproducible on `master` with `examples/2D_
 - The Re 100 excess is a grid effect in part: it changes little from 16 to 24 cells/D (+10.7 % to +10.2 % for seed 1), so the 20-sphere boxes here do not show the 7 to 8 % grid error of the reference. Tenneti et al. report that their own drag converges from below with resolution and that 20 cells/D is about 7 to 8 % low at \f$\phi\f$ = 0.2 (their Fig. 3, read from the plot), so the correlation itself may sit below a converged solution; this is an argument about the reference, not a measurement of MFC.
 - The boxes hold 20 spheres in a 3.74 D cube; the literature arrays hold 80 or more. Realization scatter is large (4 % at Re 20 here).
 - Not run: 3D arrays above 1 M cells and the 80-particle boxes (0.8 to 5.8 M cells); the pre-merge drag, Mach and per-particle force tables of those runs are not repeated here.
-- The Nusselt number has no plateau in the temporal (restart) method, and the self-similar `mean_temp_wall` method gave a heat transfer 1.7 to 1.9 times a Sun-type reference in earlier runs: TODO-FILL.
+- **Nusselt number, open.** The hot and cold bodies of the thermostat pair differ by 28 % (6.65 and 5.04 against 5.995 for Gunn); earlier runs showed the same asymmetry and a slow relaxation of the hot case. Against the Sun et al. correlation the pair mean is 1.7 times higher (earlier runs: 1.7 to 1.9), which is not explained (the methods, constant against variable properties and the Mach number differ). Treat the Nusselt numbers as plus or minus 15 %. Two further observations on `master`: at Mach 0.3 the viscous heating is of the order of the 10 K drive (the cold run gave Nu 10.6), so use Mach 0.1 or lower; and the hot run at Mach 0.3 aborted at \f$tW/D\f$ = 8.3 with an infinite viscous CFL number (reproduce: `--dim 3 --n_bodies 20 --mach 0.3 --cfl 0.2 --cells_per_D 16 --Re 20 --tstar 12 --thermostat --tw_ratio 1.0333`), which is a solver limit, not fixed here.
 - A closed periodic box with isothermal bodies gains mass slowly (documented in @ref ib_accuracy_limits and the mass-budget example `examples/2D_ibm_wall_mass_budget`).
 - A body force on moving particles is not a mean pressure gradient: with `mean_dpdx` the force is not applied inside the bodies, so use the controller for fixed or moving arrays alike.
 

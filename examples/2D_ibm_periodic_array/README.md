@@ -32,4 +32,8 @@ diameters, `ib_ip_interp = 1`, last 40 % of `tW/D` = 10. F/F_St is the total for
 | 100 | 1 | 24 | 13.894 | 12.606 | +10.2 % | 1.0000 |
 
 The 2D run of the CI case to `tW/D` = 43 holds Q to 1e-6, closes the momentum balance to 1.0000 and gives a per-body force spread of
-0.44 of the mean. TODO-FILL Nusselt.
+0.44 of the mean.
+
+Nusselt number (`--thermostat`, 20 spheres, Re_m 20, 16 cells/D, Mach 0.1, bodies at 290 K and 310 K, `tW/D` = 8): 6.65 (cold) and
+5.04 (hot) against Gunn 5.995; the pair mean 5.84 is 2.6 % below Gunn and 1.7 times the Sun et al. (2015) value on the same basis. The hot/cold
+asymmetry (28 %) is an open item, so treat the values as plus or minus 15 %; see the @ref validation_particle_array page.
