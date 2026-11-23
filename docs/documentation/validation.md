@@ -126,6 +126,18 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 **Status:** partially validated. **Example:** `examples/2D_ibm_cylinder_drag_nu`. The face-flux immersed-boundary force and the face heat of a no-slip isothermal cylinder at Re 20, 40 and 100 against Dennis and Chang, Williamson and the Nusselt-number correlations, with a momentum balance as an independent drag. Results and limits: @ref validation_cyl_drag_nu.
 
+## Moving-body gas-mass budget and Galilean twin {#sec-validation-moving-body-budget}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_moving_mass_budget`. The gas mass a translating circle creates in a closed periodic box, with and without `ib_mass_relax`, and the conducted heat and force of the moving body against the same body held in the same relative flow. Results and limits: @ref validation_moving_body_budget.
+
+## Sphere drag and Nusselt number {#sec-validation-sphere-drag-nu}
+
+**Status:** partially validated. **Example:** `examples/3D_ibm_sphere_drag_nu`. The face-flux drag and face heat of a no-slip isothermal sphere at Mach 0.2 and Re 20-300 against Schiller-Naumann, Ranz-Marshall and Whitaker, with a momentum balance as an independent drag. Results and limits: @ref validation_sphere_drag_nu.
+
+## Bow-shock stand-off {#sec-validation-standoff}
+
+**Status:** open discrepancy (resolution-limited). **Example:** `examples/2D_ibm_cylinder_standoff`. The detached-shock distance of a cylinder and a sphere at Mach 1.5-3 against Billig's correlation and a body-fitted Euler solution. Results and limits: @ref validation_standoff.
+
 ## Other families
 
 - @ref validation_tsc_annulus "Isothermal conduction annulus": image-point interpolation (inverse distance and TSC) against the exact radial conduction solution.
