@@ -22,7 +22,6 @@ parser = argparse.ArgumentParser(prog="2D_ibm_plane_poiseuille")
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC toolchain state.")
 parser.add_argument("--cells", type=int, default=8, help="Cells across the gap H = 1.")
 parser.add_argument("--wall_order", type=int, default=2, help="ib_wall_order (1 mirror, 2 two-probe quadratic).")
-parser.add_argument("--smooth_contact", type=int, default=0, help="ib_smooth_contact: smooth the tangential contact velocity in the viscous work (CPU and GPU agree).")
 parser.add_argument("--mach", type=float, default=0.05, help="Peak velocity over the sound speed.")
 parser.add_argument("--re", type=float, default=1.0, help="Re = u_max H / nu.")
 parser.add_argument("--offset", type=float, default=0.0, help="Wall offset from a cell face, in cells.")
@@ -128,8 +127,5 @@ case = {
     "prim_vars_wrt": "F",
     "parallel_io": "F",
 }
-
-if args.smooth_contact:
-    case["ib_smooth_contact"] = "T"
 
 print(json.dumps(case))
