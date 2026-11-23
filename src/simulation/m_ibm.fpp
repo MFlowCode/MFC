@@ -119,8 +119,8 @@ module m_ibm
     type(integer_field), public :: ib_markers_fine
     $:GPU_DECLARE(create='[ib_markers_fine]')
 
-    !> 1 at ghost points whose image point reaches the fluid, 0 elsewhere. Ghost points with a buried image point average over these
-    !! neighbors, and never over each other.
+    !> 1 at ghost points whose image point reaches the fluid, 2 at those with a buried image point, 0 elsewhere. The latter average
+    !! over the former, and never over each other.
     type(integer_field) :: corrected_gps
     $:GPU_DECLARE(create='[corrected_gps]')
 
@@ -645,10 +645,10 @@ contains
         real(wp)               :: buf, buf_prim
         type(ghost_point)      :: gp
 
-        ! set the Moving IBM interior conservative variables. A solid cell that is a ghost keeps the value of the last correction
-        ! when the interpolation reads solid cells (ib_keep_ghost): resetting it to the body velocity, and without chemistry to a
-        ! pressure of 1 Pa, would feed those values into the image-point state. Inverse-distance weights drop solid cells, so they
-        ! never see it.
+        ! set the Moving IBM interior conservative variables. A solid cell that is a ghost, its image point buried or not, keeps the
+        ! value of the last correction when the interpolation reads solid cells (ib_keep_ghost): resetting it to the body velocity,
+        ! and without chemistry to a pressure of 1 Pa, would feed those values into the image-point state. Inverse-distance weights
+        ! drop solid cells, so they never see it.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho, patch_id_temp]', collapse=3)
         do l = 0, p
             do k = 0, n
@@ -1056,7 +1056,7 @@ contains
                     do jj = j - rad, j + rad
                         do kk = k - rad, k + rad
                             do ll = l - rad_z, l + rad_z
-                                num_nbrs = num_nbrs + corrected_gps%sf(jj, kk, ll)
+                                if (corrected_gps%sf(jj, kk, ll) == 1) num_nbrs = num_nbrs + 1
                             end do
                         end do
                     end do
@@ -2870,7 +2870,7 @@ contains
                 ghost_points(q)%ip_stencil(kk) = merge(ic(kk) - 1, gp%ip_grid(kk), ib_ip_interp == 2)
             end do
             if (p == 0) ghost_points(q)%ip_stencil(3) = 0
-            if (ghost_points(q)%interp_valid) corrected_gps%sf(gp%loc(1), gp%loc(2), gp%loc(3)) = 1
+            corrected_gps%sf(gp%loc(1), gp%loc(2), gp%loc(3)) = merge(1, 2, ghost_points(q)%interp_valid)
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -4818,7 +4818,7 @@ contains
     end subroutine s_ibm_reserve_park
 
     !> Rebuild corrected_gps from the ghost-point list now in ghost_points: s_compute_interpolation_coeffs only sets entries, so
-    !! clear the whole field and re-mark the valid ghost points on-device.
+    !! clear the whole field and re-mark the ghost points on-device.
     impure subroutine s_ibm_rebuild_corrected_gps(n_g)
 
         integer, intent(in) :: n_g
@@ -4835,9 +4835,8 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_g]')
         do a = 1, n_g
-            if (ghost_points(a)%interp_valid) then
-                corrected_gps%sf(ghost_points(a)%loc(1), ghost_points(a)%loc(2), ghost_points(a)%loc(3)) = 1
-            end if
+            corrected_gps%sf(ghost_points(a)%loc(1), ghost_points(a)%loc(2), ghost_points(a)%loc(3)) = merge(1, 2, &
+                             & ghost_points(a)%interp_valid)
         end do
         $:END_GPU_PARALLEL_LOOP()
 
