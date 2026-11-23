@@ -4137,6 +4137,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_conduction_annulus",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
+                # Registered below at their own sizes: the 25-cell, 50-step cap leaves the erf front a fraction of a cell, the
+                # cylinder under a cell, and the heat transient too short to absorb anything
+                "1D_diffusion_verification",
+                "2D_ibm_slip_cylinder",
+                "2D_ibm_cold_wall_transient",
                 # Registered below at 24 cells per diameter (the moving body crosses cells), 6 (sphere) and 16 (stand-off)
                 "2D_ibm_moving_mass_budget",
                 "3D_ibm_sphere_drag_nu",
@@ -4207,6 +4212,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # ignition delay and T(t) against a Cantera reactor. Golden: GNU 13 double; NVHPC 25.11 (A100) agrees to 2e-12, NVHPC 25.5
         # differs by up to 1e-3 relative in minor species (issue 2181); skipped on NVHPC < 25.11 GPU builds (test.py).
         cases.append(define_case_f("1D -> Chemistry -> H2-Air Ignition -> Split Reactions", "examples/1D_h2_air_ignition/case.py", ["--T0", "1200", "--dt", "2e-8", "--tend", "1e-4", "--nsaves", "5"]))
+
+        # Species diffusion and heat conduction against the erfc solution of a step, and the transport-limited dt on a one-cell temperature
+        # spike. check_diffusion.py validates the physics; the goldens are regression guards. Golden: GNU 13 double on the AMD host CPU of
+        # an MI300A node. An A100 (NVHPC 25.11 and 25.5) agrees to 4e-11 and a GNU 13 build on an Intel Ice Lake CPU to 4e-11, so 1e-6 is the
+        # usual start for a checker-validated golden until CI shows the spread of the GitHub runners. Chemistry cases are skipped in the
+        # single-precision lane.
+        for name, args in (
+            ("Species Erf", ["--mode", "erf_species"]),
+            ("Heat Erf", ["--mode", "erf_heat"]),
+            ("Unity-Lewis Transport-Limited dt", ["--mode", "stab", "--tm", "2"]),
+        ):
+            cases.append(define_case_f(f"1D -> Chemistry -> Diffusion Verification -> {name}", "examples/1D_diffusion_verification/case.py", args, override_tol=1e-6))
 
         # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
         for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
@@ -4732,6 +4749,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # error; the y-momentum near zero and ib_heat.dat are the largest, the fields otherwise 3e-6), so 5e-4 is ten times that spread.
     cases.append(define_case_f("2D -> Chemistry -> IBM -> Cylinder Drag Nu", "examples/2D_ibm_cylinder_drag_nu/case.py", args=["--tw_ratio", "1.1"], mods={"parallel_io": "F"}, override_tol=5e-4))
 
+    # Fixed slip cylinder in a fully periodic box (uniform Mach 0.5 flow, 8 cells per R, 100 steps, default ib_mass_relax: no return for a
+    # fixed body), so the gas mass drifts: check_slip.py reads it from the saves. Skipped in the single-precision lane (see test.py).
+    # Golden: GNU 13 double on the AMD host CPU of an MI300A node. An A100 (NVHPC 25.11 and 25.5) differs from it by up to 1.4e-7 and a GNU
+    # build on an Intel Ice Lake CPU by 1.0e-7, so 1e-6 is seven times the larger. The ib_mass_relax = 1 case is not registered: on an A100
+    # the relaxation-only path does nothing in this periodic box (page validation_slip_walls); "IBM -> Fixed Circle -> Slip ->
+    # ib_mass_relax" covers the option on CPU and does not discriminate on a GPU.
+    cases.append(define_case_f("2D -> IBM -> Slip Cylinder -> Mass Budget", "examples/2D_ibm_slip_cylinder/case.py", override_tol=1e-6))
+
+    # Cold cylinder in quiescent 1500 K air with the sub-grid wall conduction column (12 cells per R, to 0.03 R^2/alpha, 99 steps): the heat
+    # the body takes (ib_heat.dat) is in the golden; check_heat.py compares it with a body-fitted 1D reference. Golden: GNU 13 double on the
+    # AMD host CPU of an MI300A node; an A100 (NVHPC 25.11 and 25.5 identical) agrees to 1.4e-8 (min of absolute and relative error). A GNU 13
+    # build on an Intel Ice Lake CPU differs from both by 2.0e-2 (density 1e-3, momentum 1.6e-2 relative, ib_heat 7e-4): the transient starts
+    # from a near-step layer and amplifies the architecture's round-off, as the withdrawn cold-wall case of issue 1892 did across
+    # compilers; the cause is not identified. 5e-2 is 2.5 times that gap, so the test catches a broken column or time-step limit, not
+    # round-off; tighten it when CI shows whether the Intel lanes follow the AMD or the Ice Lake result.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cold Wall Transient -> Wall Column", "examples/2D_ibm_cold_wall_transient/case.py", override_tol=5e-2))
     # Moving circle in a closed periodic box (examples/2D_ibm_moving_mass_budget): the gas mass it creates with the solver-default
     # ib_mass_relax (30 for a moving body), and its viscous isothermal twin (cold wall, Re 40). 24 cells per diameter, 100 steps (a
     # quarter of a diameter of travel), TSC image points: with the default inverse-distance points an A100 (NVHPC 25.11) differs from
