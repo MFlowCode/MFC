@@ -93,8 +93,6 @@ contains
             type(riemann_states_vec3)            :: b4          !< 4-magnetic field components (spatial: b4x, b4y, b4z)
             type(riemann_states_vec3)            :: cm          !< Conservative momentum variables
             integer                              :: i, j, k, l  !< Generic loop iterators
-            !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
-            integer :: Re_size_loc1, Re_size_loc2
             ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary
             ! conditions
 
@@ -103,7 +101,6 @@ contains
 
             ! Reshaping inputted data based on dimensional splitting direction
             call s_initialize_riemann_solver(norm_dir)
-            Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
             need_nc_vel = hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)
             #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -121,8 +118,7 @@ contains
                                         & qv_avg, c_L, c_R, G_L, G_R, damage_L, damage_R, solid_partial_density_L, &
                                         & solid_partial_density_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, &
                                         & vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, &
-                                        & alpha_R_sum, flux_tau_L, flux_tau_R, vel_interface]', copyin='[norm_dir]', &
-                                        & firstprivate='[Re_size_loc1, Re_size_loc2, need_nc_vel]')
+                                        & alpha_R_sum, flux_tau_L, flux_tau_R, vel_interface]', copyin='[norm_dir]', firstprivate='[need_nc_vel]')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -204,8 +200,8 @@ contains
                                 call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
 
                                 if (viscous) then
-                                    call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
-                                    call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                                    call s_compute_interface_reynolds(alpha_L, Re_L)
+                                    call s_compute_interface_reynolds(alpha_R, Re_R)
                                 end if
 
                                 if (chemistry) then

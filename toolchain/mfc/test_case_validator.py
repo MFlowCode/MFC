@@ -541,10 +541,11 @@ class TestAmrDefaults(unittest.TestCase):
     def test_admissible_amr_case_gets_defaults(self):
         p = dict(self.AMR)
         self.assertTrue(apply_amr_defaults(p))
-        self.assertEqual(p["amr_device_pack"], "T")  # cap 16 <= DEVICE_PACK_MAX_CAP
-        q = {**self.AMR, "amr_max_grid_size": 96}
-        self.assertFalse(apply_amr_defaults(q))  # static block above the cap: nothing to derive
-        self.assertNotIn("amr_device_pack", q)
+        self.assertEqual(p["amr_device_pack"], "T")
+        for cap in (96, 0):  # large or rank-derived blocks get the fused kernels too
+            q = {**self.AMR, "amr_max_grid_size": cap}
+            self.assertTrue(apply_amr_defaults(q))
+            self.assertEqual(q["amr_device_pack"], "T")
         r = {**self.AMR, "amr_device_pack": "F"}
         self.assertTrue(apply_amr_defaults(r))
         self.assertEqual(r["amr_device_pack"], "F")
@@ -572,7 +573,21 @@ class TestAmrDefaults(unittest.TestCase):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 4}, "simulation")
-        for bad, msg in (({"amr_tag_var": 5}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T"), ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2")):
+        validate_case_constraints({**self.AMR, "amr_tag_var": 5, "n": 32, "bc_y%beg": -3, "bc_y%end": -3, "amr_block_beg(2)": 10, "amr_block_end(2)": 20}, "simulation")
+        chem = {**self.AMR, "chemistry": "T", "cantera_file": "h2o2.yaml"}
+        validate_case_constraints({**chem, "amr_tag_var": 6}, "simulation")
+        validate_case_constraints({**chem, "amr_tag_var": 7, "amr_tag_species": 2, "amr_tag_abs": "T"}, "simulation")
+        bads = (
+            ({"amr_tag_var": 8}, "amr_tag_var must be"),
+            ({"amr_tag_var": 3}, "requires amr_tag_abs = T"),
+            ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2"),
+            ({"amr_tag_var": 5}, "vanishes in 1D"),
+            ({"amr_tag_var": 6}, "require chemistry"),
+            ({"amr_tag_var": 7, "amr_tag_abs": "T"}, "require chemistry"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7}, "requires amr_tag_abs = T"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7, "amr_tag_abs": "T", "amr_tag_species": 0}, "amr_tag_species must be >= 1"),
+        )
+        for bad, msg in bads:
             with self.assertRaises(CaseConstraintError) as ctx:
                 validate_case_constraints({**self.AMR, **bad}, "simulation")
             self.assertIn(msg, str(ctx.exception))

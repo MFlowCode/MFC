@@ -21,14 +21,14 @@ module m_amr_regrid
     use m_amr_state, only: amr_band_migrate
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
-    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_ind
+    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_val_sf, f_amr_tag_vort_sf, f_amr_tag_ind
     use m_amr_distribution, only: s_amr_sort_by_key
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
         & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
         & s_amr_exchange_coarse_cons_halo, s_amr_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, &
-        & s_amr_l1_fill_exchange, s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, &
+        & f_amr_rank_tile, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, &
+        & s_amr_setup_ib, s_amr_l1_fill_exchange, s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, &
         & s_amr_fill_wave_done, amr_fw_dev
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -369,17 +369,21 @@ contains
         do ck = lbound(r, 3), ubound(r, 3)
             do cj = lbound(r, 2), ubound(r, 2)
                 do ci = lbound(r, 1), ubound(r, 1)
-                    r(ci, cj, ck) = f_amr_tag_val_sf(q_cons_base, ci, cj, ck)
+                    if (amr_tag_var /= 5) r(ci, cj, ck) = f_amr_tag_val_sf(q_cons_base, ci, cj, ck)
                 end do
             end do
         end do
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
                 do ci = tg_lo(1), tg_hi(1)
-                    ! jump of the tagged variable, max over the active dimensions
-                    g = f_amr_tag_ind(r(ci + 1, cj, ck), r(ci, cj, ck), r(ci - 1, cj, ck))
-                    if (n_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj + 1, ck), r(ci, cj, ck), r(ci, cj - 1, ck)))
-                    if (p_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj, ck + 1), r(ci, cj, ck), r(ci, cj, ck - 1)))
+                    if (amr_tag_var == 5) then
+                        g = f_amr_tag_vort_sf(q_cons_base, [ci, cj, ck], [ci, cj, ck] - h, [ci, cj, ck] + h)
+                    else
+                        ! jump of the tagged variable, max over the active dimensions
+                        g = f_amr_tag_ind(r(ci + 1, cj, ck), r(ci, cj, ck), r(ci - 1, cj, ck))
+                        if (n_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj + 1, ck), r(ci, cj, ck), r(ci, cj - 1, ck)))
+                        if (p_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj, ck + 1), r(ci, cj, ck), r(ci, cj, ck - 1)))
+                    end if
                     if (g > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! acoustic source support stays coarse
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
@@ -743,7 +747,7 @@ contains
         type(t_box), allocatable, intent(inout) :: boxes(:)
         integer, intent(inout)                  :: nboxes
         type(t_box), allocatable                :: tiled(:)
-        integer                                 :: lo(3), hi(3), k, kk, ntl, capt, pad
+        integer                                 :: lo(3), hi(3), k, kk, ntl, capt, pad, tc(3)
 
         pad = amr_buf
         k = 0
@@ -758,14 +762,16 @@ contains
         nboxes = k
         if (nboxes == 0) return
 
-        ! tile boxes larger than amr_maxc_fit (IB: after carving out body blocks, so a body is never split)
+        ! tile boxes larger than amr_maxc_fit, or smaller until every rank has work (IB: after carving out body blocks, so a body
+        ! is never split)
         allocate (tiled(amr_max_blocks))
         ntl = 0; capt = 0
         if (ib) then
             call s_amr_carve_tile_around_bodies(boxes, nboxes, tiled, ntl, capt)
         else
+            tc = f_amr_rank_tile(boxes, nboxes)
             do kk = 1, nboxes
-                call s_amr_tile_box(boxes(kk)%lo, boxes(kk)%hi, tiled, ntl, amr_max_blocks, capt)
+                call s_amr_tile_box(boxes(kk)%lo, boxes(kk)%hi, tiled, ntl, amr_max_blocks, capt, tc)
             end do
         end if
         if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', amr_max_blocks

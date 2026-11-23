@@ -53,3 +53,9 @@ Use `--gpu mp` for an OpenMP-offload build, or drop the GPU flags on a CPU build
 One temperature per body is valid only while the Biot number is small; the geometry and mass are fixed (no recession);
 the update is explicit; the body must be a non-moving circle, sphere or cylinder; and the chemistry module is required
 even though no reaction occurs. The balance has been checked against first-order estimates, not an analytic solution.
+
+## Cooling in a cross flow, against the time constant of the fixed-wall Nusselt number
+
+`examples/2D_ibm_cylinder_drag_nu` runs the same lumped body (`--thermal_bc 3 --rho_cs <J/m^3/K>`) in the Re 20 and 40 cross flow
+of that example, and `check_lumped_cooling.py` compares its decay with the time constant `rho_s c_s D^2 / (4 Nu k_f)` that the Nusselt
+number of two fixed-wall twin runs implies. The results are on the @ref validation_wall_thermal page.

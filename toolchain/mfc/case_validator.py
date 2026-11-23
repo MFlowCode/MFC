@@ -2392,14 +2392,20 @@ class CaseValidator:
             "amr_tag_eps must be > 0 when amr_regrid_int > 0",
         )
         amr_tag_var = self.get("amr_tag_var", 1)
-        self.prohibit(amr_tag_var not in (1, 2, 3, 4), "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1), 3 (velocity magnitude) or 4 (pressure)")
+        self.prohibit(
+            amr_tag_var not in range(1, 8),
+            "amr_tag_var must be 1 (density), 2 (volume fraction of fluid 1), 3 (velocity magnitude), 4 (pressure), 5 (vorticity), 6 (temperature) or 7 (species mass fraction)",
+        )
+        self.prohibit(amr_tag_var == 5 and (self.get("n") or 0) == 0, "amr_tag_var = 5 (vorticity) vanishes in 1D: it requires n > 0")
+        self.prohibit(amr_tag_var in (6, 7) and self.get("chemistry", "F") != "T", "amr_tag_var = 6 (temperature) and 7 (species mass fraction) require chemistry = T")
+        self.prohibit(amr_tag_var == 7 and self.get("amr_tag_species", 1) < 1, "amr_tag_species must be >= 1 (and <= the mechanism's species count, checked at run time)")
         self.prohibit(
             amr_tag_var == 4 and (self.get("model_eqns") != 2 or any(self.get(k, "F") == "T" for k in ("chemistry", "mhd", "bubbles_euler", "hypoelasticity"))),
             "amr_tag_var = 4 (pressure) uses the five-equation mixture pressure: it requires model_eqns = 2 without chemistry, mhd, bubbles_euler or hypoelasticity",
         )
         self.prohibit(
-            amr_tag_var == 3 and self.get("amr_tag_abs", "F") != "T",
-            "amr_tag_var = 3 (velocity magnitude) requires amr_tag_abs = T: a relative jump is undefined where the fluid is at rest",
+            amr_tag_var in (3, 7) and self.get("amr_tag_abs", "F") != "T",
+            f"amr_tag_var = {amr_tag_var} (velocity magnitude, species mass fraction) requires amr_tag_abs = T: a relative jump is undefined where the variable vanishes",
         )
         self.prohibit(
             (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,
@@ -3906,8 +3912,6 @@ class CaseValidator:
 
 # AMR defaults the toolchain derives for a case that leaves them unset. The Fortran defaults stay off on purpose: a
 # default set there bypasses every rule above, so the decision lives here, under the same prohibitions.
-# The fused pack/unpack is derived only up to cap 64 (many small blocks).
-DEVICE_PACK_MAX_CAP = 64
 # Regrid hysteresis under dynamic regrid when the tag buffer leaves room (amr_snap <= amr_buf - 2).
 SNAP_DEFAULT = 2
 
@@ -3917,13 +3921,10 @@ def apply_amr_defaults(params: Dict[str, Any]) -> bool:
     simulation validation with them on. Returns True when they were applied."""
     if params.get("amr", "F") != "T":
         return False
-    defaults: Dict[str, Any] = {}
-    if 0 < int(params.get("amr_max_grid_size", 0)) <= DEVICE_PACK_MAX_CAP:
-        defaults["amr_device_pack"] = "T"
+    # fused exchange kernels: faster at every block size measured (Frontier MI250X, 8-512 GPUs)
+    defaults: Dict[str, Any] = {"amr_device_pack": "T"}
     if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1:
         defaults["amr_snap"] = min(SNAP_DEFAULT, int(params.get("amr_buf", 3)) - 2)
-    if not defaults:
-        return False
     trial = dict(params)
     trial.update({k: params.get(k, v) for k, v in defaults.items()})
     try:
