@@ -29,8 +29,11 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
 
 - **Tagging and clustering.** A coarse cell is tagged when its normalized density jump exceeds `amr_tag_eps`
   (`amr_tag_abs = T` uses the absolute jump instead). `amr_tag_var` tags on the volume fraction of fluid 1, the
-  velocity magnitude or the pressure instead of the density, for interfaces, shear layers and pressure waves with no
-  density jump. Tags are clustered
+  velocity magnitude, the pressure, the temperature or a species mass fraction (`amr_tag_species`) instead of the
+  density, for interfaces, shear layers, pressure waves and flames with no density jump. The vorticity
+  (`amr_tag_var = 5`) is not a jump: a cell is tagged when its vorticity magnitude times its cell size
+  `dx` (central velocity differences; a velocity, halving per level for a resolved vortex) exceeds `amr_tag_eps`,
+  whatever `amr_tag_abs`. Tags are clustered
   by Berger-Rigoutsos bisection into boxes that reach `amr_cluster_eff` tag efficiency, are at least `amr_blocking_factor` cells wide, are padded by `amr_buf`
   cells and are capped at `amr_max_grid_size` cells per dimension. Levels nest properly (a level-2 box lies inside one
   level-1 box).
@@ -113,7 +116,8 @@ Full descriptions: @ref case.
 | `amr_regrid_int` | 0 | Steps between regrids; 0 keeps the initial block |
 | `amr_tag_eps` | 0.1 | Tagging threshold on the normalized density jump (> 0 with regrid) |
 | `amr_tag_abs` | F | Tag on the absolute jump; `amr_tag_eps` then has the units of the tagged variable |
-| `amr_tag_var` | 1 | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model) |
+| `amr_tag_var` | 1 | Tagged variable: 1 total density, 2 volume fraction of fluid 1, 3 velocity magnitude (needs `amr_tag_abs`), 4 pressure (five-equation model), 5 vorticity (magnitude times the cell size against `amr_tag_eps`; 2D/3D), 6 temperature (chemistry), 7 mass fraction of species `amr_tag_species` (chemistry, needs `amr_tag_abs`) |
+| `amr_tag_species` | 1 | Species index tagged by `amr_tag_var = 7` |
 | `amr_buf` | 3 | Padding around tagged cells, coarse cells (>= 1 with regrid) |
 | `amr_cluster_eff` | 0.7 | Minimum tag efficiency of a clustered box |
 | `amr_blocking_factor` | 4 | Minimum box width, coarse cells |
