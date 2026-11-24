@@ -75,7 +75,8 @@
         Phoenix is shown per GPU model, since its nodes differ several-fold.
         Grind time is nanoseconds per grid point, equation and Runge&ndash;Kutta stage; lower is faster. Nodes are shared, so single
         points are noisy: the line is a median of five runs, the dots are the runs themselves (a commit may have several). A dashed line marks a commit that
-        changed the benchmark case itself, so the numbers on either side of it are not comparable.</p>
+        changed the benchmark case itself, and a dotted one a commit that changed the machine's compiler or modules; the numbers on
+        either side of either are not comparable.</p>
 
     <div class="controls">
         <div class="seg" id="view" role="group" aria-label="Machine"></div>
@@ -94,6 +95,14 @@
     <ul class="legend" id="legend"></ul>
     <p id="status">Loading benchmark history&hellip;</p>
     <div class="grid" id="charts"></div>
+
+    <h2>Changes beyond the noise</h2>
+    <p class="note">Where grind time moved to a new level and stayed there: at least 3% and five times the run-to-run scatter, on two or
+        more cases of a lane (or 10% on one, on Frontier), and narrowed to fewer than eight commits. The commits listed are the ones merged between a lane's last benchmark at the old level and its
+        first at the new one; when several lanes changed together, only the commits all of them allow. One commit listed is the cause;
+        several means the benchmarks cannot tell them apart. A change in the machine itself, outside the repository, would show up here
+        against whatever merged at the time. Hover the case count for the cases.</p>
+    <div class="log"><table id="changes"></table></div>
 
     <h2>Commits</h2>
     <p class="note">Each benchmarked commit in the range above, newest first. A lane's figure is its grind time against the commit benchmarked
@@ -166,7 +175,8 @@ function series(slug) {
     return LANES.filter(l => !state.hidden.has(l.key)).map(lane => {
         let pts = state.records
             .filter(r => r.lane === lane.key && r.t >= from && r.t <= to && r.cases[slug])
-            .map(r => ({ t: r.t, sha: r.sha, pr: r.pr, covers: r.covers?.length || 1, subject: r.subject || "", def: r.cases[slug].def || "", v: r.cases[slug].grind }));
+            .map(r => ({ t: r.t, sha: r.sha, pr: r.pr, covers: r.covers?.length || 1, subject: r.subject || "", cdef: r.cases[slug].def || "", env: r.env || "",
+                         def: `${r.cases[slug].def || ""}|${r.env || ""}`, v: r.cases[slug].grind }));
         // Off-scale: over 3x the median of the runs around it. Judged locally so that a lasting change
         // in level, which is the thing to see, is never mistaken for a stray run.
         pts = pts.map((p, i) => {
@@ -214,13 +224,20 @@ function chart(slug) {
     el("text", { x: W - R, y: H - 6, "text-anchor": "end" }, svg).textContent = new Date(t1).toLocaleString(undefined, span);
 
     // Commits at which the benchmark case itself (its input file or arguments) changed.
-    const changed = new Set(ss.flatMap(s => s.pts.filter((p, i) => i && p.def !== s.pts[i - 1].def).map(p => p.t)));
+    const changed = new Set(ss.flatMap(s => s.pts.filter((p, i) => i && p.cdef !== s.pts[i - 1].cdef).map(p => p.t)));
+    // Commits at which the machine's compiler and module set (its lines of toolchain/modules) changed.
+    const envChanged = new Set(ss.flatMap(s => s.pts.filter((p, i) => i && p.env !== s.pts[i - 1].env).map(p => p.t)));
+    for (const t of envChanged) {
+        el("line", { x1: x(t), x2: x(t), y1: T, y2: H - B, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "1 3" }, svg);
+        el("rect", { x: x(t) - 3, y: T - 8, width: 6, height: 6, fill: "var(--ink-2)" }, svg);
+    }
     for (const t of changed) {
         el("line", { x1: x(t), x2: x(t), y1: T, y2: H - B, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "3 3" }, svg);
         el("path", { d: `M${x(t)},${T - 9}l4,4l-4,4l-4,-4z`, fill: "var(--ink-2)" }, svg);
     }
     const off = all.filter(p => p.out).length;
     if (off) fig.firstChild.insertAdjacentHTML("beforeend", ` <span class="note" style="font-weight:400">· ${off} off-scale ${off === 1 ? "run" : "runs"} ▲</span>`);
+    if (envChanged.size) fig.firstChild.insertAdjacentHTML("beforeend", ` <span class="note" style="font-weight:400">· modules changed ${envChanged.size === 1 ? "once" : envChanged.size + " times"}</span>`);
     if (changed.size) fig.firstChild.insertAdjacentHTML("beforeend", ` <span class="note" style="font-weight:400">· case changed ${changed.size === 1 ? "once" : changed.size + " times"}</span>`);
 
     for (const s of ss) {
@@ -258,6 +275,7 @@ function chart(slug) {
             + `<div class="commit"><code>${c.sha.slice(0, 7)}</code>${PR_OF(c) ? ` · PR #${PR_OF(c)}` : ""} ${esc(c.subject)}</div>`
             + (c.covers > 1 ? `<div class="when">First benchmark of ${c.covers} commits</div>` : "")
             + (changed.has(t) ? `<div class="when">◆ Benchmark case changed at this commit</div>` : "")
+            + (envChanged.has(t) ? `<div class="when">■ Compiler or module set changed at this commit</div>` : "")
             + rows.map(r => `<div class="row"><span class="swatch" style="background:${r.s.lane.color}"></span>${r.s.lane.label}${r.ps.length > 1 ? ` <span class="when">(${r.ps.length} runs)</span>` : ""}<b>${fmt(r.v, state.metric)}</b></div>`).join("")
             + `<div class="when">Click: keep with links · Drag: zoom</div>`;
         tip.hidden = false;
@@ -328,12 +346,94 @@ function log(slugs) {
         + rows.reverse().slice(0, 400).map(({ cm, cells }) => `<tr><td>${day(cm.r.t)}</td><td class="what" title="${esc(cm.r.subject || "")}">${links(cm.r)} ${esc(cm.r.subject || "")}${also(cm)}</td>${cells.map(cell).join("")}</tr>`).join("");
 }
 
+// A lasting change in level, per lane and case: at each benchmarked commit, the median of the (up to) six
+// commits before against the six from it on, at least four on each side. It counts when it is at least
+// 3% and five times the scatter on either side, and it is placed at the commit where that contrast peaks.
+// Runs across a change to the case or to the modules are never compared; a run over 3x its neighbours
+// and a run whose commit is only estimated are left out. One case moving alone has to move 10%;
+// otherwise two cases on the lane must.
+// The suspects are the commits after the lane's last benchmark at the old level, up to its first at the
+// new one. Lanes that changed over overlapping spans are one event, and its suspects are the commits
+// every one of those lanes allows.
+function shifts() {
+    const med = a => { const b = [...a].sort((x, y) => x - y); return b[b.length >> 1]; };
+    const scatter = a => { const m = med(a); return 1.4826 * med(a.map(v => Math.abs(v - m))) / m; };
+    const W = 6, MIN = 4, spans = [];
+    // master's commits in order: each benchmarked commit lists the ones it covers
+    const order = [], at = new Map();
+    for (const r of state.records) for (const c of r.covers?.length ? r.covers : [[r.sha, r.subject || "", PR_OF(r)]]) if (!at.has(c[0])) { at.set(c[0], order.length); order.push(c); }
+    const slugs = [...new Set(state.records.flatMap(r => Object.keys(r.cases)))];
+    for (const lane of ALL) {
+        const hits = [];
+        for (const slug of slugs) {
+            const runs = state.records.filter(r => r.lane === lane.key && r.cases[slug] && !r.approx && at.has(r.sha)).sort((x, y) => at.get(x.sha) - at.get(y.sha)), by = new Map();
+            runs.forEach((r, i) => {
+                const near = runs.slice(Math.max(0, i - 7), i + 8).map(q => q.cases[slug].grind);
+                if (r.cases[slug].grind > 3 * med(near)) return;                       // a stray run
+                const c = by.get(r.sha) || { r, seg: `${r.cases[slug].def || ""}|${r.env || ""}`, vs: [] };
+                c.vs.push(r.cases[slug].grind); by.set(r.sha, c);
+            });
+            const cs = [...by.values()].map(c => ({ ...c, v: med(c.vs) })), score = cs.map(() => null);
+            for (let i = 1; i < cs.length; i++) {
+                const before = [], after = [];
+                for (let k = i - 1; k >= 0 && before.length < W && cs[k].seg === cs[i].seg; k--) before.push(cs[k].v);
+                for (let k = i; k < cs.length && after.length < W && cs[k].seg === cs[i].seg; k++) after.push(cs[k].v);
+                if (before.length < MIN || after.length < MIN) continue;
+                const pct = med(after) / med(before) - 1, noise = Math.max(scatter(before), scatter(after), 0.002);
+                if (Math.abs(pct) >= 0.03 && Math.abs(pct) >= 5 * noise) score[i] = pct;
+            }
+            for (let i = 1; i < cs.length; i++) {
+                if (score[i] === null) continue;
+                // the step sits where the contrast is largest among neighbouring commits flagged the same way
+                let peak = true;
+                for (let k = Math.max(1, i - 3); k <= Math.min(cs.length - 1, i + 3); k++)
+                    if (k !== i && score[k] !== null && Math.sign(score[k]) === Math.sign(score[i]) && (Math.abs(score[k]) > Math.abs(score[i]) || Math.abs(score[k]) === Math.abs(score[i]) && k < i)) peak = false;
+                if (peak) hits.push({ lane, slug, pct: score[i] * 100, lo: at.get(cs[i - 1].r.sha) + 1, hi: at.get(cs[i].r.sha), r: cs[i].r });
+            }
+        }
+        // per lane: cases that stepped over overlapping spans, in the same direction, are one change
+        hits.sort((x, y) => x.lo - y.lo);
+        for (const h of hits) {
+            const s = spans.find(s => s.lane === lane && Math.sign(s.hits[0].pct) === Math.sign(h.pct) && h.lo <= s.hi && h.hi >= s.lo);
+            if (s) { s.lo = Math.max(s.lo, h.lo); s.hi = Math.min(s.hi, h.hi); s.hits.push(h); } else spans.push({ lane, lo: h.lo, hi: h.hi, hits: [h] });
+        }
+    }
+    // Kept: two cases together, or one moving 10% on a lane with a single hardware (a Phoenix lane is
+    // one GPU model, with fewer runs, so it needs two); and a span short enough to point at something.
+    const solid = spans.filter(s => (s.hits.length >= 2 || Math.abs(s.hits[0].pct) >= 10 && s.lane.view === "Frontier") && s.hi - s.lo < 8).sort((x, y) => x.lo - y.lo), events = [];
+    for (const s of solid) {
+        const e = events.find(e => Math.sign(e.spans[0].hits[0].pct) === Math.sign(s.hits[0].pct) && s.lo <= e.hi && s.hi >= e.lo);
+        if (e) { e.lo = Math.max(e.lo, s.lo); e.hi = Math.min(e.hi, s.hi); e.spans.push(s); } else events.push({ lo: s.lo, hi: s.hi, spans: [s] });
+    }
+    const first = new Map(); for (const r of state.records) if (!first.has(r.sha)) first.set(r.sha, r);
+    return events.map(e => ({ ...e, suspects: order.slice(e.lo, e.hi + 1), r: first.get(order[e.hi][0]) || e.spans[0].hits[0].r })).sort((a, b) => b.hi - a.hi);
+}
+
+function changes() {
+    const [from, to] = windowOf(), rows = shifts().filter(e => e.r.t >= from && e.r.t <= to);
+    const commit = c => c[2] ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener">#${c[2]}</a> ${esc(c[1])}`
+                             : `<a href="${COMMIT_URL(c[0])}" target="_blank" rel="noopener"><code>${c[0].slice(0, 7)}</code></a> ${esc(c[1])}`;
+    $("changes").innerHTML = `<tr><th>First seen</th><th>Commit</th><th>Lane</th><th>Cases</th><th>Change in grind time</th></tr>`
+        + (rows.length ? "" : `<tr><td colspan="5" class="note">No lasting change beyond the noise in this range.</td></tr>`)
+        + rows.map(e => {
+            const who = e.suspects.length === 1 ? commit(e.suspects[0]) : `One of ${e.suspects.length}:<br>` + e.suspects.map(commit).join("<br>");
+            return e.spans.map((s, i) => {
+                const pcts = s.hits.map(h => h.pct).sort((x, y) => x - y), mid = pcts[pcts.length >> 1], slower = mid > 0;
+                return `<tr>${i ? "" : `<td rowspan="${e.spans.length}">${day(e.r.t)}</td><td rowspan="${e.spans.length}" class="what" style="white-space:normal">${who}</td>`}`
+                    + `<td>${s.lane.view === "Frontier" ? s.lane.label : `${s.lane.view} · ${s.lane.label}`}</td>`
+                    + `<td title="${s.hits.map(h => `${h.slug} ${h.pct >= 0 ? "+" : ""}${h.pct.toFixed(1)}%`).join(", ")}">${s.hits.length}</td>`
+                    + `<td class="${slower ? "slower" : "faster"}">${slower ? "▲ slower" : "▼ faster"} ${mid >= 0 ? "+" : ""}${mid.toFixed(1)}%</td></tr>`;
+            }).join("");
+        }).join("");
+}
+
 function render() {
     const slugs = [...new Set(state.records.flatMap(r => Object.keys(r.cases)))].sort();
     $("charts").replaceChildren(...slugs.map(chart));
     $("reset").hidden = !state.zoom;
     table(slugs);
     log(slugs);
+    changes();
 }
 
 function controls() {
@@ -363,7 +463,7 @@ function legend() {
         $("legend").appendChild(li);
     }
     const mark = (d, text) => `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="${d}" fill="var(--ink-2)"/></svg>${text}</span></li>`;
-    $("legend").insertAdjacentHTML("beforeend", mark("M5,1l4,4l-4,4l-4,-4z", "Benchmark case changed") + mark("M5,1l4,7h-8z", "Run off the scale (over 3x the runs around it)"));
+    $("legend").insertAdjacentHTML("beforeend", mark("M5,1l4,4l-4,4l-4,-4z", "Benchmark case changed") + mark("M2,2h6v6h-6z", "Compiler or module set changed") + mark("M5,1l4,7h-8z", "Run off the scale (over 3x the runs around it)"));
 }
 
 fetch(DATA_URL).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); }).then(text => {

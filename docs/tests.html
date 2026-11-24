@@ -10,11 +10,13 @@
         :root {
             --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
             --grid: #e1e0d9; --axis: #c3c2b7; --critical: #d03b3b; --warn: #eda100;
+            --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
         }
         @media (prefers-color-scheme: dark) {
             :root {
                 --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
                 --grid: #2c2c2a; --axis: #383835; --critical: #e66767; --warn: #c98500;
+                --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
             }
         }
         * { box-sizing: border-box; }
@@ -47,6 +49,10 @@
         tr.detail td { text-align: left; white-space: normal; color: var(--ink-2); font-size: 12px; background: color-mix(in srgb, var(--ink) 3%, transparent); }
         table.explain td { white-space: normal; vertical-align: top; }
         table.explain td:first-child { white-space: nowrap; font-weight: 600; }
+        svg { display: block; width: 100%; height: auto; } svg text { fill: var(--muted); font-size: 11px; }
+        .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 10px; padding: 0; list-style: none; color: var(--ink-2); font-size: 13px; }
+        .legend li { display: inline-flex; align-items: center; gap: 6px; }
+        .sw { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
         .retry { color: var(--ink-2); }
         .zero { color: var(--muted); }
     </style>
@@ -90,6 +96,16 @@
         <input type="search" id="find" placeholder="Filter by test name or id" aria-label="Filter by test name or id">
     </div>
     <div class="panel"><table id="tests"></table></div>
+
+    <h2>How long the tests take</h2>
+    <p class="note">Minutes the test phase of a full-suite job took, per day (median), by lane. A Frontier test job has 1 hour 59 minutes
+        in all, so a line climbing toward it means the suite is outgrowing its shards. Hover a point for its value.</p>
+    <ul class="legend" id="lanekeys"></ul>
+    <div class="panel"><svg id="took"></svg></div>
+
+    <h2>Slowest test cases</h2>
+    <p class="note">Median seconds, per lane, of the cases that were among the six slowest of at least three test jobs on a lane in the range.</p>
+    <div class="panel"><table id="slow"></table></div>
 
     <h2 id="how">How a cluster test job fails</h2>
     <p class="note">A test job on a cluster checks out the code on a runner on the login node, builds MFC in a SLURM job, runs the test
@@ -225,6 +241,47 @@ function render() {
                 return `${day(w.r.t)} · <a href="${JOB_URL(w.r.run, w.j.id)}" target="_blank" rel="noopener">${lane}${w.j.s ? ` [${w.j.s}]` : ""}</a> · ${w.kind === "f" ? "failed" : "passed on a retry"} · ${w.r.master ? "master" : "pull request"}: ${esc(w.r.title)}`; }).join("<br>")
                 + (t.where.length > 12 ? `<br>and ${t.where.length - 12} more` : "") + `</td></tr>` : "")).join("")
         + (rows.length > 200 ? `<tr><td colspan="${3 + LANES.length}" class="zero">Showing the 200 worst of ${rows.length}.</td></tr>` : "");
+    durations();
+}
+
+// Test-phase minutes of full-suite jobs per day and lane, and the slowest cases.
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+const med = a => [...a].sort((x, y) => x - y)[a.length >> 1];
+function durations() {
+    const js = jobs(), W = 900, H = 240, L = 46, B = 24, T = 14, svg = $("took"), LIMIT = 119;
+    const color = l => `var(--s${LANES.indexOf(l) + 1})`, name = l => `${l.machine} · ${l.compiler} · ${l.offload}`;
+    $("lanekeys").innerHTML = LANES.map(l => `<li><span class="sw" style="background:${color(l)}"></span>${name(l)}</li>`).join("");
+    // A whole shard of the suite: a run that selected a few tests says nothing about how long the suite takes.
+    const ss = LANES.map(l => { const d = new Map();
+        for (const { r, j } of js) if (j.l === l.key && j.tt && j.n >= 300) d.set(r.date.slice(0, 10), [...(d.get(r.date.slice(0, 10)) || []), j.tt / 60]);
+        return { l, pts: [...d].sort().map(([date, v]) => ({ t: Date.parse(date + "T12:00:00Z"), v: med(v), n: v.length })) }; }).filter(s => s.pts.length);
+    svg.replaceChildren(); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const all = ss.flatMap(s => s.pts); if (!all.length) return;
+    const t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t), t0 + 1), hi = Math.max(...all.map(p => p.v), LIMIT) * 1.06;
+    const x = t => L + (t - t0) / (t1 - t0) * (W - L - 16), y = v => T + (1 - v / hi) * (H - T - B);
+    for (let i = 0; i <= 4; i++) { const v = hi * i / 4;
+        el("line", { x1: L, x2: W - 8, y1: y(v), y2: y(v), stroke: i ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }, svg);
+        el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = Math.round(v); }
+    el("text", { x: L, y: H - 6 }, svg).textContent = day(t0); el("text", { x: W - 8, y: H - 6, "text-anchor": "end" }, svg).textContent = day(t1);
+    el("line", { x1: L, x2: W - 8, y1: y(LIMIT), y2: y(LIMIT), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "4 3" }, svg);
+    el("text", { x: W - 10, y: y(LIMIT) - 5, "text-anchor": "end" }, svg).textContent = "Frontier job limit, 1 h 59 min";
+    for (const s of ss) {
+        el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(""), fill: "none", stroke: color(s.l), "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+        for (const p of s.pts) el("title", {}, el("circle", { cx: x(p.t), cy: y(p.v), r: 3.5, fill: color(s.l), stroke: "var(--surface)", "stroke-width": 1 }, svg)).textContent = `${name(s.l)}, ${day(p.t)}: ${Math.round(p.v)} min (${p.n} ${p.n === 1 ? "job" : "jobs"})`;
+    }
+
+    const cases = new Map();
+    for (const { j } of js) for (const [uuid, nm, secs] of j.slow || []) {
+        const c = cases.get(uuid) || { uuid, name: nm, by: new Map() };
+        if (nm.length > c.name.length || c.name.endsWith("...") && !nm.endsWith("...")) c.name = nm;
+        c.by.set(j.l, [...(c.by.get(j.l) || []), secs]); cases.set(uuid, c);
+    }
+    // Three or more sightings on a lane, so that one hung run does not make a case look slow.
+    for (const c of cases.values()) for (const [l, v] of c.by) if (v.length < 3) c.by.delete(l);
+    const rows = [...cases.values()].filter(c => c.by.size).map(c => ({ ...c, top: Math.max(...[...c.by.values()].map(med)) })).sort((a, b) => b.top - a.top).slice(0, 25);
+    $("slow").innerHTML = `<tr><th>Test case</th>${LANES.map(l => `<th>${l.machine}<br>${l.compiler}<br>${l.offload}</th>`).join("")}</tr>`
+        + rows.map(c => `<tr><td class="name">${esc(c.name)} <code>${c.uuid}</code></td>${LANES.map(l => c.by.has(l.key) ? `<td>${Math.round(med(c.by.get(l.key)))} s</td>` : `<td class="zero">–</td>`).join("")}</tr>`).join("");
 }
 
 for (const [id, key, cast] of [["range", "days", Number], ["scope", "scope", String], ["pattern", "pattern", String]]) {

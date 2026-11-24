@@ -19,6 +19,8 @@ and, for a test job whose log is in DIR as <job id>.txt:
     n    tests that passed
     f    tests that failed: [uuid, name, error class]
     r    tests that failed and then passed on a retry: [uuid, name, error class]
+    tt   seconds the test phase took (the runner's own "Time:"), or absent if it did not finish
+    slow the six slowest tests that passed: [uuid, name, seconds]
 
 and, for any failed job whose log is there:
 
@@ -78,7 +80,8 @@ def merges(compare: dict) -> list:
 
 STAMP = re.compile(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-PASSED = re.compile(r"^\s*\(\s*\d+/\d+\)\s+(.*?)\s+\d+\.\d+\s+([0-9A-F]{8})\s*$")
+PASSED = re.compile(r"^\s*\(\s*\d+/\d+\)\s+(.*?)\s+(\d+\.\d+)\s+([0-9A-F]{8})\s*$")
+TOOK = re.compile(r"Time: (?:(\d+)m )?(\d+(?:\.\d+)?)s")
 RECOVERED = re.compile(r"^\s*recovered on attempt \d+ \(([^)]*)\): (.*)$")
 
 
@@ -94,11 +97,16 @@ def error_class(text: str) -> str:
 def tests(log: str, failed_job: bool) -> dict:
     """What a test job's log says about its tests, and for a failed job what failed."""
     lines = [ANSI.sub("", STAMP.sub("", line)) for line in log.splitlines()]
-    passed, failed, recovered = {}, {}, {}
+    passed, failed, recovered, seconds, took = {}, {}, {}, {}, None
     for i, line in enumerate(lines):
         m = PASSED.match(line)
         if m:
-            passed[m.group(2)] = m.group(1)
+            passed[m.group(3)] = m.group(1)
+            seconds[m.group(3)] = float(m.group(2))
+            continue
+        m = TOOK.search(line)
+        if m and passed:  # the build's dry run prints a time too, before any test has passed
+            took = round(int(m.group(1) or 0) * 60 + float(m.group(2)))
             continue
         m = RECOVERED.match(line)
         if m:
@@ -115,7 +123,10 @@ def tests(log: str, failed_job: bool) -> dict:
         uuid = next((u for u, shown in passed.items() if name.startswith(shown.rstrip(".").rstrip())), "")
         retried.append([uuid, name, cls])
 
-    out = {"n": len(passed), "f": list(failed.values()), "r": retried}
+    slow = sorted(seconds, key=seconds.get, reverse=True)[:6]
+    out = {"n": len(passed), "f": list(failed.values()), "r": retried, "slow": [[u, passed[u], round(seconds[u])] for u in slow]}
+    if took is not None:
+        out["tt"] = took
     if failed_job:
         text = "\n".join(lines)
         out["why"] = (
