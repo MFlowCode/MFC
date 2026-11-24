@@ -102,7 +102,7 @@ Same annulus at tip Mach 0.01 and Re = 11, run for 4 slowest viscous times from 
 - The wall shear read from near-wall cells (a three-cell quadratic fit in the channel, a cubic fit in the annulus) does not converge for the channel with either order.
 - 2D, two Mach numbers and Reynolds numbers, one machine and compiler. A third grid beyond 40 cells per R and 3D are not measured, so the status stays "partially validated". High-Reynolds-number boundary layers, moving flat walls and slip walls are not measured. The Mach 0.01 runs are not fully steady.
 - The rigid-rotation check (an inviscid circle in gas already in rigid rotation) was not reproduced for this page: it needs an initial condition that no case-file patch provides.
-- On an NVIDIA A100 the registered tests differ from the CPU golden by 5e-6 (annulus) and 1.5e-5 (channel) in density, the known CPU/GPU gap of the viscous immersed-boundary work (#2419), so their tolerance is 1e-4.
+- The registered tests agree across the CPU lanes to 1e-13 and between an NVIDIA A100 and the CPU golden to 1e-14, so their tolerance is 1e-10. An A100 difference of 5e-6 reported earlier came from an annulus golden generated in single precision, not from a CPU/GPU gap.
 
 ## Reproduce
 
@@ -114,4 +114,4 @@ python3 examples/2D_ibm_taylor_couette/check_couette.py examples/2D_ibm_taylor_c
 ```
 
 Each run writes into the example directory (clear `D/`, `restart_data/` and the `.inp` files between runs). Channel: `--offset 0.37`, `--wall_order 1`. Annulus: `--wall_order 1`, `--ip_interp 2`, `--visc_compact 1`, `--mach 0.01 --re 11 --ntau 4`.
-The CI-sized runs are the tests `2D -> IBM -> Taylor-Couette -> ib_wall_order=2` and `2D -> IBM -> Plane Poiseuille -> ib_wall_order=2` (regression goldens, GNU 13 double: 100 steps for the annulus, 300 for the channel; the tolerance is 1e-4: the GNU, Intel, NVHPC and macOS CI lanes agree to 1e-13, but an A100 run differs from the CPU golden by 5e-6 and 1.5e-5 in density, the CPU/GPU gap of the viscous immersed-boundary work tracked in #2419).
+The CI-sized runs are the tests `2D -> IBM -> Taylor-Couette -> ib_wall_order=2` and `2D -> IBM -> Plane Poiseuille -> ib_wall_order=2` (regression goldens, GNU CPU, double: 100 steps for the annulus, 300 for the channel; the tolerance is 1e-10: the GNU, Intel, NVHPC and macOS CI lanes agree to 1e-13 and an A100 to 1e-14).
