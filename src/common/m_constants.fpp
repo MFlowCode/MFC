@@ -67,6 +67,8 @@ module m_constants
     integer, parameter :: amr_restart_blk_own_ints = 4
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
+    !> Volume fraction below which a phase counts as absent for the capillary time-step limit
+    real(wp), parameter :: capillary_alpha_min = 1.e-3_wp
     !> Spatial support width of acoustic source, used in s_source_spatial
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp
     real(wp), parameter :: dflt_vcfl_dt = 100._wp  !< value of vcfl_dt when viscosity is off for computing adaptive timestep size

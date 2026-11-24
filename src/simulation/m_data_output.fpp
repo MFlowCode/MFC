@@ -107,23 +107,12 @@ contains
 
         write (3, '(A)') ''; write (3, '(A)') ''
 
-        write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
-
-        if (surface_tension) then
-            write (3, '(13X,A10)', advance="no") trim('CCFL Max')
-        end if
-
-        if (heat_conduction) then
-            write (3, '(13X,A10)', advance="no") trim('TCFL Max')
-        end if
-
-        if (viscous) then
-            write (3, '(13X,A10,13X,A16)', advance="no") trim('VCFL Max'), trim('Rc Min')
-        end if
-
-        if (bubbles_lagrange) then
-            write (3, '(13X,A10)', advance="no") trim('N Bubbles')
-        end if
+        ! Columns two blanks apart; reals to four significant digits (ES10.3), counts exact
+        write (3, '(A9,3(2X,A10))', advance="no") 'Time-step', 'dt', 'Time', 'ICFL Max'
+        if (surface_tension) write (3, '(2X,A10)', advance="no") 'CCFL Max'
+        if (heat_conduction) write (3, '(2X,A10)', advance="no") 'TCFL Max'
+        if (viscous) write (3, '(2X,A10,2X,A10)', advance="no") 'VCFL Max', 'Rc Min'
+        if (bubbles_lagrange) write (3, '(2X,A10)', advance="no") 'N Bubbles'
 
         write (3, *)  ! new line
 
@@ -182,6 +171,7 @@ contains
         real(wp)               :: qv  !< Cell-avg. internal energy reference value
         real(wp)               :: c  !< Cell-avg. sound speed
         real(wp), dimension(2) :: Re  !< Cell-avg. Reynolds numbers
+        real(wp)               :: Dth  !< Cell thermal diffusivity
         integer                :: j, k, l
         real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
         real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
@@ -205,10 +195,10 @@ contains
         mu_frac_max_loc = 0._wp
         pw1 = amr_cfl_pow(1); pw2 = amr_cfl_pow(2); pw3 = amr_cfl_pow(3); amr_on = amr
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
-                            & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
-                            & ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]', &
-                            & firstprivate='[pw1, pw2, pw3, amr_on]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, &
+                            & qv, icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, &
+                            & vcfl_max_loc, ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, &
+                            & min]', firstprivate='[pw1, pw2, pw3, amr_on]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -247,7 +237,9 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
-                        call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                        call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)
+                        call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, Dth, j, k, l, icfl, vcfl, Rc, ccfl, &
+                                                         & tcfl)
                         if (amr_on) call s_amr_scale_stability(amr_cfl_rf(j, k, l), pw1, pw2, pw3, icfl, vcfl, Rc, ccfl, tcfl)
 
                         icfl_max_loc = max(icfl_max_loc, icfl)
@@ -307,23 +299,11 @@ contains
         call s_mpi_barrier()  ! ensure diagnostic output above is flushed before any rank aborts below
 
         if (proc_rank == 0) then
-            write (3, '(13X,I9,13X,ES10.3,13X,ES10.3,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
-
-            if (surface_tension) then
-                write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
-            end if
-
-            if (heat_conduction) then
-                write (3, '(13X,F10.6)', advance="no") tcfl_max_glb
-            end if
-
-            if (viscous) then
-                write (3, '(13X,F10.6,13X,ES16.6)', advance="no") vcfl_max_glb, Rc_min_glb
-            end if
-
-            if (bubbles_lagrange) then
-                write (3, '(13X,I10)', advance="no") n_el_bubs_glb
-            end if
+            write (3, '(I9,3(2X,ES10.3))', advance="no") t_step, dt, mytime, icfl_max_glb
+            if (surface_tension) write (3, '(2X,ES10.3)', advance="no") ccfl_max_glb
+            if (heat_conduction) write (3, '(2X,ES10.3)', advance="no") tcfl_max_glb
+            if (viscous) write (3, '(2X,ES10.3,2X,ES10.3)', advance="no") vcfl_max_glb, Rc_min_glb
+            if (bubbles_lagrange) write (3, '(2X,I10)', advance="no") n_el_bubs_glb
 
             write (3, *)  ! new line
 
@@ -409,7 +389,7 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, 0._wp, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
                     if (amr) call s_amr_scale_stability(amr_cfl_rf(j, k, l), amr_cfl_pow(1), amr_cfl_pow(2), amr_cfl_pow(3), &
                         & icfl, vcfl, Rc, ccfl, tcfl)
 
@@ -1958,11 +1938,11 @@ contains
         write (3, '(A)') '    '
         write (3, '(A)') ''
 
-        write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
-        if (surface_tension) write (3, '(A,F9.6)') 'CCFL Max: ', ccfl_max
-        if (heat_conduction) write (3, '(A,F9.6)') 'TCFL Max: ', tcfl_max
-        if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
+        write (3, '(A,ES10.3)') 'ICFL Max: ', icfl_max
+        if (surface_tension) write (3, '(A,ES10.3)') 'CCFL Max: ', ccfl_max
+        if (heat_conduction) write (3, '(A,ES10.3)') 'TCFL Max: ', tcfl_max
+        if (viscous) write (3, '(A,ES10.3)') 'VCFL Max: ', vcfl_max
+        if (viscous) write (3, '(A,ES10.3)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
