@@ -1578,7 +1578,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
-            # ib_mass_relax = 1 returns a fixed slip wall's ghost-layer intake in the step it occurs
+            # ib_mass_relax = 1 returns a fixed slip wall's ghost-layer intake in the step it occurs. A uniform stream past the
+            # body makes the intake large enough that the golden differs with the option off.
             cases.append(
                 define_case_d(
                     stack,
@@ -1589,6 +1590,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "fd_order": 2,
                         "n": 49,
                         "ib_mass_relax": 1,
+                        **{f"patch_icpp({i})%{k}": v for i in range(1, 4) for k, v in [("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.5)]},
                         "patch_ib(1)%geometry": 2,
                         "patch_ib(1)%x_centroid": 0.5,
                         "patch_ib(1)%y_centroid": 0.5,
