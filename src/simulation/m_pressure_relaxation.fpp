@@ -117,6 +117,20 @@ contains
 
     end function s_needs_pressure_relaxation
 
+    !> A phase takes part in the equilibration if it is present with a positive mass. A vanishing phase transported to round-off can
+    !! carry a negative partial density, which has no density to equilibrate; it keeps its state instead
+    logical function f_phase_active(q_cons_vf, i, j, k, l)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer, intent(in)                                 :: i, j, k, l
+
+        f_phase_active = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, &
+                                   & k, l) > 0._wp
+
+    end function f_phase_active
+
     !> Correct volume fractions to physical bounds
     subroutine s_correct_volume_fractions(q_cons_vf, j, k, l)
 
@@ -173,7 +187,7 @@ contains
         pres_relax = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
+            if (f_phase_active(q_cons_vf, i, j, k, l)) then
                 ! Phasic internal energy carries the formation energy: alpha_rho_k*qv_k must be
                 ! removed before inverting the stiffened-gas EOS, or a nonzero qv inflates the
                 ! phasic pressure by rho_k*qv_k/gamma_k (this is what breaks the reactive burn).
@@ -214,14 +228,14 @@ contains
                 df_pres = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
-                    if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. any_state_dependent_eos) then
+                    if (f_phase_active(q_cons_vf, i, j, k, l) .and. any_state_dependent_eos) then
                         rho_i = rho_K_init(i)
                         p_i = pres_K_init(i)
                         call s_phase_density_on_isentrope(i, rho_i, p_i, pres_relax, rho_s_i, c2_K)
                         rho_K_s(i) = rho_s_i
                         f_pres = f_pres + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
                         df_pres = df_pres - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/(rho_K_s(i)**2*c2_K)
-                    else if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
+                    else if (f_phase_active(q_cons_vf, i, j, k, l)) then
                         ! Isentropic relation: rho = rho0 * (p/p0)^(1/gamma), Saurel et al. JFM (2009)
                         rho_K_s(i) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/max(q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, &
                                 & k, l), &
@@ -255,13 +269,13 @@ contains
         usable = .true.
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. .not. (rho_K_s(i) > 0._wp)) usable = .false.
+            if (f_phase_active(q_cons_vf, i, j, k, l) .and. .not. (rho_K_s(i) > 0._wp)) usable = .false.
         end do
 
         if (usable) then
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
-                if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                if (f_phase_active(q_cons_vf, i, j, k, l)) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
                     & l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
             end do
         else

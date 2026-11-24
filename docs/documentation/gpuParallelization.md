@@ -1006,6 +1006,15 @@ answer is wrong, or one backend diverges from all the others.
   ``grep -nE 'if \(.*\) [a-z_]+ = ' src/simulation/*.fpp``; it over-matches (about 260 hits on
   the tree at the time of writing), so each hit inside a GPU loop needs a
   human check of its context.
+- **Pass a named array, never an array expression, to a device routine.** In a `GPU_ROUTINE`
+  called from a kernel, an actual argument such as `wall_loc + d*wall_normal` needs a temporary;
+  NVHPC does not inline the callee ("array reshaping not enabled" in `-Minfo=inline`) and builds
+  the temporary on the device heap at every call. In
+  `s_wall_fill` (`src/simulation/m_ibm.fpp`, `ib_wall_order = 2`) two such calls made the
+  ghost-point kernel of `s_ibm_correct_state` 80 times slower on an A100 (NVHPC 25.11: 58 us to
+  4.6 ms on a 20-particle cloud, +62 % per step), with correct results. Assign the expression to
+  a local array first. Look for the remark in the build's `-Minfo` output, or for one kernel
+  that dominates an `nsys` profile after a small change.
 - **Run `GPU_UPDATE(device=...)` and `GPU_ENTER_DATA` of static module data only after the
   rank is bound to its GPU.** `s_mpi_initialize` (`src/common/m_mpi_common.fpp`) updated
   `num_procs` and `proc_rank` on the device before `s_initialize_mpi_domain`

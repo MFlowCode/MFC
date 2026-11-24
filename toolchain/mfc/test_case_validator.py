@@ -533,6 +533,25 @@ class TestAltSoundspeedHlld(ConstraintTestCase):
         self.assertNotIn(self.MSG, self.errors_for({**TWO_FLUID, "riemann_solver": 4}))
 
 
+class TestWenoReFluxWithoutAvg(unittest.TestCase):
+    """weno_Re_flux without weno_avg misses a jump between cells: a warning, not an error."""
+
+    MSG = "weno_Re_flux without weno_avg"
+    VISCOUS = {**BASE, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "weno_Re_flux": "T"}
+
+    def warnings_for(self, params):
+        return CaseValidator(dict(params)).validate("simulation")
+
+    def test_warns_without_weno_avg(self):
+        self.assertTrue(any(self.MSG in w for w in self.warnings_for(self.VISCOUS)))
+
+    def test_silent_with_weno_avg(self):
+        self.assertFalse(any(self.MSG in w for w in self.warnings_for({**self.VISCOUS, "weno_avg": "T"})))
+
+    def test_silent_without_weno_Re_flux(self):
+        self.assertFalse(any(self.MSG in w for w in self.warnings_for({**self.VISCOUS, "weno_Re_flux": "F"})))
+
+
 class TestAmrDefaults(unittest.TestCase):
     """The derived AMR defaults apply only where the validator admits them, and never to a non-AMR case."""
 
@@ -541,10 +560,11 @@ class TestAmrDefaults(unittest.TestCase):
     def test_admissible_amr_case_gets_defaults(self):
         p = dict(self.AMR)
         self.assertTrue(apply_amr_defaults(p))
-        self.assertEqual(p["amr_device_pack"], "T")  # cap 16 <= DEVICE_PACK_MAX_CAP
-        q = {**self.AMR, "amr_max_grid_size": 96}
-        self.assertFalse(apply_amr_defaults(q))  # static block above the cap: nothing to derive
-        self.assertNotIn("amr_device_pack", q)
+        self.assertEqual(p["amr_device_pack"], "T")
+        for cap in (96, 0):  # large or rank-derived blocks get the fused kernels too
+            q = {**self.AMR, "amr_max_grid_size": cap}
+            self.assertTrue(apply_amr_defaults(q))
+            self.assertEqual(q["amr_device_pack"], "T")
         r = {**self.AMR, "amr_device_pack": "F"}
         self.assertTrue(apply_amr_defaults(r))
         self.assertEqual(r["amr_device_pack"], "F")

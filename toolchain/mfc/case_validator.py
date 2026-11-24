@@ -1888,6 +1888,12 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+        # advisory: smooth fields are exact either way (#2391)
+        self.warn(
+            weno_Re_flux and viscous and not weno_avg,
+            "weno_Re_flux without weno_avg: a cell's velocity gradient uses only its own two face values, so the viscous flux "
+            "misses a jump between neighbouring cells (zero wall shear on an impulsive start); set weno_avg = T",
+        )
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and not weno_Re_flux, "weno_Re_flux_compact requires weno_Re_flux")
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "weno_Re_flux_compact requires Cartesian coordinates")
 
@@ -3912,8 +3918,6 @@ class CaseValidator:
 
 # AMR defaults the toolchain derives for a case that leaves them unset. The Fortran defaults stay off on purpose: a
 # default set there bypasses every rule above, so the decision lives here, under the same prohibitions.
-# The fused pack/unpack is derived only up to cap 64 (many small blocks).
-DEVICE_PACK_MAX_CAP = 64
 # Regrid hysteresis under dynamic regrid when the tag buffer leaves room (amr_snap <= amr_buf - 2).
 SNAP_DEFAULT = 2
 
@@ -3923,13 +3927,10 @@ def apply_amr_defaults(params: Dict[str, Any]) -> bool:
     simulation validation with them on. Returns True when they were applied."""
     if params.get("amr", "F") != "T":
         return False
-    defaults: Dict[str, Any] = {}
-    if 0 < int(params.get("amr_max_grid_size", 0)) <= DEVICE_PACK_MAX_CAP:
-        defaults["amr_device_pack"] = "T"
+    # fused exchange kernels: faster at every block size measured (Frontier MI250X, 8-512 GPUs)
+    defaults: Dict[str, Any] = {"amr_device_pack": "T"}
     if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1:
         defaults["amr_snap"] = min(SNAP_DEFAULT, int(params.get("amr_buf", 3)) - 2)
-    if not defaults:
-        return False
     trial = dict(params)
     trial.update({k: params.get(k, v) for k, v in defaults.items()})
     try:

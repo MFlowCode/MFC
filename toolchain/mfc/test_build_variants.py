@@ -1,7 +1,7 @@
 """Tests for the concurrent build variants in .github/workflows/common/build.sh.
 
-The suite needs three kinds of simulation binary (base, chemistry, state-dependent
-EOS), and a Frontier job built them one after another: 67-89 minutes with CCE on
+The suite needs four kinds of simulation binary (base, two chemistry mechanisms,
+state-dependent EOS), and a Frontier job built them one after another: 67-89 minutes with CCE on
 GPUs, of a two-hour allocation, so a retry after a late failure could not finish.
 They stage under different slugs, the allocation is a whole node, and the AMD GPU
 lane has long built them as separate concurrent jobs. Here they build side by side
@@ -68,14 +68,24 @@ def _run(tmp_path, cluster="frontier", variant="", fail_arg="none"):
 
 
 def _is(kind, cmd):
-    return {"base": cmd.startswith("build -j"), "chem": "-o Chemistry" in cmd, "eos": "-o eos=mie_gruneisen" in cmd, "sweep": cmd.startswith("test") and " -o " not in cmd}[kind]
+    return {
+        "base": cmd.startswith("build -j"),
+        "chem": "-o Chemistry" in cmd and ".yaml" not in cmd,
+        "chem-h2o2": "-o Chemistry h2o2.yaml" in cmd,
+        "chem-carbon": "-o Chemistry carbon_gasphase_reduced_gri11.yaml" in cmd,
+        "eos": "-o eos=mie_gruneisen" in cmd,
+        "sweep": cmd.startswith("test") and " -o " not in cmd,
+    }[kind]
 
 
-def test_the_three_variants_build_side_by_side_then_the_sweep(tmp_path):
+SIDE_BY_SIDE = ("base", "chem-h2o2", "chem-carbon", "eos")
+
+
+def test_the_variants_build_side_by_side_then_the_sweep(tmp_path):
     result, calls = _run(tmp_path)
     assert result.returncode == 0, result.stdout + result.stderr
-    variants = [c for c in calls if any(_is(k, c[2]) for k in ("base", "chem", "eos"))]
-    assert sorted(k for c in variants for k in ("base", "chem", "eos") if _is(k, c[2])) == ["base", "chem", "eos"], calls
+    variants = [c for c in calls if any(_is(k, c[2]) for k in SIDE_BY_SIDE)]
+    assert sorted(k for c in variants for k in SIDE_BY_SIDE if _is(k, c[2])) == sorted(SIDE_BY_SIDE), calls
     assert max(s for s, _, _ in variants) < min(e for _, e, _ in variants), "the variants did not overlap"
     sweep = [c for c in calls if _is("sweep", c[2])]
     assert len(sweep) == 1 and sweep[0][0] >= max(e for _, e, _ in variants), "the full build must run once, after the variants"
@@ -84,17 +94,17 @@ def test_the_three_variants_build_side_by_side_then_the_sweep(tmp_path):
 
 def test_each_variants_output_is_labelled_and_kept_in_its_own_log(tmp_path):
     result, _ = _run(tmp_path)
-    for name, arg in (("base", "build -j 8 --gpu acc"), ("chem", "-o Chemistry"), ("eos", "-o eos=mie_gruneisen")):
+    for name, arg in (("base", "build -j 8 --gpu acc"), ("chem-h2o2", "-o Chemistry h2o2.yaml"), ("chem-carbon", "-o Chemistry carbon_"), ("eos", "-o eos=mie_gruneisen")):
         assert any(line.startswith(f"[{name}] ") and arg in line for line in result.stdout.splitlines()), f"no labelled output for {name}"
         assert arg in (tmp_path / f"build-gpu-acc-{name}.log").read_text()
 
 
 def test_a_failed_variant_fails_the_job_after_the_others_finish(tmp_path):
-    result, calls = _run(tmp_path, fail_arg="Chemistry")
+    result, calls = _run(tmp_path, fail_arg="h2o2.yaml")
     assert result.returncode == 1
     assert not [c for c in calls if _is("sweep", c[2])], "the sweep must not run after a failed variant"
-    assert [c for c in calls if _is("base", c[2])] and [c for c in calls if _is("eos", c[2])], "the other variants must be allowed to finish"
-    assert len([c for c in calls if _is("chem", c[2])]) == 2, "the failed variant gets its one retry"
+    assert all([c for c in calls if _is(k, c[2])] for k in ("base", "chem-carbon", "eos")), "the other variants must be allowed to finish"
+    assert len([c for c in calls if _is("chem-h2o2", c[2])]) == 2, "the failed variant gets its one retry"
 
 
 def test_a_job_given_one_variant_builds_only_that_variant(tmp_path):

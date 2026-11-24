@@ -30,7 +30,7 @@ Moving-body kinematics and the restitution of a wall collision are checked in [V
 | `ib_mass_relax` | returns the spurious gas mass of a body over about N steps; the default resolves at start-up (see the parameter entry) |
 
 Each option has a default that leaves existing results unchanged, except `ib_mass_relax`, whose default depends on whether a body moves.
-Drag and Nusselt number of a cylinder: @ref validation_cyl_drag_nu. Interpolation against an exact conduction solution: @ref validation_tsc_annulus.
+Drag and Nusselt number of a cylinder: @ref validation_cyl_drag_nu. Interpolation against an exact conduction solution: @ref validation_tsc_annulus. Slip walls (mass budget, exact vortex, known failures): @ref validation_slip_walls. Lumped cooling and the wall conduction column: @ref validation_wall_thermal.
 
 ## Heat transfer and chemistry
 

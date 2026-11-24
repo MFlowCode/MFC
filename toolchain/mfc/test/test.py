@@ -208,8 +208,8 @@ def _assert_species_bounds(case: TestCase, pack, stdout: str, single: bool = Fal
 def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:
     """The set of labels --only matches a case against: its trace elements and its UUID.
 
-    With include_chemistry, also "Chemistry" for any case that turns chemistry
-    on, whatever its trace says. That label selects a build, not just a test: on
+    With include_chemistry, also "Chemistry" and the mechanism's file name (e.g.
+    "h2o2.yaml") for any case that turns chemistry on, whatever its trace says. That label selects a build, not just a test: on
     Frontier AMD's GPU lane the chemistry binaries are compiled by a separate
     SLURM job invoked with `-o Chemistry` (.github/workflows/common/build.sh),
     because amdflang needs ~1 h per device link and building base + chemistry
@@ -229,8 +229,11 @@ def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]
     check = set(case.trace.split(" -> "))
     check.add(case.get_uuid())
 
-    if include_chemistry and case.to_case().params.get("chemistry", "F") == "T":
-        check.add("Chemistry")
+    if include_chemistry:
+        params = case.to_case().params
+        if params.get("chemistry", "F") == "T":
+            # The mechanism selects the binary too, so CI can build each one in its own process.
+            check.update({"Chemistry", os.path.basename(params.get("cantera_file", ""))} - {""})
 
     return check
 
@@ -275,7 +278,8 @@ def _filter_only(cases, skipped_cases):
 # is 25.5. The cause is not identified, so the skip is reported per case and tolerances stay untouched. See
 # https://github.com/MFlowCode/MFC/issues/2181
 # 009447E8 (uniform-box H2/air ignition) shows it without any flow: species differ by up to 1e-3 from the CPU result; it needs -O1 or higher.
-NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972", "009447E8"}
+# 8994884D (1D CJ detonation front formation) differs by 2e-2 relative and 1E0EF4E5 (2D flame-vortex pair) by 1e-3 in a minor species on 25.5; both agree to 2e-6 on 25.11.
+NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972", "009447E8", "8994884D", "1E0EF4E5"}
 NVHPC_GPU_FIXED_VERSION = (25, 11)
 
 
@@ -374,6 +378,12 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 # Double builds agree to 1e-12 across O0, O3 and reldebug.
                 "Constant Acceleration",
                 "Wall Collision",
+                # A Mach 1.66 shock on 12 cells per diameter: single-precision round-off moves the front by about 1e-4 relative at 100,
+                # 200 and 300 steps alike (measured 1.0e-4 to 1.1e-4 against the 1e-4 tolerance), (WENO-JS too).
+                "Shock Curtain",
+                # Single precision moves the near-zero momentum entries of the flow past a slip cylinder (|rho v| of 0.5 against 3e2 in the
+                # bulk) by 2e-4 relative after 50 steps; the lane allows 1e-4. Double builds agree to 1e-7 across GNU and NVHPC on an A100.
+                "Slip Cylinder",
                 # WENO5 weights acting on a near-uniform gas amplify single-precision round-off: the moving-circle mass budget and the
                 # bow-shock stand-off differ from the double golden by up to 9e-3 (absolute) after 100-150 steps, against the 1e-4 tolerance.
                 "Mass Budget",
@@ -384,7 +394,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 skipped_cases.append(case)
 
     for case in cases[:]:
-        if ARG("gpu"):
+        if ARG("gpu") != "no":
             skip = ["Gauss Seidel"]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
