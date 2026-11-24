@@ -89,7 +89,8 @@ jobs:
   #   ready PR                   smoke: Frontier CCE OpenACC and Phoenix NVHPC OpenMP each build, then
   #                              run up to 120 of the tests the change selects; nothing if no
   #                              cluster job reads what it changed
-  #   ready PR labelled ci:clusters or touching GPU macros, MPI, the build system or cluster CI,
+  #   ready PR labelled ci:clusters, touching GPU macros, MPI, the build system or cluster CI, or
+  #   adding or changing a GPU_PARALLEL_LOOP or GPU_ROUTINE,
   #   manual run, or the 6-hourly schedule when master has moved
   #                              full: every lane, whole suite, case-optimization
   # Its own job so that re-running it (cluster-label.yml does, when the label is added) re-runs
