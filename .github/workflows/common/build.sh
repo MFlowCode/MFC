@@ -154,3 +154,8 @@ fi
 # build did print is the only evidence there is.
 RETRY_VALIDATE_CMD="$validate_cmd" \
     run_build_step "${log_base}.log" retry_build "${build_cmd[@]}"
+
+# Record where the build ran, for test jobs that reuse it (see MFC_GPU_PARTITION in submit-slurm-job.sh).
+if [ "$job_cluster" = "phoenix" ]; then
+    echo "${SLURM_JOB_PARTITION:-}" > .ci-build-partition
+fi

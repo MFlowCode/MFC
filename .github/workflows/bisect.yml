@@ -1,0 +1,73 @@
+name: 'Cluster Bisect'
+
+# Find the merge that broke a cluster lane on master. Dispatched by the Cluster Master Alert
+# when a scheduled run goes red with more than one merge since the last green run; can also be
+# run by hand. Each step costs one build of the lane plus the failed tests.
+on:
+  workflow_dispatch:
+    inputs:
+      cluster:
+        description: 'Lane cluster'
+        type: choice
+        options: [frontier, frontier_amd, phoenix]
+        required: true
+      interface:
+        description: 'GPU interface'
+        type: choice
+        options: [acc, omp]
+        required: true
+      good:
+        description: 'Last commit known to pass'
+        required: true
+      bad:
+        description: 'Commit known to fail'
+        required: true
+      tests:
+        description: 'Failed test UUIDs, space-separated (empty: bisect the build)'
+        default: ''
+      issue:
+        description: 'Issue number to report on'
+        default: ''
+
+concurrency:
+  group: bisect-${{ inputs.cluster }}-${{ inputs.interface }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bisect:
+    name: "Bisect | ${{ inputs.cluster }} (gpu-${{ inputs.interface }})"
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on:
+      group:  phoenix
+      labels: ${{ inputs.cluster == 'phoenix' && 'gt' || 'frontier' }}
+    timeout-minutes: 1200
+    steps:
+      - name: Clone
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.bad }}
+          fetch-depth: 0
+          clean: false
+
+      - name: Bisect
+        env:
+          GH_TOKEN:  ${{ github.token }}
+          REPO:      ${{ github.repository }}
+          CLUSTER:   ${{ inputs.cluster }}
+          INTERFACE: ${{ inputs.interface }}
+          GOOD:      ${{ inputs.good }}
+          BAD:       ${{ inputs.bad }}
+          TESTS:     ${{ inputs.tests }}
+          ISSUE:     ${{ inputs.issue }}
+        run: bash .github/scripts/cluster-bisect.sh
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            scancel "$(cat "$f")" 2>/dev/null || true
+          done

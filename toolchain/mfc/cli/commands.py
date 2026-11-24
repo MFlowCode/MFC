@@ -416,6 +416,13 @@ TEST_COMMAND = Command(
             default=100,
         ),
         Argument(
+            name="max-tests",
+            help="Run at most this many tests, evenly spaced through the selected ones (0: no limit).",
+            type=int,
+            default=0,
+            dest="max_tests",
+        ),
+        Argument(
             name="max-attempts",
             short="m",
             help="Maximum number of attempts to run a test.",

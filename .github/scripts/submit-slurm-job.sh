@@ -139,7 +139,9 @@ elif [ "$device" = "gpu" ]; then
         # idle nodes in the SAME partition at once -- the main bench queue-starver).
         # gpu-l40s (bad hardware) and gpu-rtx6000 (too slow for the time limit) are
         # intentionally omitted.
-        gpu_partition="gpu-h200,gpu-h100,gpu-a100,gpu-v100"
+        # MFC_GPU_PARTITION pins the list to one partition: test jobs that reuse a
+        # build made by an earlier job must run on the node type it was built on.
+        gpu_partition="${MFC_GPU_PARTITION:-gpu-h200,gpu-h100,gpu-a100,gpu-v100}"
         echo "Using GPU partition list: $gpu_partition"
     fi
 
@@ -258,6 +260,7 @@ export job_shard="$shard"
 export job_variant="$variant"
 export job_cluster="$cluster"
 export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
+export MFC_TEST_EXTRA_OPTS="${MFC_TEST_EXTRA_OPTS:-}"
 
 . ./mfc.sh load -c $compiler_flag -m $module_mode
 

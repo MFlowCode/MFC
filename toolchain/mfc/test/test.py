@@ -297,6 +297,20 @@ def gpu_fc_version(fc_version: str, probe=lambda: _compiler_version("nvfortran")
     return fc_version if re.search(r"\b(nvfortran|gnu|cray|ifx|ifort|flang|clang)", fc_version, re.I) else probe()
 
 
+def cap_evenly(cases: list, cap: int, runs=lambda case: True) -> typing.Tuple[list, list]:
+    """Keep at most `cap` of the cases that will run, spread evenly over the list; return (kept, dropped).
+
+    The list is ordered by feature, so an even spread samples every area where the
+    first `cap` cases would sample one. Cases for which `runs` is false are left in
+    place and do not count: something later skips them anyway.
+    """
+    pool = [c for c in cases if runs(c)]
+    if cap <= 0 or len(pool) <= cap:
+        return cases, []
+    kept = {id(pool[i * len(pool) // cap]) for i in range(cap)}
+    return [c for c in cases if id(c) in kept or not runs(c)], [c for c in pool if id(c) not in kept]
+
+
 def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
     cases = cases_[:]
     selected_cases = []
@@ -454,6 +468,12 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
             else:
                 cons.print("[dim](shadow mode: running full suite; pass --select-enforce to actually skip)[/dim]")
 
+    if ARG("max_tests") > 0:
+        # --no-chemistry drops chemistry cases later; keep them out of the cap's pool.
+        runs = (lambda c: c.to_case().params.get("chemistry", "F") != "T") if ARG("no_chemistry") else (lambda c: True)
+        cases, capped = cap_evenly(cases, ARG("max_tests"), runs)
+        skipped_cases += capped
+
     if ARG("percent") == 100:
         return cases, skipped_cases
 
@@ -520,7 +540,9 @@ def test():
     global errors, failed_tests, test_start_time  # noqa: PLW0603
 
     test_start_time = time.time()  # Start timing
-    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
+    # One file per shard: concurrent shards share a checkout in CI.
+    shard_tag = f"-{ARG('shard').replace('/', '-of-')}" if ARG("shard") else ""
+    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, f"failed_uuids{shard_tag}.txt")
     cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/
