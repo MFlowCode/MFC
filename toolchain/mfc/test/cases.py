@@ -1808,9 +1808,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Soft-sphere friction across the x = 10 rank seam: two circles close head-on, so the slip is round-off. With
             # ib_friction_slip_eps = 0 that round-off sets a full mu*|F_n| force whose direction depends on the rank layout (the
             # y force of 1 and 2 ranks has opposite sign from step 80, 0.13 apart); with it both stay ~1e-4. A seam transient in the
-            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. override_tol: Cray Fortran
-            # and the GNU/Intel/macOS CI lanes (which agree with each other to 1e-13) differed by up to 3.2e-5 (1 fluid) and 9.1e-6
-            # (2 fluids), abs, in the energy; 3e-4 is ~10x that and far below the 0.13 sign flip it guards. Golden: GNU 12.3 (#2432).
+            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. Golden: GNU 12.3 (#2432).
+            # GNU 12.3 and 15.2 stay within 1e-11 of it in double precision, and within 1.3e-5 (1 fluid) and 3.4e-5 (2 fluids) in single,
+            # also after a 1-ulp change of a centroid. override_tol: 3e-4 leaves room for Cray, which differed from the GNU lanes by up to
+            # 3.2e-5 before #2436, and stays far below the 0.13 sign flip it guards.
             def friction_box(box, bodies, steps, eps, mu, **extra):
                 # still uniform gas in a periodic box of side box (0.25 cells), soft-sphere circles (x, y, vx, vy), mass 1
                 cells = round(box / 0.25) - 1
