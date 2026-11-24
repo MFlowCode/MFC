@@ -8,18 +8,10 @@
     <link rel="icon" type="image/x-icon" href="res/icon.ico">
     <style>
         :root {
-            --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
-            --grid: #e1e0d9; --axis: #c3c2b7;
+            --page: #ffffff; --surface: #ffffff; --ink: #0f172a; --ink-2: #475569; --muted: #64748b;
+            --grid: #e2e8f0; --axis: #cbd5e1;
             --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
             --slower: #d03b3b; --faster: #0ca30c;
-        }
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
-                --grid: #2c2c2a; --axis: #383835;
-                --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c;
-                --slower: #e66767; --faster: #0ca30c;
-            }
         }
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -68,18 +60,45 @@
         table { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
         th, td { padding: 4px 10px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; }
         th:first-child, td:first-child { text-align: left; }
+
+        /* The look of the MFC landing page: slate band, white body, amber accent, no cards. */
+        body { background: #0f172a; font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; }
+        .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+        header.site { color: #ffffff; }
+        header.site .brand { display: flex; align-items: center; gap: 16px; padding: 24px 0 8px; font-weight: 700; font-size: 22px; text-decoration: none; color: #ffffff; }
+        header.site .brand img { height: 24px; }
+        header.site nav { display: flex; flex-wrap: wrap; gap: 0 28px; padding-bottom: 20px; }
+        header.site nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 17px; padding: 12px 2px; border-bottom: 2px solid #ffffff; }
+        header.site nav a:hover, header.site nav a[aria-current="page"] { border-bottom-color: #fbbf24; }
+        main { max-width: none; margin: 0; padding: 32px 0 48px; background: #ffffff; }
+        footer.site { color: #d4d4d4; font-size: 13px; padding: 28px 0; }
+        footer.site strong { color: #ffffff; } footer.site a { color: #fbbf24; text-decoration: none; }
+        h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; }
+        h2 { font-size: 20px; font-weight: 800; margin: 40px 0 6px; }
+        .seg { border: 0; border-radius: 0; gap: 20px; overflow: visible; }
+        .seg button { padding: 4px 0; border: 0; border-bottom: 2px solid transparent; font-weight: 600; color: var(--muted); }
+        .seg button + button { border-left: 0; }
+        .seg button:hover { color: var(--ink); }
+        .seg button[aria-pressed="true"] { background: none; color: var(--ink); border-bottom-color: #fbbf24; }
+        .panel, figure, .log { background: transparent; border: 0; border-top: 1px solid var(--grid); border-radius: 0; padding: 10px 0 0; }
+        .log { border-bottom: 1px solid var(--grid); padding: 0; }
+        .tiles { gap: 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
+        .tile { background: transparent; border: 0; border-radius: 0; padding: 12px 16px 12px 0; }
+        .tile .v { font-size: 24px; font-weight: 800; }
+        .tip { border-radius: 2px; box-shadow: 0 1px 4px rgba(15, 23, 42, .2); }
+        button.plain { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; font-weight: 600; }
+        input[type="search"] { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); background: transparent; padding: 4px 0; }
     </style>
 </head>
 <body>
-<main>
-    <p class="note"><a href="index.html">MFC</a> / Performance history &nbsp;·&nbsp; <a href="ci.html">CI health</a> &nbsp;·&nbsp; <a href="tests.html">Test health</a></p>
+<header class="site"><div class="wrap">
+    <a class="brand" href="index.html"><img src="res/banner.png" alt="MFC"><span>Multi-Component Flow Code</span></a>
+    <nav><a href="index.html">Home</a><a href="documentation/index.html">Documentation</a><a href="benchmarks.html" aria-current="page">Performance</a><a href="ci.html">CI health</a><a href="tests.html">Test health</a></nav>
+</div></header>
+<main><div class="wrap">
     <h1>Performance history</h1>
-    <p class="lede">Grind time of each benchmark case on the CI machines, for every benchmarked commit on <code>master</code>.
-        Phoenix is shown per GPU model, since its nodes differ several-fold.
-        Grind time is nanoseconds per grid point, equation and Runge&ndash;Kutta stage; lower is faster. Nodes are shared, so single
-        points are noisy: the line is a median of five runs, the dots are the runs themselves (a commit may have several). A dashed line marks a commit that
-        changed the benchmark case itself, and a dotted one a commit that changed the machine's compiler or modules; the numbers on
-        either side of either are not comparable.</p>
+    <p class="lede">Grind time of each benchmark case for every benchmarked commit on <code>master</code>, in nanoseconds per grid point,
+        equation and Runge&ndash;Kutta stage; lower is faster. Dots are runs, the line is a median of five. Phoenix is shown per GPU model.</p>
 
     <div class="controls">
         <div class="seg" id="view" role="group" aria-label="Machine"></div>
@@ -100,11 +119,9 @@
     <div class="grid" id="charts"></div>
 
     <h2>Changes beyond the noise</h2>
-    <p class="note">Where grind time moved to a new level and stayed there: at least 3% and five times the run-to-run scatter, on two or
-        more cases of a lane (or 10% on one, on Frontier), and narrowed to fewer than eight commits. The commits listed are the ones merged between a lane's last benchmark at the old level and its
-        first at the new one; when several lanes changed together, only the commits all of them allow. One commit listed is the cause;
-        several means the benchmarks cannot tell them apart. A change in the machine itself, outside the repository, would show up here
-        against whatever merged at the time.</p>
+    <p class="note">Lasting changes of at least 3% and five times the run-to-run scatter. The commits listed merged between the last
+        benchmark at the old level and the first at the new one, narrowed across the lanes that changed together: one commit is the cause, several
+        cannot be told apart. A change in the machine itself appears against whatever merged at the time.</p>
     <div class="log"><table id="changes"></table></div>
 
     <h2>Commits</h2>
@@ -116,9 +133,13 @@
         <summary>Latest results as a table</summary>
         <div class="scroll"><table id="table"></table></div>
     </details>
-</main>
+</div></main>
+<footer class="site"><div class="wrap">
+    <strong>&copy; <span id="copyright-year"></span> Spencer H. Bryngelson and Tim Colonius</strong> &middot; <a href="https://comp-physics.group/">Computational Physics Group @ Georgia Tech</a>
+</div></footer>
 <script>
 "use strict";
+document.getElementById("copyright-year").textContent = new Date().getFullYear();
 // One JSON object per line, appended by the `record` job of .github/workflows/bench.yml.
 const DATA_URL = "https://raw.githubusercontent.com/MFlowCode/MFC-ci-data/main/benchmarks.jsonl";
 // A lane is one machine, compiler and offload model, and on Phoenix one GPU model too: its nodes differ
