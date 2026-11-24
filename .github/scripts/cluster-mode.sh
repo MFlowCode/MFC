@@ -4,7 +4,7 @@
 #          smoke  two lanes, Frontier CCE OpenACC and Phoenix NVHPC OpenMP: build, then up to 120
 #                 of the tests the change selects on each
 #          full   every cluster lane, the whole suite, case-optimization and benchmarks
-#   base   scheduled runs: the commit the last successful scheduled run tested
+#   base   scheduled runs: the commit of the last scheduled run whose cluster jobs all passed
 #
 # Env: EVENT, REPO, RUN_ID, HEAD_SHA, PR_NUMBER, PR_DRAFT, CHECKALL, GH_TOKEN;
 #      WORKFLOW (default test.yml) is the workflow whose scheduled runs are compared.
@@ -24,13 +24,25 @@ case "$EVENT" in
     schedule)
         # Full run unless this commit has already passed a scheduled run, or failed two: a run lost to
         # an outage or a cancellation is retried, a commit that is really broken is not run forever.
+        # Judged by the cluster jobs, not the run: the Frontier lanes are continue-on-error, so a run
+        # they failed in still concludes "success".
         runs=$(gh api "repos/$REPO/actions/workflows/$WORKFLOW/runs?event=schedule&branch=master&per_page=50" \
-            --jq "[.workflow_runs[] | select(.id != $RUN_ID) | {sha: .head_sha, conclusion}]")
-        passed=$(jq --arg sha "$HEAD_SHA" '[.[] | select(.sha == $sha and .conclusion == "success")] | length' <<<"$runs")
-        failed=$(jq --arg sha "$HEAD_SHA" '[.[] | select(.sha == $sha and .conclusion == "failure")] | length' <<<"$runs")
+            --jq "[.workflow_runs[] | select(.id != $RUN_ID) | {id, sha: .head_sha}]")
+        passed=0 failed=0
+        for id in $(jq -r '.[].id' <<<"$runs"); do
+            sha=$(jq -r --argjson id "$id" '.[] | select(.id == $id) | .sha' <<<"$runs")
+            [ "$sha" = "$HEAD_SHA" ] || [ -z "$base" ] || continue
+            verdict=$(gh api --paginate "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
+                --jq '[.jobs[] | select(.labels | any(. == "frontier" or . == "gt")) | .conclusion]' | jq -rs 'add
+                    | if length == 0 or all(. == "skipped") then "none" elif all(. == "success" or . == "skipped") then "passed"
+                      elif any(. == "failure") then "failed" else "unfinished" end')
+            if [ "$sha" = "$HEAD_SHA" ]; then
+                case "$verdict" in passed) passed=$((passed + 1)) ;; failed) failed=$((failed + 1)) ;; esac
+            elif [ "$verdict" = passed ]; then
+                base=$sha       # the commit the last passing scheduled run tested: what a benchmark compares against
+            fi
+        done
         if [ "$passed" -eq 0 ] && [ "$failed" -lt 2 ]; then mode=full; fi
-        # The commit the last successful scheduled run tested: what a benchmark compares against.
-        base=$(jq -r --arg sha "$HEAD_SHA" '[.[] | select(.sha != $sha and .conclusion == "success")][0].sha // ""' <<<"$runs")
         ;;
     pull_request)
         if [ "$PR_DRAFT" != "true" ]; then

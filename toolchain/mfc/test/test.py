@@ -297,17 +297,20 @@ def gpu_fc_version(fc_version: str, probe=lambda: _compiler_version("nvfortran")
     return fc_version if re.search(r"\b(nvfortran|gnu|cray|ifx|ifort|flang|clang)", fc_version, re.I) else probe()
 
 
-def cap_evenly(cases: list, cap: int, runs=lambda case: True) -> typing.Tuple[list, list]:
+def cap_evenly(cases: list, cap: int, runs=lambda case: True, keep=lambda case: False) -> typing.Tuple[list, list]:
     """Keep at most `cap` of the cases that will run, spread evenly over the list; return (kept, dropped).
 
     The list is ordered by feature, so an even spread samples every area where the
     first `cap` cases would sample one. Cases for which `runs` is false are left in
-    place and do not count: something later skips them anyway.
+    place and do not count: something later skips them anyway. Cases for which
+    `keep` is true are always kept, and the spread fills what is left of the cap.
     """
     pool = [c for c in cases if runs(c)]
     if cap <= 0 or len(pool) <= cap:
         return cases, []
-    kept = {id(pool[i * len(pool) // cap]) for i in range(cap)}
+    rest = [c for c in pool if not keep(c)]
+    room = max(cap - (len(pool) - len(rest)), 0)
+    kept = {id(c) for c in pool if keep(c)} | {id(rest[i * len(rest) // room]) for i in range(min(room, len(rest)))}
     return [c for c in cases if id(c) in kept or not runs(c)], [c for c in pool if id(c) not in kept]
 
 
@@ -449,6 +452,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
+    changed = None
     if ARG("only_changes") or ARG("select_enforce"):
         import datetime
 
@@ -471,7 +475,9 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
     if ARG("max_tests") > 0:
         # --no-chemistry drops chemistry cases later; keep them out of the cap's pool.
         runs = (lambda c: c.to_case().params.get("chemistry", "F") != "T") if ARG("no_chemistry") else (lambda c: True)
-        cases, capped = cap_evenly(cases, ARG("max_tests"), runs)
+        # A change to a test's own files (its golden data) must be answered by that test, cap or not.
+        touched = {m.group(1) for f in changed or () if (m := re.match(r"tests/([0-9A-F]{8})/", f))}
+        cases, capped = cap_evenly(cases, ARG("max_tests"), runs, lambda c: c.get_uuid() in touched)
         skipped_cases += capped
 
     if ARG("percent") == 100:

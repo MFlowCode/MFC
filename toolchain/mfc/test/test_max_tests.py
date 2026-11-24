@@ -28,3 +28,15 @@ def test_cap_counts_only_cases_that_will_run():
 def test_order_is_preserved():
     kept, _ = cap_evenly(list("abcdefghij"), 3)
     assert kept == sorted(kept)
+
+
+def test_cases_marked_keep_survive_and_count_toward_the_cap():
+    cases = list(range(100))
+    kept, dropped = cap_evenly(cases, 10, keep=lambda c: c in (3, 97))
+    assert 3 in kept and 97 in kept
+    assert len(kept) == 10 and sorted(kept + dropped) == cases
+
+
+def test_more_kept_cases_than_the_cap_all_run():
+    kept, _ = cap_evenly(list(range(50)), 5, keep=lambda c: c < 8)
+    assert kept == list(range(8))
