@@ -4876,12 +4876,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # guard on the cons fields and the ib_forces.dat history; the accuracy against the exact solutions is measured by check_couette.py and
     # check_poiseuille.py (see the Validation page). The default order 1 is covered by the viscous IBM tests above. The annulus has a
     # rotating inner wall: its golden changes with the wall-point velocity fix (#2383, merged: a rotating body's ghost-cell wall velocity
-    # evaluated at the wall point, not the ghost point; this golden has it); the channel golden does not. Against goldens generated with GNU 13 (CPU, double), the GNU,
-    # Intel, NVHPC and macOS CI lanes differ by at most 1e-13 absolute on the first entries that exceed 1e-16. An A100 NVHPC GPU run
-    # differs by 5e-6 (annulus, 100 steps) and 1.5e-5 (channel, 300 steps) in density, the CPU/GPU gap of the viscous IBM work
-    # (#2419; unchanged by ib_smooth_contact), so override_tol = 1e-4 admits the GPU lanes and still fails a change of order 1e-3.
-    cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", args=["--steps", "100"], mods={"t_step_save": 100}, override_tol=1e-4))
-    cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-4))
+    # evaluated at the wall point, not the ghost point; this golden has it); the channel golden does not. Against double-precision
+    # goldens (GNU, CPU), the GNU, Intel, NVHPC and macOS CI lanes differ by at most 1e-13 absolute and an A100 (NVHPC 25.11) by 1e-14,
+    # so override_tol = 1e-10. The earlier 1e-4 covered an annulus golden generated in single precision, not a CPU/GPU gap.
+    cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", args=["--steps", "100"], mods={"t_step_save": 100}, override_tol=1e-10))
+    cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-10))
 
     # Isothermal conduction annulus (inner circle, outer STL ring) against the exact ln(r) profile, with inverse-distance and TSC
     # image points. 12 cells per radius (64 x 64) and 300 steps (about 3 conduction times). The gas starts on the exact profile, so the run
