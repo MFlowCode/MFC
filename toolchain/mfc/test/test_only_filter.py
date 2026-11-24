@@ -60,6 +60,13 @@ def test_a_chemistry_case_is_labeled_chemistry_without_saying_so_in_its_trace():
     assert "Chemistry" in case_filter_labels(case, include_chemistry=True)
 
 
+def test_a_chemistry_case_is_labeled_with_its_mechanism_file():
+    """CI builds each mechanism's binary in its own process with -o Chemistry <file>."""
+    case = _FakeCase("2D -> Example -> ibm_reacting_surface", {"chemistry": "T", "cantera_file": "/x/carbon_gasphase_reduced_gri11.yaml"})
+
+    assert {"Chemistry", "carbon_gasphase_reduced_gri11.yaml"} <= case_filter_labels(case, include_chemistry=True)
+
+
 def test_a_non_chemistry_case_is_not_labeled_chemistry():
     case = _FakeCase("2D -> Example -> rayleigh_taylor")
 

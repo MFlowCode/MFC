@@ -363,7 +363,7 @@ contains
         ! body must still take part in its allreduce.
         call s_mpi_allreduce_integer_sum(int(count(patch_ib(1:num_ibs)%thermal_bc == 3), 8), n_lumped)
         ib_exchange = n_lumped > 0 .or. ib_heat_wrt .or. ib_mass_relax > 0
-        ib_mass_only = ib_mass_relax > 0 .and. n_lumped == 0 .and. .not. (ib_heat_wrt .or. ib_state_wrt &
+        ib_mass_only = ib_mass_relax > 0 .and. n_lumped == 0 .and. .not. (ib_heat_wrt .or. ib_state_wrt .or. ib_force_wrt &
             & .or. moving_immersed_boundary_flag .or. amr .or. hypo_nc_mode == hypo_nc_mode_dual_pass)
         record_surface = ib_surface_wrt .or. ib_exchange
         $:GPU_UPDATE(device='[record_surface]')
@@ -3038,8 +3038,8 @@ contains
     !!
     !! (d = ghost_depth, s1 = probe1_dist, s2 = probe2_dist below.) L0 + L1 + L2 = 1 and at d = 0 they reduce to (1, 0, 0), so the
     !! wall value is exact on the wall. s1 = max(h, d) bounds the weights by (3, -3, 1) at any ghost depth. Tier 1 uses both probes;
-    !! tier 2 is the linear mirror where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body);
-    !! tier 3 leaves the default treatment.
+    !! tier 2 is the linear mirror where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body)
+    !! or lies beyond the halo (a ghost several cells deep); tier 3 leaves the default treatment.
     subroutine s_wall_fill(gp, wf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -3051,6 +3051,11 @@ contains
         real(wp)                      :: probe1_dist, probe2_dist  !< Distances of the probes from the wall along wall_normal
         real(wp)                      :: probe1_fluid_frac, probe2_fluid_frac  !< Fraction of each probe's TSC weight on fluid cells
         real(wp)                      :: cell_vol
+        real(wp), dimension(3)        :: probe_loc  !< Named, not an expression argument (see the Silent-Failure Traps)
+        real(wp)                      :: reach  !< Largest probe offset from the ghost, in its cell widths, inside the halo
+        real(wp), dimension(3)        :: width  !< Cell widths at the ghost
+        logical                       :: in1, in2  !< Each probe's stencil lies inside the halo
+        integer                       :: d
 
         cell_vol = dx(gp%loc(1))*dy(gp%loc(2))
         if (p > 0) cell_vol = cell_vol*dz(gp%loc(3))
@@ -3063,15 +3068,28 @@ contains
         wall_loc(1) = x_cc(gp%loc(1)); wall_loc(2) = y_cc(gp%loc(2))
         if (p > 0) wall_loc(3) = z_cc(gp%loc(3))
         wall_loc = wall_loc + ghost_depth*wall_normal
-        call s_tsc_weights(ib_markers, wall_loc + probe1_dist*wall_normal, wf%ic1, wf%wd1, probe1_fluid_frac)
-        call s_tsc_weights(ib_markers, wall_loc + probe2_dist*wall_normal, wf%ic2, wf%wd2, probe2_fluid_frac)
+        probe_loc = wall_loc + probe1_dist*wall_normal
+        call s_tsc_weights(ib_markers, probe_loc, wf%ic1, wf%wd1, probe1_fluid_frac)
+        probe_loc = wall_loc + probe2_dist*wall_normal
+        call s_tsc_weights(ib_markers, probe_loc, wf%ic2, wf%wd2, probe2_fluid_frac)
+
+        ! A deep ghost's probe can lie beyond the halo, where its stencil is clamped and the fill would depend on the domain
+        ! decomposition. Decided from the ghost's own geometry, so every decomposition drops the same ghosts a tier.
+        reach = real(buff_size, wp) - 2.5_wp
+        width(1) = dx(gp%loc(1)); width(2) = dy(gp%loc(2)); width(3) = 1._wp
+        if (p > 0) width(3) = dz(gp%loc(3))
+        in1 = .true.; in2 = .true.
+        do d = 1, num_dims
+            in1 = in1 .and. abs((ghost_depth + probe1_dist)*wall_normal(d)) <= reach*width(d)
+            in2 = in2 .and. abs((ghost_depth + probe2_dist)*wall_normal(d)) <= reach*width(d)
+        end do
 
         wf%llin = [1._wp + ghost_depth/probe1_dist, -ghost_depth/probe1_dist]
         wf%lw = [wf%llin(1), wf%llin(2), 0._wp]
         wf%tier = 3
-        if (probe1_fluid_frac < FLUID_FRAC_MIN) return
+        if (probe1_fluid_frac < FLUID_FRAC_MIN .or. .not. in1) return
         wf%tier = 2
-        if (probe2_fluid_frac < FLUID_FRAC_MIN) return
+        if (probe2_fluid_frac < FLUID_FRAC_MIN .or. .not. in2) return
         wf%lw = [(ghost_depth + probe1_dist)*(ghost_depth + probe2_dist)/(probe1_dist*probe2_dist), &
                   & -ghost_depth*(ghost_depth + probe2_dist)/(probe1_dist*(probe2_dist - probe1_dist)), &
                   & ghost_depth*(ghost_depth + probe1_dist)/(probe2_dist*(probe2_dist - probe1_dist))]
@@ -3573,7 +3591,7 @@ contains
         integer :: j0, k0, l0, fj, fk, fl, ibm, jl, kl, ll, sd, bw, cov, nc, sh, c
         logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR, fine, heat, covd
 
-        do_ft = moving_immersed_boundary_flag .or. ib_state_wrt
+        do_ft = moving_immersed_boundary_flag .or. ib_state_wrt .or. ib_force_wrt
         if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
         if (ib_mass_only) then
             call s_accumulate_ib_mass(idir, stage)

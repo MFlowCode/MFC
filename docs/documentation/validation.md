@@ -9,7 +9,9 @@ Every check has an example in `examples/` with a checker script and a README, an
 Status words: **validated** (agrees with the reference within the stated error), **partially validated** (agrees where measured; a regime or quantity is open), **open discrepancy** (disagrees, cause known or not), **comparison only** (reference data are qualitative).
 Errors are (MFC − reference)/reference.
 
+Separate pages: @ref validation_wall_order_couette "Wall-normal ghost velocity at viscous walls" (`ib_wall_order` against plane Poiseuille and Taylor-Couette flow).
 Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
+Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
 
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
@@ -125,6 +127,30 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 ## Circular cylinder drag and Nusselt number {#sec-validation-cyl-drag-nu}
 
 **Status:** partially validated. **Example:** `examples/2D_ibm_cylinder_drag_nu`. The face-flux immersed-boundary force and the face heat of a no-slip isothermal cylinder at Re 20, 40 and 100 against Dennis and Chang, Williamson and the Nusselt-number correlations, with a momentum balance as an independent drag. Results and limits: @ref validation_cyl_drag_nu.
+
+## Periodic particle arrays {#sec-validation-particle-array}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_periodic_array`. Random arrays of fixed no-slip isothermal cylinders and spheres in a periodic box at a held mass flux: the global momentum balance (closes to 1e-4), the mean drag of 20-sphere arrays against Tenneti et al. (within 4 % at Re_m 20, +10 to +14 % at Re_m 100), the per-body force spread and the Nusselt number. Results and limits: @ref validation_particle_array.
+
+## Shock through a dense particle curtain {#sec-validation-shock-curtain}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_shock_curtain`. The unsteady drag of a sphere after a Mach 1.22 shock against Mehta et al. (peak within 3 %), and the Favre-averaged gas velocity through a Mach 1.66 curtain of spheres at a solid fraction of 0.2 against a published particle-resolved DNS (0.04 to 0.05 of the post-shock velocity), with the wall-model comparison. Results and limits: @ref validation_shock_curtain.
+
+## Accuracy limits of the ghost-cell immersed boundary {#sec-validation-ib-limits}
+
+**Status:** open discrepancy (measured limits, no example). Wall value about second order, wall-normal gradient first order or worse, rotating-wall shear plateau near 2 %, and the options that help or do not: @ref ib_accuracy_limits.
+
+## Slip immersed walls {#sec-validation-slip-walls}
+
+**Status:** partially validated. **Example:** `examples/2D_ibm_slip_cylinder`. The gas mass of a fixed slip cylinder in a periodic box with and without `ib_mass_relax`, and the near-wall pressure and velocity error of an exact steady vortex for the curvature term, TSC image-point weights and `ib_slip_ccst`. Slip walls in a shock curtain and in close approach do not work and are recorded there. Results and limits: @ref validation_slip_walls.
+
+## Species diffusion, conduction and the transport time step {#sec-validation-species-transport}
+
+**Status:** partially validated. **Example:** `examples/1D_diffusion_verification`. Trace-species diffusion and heat conduction against the erfc solution (second order), a multicomponent mixing layer against an independent 1D solver, and the stability threshold of `chem_params%%transport_dt` for both transport models. Results and limits: @ref validation_species_transport.
+
+## Solid-wall thermal models {#sec-validation-wall-thermal}
+
+**Status:** partially validated. **Examples:** `examples/2D_ibm_cylinder_drag_nu` (lumped cooling) and `examples/2D_ibm_cold_wall_transient`. The decay of a lumped-temperature cylinder in a cross flow against the time constant its fixed-wall Nusselt number implies, and the heat a cold isothermal cylinder absorbs from quiescent hot gas with and without the sub-grid wall conduction column against a body-fitted 1D reference. Results and limits: @ref validation_wall_thermal.
 
 ## Moving-body gas-mass budget and Galilean twin {#sec-validation-moving-body-budget}
 
