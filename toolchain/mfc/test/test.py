@@ -208,8 +208,8 @@ def _assert_species_bounds(case: TestCase, pack, stdout: str, single: bool = Fal
 def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:
     """The set of labels --only matches a case against: its trace elements and its UUID.
 
-    With include_chemistry, also "Chemistry" for any case that turns chemistry
-    on, whatever its trace says. That label selects a build, not just a test: on
+    With include_chemistry, also "Chemistry" and the mechanism's file name (e.g.
+    "h2o2.yaml") for any case that turns chemistry on, whatever its trace says. That label selects a build, not just a test: on
     Frontier AMD's GPU lane the chemistry binaries are compiled by a separate
     SLURM job invoked with `-o Chemistry` (.github/workflows/common/build.sh),
     because amdflang needs ~1 h per device link and building base + chemistry
@@ -229,8 +229,11 @@ def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]
     check = set(case.trace.split(" -> "))
     check.add(case.get_uuid())
 
-    if include_chemistry and case.to_case().params.get("chemistry", "F") == "T":
-        check.add("Chemistry")
+    if include_chemistry:
+        params = case.to_case().params
+        if params.get("chemistry", "F") == "T":
+            # The mechanism selects the binary too, so CI can build each one in its own process.
+            check.update({"Chemistry", os.path.basename(params.get("cantera_file", ""))} - {""})
 
     return check
 
