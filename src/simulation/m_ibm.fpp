@@ -5347,10 +5347,9 @@ contains
     !!
     !! theta = 1 is the full second-order mirror; theta = 0 is the first-order Dirichlet ghost phi_g = phi_s, which is
     !! Gibou et al. (JCP 176:205, 2002) Eq. 17 and is what they likewise fall back to where the linear form is ill-behaved.
-    !! One theta is shared by every species, so since both endpoints satisfy sum(Y) = 1, so does every blend between them --
-    !! exactly, with no renormalization. Temperature gets its own theta: nothing couples it to the composition, and sharing
-    !! would let a trace radical the surface consumes to ~1e-9 (O and OH at a burning carbon wall) drag the thermal mirror
-    !! down with it, turning a 2100 K ghost into 1205 K over a species whose own excursion was 1e-9. The cost of limiting
+    !! Each species and the temperature get their own theta (s_blend_ghost_species keeps sum(Y) = 1 through the bath species).
+    !! Sharing one would let a trace radical the surface consumes to ~1e-9 (O and OH at a burning carbon wall) drag every other
+    !! mirror down with it, turning a 2100 K ghost into 1205 K over a species whose own excursion was 1e-9. The cost of limiting
     !! is small: the mirror already delivers only first-order wall flux (Ezra et al., Int. J. Heat Mass Transfer, 2025),
     !! and a boundary closure one order below the interior scheme retains the interior convergence rate (Gustafsson,
     !! Math. Comp. 29:396, 1975).
@@ -5384,7 +5383,10 @@ contains
 
     end subroutine s_blend_ghost_temperature
 
-    !> Species half of the ghost-state blend: one theta shared by every species (see s_blend_ghost_temperature).
+    !> Species half of the ghost-state blend: each species takes its own positivity-limited theta and the bath species (the most
+    !! abundant at the surface) absorbs the difference, so sum(Y_g) = sum(Y_s). One theta shared by every species collapsed to
+    !! ~0.006 at a burning carbon wall, where the surface consumes the trace radicals (O, OH), and made every species ghost first
+    !! order. The shared theta is the fallback if the bath species would go negative.
     subroutine s_blend_ghost_species(Ys_IP, Ys_s, Ys_g)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -5393,13 +5395,23 @@ contains
         real(wp), intent(out) :: Ys_g(num_species)
         real(wp), parameter   :: blend_safety = 0.9_wp
         real(wp)              :: theta_Y
-        integer               :: k
+        integer               :: k, k_bath
+
+        call s_pick_bath_species(Ys_s, k_bath)
+        Ys_g(k_bath) = Ys_s(k_bath)
+        do k = 1, num_species
+            if (k == k_bath) cycle
+            theta_Y = 1._wp
+            if (Ys_s(k) < Ys_IP(k)) theta_Y = min(1._wp, blend_safety*Ys_s(k)/(Ys_IP(k) - Ys_s(k)))
+            Ys_g(k) = Ys_s(k) + theta_Y*(Ys_s(k) - Ys_IP(k))
+            Ys_g(k_bath) = Ys_g(k_bath) + Ys_s(k) - Ys_g(k)
+        end do
+        if (Ys_g(k_bath) >= 0._wp) return
 
         theta_Y = 1._wp
         do k = 1, num_species
             if (Ys_s(k) < Ys_IP(k)) theta_Y = min(theta_Y, blend_safety*Ys_s(k)/(Ys_IP(k) - Ys_s(k)))
         end do
-
         do k = 1, num_species
             Ys_g(k) = Ys_s(k) + theta_Y*(Ys_s(k) - Ys_IP(k))
         end do
