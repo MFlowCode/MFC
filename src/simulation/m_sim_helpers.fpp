@@ -118,21 +118,11 @@ contains
         real(wp), intent(out)                 :: qv
         integer, intent(in)                   :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: Gs
-        #:else
-            real(wp), dimension(num_fluids) :: Gs
-        #:endif
-        real(wp) :: G_local
-        integer  :: i
+        integer                               :: i
 
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
-        if (hypoelasticity) then
-            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re, G_local, Gs)
-        else
-            call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
-        end if
+        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha, alpha_rho, Re)
 
         if (igr) then
             $:GPU_LOOP(parallelism='[seq]')
@@ -209,6 +199,9 @@ contains
 
         call s_compute_inv_dx2_sum(j, k, l, inv_dx2)
 
+        ! Inactive criteria stay defined: the AMR scaling multiplies all of them
+        vcfl = 0._wp; Rc = huge(1._wp); ccfl = 0._wp
+
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
         ! obtained from a shared helper procedure: NVHPC 25.5's fort2 segfaults
@@ -251,7 +244,6 @@ contains
 
         ! Capillary CFL calculation
         if (surface_tension) then
-            ccfl = 0._wp
             call s_compute_capillary_rho(alpha, alpha_rho, rho_c)
             if (rho_c > 0._wp) then
                 if (p > 0) then

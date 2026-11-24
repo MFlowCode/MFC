@@ -701,7 +701,13 @@ contains
 
         integer, intent(in) :: stage
 
-        call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwbuff)
+        ! Before the first RHS the conservative ghosts are unset; Lagrange refills the primitive ones below
+
+        if (bubbles_lagrange) then
+            call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
+        else
+            call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwbuff)
+        end if
 
         if (bubbles_euler) then
             call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, divu)
