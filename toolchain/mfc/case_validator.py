@@ -227,7 +227,11 @@ PHYSICS_DOCS = {
         "title": "Viscosity",
         "category": "Numerical Schemes",
         "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
-        "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
+        "explanation": (
+            "Reynolds numbers must be positive. Not supported with model_eqns = 1. weno_Re_flux requires weno_avg = T: "
+            "the cell gradient from a cell's own two WENO face values is not damped by the viscous operator once the "
+            "WENO weights are nonlinear, so grid-scale noise grows at any time step."
+        ),
     },
     "check_heat_conduction": {
         "title": "Fourier Heat Conduction",
@@ -938,6 +942,8 @@ class CaseValidator:
             ib and num_ibs <= 0 and not has_particle_clouds,
             "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_cloud with num_particles > 0)",
         )
+        num_local_ibs_max = self.get("num_local_ibs_max")
+        self.prohibit(num_local_ibs_max is not None and num_local_ibs_max < 1, "num_local_ibs_max must be >= 1")
         num_ib_patches_max = NIB
         self.prohibit(
             ib and num_ibs > num_ib_patches_max,
@@ -1888,11 +1894,10 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
-        # advisory: smooth fields are exact either way (#2391)
-        self.warn(
-            weno_Re_flux and viscous and not weno_avg,
-            "weno_Re_flux without weno_avg: a cell's velocity gradient uses only its own two face values, so the viscous flux "
-            "misses a jump between neighbouring cells (zero wall shear on an impulsive start); set weno_avg = T",
+        # The own-face gradient grows grid-scale noise with nonlinear WENO weights (#2435) and misses jumps between cells (#2391)
+        self.prohibit(
+            weno_Re_flux and not weno_avg,
+            "weno_Re_flux requires weno_avg = T: the gradient from a cell's own two face values grows grid-scale noise at any time step and misses a jump between neighbouring cells",
         )
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and not weno_Re_flux, "weno_Re_flux_compact requires weno_Re_flux")
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "weno_Re_flux_compact requires Cartesian coordinates")

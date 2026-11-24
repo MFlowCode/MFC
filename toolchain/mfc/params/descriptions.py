@@ -167,6 +167,7 @@ DESCRIPTIONS = {
     "num_stl_models": "Number of STL/OBJ model entries in the stl_models array",
     "num_particle_clouds": "Number of particle bed specifications to generate immersed boundary patches from",
     "ib_neighborhood_radius": "Neighborhood radius in ranks for IB awareness",
+    "num_local_ibs_max": "Capacity of the per-rank immersed-boundary arrays (owned plus neighboring bodies, default 30000)",
     "many_ib_patch_parallelism": "Parallelize over IB patches instead of grid cells (better for many small patches)",
     "ib_second_order_vel": "Extrapolate IB ghost-point velocity linearly through the boundary intercept (second order)",
     "ib_ip_min_dist": "Minimum boundary-to-image-point distance in local cell widths for ib_second_order_vel",

@@ -61,6 +61,7 @@ data = {
     "null_weights": "F",
     "mp_weno": "T",
     "weno_Re_flux": "T",
+    "weno_avg": "T",
     "riemann_solver": "hllc",
     "wave_speeds": "direct",
     "bc_x%beg": -2,
