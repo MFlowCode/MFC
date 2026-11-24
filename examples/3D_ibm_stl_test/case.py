@@ -88,6 +88,10 @@ print(
             "stl_models(1)%model_translate(1)": 0,
             "stl_models(1)%model_translate(2)": -0.05,
             "stl_models(1)%model_translate(3)": -0.05,
+            # Cube_IBM.stl is 0.1 across: scale it to D (12 cells), else it marks no cell
+            "stl_models(1)%model_scale(1)": D / 0.1,
+            "stl_models(1)%model_scale(2)": D / 0.1,
+            "stl_models(1)%model_scale(3)": D / 0.1,
             "stl_models(1)%model_threshold": 0.95,
             "patch_ib(1)%slip": "F",
             # Fluids Physical Parameters

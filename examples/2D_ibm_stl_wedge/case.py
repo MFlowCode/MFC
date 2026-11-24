@@ -52,6 +52,9 @@ print(
             "ib": "T",
             "num_ibs": 1,
             "fd_order": 2,
+            # Mach 4.7 past the blunt base leaves a near-vacuum wake where unbounded WENO face states reach p < 0 (NaN sound
+            # speed in HLLC by step 153); bound them
+            "face_bound": 1,
             # Formatted Database Files Structure Parameters
             # Export primitive variables in double precision with parallel
             # I/O to minimize I/O computational time during large simulations

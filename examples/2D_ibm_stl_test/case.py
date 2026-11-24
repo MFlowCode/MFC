@@ -76,6 +76,10 @@ print(
             "stl_models(1)%model_filepath": "Circle_IBM.stl",
             "stl_models(1)%model_translate(1)": -0.05,
             "stl_models(1)%model_translate(2)": -0.05,
+            # Circle_IBM.stl is 0.1 across: scale it to the diameter D (13 cells), else it marks no cell
+            "stl_models(1)%model_scale(1)": D / 0.1,
+            "stl_models(1)%model_scale(2)": D / 0.1,
+            "stl_models(1)%model_scale(3)": D / 0.1,
             "stl_models(1)%model_threshold": 0.95,
             "patch_ib(1)%slip": "F",
             # Fluids Physical Parameters
