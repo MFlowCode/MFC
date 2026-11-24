@@ -6,7 +6,8 @@
 Run from the root of the benchmarked checkout. Prints a JSON object: the commit (hash, date,
 subject, pull request), the lane (with the GPU model where a cluster has several), and for each case its grind time (ns per grid point, equation and RK
 stage) and `def`, a hash of what the case is: its input file, its arguments and the
-benchmark invocation. A grind time is only comparable with another of the same `def`.
+benchmark invocation. A grind time is only comparable with another of the same `def`, and of
+the same `env`: a hash of the cluster's own lines of toolchain/modules at that commit.
 With compare.json (the API's `compare/<previously benchmarked commit>...<sha>`), the line also
 lists `covers`: every commit since the previous benchmark, as [sha, subject, pull request]. Any
 of them can be behind a change in the numbers.
@@ -66,6 +67,19 @@ def covers(compare_path: str) -> list:
     return out
 
 
+SLUGS = {"frontier": "f", "frontier_amd": "famd", "phoenix": "p"}  # each cluster's entries in toolchain/modules
+
+
+def environment(cluster: str, read=None) -> str:
+    """Hash of the cluster's own lines of toolchain/modules: its compiler and module set as declared here."""
+    try:
+        text = (read("toolchain/modules") if read else open("toolchain/modules", "rb").read()).decode(errors="replace")
+    except (OSError, ValueError):
+        return ""
+    mine = [line.strip() for line in text.splitlines() if re.match(rf"^{SLUGS.get(cluster, cluster)}(-|\s)", line)]
+    return hashlib.sha1("\n".join(mine).encode()).hexdigest()[:10]
+
+
 def record(path: str, cluster: str, device: str, interface: str, sha: str, date: str, subject: str, hardware: str = "", compare: str = "", read=None) -> dict:
     with open(path) as f:
         data = yaml.safe_load(f)
@@ -78,7 +92,7 @@ def record(path: str, cluster: str, device: str, interface: str, sha: str, date:
             cases[slug] = {"grind": grind, "def": definition(case.get("description") or {}, invocation, read)}
 
     pr = PR.search(subject)
-    return {"sha": sha, "date": date, "subject": subject, "pr": int(pr.group(1)) if pr else None, "cluster": cluster, "device": device, "interface": interface, "hardware": hardware, "covers": covers(compare) if compare else [], "cases": cases}
+    return {"sha": sha, "date": date, "subject": subject, "pr": int(pr.group(1)) if pr else None, "cluster": cluster, "device": device, "interface": interface, "hardware": hardware, "env": environment(cluster, read), "covers": covers(compare) if compare else [], "cases": cases}
 
 
 if __name__ == "__main__":
