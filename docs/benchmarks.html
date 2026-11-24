@@ -36,6 +36,7 @@
         .legend button { font: inherit; color: inherit; background: none; border: 0; padding: 2px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
         .legend button[aria-pressed="false"] { opacity: .4; text-decoration: line-through; }
         .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+        .legend svg { width: 10px; height: 10px; flex: none; display: inline-block; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
         figure { margin: 0; background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 12px 6px; position: relative; }
         figcaption { font-weight: 600; font-size: 14px; margin-bottom: 4px; overflow-wrap: anywhere; }
@@ -58,6 +59,8 @@
         .log th { position: sticky; top: 0; background: var(--surface); }
         .log td.what { text-align: left; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .log td.what .note { white-space: normal; }
+        .log td.cases { text-align: left; white-space: nowrap; }
+        .log td, .log th { vertical-align: top; }
         .slower { color: var(--slower); font-weight: 600; } .faster { color: var(--faster); font-weight: 600; }
         details { margin-top: 24px; }
         summary { cursor: pointer; font-weight: 600; }
@@ -90,7 +93,7 @@
             <button data-v="0" aria-pressed="false">All</button>
         </div>
         <button id="reset" class="plain" hidden>Reset zoom</button>
-        <span class="note">Drag across a chart to zoom all of them; click a point to keep its commit and pull request.</span>
+        <span class="note">Drag across a chart to zoom all of them; click a point to keep its commit and pull request; hover a marker to see what it marks.</span>
     </div>
     <ul class="legend" id="legend"></ul>
     <p id="status">Loading benchmark history&hellip;</p>
@@ -101,7 +104,7 @@
         more cases of a lane (or 10% on one, on Frontier), and narrowed to fewer than eight commits. The commits listed are the ones merged between a lane's last benchmark at the old level and its
         first at the new one; when several lanes changed together, only the commits all of them allow. One commit listed is the cause;
         several means the benchmarks cannot tell them apart. A change in the machine itself, outside the repository, would show up here
-        against whatever merged at the time. Hover the case count for the cases.</p>
+        against whatever merged at the time.</p>
     <div class="log"><table id="changes"></table></div>
 
     <h2>Commits</h2>
@@ -212,6 +215,9 @@ function chart(slug) {
     const y = v => T + Math.max(0, (hi - v) / (hi - lo)) * (H - T - B);       // off-scale runs sit on the top edge
 
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${slug}: grind time history` });
+    // Markers are small: each gets a wider invisible target that says, on hover, what it marks.
+    const notes = [], pointAt = t => all.find(p => p.t === t), named = p => `${p.sha.slice(0, 7)}${PR_OF(p) ? ` (#${PR_OF(p)})` : ""} ${p.subject}`;
+    const mark = (cx, cy, text) => notes.push({ cx, cy, text });
     for (let i = 0; i <= 4; i++) {
         const v = lo + (hi - lo) * i / 4;
         el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }, svg);
@@ -230,10 +236,12 @@ function chart(slug) {
     for (const t of envChanged) {
         el("line", { x1: x(t), x2: x(t), y1: T, y2: H - B, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "1 3" }, svg);
         el("rect", { x: x(t) - 3, y: T - 8, width: 6, height: 6, fill: "var(--ink-2)" }, svg);
+        mark(x(t), T - 5, `Compiler or module set changed at or just before ${named(pointAt(t))}`);
     }
     for (const t of changed) {
         el("line", { x1: x(t), x2: x(t), y1: T, y2: H - B, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "3 3" }, svg);
         el("path", { d: `M${x(t)},${T - 9}l4,4l-4,4l-4,-4z`, fill: "var(--ink-2)" }, svg);
+        mark(x(t), T - 5, `Benchmark case changed at or just before ${named(pointAt(t))}`);
     }
     const off = all.filter(p => p.out).length;
     if (off) fig.firstChild.insertAdjacentHTML("beforeend", ` <span class="note" style="font-weight:400">· ${off} off-scale ${off === 1 ? "run" : "runs"} ▲</span>`);
@@ -242,7 +250,8 @@ function chart(slug) {
 
     for (const s of ss) {
         for (const p of s.pts) {
-            if (p.out) el("path", { d: `M${x(p.t)},${T - 1}l3.5,6h-7z`, fill: s.lane.color }, svg);
+            if (p.out) { el("path", { d: `M${x(p.t)},${T - 1}l3.5,6h-7z`, fill: s.lane.color }, svg);
+                         mark(x(p.t), T + 2, `Off the scale: ${s.lane.label}, ${fmt(p.v, state.metric)} at ${named(p)}`); }
             else el("circle", { cx: x(p.t), cy: y(p.v), r: 1.8, fill: s.lane.color, opacity: .5 }, svg);
         }
         el("path", { d: s.pts.map((p, i) => `${i && p.def === s.pts[i - 1].def ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.m).toFixed(1)}`).join(""),
@@ -302,6 +311,7 @@ function chart(slug) {
     });
     hit.addEventListener("pointerleave", () => { if (drag === null) { tip.hidden = true; marks.replaceChildren(); cross.setAttribute("visibility", "hidden"); } });
     svg.addEventListener("dblclick", () => { if (state.zoom) { state.zoom = null; render(); } });
+    for (const m of notes) el("title", {}, el("circle", { cx: m.cx, cy: m.cy, r: 7, fill: "transparent" }, svg)).textContent = m.text;
     fig.append(svg, tip, pin);
     return fig;
 }
@@ -421,7 +431,7 @@ function changes() {
                 const pcts = s.hits.map(h => h.pct).sort((x, y) => x - y), mid = pcts[pcts.length >> 1], slower = mid > 0;
                 return `<tr>${i ? "" : `<td rowspan="${e.spans.length}">${day(e.r.t)}</td><td rowspan="${e.spans.length}" class="what" style="white-space:normal">${who}</td>`}`
                     + `<td>${s.lane.view === "Frontier" ? s.lane.label : `${s.lane.view} · ${s.lane.label}`}</td>`
-                    + `<td title="${s.hits.map(h => `${h.slug} ${h.pct >= 0 ? "+" : ""}${h.pct.toFixed(1)}%`).join(", ")}">${s.hits.length}</td>`
+                    + `<td class="cases">${s.hits.sort((x, y) => Math.abs(y.pct) - Math.abs(x.pct)).map(h => `${esc(h.slug)} <span class="note">${h.pct >= 0 ? "+" : ""}${h.pct.toFixed(1)}%</span>`).join("<br>")}</td>`
                     + `<td class="${slower ? "slower" : "faster"}">${slower ? "▲ slower" : "▼ faster"} ${mid >= 0 ? "+" : ""}${mid.toFixed(1)}%</td></tr>`;
             }).join("");
         }).join("");
