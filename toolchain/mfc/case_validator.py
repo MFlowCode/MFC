@@ -275,6 +275,18 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
+    "check_projection_simulation": {
+        "title": "All-Mach Pressure Projection",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "Five-equation model (Allaire) on a Cartesian grid. Walls, periodic, extrapolation (pressure outlets with pres_out) "
+            "and Dirichlet (-17) boundaries only; the pressure solve replaces the Riemann solver, so physics that feeds it "
+            "(spatial or synthetic forcing, bubbles, elasticity, MHD, chemistry, immersed boundaries) is not yet supported. "
+            "Uniform body forces (bf_x/y/z) enter the face predictor, which keeps hydrostatic states at rest; viscosity "
+            "(weno_Re_flux = F) and heat conduction are explicit; surface tension is either the capillary stress tensor or, with "
+            "surface_tension_model = 2, a well-balanced face CSF."
+        ),
+    },
     "check_non_newtonian": {
         "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
         "category": "Feature Compatibility",
@@ -315,8 +327,8 @@ PHYSICS_DOCS = {
         "math": r"f_i^{n+1} = f_i^n + \frac{G}{\Delta t}\left(Q_i^\ast - 2Q_i^n + Q_i^{n-1}\right)",
         "explanation": (
             "mean_dpdx(i) or mean_mflux(i) requires direction i to be active and periodic on both ends, in Cartesian "
-            "coordinates. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable range of the controller; "
-            "a gain without a target is rejected."
+            "coordinates, without proj_method. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable "
+            "range of the controller; a gain without a target is rejected."
         ),
     },
     "check_mean_temperature_source": {
@@ -324,9 +336,9 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "math": r"\dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right)",
         "explanation": (
-            "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, periodic x, and periodic or wall (-15, -16) "
-            "boundaries in y and z. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain without a target is "
-            "rejected. mean_temp_wall (positive) requires a mean_temp target."
+            "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, no proj_method, periodic x, and periodic "
+            "or wall (-15, -16) boundaries in y and z. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain "
+            "without a target is rejected. mean_temp_wall (positive) requires a mean_temp target."
         ),
     },
     "check_synthetic_turbulence": {
@@ -647,7 +659,8 @@ class CaseValidator:
         self.prohibit(self.get("face_bound", 0) == 1 and model_eqns != 2, "face_bound = 1 requires model_eqns = 2")
         self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
         self.prohibit(
-            int_comp != 0 and model_eqns == 3,
+            # The projection never transports the phase energies, only rebuilds them from the solved pressure
+            int_comp != 0 and model_eqns == 3 and self.get("proj_method", "F") != "T",
             "int_comp > 0 is not supported with model_eqns = 3: THINC does not update per-fluid internal energies, leaving thermodynamically inconsistent face states",
         )
 
@@ -1521,6 +1534,20 @@ class CaseValidator:
         self.prohibit(sigma is not None and not surface_tension, "sigma is set but surface_tension is not enabled")
         self.prohibit(surface_tension and model_eqns not in [2, 3], "The surface tension model requires model_eqns = 2 or model_eqns = 3")
         self.prohibit(surface_tension and num_fluids != 2, "The surface tension model requires num_fluids = 2")
+        st_model = self.get("surface_tension_model")
+        self.prohibit(st_model is not None and not surface_tension, "surface_tension_model is set but surface_tension is not enabled")
+        self.prohibit(st_model is not None and st_model not in [1, 2], "surface_tension_model must be 1 (conservative) or 2 (well_balanced)")
+        self.prohibit(
+            st_model == 2 and self.get("proj_method", "F") != "T",
+            "surface_tension_model = 2 (well_balanced) balances the capillary force against the projection's face pressure gradient and requires proj_method",
+        )
+        # The curvature's interface normal is differenced from a volume-fraction gradient set over two ghost layers, which reads
+        # three; first-order reconstruction leaves only two
+        first_order = (self._get_recon_type() == 1 and self.get("weno_order") == 1) or (self._get_recon_type() == 2 and self.get("muscl_order") == 1)
+        self.prohibit(
+            st_model == 2 and first_order,
+            "surface_tension_model = 2 (well_balanced) needs three ghost layers for its curvature; first-order reconstruction (weno_order = 1 or muscl_order = 1) provides two",
+        )
 
     def check_mhd(self):
         """Checks constraints on MHD parameters"""
@@ -1798,6 +1825,8 @@ class CaseValidator:
             self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
             # The controller averages the coarse grid only; unchecked against refined blocks.
             self.prohibit(self.get("amr", "F") == "T", "mean_dpdx/mean_mflux have not been validated with amr")
+            # proj_method applies body forces in its own pressure solve, which does not include the mean sources
+            self.prohibit(self.get("proj_method", "F") == "T", "mean_dpdx/mean_mflux are not supported with proj_method")
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
 
     def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
@@ -1823,6 +1852,7 @@ class CaseValidator:
         self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
         # As for mean_dpdx: the controller averages the coarse grid only
         self.prohibit(self.get("amr", "F") == "T", "mean_qdot/mean_temp have not been validated with amr")
+        self.prohibit(self.get("proj_method", "F") == "T", "mean_qdot/mean_temp are not supported with proj_method")
         dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
         for d, active in dims:
             # x is the streamwise (mixing-cup) direction; walls may bound the others
@@ -2024,6 +2054,53 @@ class CaseValidator:
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")
+
+    def check_projection_simulation(self):
+        """Checks all-Mach pressure projection constraints"""
+        if self.get("proj_method", "F") != "T":
+            self.prohibit(self.get("proj_woods_modulus", "F") == "T", "proj_woods_modulus requires proj_method")
+            return
+
+        omega = self.get("proj_mg_omega")
+        self.prohibit(omega is not None and not 0 < omega < 2, "proj_mg_omega must be in (0, 2) for the preconditioner to stay SPD")
+        model_eqns = self.get("model_eqns")
+        self.prohibit(model_eqns not in (2, 3), "proj_method requires model_eqns = 2 or 3")
+        self.prohibit(self.get("proj_woods_modulus", "F") == "T" and model_eqns != 3, "proj_woods_modulus requires model_eqns = 3")
+        max_acfl = self.get("proj_max_acfl") or 0
+        cfl_dt = self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"
+        forced = any(self.get(f"bf_{d}", "F") == "T" for d in "xyz")
+        self.prohibit(
+            cfl_dt and max_acfl == 0 and not forced,
+            "proj_method with cfl_adap_dt/cfl_const_dt needs proj_max_acfl > 0 or a body force to bound dt for fluid at rest",
+        )
+        self.prohibit(self.get("cyl_coord", "F") == "T", "proj_method does not support cylindrical coordinates")
+        for flag in [
+            "igr",
+            "ib",
+            "chemistry",
+            "weno_Re_flux",
+            "bubbles_euler",
+            "bubbles_lagrange",
+            "hypoelasticity",
+            "hyperelasticity",
+            "mhd",
+            "relax",
+            "alt_soundspeed",
+            "acoustic_source",
+            "mpp_lim",
+            "reactive_burn",
+            "cont_damage",
+            "bf_spatial_support",
+            "synthetic_turbulence",
+        ]:
+            self.prohibit(self.get(flag, "F") == "T", f"proj_method does not support {flag} = T")
+        for i in range(1, (self.get("num_fluids") or 1) + 1):
+            eos = self.get(f"fluid_pp({i})%eos")
+            self.prohibit(eos not in (None, 1, 2, "stiffened_gas", "ideal_gas"), f"proj_method supports only stiffened- and ideal-gas fluids (fluid_pp({i})%eos)")
+        for d in ["x", "y", "z"]:
+            for e in ["beg", "end"]:
+                bc = self.get(f"bc_{d}%{e}")
+                self.prohibit(bc is not None and bc not in [-1, -2, -3, -15, -16, -17], f"proj_method does not support bc_{d}%{e} = {bc}")
 
     def check_igr_simulation(self):
         """Checks IGR constraints specific to simulation"""
@@ -3799,6 +3876,7 @@ class CaseValidator:
         self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
+        self.check_projection_simulation()
         self.check_acoustic_source()
         self.check_amr()
         self.check_adaptive_time_stepping()

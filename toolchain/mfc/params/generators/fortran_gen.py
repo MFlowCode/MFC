@@ -86,6 +86,7 @@ SIM_GPU_DECL_VARS = {
     "mixture_err",
     "model_eqns",
     "mp_weno",
+    "proj_woods_modulus",
     "mhd",
     "mpp_lim",
     "muscl_eps",
