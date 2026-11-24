@@ -7,7 +7,7 @@ from mfc import common
 
 from ..state import ARG
 from .case import BASE_CFG, PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
-from .convergence import ConvergenceSpec, run_amp_sweep, run_amr_check, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
+from .convergence import ConvergenceSpec, run_amp_sweep, run_amr_check, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1, run_transpose_check
 
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
@@ -1808,9 +1808,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Soft-sphere friction across the x = 10 rank seam: two circles close head-on, so the slip is round-off. With
             # ib_friction_slip_eps = 0 that round-off sets a full mu*|F_n| force whose direction depends on the rank layout (the
             # y force of 1 and 2 ranks has opposite sign from step 80, 0.13 apart); with it both stay ~1e-4. A seam transient in the
-            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. override_tol: the golden is
-            # from Cray Fortran; the GNU/Intel/macOS CI lanes agree with each other to 1e-13 and differ from it by up to 3.2e-5
-            # (1 fluid) and 9.1e-6 (2 fluids), abs, in the energy; 3e-4 is ~10x that and far below the 0.13 sign flip it guards.
+            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. override_tol: Cray Fortran
+            # and the GNU/Intel/macOS CI lanes (which agree with each other to 1e-13) differed by up to 3.2e-5 (1 fluid) and 9.1e-6
+            # (2 fluids), abs, in the energy; 3e-4 is ~10x that and far below the 0.13 sign flip it guards. Golden: GNU 12.3 (#2432).
             def friction_box(box, bodies, steps, eps, mu, **extra):
                 # still uniform gas in a periodic box of side box (0.25 cells), soft-sphere circles (x, y, vx, vy), mass 1
                 cells = round(box / 0.25) - 1
@@ -1852,6 +1852,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # force flips sign every step with magnitude mu*|F_n|; with it the slide dies out.
             wall_slide = friction_box(10.0, [(5.0, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
             cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=3e-4))
+            if num_fluids == 1:
+                # The seam pair on 1 rank and transposed along y (#2432): ib_mass_relax gave a cell within reach of both shells to the
+                # first marker of the x-inner scan, so the two differed by 7.6e-3. The Convergence check asserts the transpose. The
+                # seam pair's tolerance, as Cray may differ from the GNU golden in the same way.
+                pair_y = friction_box(20.0, [(15.0, 9.35, 0.0, 0.3), (15.0, 10.65, 0.0, -0.3)], 100, 0.003, 0.1)
+                pairs = {a: define_case_d(stack, f"IBM -> Collision -> Contact pair along {a}", mods, override_tol=3e-4) for a, mods in (("x", seam_pair), ("y", pair_y))}
+                cases.extend(pairs.values())
+                spec = ConvergenceSpec(runner=run_transpose_check, case_path="", expected_order=0.0, tol=1e-9, params={a: {**BASE_CFG, **c.mods} for a, c in pairs.items()})
+                cases.append(define_convergence_case("Convergence -> IBM -> contact pair transposition", spec=spec))
             cases.append(
                 define_case_d(
                     stack,

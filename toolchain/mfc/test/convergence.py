@@ -535,6 +535,29 @@ def run_amr_check(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     return run.returncode == 0, run.stdout[-3000:] + run.stderr[-1000:]
 
 
+def run_transpose_check(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
+    """Run the 2D case spec.params["x"] and its x/y transpose spec.params["y"] (square grid, 1 rank): the final conserved fields
+    must be transposes of each other, the momenta swapped, to a relative spec.tol."""
+    q = {}
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for tag, params in spec.params.items():
+            run_dir = os.path.join(tmpdir, tag)
+            os.makedirs(run_dir)
+            case = os.path.join(run_dir, "case.json")
+            common.file_write(case, json.dumps(params))
+            run = subprocess.run([MFC, "run", case, "-t", "pre_process", "simulation", "-n", "1"] + spec.extra_args, capture_output=True, text=True, check=False)
+            if run.returncode != 0:
+                raise common.MFCException(f"./mfc.sh run failed for {tag}\n{run.stdout[-3000:]}\n{run.stderr}")
+            mx, my, nf = int(params["m"]) + 1, int(params["n"]) + 1, int(params["num_fluids"])
+            q[tag] = np.array([_read_field(run_dir, int(params["t_step_stop"]), i, 1, mx * my).reshape((my, mx)) for i in range(1, nf + 4)])
+    mom = [q["y"].shape[0] - 3, q["y"].shape[0] - 2]
+    qt = q["y"].transpose(0, 2, 1).copy()
+    qt[mom] = qt[mom[::-1]]
+    rel = max(float(np.max(np.abs(q["x"][v] - qt[v])) / max(float(np.max(np.abs(q["x"][v]))), 1e-300)) for v in range(q["x"].shape[0]))
+    passed = rel <= spec.tol
+    return passed, f"  max relative difference of x and transposed y: {rel:.3e} (need <= {spec.tol:.1e})  {'OK' if passed else 'FAIL'}\n"
+
+
 def run_case(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     """Run one convergence case. Returns (passed, full output report)."""
     try:

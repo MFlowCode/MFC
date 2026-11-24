@@ -2096,28 +2096,37 @@ contains
     end subroutine s_ib_bank_step
 
     !> ib_mass_relax: tag the fluid cells within ib_shell_width cells of each body (ib_shell) and add their gas mass to ib_part(3)
-    !! (summed into ib_heat(5) by s_update_ib_temperatures). A cell within reach of two bodies is assigned to the first one found.
+    !! (summed into ib_heat(5) by s_update_ib_temperatures). A cell within reach of two bodies goes to the nearer one.
     impure subroutine s_ib_shell_mass(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp)                                            :: rho, vol
-        integer                                             :: i, j, k, l, jj, kk, ll, wz, mk, ib_tmp, ib_id, g, xp, yp, zp, sh
+        real(wp) :: rho, vol
+        integer :: i, j, k, l, jj, kk, ll, wz, mk, ib_tmp, ib_id, g, xp, yp, zp, sh, c, d2, d2min
 
         wz = 0
         if (num_dims == 3) wz = ib_shell_width
         ! Shell membership from the markers, which carry the halo, so a cell next to another rank's body is found too
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, jj, kk, ll, mk, ib_tmp, ib_id, g, xp, yp, zp, rho, vol, sh]', collapse=3, &
-                            & copyin='[wz]')
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, jj, kk, ll, mk, ib_tmp, ib_id, g, xp, yp, zp, rho, vol, sh, c, d2, d2min]', &
+                            & collapse=3, copyin='[wz]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     g = 0
                     if (ib_markers%sf(j, k, l) == 0) then
+                        ! Nearest marker, ties to the smaller patch id (not the encoded marker, whose periodic offset is
+                        ! axis-ordered): independent of the scan order, so of orientation
                         mk = 0
+                        d2min = huge(d2min)
                         do ll = -wz, wz
                             do kk = -ib_shell_width, ib_shell_width
                                 do jj = -ib_shell_width, ib_shell_width
-                                    if (mk == 0) mk = ib_markers%sf(j + jj, k + kk, l + ll)
+                                    c = ib_markers%sf(j + jj, k + kk, l + ll)
+                                    d2 = jj*jj + kk*kk + ll*ll
+                                    if (c /= 0 .and. (d2 < d2min .or. (d2 == d2min .and. mod(c - 1, &
+                                        & num_gbl_ibs + 1) < mod(mk - 1, num_gbl_ibs + 1)))) then
+                                        mk = c
+                                        d2min = d2
+                                    end if
                                 end do
                             end do
                         end do
