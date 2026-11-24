@@ -489,6 +489,9 @@ if (MFC_DOCUMENTATION)
 
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
                         "${CMAKE_CURRENT_SOURCE_DIR}/docs/404.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/benchmarks.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/ci.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/tests.html"
             DESTINATION "docs/mfc")
 endif()
 
