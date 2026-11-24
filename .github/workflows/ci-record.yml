@@ -67,11 +67,18 @@ jobs:
           # Re-run the failed jobs when no failure is the change's own: every failed job is a cluster
           # job that died of the machine or the plumbing, and this is not already the third attempt.
           # A SLURM time limit is retried once. A newer run of the same workflow and branch wins.
+          # The causes and the SLURM notices are read from job logs and annotations, which a pull request's
+          # own code can print. The most that buys it is two re-runs of its own run or invented SLURM rows
+          # in the history; nothing here runs what it prints.
           attempt=$(jq -r '.run_attempt' run.json)
           hosted=$(jq --argjson a "$attempt" '[.jobs[] | select(.run_attempt == $a and .conclusion == "failure") | select(.labels | any(. == "frontier" or . == "gt") | not)] | length' jobs.json)
+          # A hosted job that failed without failing the run was continue-on-error: it says nothing here.
+          if [ "$(jq -r '.conclusion' run.json)" != failure ]; then hosted=0; fi
           causes=$(jq -r --argjson a "$attempt" '[.jobs[] | select(.a == $a and .c == "failure") | .why // "other"] | unique | join(" ")' line.json)
           retry=false
-          if [ "$(jq -r '.conclusion' run.json)" = failure ] && [ "$attempt" -lt 3 ] && [ "$hosted" -eq 0 ] && [ -n "$causes" ]; then
+          # Not gated on the run having failed: the Frontier lanes are continue-on-error, so a run they
+          # failed in concludes "success". A cancelled run was replaced or stopped by someone.
+          if [ "$(jq -r '.conclusion' run.json)" != cancelled ] && [ "$attempt" -lt 3 ] && [ "$hosted" -eq 0 ] && [ -n "$causes" ]; then
             retry=true
             for cause in $causes; do
               case "$cause" in
