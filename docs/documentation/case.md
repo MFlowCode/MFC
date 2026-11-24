@@ -127,8 +127,8 @@ feature, detecting GPU pointers and performing RDMA accordingly.
 | `x[y,z]_domain%%beg[end]`| Real    | Beginning [ending] of the $x$[y,z]-direction domain    |
 | `stretch_x[y,z]`         | Logical | Stretching of the mesh in the $x$[y,z]-direction |
 | `a_x[y,z]`               | Real    | Rate at which the grid is stretched in the $x$[y,z]-direction |
-| `x[y,z]_a`               | Real    | Beginning of the stretching in the negative $x$[y,z]-direction |
-| `x[y,z]_b`               | Real    | Beginning of the stretching in the positive $x$[y,z]-direction |
+| `x_a`, `y_a`, `z_a`      | Real    | Beginning of the stretching in the negative $x$[y,z]-direction |
+| `x_b`, `y_b`, `z_b`      | Real    | Beginning of the stretching in the positive $x$[y,z]-direction |
 | `loops_x[y,z]`           | Integer | Number of times to recursively apply grid stretching |
 | `cyl_coord`              | Logical | Cylindrical coordinates (2D: Axisymmetric, 3D: Cylindrical) |
 | `m`                      | Integer | Number of grid cells in the $x$-coordinate direction |
@@ -190,6 +190,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
 | `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
 | `model_id`           | Integer | Not Supported         | Index into the `stl_models` array (geometry 21)              |
+| `sph_har_coeff(l,m)` | Real    | Not Supported         | Spherical-harmonic surface coefficient (geometry 14)         |
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index.
 
@@ -342,6 +343,8 @@ Optimal choice of the value of `smooth_coeff` is case-dependent and left to the 
 - `patch_icpp(j)%%alpha(i)`, `patch_icpp(j)%%alpha_rho(i)`, `patch_icpp(j)%%pres`, and `patch_icpp(j)%%vel(i)` define for $j$-th patch the void fraction of `fluid(i)`, partial density of `fluid(i)`, the pressure, and the velocity in the $i$-th coordinate direction.
 These physical parameters must be consistent with fluid material's parameters defined in the next subsection.
 
+- `sph_har_coeff(l,m)` (geometry 14, 3D, pre-process) shapes the patch surface as \f$r(\theta,\phi) = R + \sum_{l,m} c_{lm} Y_{lm}(\theta,\phi)\f$, with \f$R\f$ the patch `radius`, \f$\theta\f$ and \f$\phi\f$ the polar and azimuthal angles about the centroid (polar axis along \f$z\f$), and \f$Y_{lm}\f$ the orthonormal real spherical harmonics (\f$\cos(m\phi)\f$ for \f$m > 0\f$, \f$\sin(|m|\phi)\f$ for \f$m < 0\f$). Degrees run `l = 0..5` and orders `m = -l..l`; unset coefficients are 0, giving a sphere. A cell is inside when its distance from the centroid is at most \f$r(\theta,\phi)\f$.
+
 - `model_id` selects the STL/OBJ model for a geometry-21 patch by indexing into the `stl_models` array. The model file, scaling, and translation, and the inside/outside threshold, are configured on that `stl_models` entry (see the `stl_models` section below); a cell is marked inside the model using a winding-number test.
 
 #### Elliptic Smoothing
@@ -387,6 +390,9 @@ The measured accuracy of the wall value and wall-normal gradient, and which opti
 | `wall_column`        | Logical | Sub-grid wall conduction column per first-layer ghost of a fixed, inert `thermal_bc = 1` circle or sphere (default F). |
 | `wall_column_len`    | Real    | Column length L [m]; the column spans max(3h, L) (default 0: 0.15 `radius`). |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
+| `v_blow`             | Real    | Wall-normal blowing speed out of the surface (burning or transpiring body); 0 (default) = impermeable. |
+| `inj_species`        | Integer | With `chemistry`, index of the species whose pure state fills the body's ghost points (an injecting surface, with `v_blow`); 0 (default) = the mirrored ambient composition. |
+| `burn_rate_exp`, `burn_rate_pref` | Real | Pressure-coupled blowing \f$v_{blow} (p/p_{ref})^n\f$ (Vieille's law): exponent \f$n \ge 0\f$ and reference pressure \f$p_{ref}\f$; `burn_rate_pref = 0` (default) keeps `v_blow` constant. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `mass`               | Real    | Body mass; must be > 0 for `moving_ibm = 2`, whose acceleration is force/mass. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
@@ -456,6 +462,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `thermal_layer` = δ > 0 starts the gas around a `thermal_bc = 1` or `3` circle (geometry 2) or sphere (geometry 8) in the conduction solution for a wall brought to `Twall` (the initial `Twall` for `thermal_bc = 3`) a time t₀ = δ²/(4α) earlier: T = T∞ + (`Twall` − T∞)(R/r)^((d−1)/2) erfc((r − R)/δ), with pressure and composition unchanged. It is exact for a sphere and the leading-order term for a cylinder. Without it a hot wall meets ambient gas as a temperature step at t = 0, and the near-wall cells heat faster than they can expand; on coarse grids that transient can drive the state non-physical. Resolve δ with a few cells: the profile is evaluated at the cell centres, not cell-averaged, so the cell-mean density differs from it by O((h/δ)²), about 1 % at δ = 2 cells. Where layers overlap, the IB with the largest temperature change sets the cell, and periodic directions use the nearest image.
 
 - `wall_column` = T gives each first-layer ghost of the wall a one-dimensional low-Mach conduction column along the wall normal, from the wall at `Twall` to a distance max(3h, `wall_column_len`), with the body's curvature, frozen composition and the gas temperature and pressure at its top (a Lagrange probe). The ghost's conduction temperature (see `thermal_bc = 1` above) mirrors the first gas cell's temperature, which carries at most about 2λΔT/h through the face, far below the flux of a wall layer thinner than a cell. The column advances once per step from the state of the step's first stage; its step-mean wall flux enters the gas as one equivalent conduction temperature per ghost, with the diffusion flux's own face conductivity and the steady radial weight of each gas face. A one-sided guard cuts the drain of a gas cell colder than the column averaged over its own area (zero in steady state). With `ib_heat_wrt` the body books the column's flux: the gas faces' flux plus the guard's cut. `wall_column_dt_frac` adds a time-step limit (`WCOL`) that keeps a step's column drain within that fraction of a near-wall cell's heat span. The option requires `chemistry`, `chem_params%%diffusion`, `chem_params%%transport_model = 1`, `surface_reaction = 0`, fixed bodies, no AMR, and `cfl_adap_dt` or `cfl_const_dt`. With `cfl_const_dt` the limit is evaluated once, at the first step, from the column's initial (semi-infinite-wall) flux estimate, and stays in the constant dt: conservative, possibly much smaller than needed. The default F leaves every result unchanged.
+
+- `v_blow` (simulation) adds an outward wall-normal velocity `v_blow` to the ghost-point velocity of the body, so the surface injects gas. With `chemistry` and `inj_species > 0` the ghost composition is that species alone, at the image-point pressure and temperature (independent of `v_blow`). With `burn_rate_pref > 0` the speed follows Vieille's law, \f$v = v_{blow}\,(\max(p, 0)/p_{ref})^{n}\f$, with \f$p\f$ the image-point pressure of each ghost point, \f$p_{ref}\f$ = `burn_rate_pref` and \f$n\f$ = `burn_rate_exp`, in the case's pressure units (`examples/2D_ibm_burning_grain`). The validator rejects `burn_rate_exp < 0`.
 
 - `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 
@@ -547,6 +555,13 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 | `sigma`   | Real   | Surface tension coefficient                    |
 | `G`       | Real   | Shear modulus of solid.                        |
+| `eos`     | Integer | Equation of state, by number or name: 1 `stiffened_gas` (default), 2 `ideal_gas`, 3 `mie_gruneisen`, 4 `jwl`, 5 `vinet`. |
+| `mg_rho0`, `mg_c0`, `mg_s`, `mg_gruneisen` | Real | Mie-Gruneisen (``eos = 'mie_gruneisen'``): reference density, bulk sound speed, Hugoniot slope, Gruneisen coefficient (required). |
+| `mg_s2`, `mg_s3`, `mg_gruneisen_a`, `mg_t0` | Real | Mie-Gruneisen: quadratic and cubic Hugoniot terms, density slope of the Gruneisen coefficient, reference temperature (optional, default 0). |
+| `jwl_a`, `jwl_b`, `jwl_r1`, `jwl_r2`, `jwl_omega`, `jwl_rho0` | Real | JWL (``eos = 'jwl'``): \f$A\f$, \f$B\f$, \f$R_1\f$, \f$R_2\f$, \f$\omega\f$ and reference density (required). |
+| `jwl_t0`  | Real   | JWL: reference temperature (optional).          |
+| `vinet_k0`, `vinet_k0p`, `vinet_rho0`, `vinet_gruneisen` | Real | Vinet (``eos = 'vinet'``): bulk modulus, its pressure derivative, reference density, Gruneisen coefficient (required). |
+| `vinet_gruneisen_a`, `vinet_t0` | Real | Vinet: density slope of the Gruneisen coefficient, reference temperature (optional, default 0). |
 
 Fluid material's parameters. All parameters except for sigma should be prepended with `fluid_pp(i)` where $i$ is the fluid index.
 
@@ -569,6 +584,15 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
+
+- `fluid_pp(i)%%eos` selects the equation of state of fluid $i$ (read by all three targets; `src/common/m_eos.fpp`). `stiffened_gas` uses `gamma` and `pi_inf`; `ideal_gas` uses `gamma` and must not set `pi_inf`. The state-dependent families `mie_gruneisen`, `jwl` and `vinet` set neither: each is a Mie-Gruneisen form about a reference curve \f$p_{ref}(\rho)\f$, \f$e_{ref}(\rho)\f$,
+  \f[ p = p_{ref}(\rho) + \Gamma_G(\rho)\,\rho\,\big(e - e_{ref}(\rho)\big), \qquad \Gamma_G = \Gamma_0 + a\,\mu, \qquad \mu = \rho/\rho_0 - 1, \f]
+  and only the selected family's `<prefix>_*` parameters may be set. All values are dimensional in the case's own units.
+  - `mie_gruneisen`: the reference curve is the shock Hugoniot \f$u_s = c_0 + s\,u_p + s_2 u_p^2 + s_3 u_p^3\f$ (`mg_c0`, `mg_s`, `mg_s2`, `mg_s3`), with \f$p_H = \rho_0 u_s u_p\f$ and \f$e_H = p_H \mu / (2\rho_0(1+\mu))\f$, and \f$p_{ref} = \rho_0 c_0^2 \mu\f$ in tension (\f$\mu < 0\f$); \f$\Gamma_0\f$ = `mg_gruneisen`, \f$a\f$ = `mg_gruneisen_a`. A cubic fit is clamped at the compression where it turns over. `mg_s >= 1` is required.
+  - `jwl`: \f$p_{ref} = A e^{-R_1 V} + B e^{-R_2 V}\f$, \f$V = \rho_0/\rho\f$, an isentrope, with \f$\Gamma_G = \omega\f$ constant (`jwl_a`, `jwl_b`, `jwl_r1`, `jwl_r2`, `jwl_omega`, `jwl_rho0`). `jwl_r1 > jwl_r2 > 0` is required.
+  - `vinet`: the Vinet cold curve \f$p_{ref} = 3K_0 (1-x) x^{-2} e^{\eta(1-x)}\f$, \f$x = (\rho_0/\rho)^{1/3}\f$, \f$\eta = 3(K_0'-1)/2\f$, also an isentrope (`vinet_k0`, `vinet_k0p`, `vinet_rho0`); \f$\Gamma_0\f$ = `vinet_gruneisen`, \f$a\f$ = `vinet_gruneisen_a`. `vinet_k0p > 1` is required.
+  - `<prefix>_t0` is the temperature at \f$\rho_0\f$ on the reference curve, from which the temperature is integrated (with `cv`); it is needed only when a temperature is (`T_wrt`, or an Arrhenius `rburn%%ta`).
+  - A state-dependent fluid requires `model_eqns = 2` or `3`, `riemann_solver = 1`, `2` or `5`, and `wave_speeds = 1`, and is not supported with bubbles, particles, `igr`, `relativity`, `mhd`, `chemistry`, `relax` or `ib`. Every patch's initial state must lie inside the equation of state. Examples: `examples/1D_mg_impact`, `examples/1D_mg_acoustic`, `examples/1D_isentropic_release` (`--eos jwl` or `vinet`).
 
 > **Stored-form parameters:** The values `gamma`, `pi_inf`, and `Re(1)`/`Re(2)` are **not** the raw physical quantities. MFC expects transformed stored forms:
 > - `gamma` = \f$1/(\gamma-1)\f$, not \f$\gamma\f$ itself
@@ -755,7 +779,7 @@ If this option is false, velocity gradient is computed using finite difference s
   The WENO chain (face values, divergence-theorem cell gradient, reconstruction of that gradient, face mean) has a damping rate of exactly zero at the checkerboard wavenumber: a periodic box with a seeded u(y) = (-1)^j mode decays at rate 0.000 with `weno_Re_flux`, at 4 nu/dy^2 (20.5 at nu = 0.005, 32 cells) with `weno_Re_flux = F` or this option, and a smooth mode decays at the exact nu k^2 either way.
   At a no-slip wall (`bc_y%%beg = -16`) the odd-mirror ghost forces that band, and the velocity next to the wall alternates about the exact profile (up to 6 % of the bulk velocity in the first four cells of a 32-cell channel with HLLC, 12 % in the hot-wall thermal channel); the option removes it.
   The face difference brings the explicit viscous time-step limit of `weno_Re_flux = F`, about nu dt/dy^2 below 0.25 to 0.4 (a 128-cell channel with nu dt/dy^2 = 0.47 diverged, 0.23 was stable), which the WENO chain does not impose at this scale.
-  It does not touch the tangential and cross terms or the immersed-boundary walls (use `ib_visc_compact`, whose band covers faces near a body; the two can be combined). `weno_avg = F` with `weno_Re_flux` reads a cell's own two reconstructed face values, so it does not see a jump between two cells (an impulsive start next to a wall gives zero wall shear at the first step); this is a separate observation.
+  It does not touch the tangential and cross terms or the immersed-boundary walls (use `ib_visc_compact`, whose band covers faces near a body; the two can be combined). `weno_avg = F` with `weno_Re_flux` reads a cell's own two reconstructed face values, so it does not see a jump between two cells (an impulsive start next to a wall gives zero wall shear at the first step), and the validator warns on that combination; set `weno_avg = T`.
 
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
@@ -952,7 +976,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files.
 
-- `ib_force_wrt` records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. It is off by default: the history is written every step, which at large rank counts is a cost a run should opt into rather than inherit. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
+- `ib_force_wrt` records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below, and needs no other output flag: with no moving body it turns on the force and torque calculation itself. It is off by default: the history is written every step, which at large rank counts is a cost a run should opt into rather than inherit. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
 
 - `ib_surface_wrt` writes, at every save, one text file per rank, `D/ib_surface_<rank>_<save>.dat`, with a line per surface point of each non-injecting IB (`inj_species` = 0) of a chemistry run, and no header, columns `x y z ib nx ny nz area T_wall mdot`. `ib` is the global IB index, `(nx, ny, nz)` the level-set normal, `T_wall` the surface temperature [K] and `mdot` the gasified mass flux [kg/m²/s] from the surface solve (0 on an inert surface). `area` [m², or m per unit depth in 2D] is the surface each point stands for: summing `area`·`mdot` over an IB's lines gives its mass loss rate [kg/s], and `mdot`/ρ_solid is the local surface regression rate. The points are the ghost points within two cell sizes h = (cell volume)^(1/d) of the surface, each weighted by cell volume/(2h); for circles, spheres and cylinder sides the weight is also scaled by (R/(R − depth))^(d−1), the area ratio between the surface and the layer the point sits in. The areas then sum to the surface area without bias (a sphere at R = 12h: within 0.3%; a circle at R = 20h: within about 1%); other shapes keep the uncorrected band, which underestimates a convex surface by about (d−1)·h/R.
 
@@ -1341,6 +1365,8 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `mixlayer_perturb_k0`  | Real    | Base wavenumber for mixing layer perturbation |
 | `mixlayer_perturb_nk`  | Integer | Number of perturbation modes for mixing layer |
 | `simplex_perturb`      | Logical | Enable simplex noise perturbation of initial conditions |
+| `simplex_params%%perturb_vel(d)`, `perturb_vel_freq(d)`, `perturb_vel_scale(d)`, `perturb_vel_offset(d,j)` | Logical, Real | Simplex-noise perturbation of velocity component $d$: switch, spatial frequency, relative amplitude, coordinate offset in direction $j$ |
+| `simplex_params%%perturb_dens(i)`, `perturb_dens_freq(i)`, `perturb_dens_scale(i)`, `perturb_dens_offset(i,j)` | Logical, Real | The same for the partial density of fluid $i$ |
 
 The table lists velocity field parameters.
 The parameters are optionally used to define initial velocity profiles and perturbations.
@@ -1354,6 +1380,8 @@ The parameters are optionally used to define initial velocity profiles and pertu
 - `perturb_sph` activates the perturbation of initial partial density by random noise.
 
 - `perturb_sph_fluid` specifies the fluid component whose partial density is to be perturbed.
+
+- `simplex_perturb` (pre-process, 2D and 3D) adds simplex noise \f$N \in [-1, 1]\f$ to the initial condition after the patches are laid down. For each velocity component $d$ with ``simplex_params%%perturb_vel(d) = 'T'``, \f$u_d \mathrel{+}= |\mathbf{u}|\, s\, N(f(\mathbf{x} + \mathbf{o}))\f$, with \f$s\f$ = `perturb_vel_scale(d)`, \f$f\f$ = `perturb_vel_freq(d)` and \f$o_j\f$ = `perturb_vel_offset(d,j)`, so the perturbation scales with the local speed and vanishes where the gas is at rest. For each fluid $i$ with ``perturb_dens(i) = 'T'``, the partial density is scaled by \f$1 + s\,N\f$ with the `perturb_dens_*` values of that fluid. Different offsets decorrelate the fields; the noise is deterministic.
 
 - `mixlayer_vel_profile` activates setting the mean streamwise velocity to a hyperbolic tangent profile. This option works only for `n > 0`.
 

@@ -257,6 +257,10 @@ if [ "$u_c" '==' 'famd' ] || [ "$u_c" '==' 'tamd' ]; then
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
                         -lmpifort_amd -lmpi_amd -lmpi -lpmi -lpmi2"
+    # GPU-aware MPI (rdma_mpi): GTL, set by craype-accel-amd-gfx90a on Frontier GPU loads
+    if [ "$u_c" '==' 'famd' ] && [ "$cg" '==' 'gpu' ]; then
+        export CRAY_MPICH_LIB="${CRAY_MPICH_LIB} ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
+    fi
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CRAY_LD_LIBRARY_PATH}"
     export CMAKE_PREFIX_PATH="${OLCF_AFAR_ROOT}:${CMAKE_PREFIX_PATH}"
     export FC="${OLCF_AFAR_ROOT}/bin/amdflang"

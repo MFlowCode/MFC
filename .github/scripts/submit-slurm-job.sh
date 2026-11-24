@@ -163,7 +163,8 @@ elif [ "$device" = "gpu" ]; then
 #SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4
 #SBATCH -G${gpu_count}"
-            node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0,atl1-1-01-002-28-0"
+            # atl1-1-03-010-1-0 passes preflight, then OpenMP offload finds no device (#2423, #2424).
+            node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0,atl1-1-01-002-28-0,atl1-1-03-010-1-0"
             ;;
         frontier|frontier_amd)
             sbatch_device_opts="\
@@ -259,6 +260,13 @@ export job_cluster="$cluster"
 export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 
 . ./mfc.sh load -c $compiler_flag -m $module_mode
+
+# GPU model, compute capability and driver, and the NVHPC version: a GPU partition list lands on mixed generations
+if [ "\$job_device" = "gpu" ] && command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi -L || true
+    nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv || true
+    if command -v nvfortran >/dev/null 2>&1; then nvfortran --version | head -2 || true; fi
+fi
 
 $sbatch_script_contents
 

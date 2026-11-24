@@ -1918,6 +1918,12 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
+        # advisory: smooth fields are exact either way (#2391)
+        self.warn(
+            weno_Re_flux and viscous and not weno_avg,
+            "weno_Re_flux without weno_avg: a cell's velocity gradient uses only its own two face values, so the viscous flux "
+            "misses a jump between neighbouring cells (zero wall shear on an impulsive start); set weno_avg = T",
+        )
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and not weno_Re_flux, "weno_Re_flux_compact requires weno_Re_flux")
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "weno_Re_flux_compact requires Cartesian coordinates")
 

@@ -1268,8 +1268,8 @@ contains
 
     end subroutine s_write_serial_ib_state
 
-    !> Record every immersed body's force, torque and kinematics (D/ib_forces.dat, ib_force_wrt with ib_state_wrt) and its mass and
-    !! heat exchange (D/ib_heat.dat, ib_heat_wrt) for this step.
+    !> Record every immersed body's force, torque and kinematics (D/ib_forces.dat, ib_force_wrt) and its mass and heat exchange
+    !! (D/ib_heat.dat, ib_heat_wrt) for this step.
     !!
     !! One shared text file per quantity, opened once for the run. Each rank writes only the
     !! bodies it owns, at a byte offset computed from the step and the global body id, so the file
@@ -1294,7 +1294,7 @@ contains
         integer             :: i, ib_idx, n_write, row
         logical             :: wrt_force
 
-        wrt_force = ib_force_wrt .and. ib_state_wrt
+        wrt_force = ib_force_wrt
         if (.not. (wrt_force .or. ib_heat_wrt)) return
         if (mod(t_step, max(ib_force_stride, 1)) /= 0) return
         ! This runs at RK stage 1, before the step's force has been computed, so the row for step N carries the
