@@ -17,7 +17,7 @@ module m_phase_timing
     public :: s_phase_tic, s_phase_toc, s_phase_step_tic, s_phase_step_toc, s_phase_report, PH_HALO, PH_GATHER, PH_GFILL, &
         & PH_SEAM, PH_RHS, PH_RK, PH_REFLUX, PH_REGRID, PH_COARSE, PH_SWAP, PH_RESTR, PH_LERP, PH_RG_HALO, PH_RG_TAG, PH_RG_CLUS, &
         & PH_RG_OWN, PH_RG_MIG, PH_RG_BUILD, PH_RG_REC, s_mem_note, s_mem_note_fields, MEM_STORE, MEM_SCRATCH, MEM_PATCH, &
-        & MEM_REG, MEM_IB, MEM_IBHOST, s_mem_note_level
+        & MEM_REG, MEM_IB, MEM_IBHOST, s_mem_note_level, s_mem_reset_levels
 
     integer, parameter          :: PH_HALO = 1       !< coarse cons halo exchange (once per stage)
     integer, parameter          :: PH_GATHER = 2     !< fill waves: coarse-patch gather into every block
@@ -181,6 +181,13 @@ contains
         mem_fill_sum(lev) = mem_fill_sum(lev) + sum(fill); mem_fill_n(lev) = mem_fill_n(lev) + real(size(fill), wp)
 
     end subroutine s_mem_note_level
+
+    !> Forget the per-level notes so far (a restart replaces the initial layout before the first step).
+    impure subroutine s_mem_reset_levels()
+
+        if (allocated(mem_lev_hw)) deallocate (mem_lev_hw, mem_fill_min, mem_fill_max, mem_fill_sum, mem_fill_n)
+
+    end subroutine s_mem_reset_levels
 
     !> Add bytes to group id of the end-of-run AMR memory table.
     impure subroutine s_mem_note(id, bytes)

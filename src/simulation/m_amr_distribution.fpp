@@ -759,25 +759,25 @@ contains
 
     end subroutine s_amr_expand_box_over_bodies
 
-    !> Tile size for the level-1 regrid boxes. From amr_maxc_fit, shrink one cell in one dimension at a time (in turn, not below
-    !! amr_rank_tile_min) and keep the size whose tile count n best balances over P = min(num_procs, amr_max_blocks) ranks: least
-    !! ceil(n/P)*P/n, the busiest rank's tiles over the mean, ties to larger tiles. A size is a candidate only if n fits the block
-    !! pool and no box leaves a last tile narrower than the seam halo (buff_size fine cells). The search stops past 2P tiles or at
-    !! the floor. amr_maxc_fit as is with amr_max_grid_size set or on one rank. Replicated input: rank-invariant.
+    !> Tile size for the level-1 regrid boxes: from amr_maxc_fit, shrink one cell in one dimension at a time (in turn, not below
+    !! amr_rank_tile_min) until there is at least one tile per rank, P = min(num_procs, amr_max_blocks), so a small refined region
+    !! gives every rank work while blocks stay as large as that allows. A size is skipped if its tile count overflows the block pool
+    !! or a box would leave a last tile narrower than the seam halo (buff_size fine cells); if none reaches P, the valid size with
+    !! the most tiles. amr_maxc_fit as is with amr_max_grid_size set or on one rank. Replicated input: rank-invariant. (Choosing the
+    !! size that best balances ceil(n/P)*P/n was 8 % slower at 128 MI250X ranks: more, smaller blocks.)
     pure function f_amr_rank_tile(boxes, nboxes) result(tc)
 
         type(t_box), intent(in) :: boxes(:)
         integer, intent(in)     :: nboxes
         integer, parameter      :: amr_rank_tile_min = 16
         integer                 :: tc(3), cur(3), k, d, dd, ntl, s, minw, wmin
-        integer(8)              :: n, tgt
-        real(wp)                :: score, best
+        integer(8)              :: n, tgt, nbest
 
         tc = amr_maxc_fit
         if (amr_max_grid_size > 0 .or. num_procs == 1) return
         tgt = int(min(num_procs, amr_max_blocks), 8)
         wmin = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio  ! narrowest tile, in coarse cells, the seam exchange supports
-        cur = amr_maxc_fit; d = 0; best = huge(1._wp)
+        cur = amr_maxc_fit; d = 0; nbest = 0_8
         do
             n = 0_8; minw = huge(1)
             do k = 1, nboxes
@@ -790,13 +790,11 @@ contains
                     minw = min(minw, boxes(k)%hi(dd) - boxes(k)%lo(dd) + 1 - (ntl - 1)*s)
                 end do
             end do
-            if (n <= int(amr_max_blocks, 8) .and. minw >= wmin) then
-                score = real((n + tgt - 1)/tgt*tgt, wp)/real(n, wp)
-                if (score < best*(1._wp - 1.e-12_wp)) then
-                    best = score; tc = cur
-                end if
+            if (n <= int(amr_max_blocks, 8) .and. minw >= wmin .and. n >= nbest) then
+                tc = cur; nbest = n
+                if (n >= tgt) return
             end if
-            if (n > 2_8*tgt .or. all(.not. amr_dim .or. cur <= amr_rank_tile_min)) return
+            if (n > int(amr_max_blocks, 8) .or. all(.not. amr_dim .or. cur <= amr_rank_tile_min)) return
             do
                 d = mod(d, 3) + 1
                 if (amr_dim(d) .and. cur(d) > amr_rank_tile_min) exit

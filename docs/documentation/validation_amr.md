@@ -73,7 +73,7 @@ python3 examples/1D_amr_sod/check_sod.py examples/1D_amr_sod
 python3 examples/2D_amr_conservation/check_conservation.py examples/2D_amr_conservation
 ```
 
-`case.py -N <N> --levels 0` and `--fine` give the uniform grids; `--subcycle` the subcycled AMR runs. Each run needs its own directory (copy `case.py`), since the checker reads the restart files of the case directory. The suite runs `AMR -> 1D -> Example -> Sod two levels` (995DE2F6) and `AMR -> 2D -> Example -> conservation subcycle` (2352E14C).
+The checkers import `mfc.viz`, so run them in MFC's Python environment (`source build/venv/bin/activate` after any `./mfc.sh` command). `case.py -N <N> --levels 0` and `--fine` give the uniform grids; `--subcycle` the subcycled AMR runs. Each run needs its own directory (copy `case.py`), since the checker reads the restart files of the case directory. The suite runs `AMR -> 1D -> Example -> Sod two levels` (995DE2F6) and `AMR -> 2D -> Example -> conservation subcycle` (2352E14C).
 
 ## Smooth flow across block seams {#sec-validation-amr-vortex}
 

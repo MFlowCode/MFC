@@ -1,12 +1,12 @@
-This file was created on 2026-11-25 17:22:54.070322.
+This file was created on 2026-11-25 18:04:49.856734.
 
 mfc.sh:
 
     Invocation: test --no-build --no-gpu --generate -o 6DD45F93 -j 1 --max-attempts 1 -- -c frontier_amd
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        dd2d0843a9980a187b62aea677535a305967b2fa on amr-cleanups (dirty)
+    Git:        0ccf4a61d3f46e7d8805e4fee2f344095a59dcb3 on amr-cleanups (dirty)
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -15,8 +15,8 @@ pre_process:
         C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
         Fortran : LLVMFlang v24.0.0 (/ccs/proj/cfd154/sw/therock-afar-24.4.0-multiarch-10.3.0-a71da8f/bin/amdflang)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -33,8 +33,8 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
+        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
         FC       : /ccs/proj/cfd154/sw/therock-afar-24.4.0-multiarch-10.3.0-a71da8f/bin/amdflang
         OMPI_CC  : 
         OMPI_CXX : 
@@ -74,7 +74,7 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -83,8 +83,8 @@ simulation:
         C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
         Fortran : LLVMFlang v24.0.0 (/ccs/proj/cfd154/sw/therock-afar-24.4.0-multiarch-10.3.0-a71da8f/bin/amdflang)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -101,8 +101,8 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
+        CC       : 
+        CXX      : 
         FC       : /ccs/proj/cfd154/sw/therock-afar-24.4.0-multiarch-10.3.0-a71da8f/bin/amdflang
         OMPI_CC  : 
         OMPI_CXX : 

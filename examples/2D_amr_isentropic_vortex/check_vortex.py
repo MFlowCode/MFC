@@ -10,7 +10,6 @@ largest error in the cells within 3 level-0 cells of a block edge, "away" in all
 """
 
 import math
-import os
 import sys
 
 import numpy as np

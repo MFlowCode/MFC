@@ -23,4 +23,6 @@ similarity equations for \f$\xi_0\f$ and prints the radius error and the peak de
 python3 examples/3D_amr_sedov/check_sedov.py examples/3D_amr_sedov
 ```
 
+The checkers import `mfc.viz`, so run them in MFC's Python environment (`source build/venv/bin/activate` after any `./mfc.sh` command).
+
 Results and limits: the AMR section of the validation page.

@@ -23,6 +23,7 @@ module m_amr_restart
     use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, &
         & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_assign_block_owners, s_set_amr_fine_geometry
     use m_amr_regrid, only: s_amr_check_seam_topology
+    use m_phase_timing, only: s_mem_reset_levels
     use m_amr_distribution, only: s_amr_adopt_block_owners
 
     implicit none
@@ -269,6 +270,7 @@ contains
         else
             call s_amr_assign_block_owners()
         end if
+        call s_mem_reset_levels()  ! the initial tiles this replaces never held a step
         call s_amr_reconcile_slots()
         do k = 1, amr_num_blocks
             amr_cur = k
