@@ -571,3 +571,35 @@ def has_lag_bubble_evol(case_dir: str) -> bool:
     """Return True if ``D/lag_bubble_evol_*.dat`` files exist in *case_dir*."""
     d_dir = os.path.join(case_dir, "D")
     return bool(glob.glob(os.path.join(d_dir, "lag_bubble_evol_*.dat")))
+
+
+@dataclass
+class AMRBlock:
+    """One refined block of an AMR restart: its region in level-0 cells (inclusive), level and conserved fields."""
+
+    lo: Tuple[int, int, int]
+    hi: Tuple[int, int, int]
+    level: int
+    q: np.ndarray  # (sys_size, m+1, n+1, p+1)
+
+
+def read_amr_restart(case_dir: str, step: int, rank: int = 0) -> Tuple[np.ndarray, List[AMRBlock]]:
+    """Level-0 conserved fields (sys_size, cells; flat, x fastest) and the refined blocks this rank owns, from the serial
+    restart files p_all/p<rank>/<step>/q_cons_vf<i>.dat and amr_fine.dat (parallel_io = F)."""
+    d = os.path.join(case_dir, "p_all", f"p{rank}", str(step))
+    with open(os.path.join(d, "amr_fine.dat"), "rb") as f:
+        _, nblk, sys_size, _, _, word = struct.unpack("<6i", _read_record_endian(f, "<"))
+        dt = np.float64 if word == 8 else np.float32
+        blocks = []
+        for _ in range(nblk):
+            h = struct.unpack("<10i", _read_record_endian(f, "<"))
+            if h[7] < 0:  # owned by another rank
+                continue
+            ext = tuple(e + 1 for e in h[7:10])
+            q = np.array([np.frombuffer(_read_record_endian(f, "<"), dtype=dt).reshape(ext, order="F") for _ in range(sys_size)])
+            blocks.append(AMRBlock(h[0:3], h[3:6], h[6], q))
+    q0 = []
+    for i in range(1, sys_size + 1):
+        with open(os.path.join(d, f"q_cons_vf{i}.dat"), "rb") as f:
+            q0.append(np.frombuffer(_read_record_endian(f, "<"), dtype=dt))
+    return np.array(q0), blocks
