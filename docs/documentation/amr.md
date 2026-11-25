@@ -126,7 +126,7 @@ Full descriptions: @ref case.
 | `amr_buf` | 3 | Padding around tagged cells, coarse cells (>= 1 with regrid) |
 | `amr_cluster_eff` | 0.7 | Minimum tag efficiency of a clustered box |
 | `amr_blocking_factor` | 4 | Minimum box width, coarse cells |
-| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition (and, on several ranks, tiles regrid boxes smaller, not below 16, until there is one per rank) |
+| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition (and, on several ranks, picks the regrid tile size, at least 16, that best spreads the boxes over the ranks) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
 | `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: one level only) |
@@ -208,8 +208,9 @@ comparable (forces on coarse faces only).
 ## Limitations {#amr-limitations}
 
 - **Block size.** A block spans at most about half a rank's subdomain per dimension unless `amr_max_grid_size` is set;
-  larger features are covered by several blocks. On several ranks, regrid tiles the level-1 boxes smaller (not below 16
-  coarse cells) until there is at least one per rank, so a small refined region still spreads over the ranks.
+  larger features are covered by several blocks. On several ranks, regrid tiles the level-1 boxes with the tile size (at
+  least 16 coarse cells) whose tile count best divides over min(ranks, `amr_max_blocks`), so a small refined region still
+  spreads over the ranks; a size that would leave a tile narrower than the ghost layer or overflow the block pool is skipped.
 - **Restart.** `parallel_io` restarts work on any rank count when `amr_max_grid_size` is set; otherwise restart on no
   more ranks than wrote the checkpoint. The serial format needs the rank count that wrote it.
   The file header records `amr_ref_ratio`, `amr_max_level` and the storage precision, which must match (the level count may

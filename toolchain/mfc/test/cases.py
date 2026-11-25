@@ -6499,6 +6499,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True))
         stack.pop()
 
+        # derived block cap at np=2 with amr_maxc_fit = 32 > the 16-cell floor (m = 127): f_amr_rank_tile searches tile sizes, so
+        # a refined region wider than 16 coarse cells splits over both ranks (#2496)
+        stack.push(
+            "AMR -> 1D -> dynamic regrid np=2 -> derived tiles",
+            {**amr_1d_base, "m": 127, "amr_block_beg(1)": 32, "amr_block_end(1)": 95, "amr_regrid_int": 2, "amr_tag_eps": 0.05, "amr_buf": 2},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
         # multi-level + dynamic regrid at np=2: children are placed by distributed sensor-on-fine nesting (tags OR-reduced
         # across ranks; each child stays co-located with its parent). Same eps=0.1/amr_buf=6 as the np=1 case.
         stack.push(
