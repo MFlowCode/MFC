@@ -134,8 +134,7 @@ for j in range(1, NSHELL + 1):
     else:
         case[pre + "radius"] = R + (r2 - R) * shell / NSHELL
         case.update({pre + f"alter_patch({i})": "T" for i in range(1, j)})
-if args.interp == 2:
-    case["ib_ip_interp"] = 2
+case["ib_ip_interp"] = args.interp  # always written: the solver default is 2
 
 if __name__ == "__main__":
     print(json.dumps(case))

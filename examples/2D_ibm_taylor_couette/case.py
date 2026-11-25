@@ -123,8 +123,7 @@ case = {
     "prim_vars_wrt": "F",
     "parallel_io": "F",
 }
-if args.ip_interp != 1:
-    case["ib_ip_interp"] = args.ip_interp
+case["ib_ip_interp"] = args.ip_interp  # always written: the solver default is 2
 if args.visc_compact:
     case["ib_visc_compact"] = "T"
 

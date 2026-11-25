@@ -9,6 +9,18 @@ from ..state import ARG
 from .case import BASE_CFG, PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
 from .convergence import ConvergenceSpec, run_amp_sweep, run_amr_check, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1, run_transpose_check
 
+# Fractions of a cell that move a body off the grid's faces, centre lines and mirror lines: a body placed on one makes
+# round-off pick a branch (stencil, upwind side, contact direction), so compilers differ by far more than round-off.
+_OFF_X, _OFF_Y = 0.1371, 0.2913
+
+
+def _ib_off_grid(case: dict) -> None:
+    """Shift patch_ib(1) by (_OFF_X, _OFF_Y) cells of the case's uniform grid."""
+    for d, frac, cells in (("x", _OFF_X, "m"), ("y", _OFF_Y, "n")):
+        width = (case[f"{d}_domain%end"] - case[f"{d}_domain%beg"]) / (case[cells] + 1)
+        case[f"patch_ib(1)%{d}_centroid"] += frac * width
+
+
 # Convergence test specs.
 # One TestCase per (problem, scheme) pair. Trace prefix "Convergence ->" is
 # the filter handle (`./mfc.sh test --only Convergence`); convergence cases
@@ -1384,21 +1396,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
             if not slip and not viscous and num_fluids == 1 and len(dimInfo[0]) >= 2:
-                # TSC image-point interpolation (ib_ip_interp = 2). Its stencil reads ghost cells, which the default inverse-distance
-                # weights mask out. The quiescent cases hold a uniform state at a realistic pressure, so the exact solution is the
-                # initial state and any change is an error; the other cases run at p = 1, where a solid cell reset to 1 Pa is invisible.
+                # The default TSC image points read ghost cells, which the inverse-distance weights (ib_ip_interp = 1, the opt-out)
+                # mask out. The quiescent cases hold a uniform state at a realistic pressure, so the exact solution is the initial
+                # state and any change is an error; the other cases run at p = 1, where a solid cell reset to 1 Pa is invisible.
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
                 quiescent = {"dt": 1.0e-6}  # the fixed step of the other cases would be a CFL of about 9 at this sound speed
                 for i in (1, 2, 3):
                     quiescent.update({f"patch_icpp({i})%pres": 1.0e5, f"patch_icpp({i})%alpha_rho(1)": 1.2, f"patch_icpp({i})%vel(1)": 0.0})
-                cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=2", {**geom, "ib_ip_interp": 2}))
+                cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=1", {**geom, "ib_ip_interp": 1}))
                 cases.append(define_case_d(stack, f"{shape} -> quiescent", {**geom, **quiescent}))
-                cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=2 quiescent", {**geom, "ib_ip_interp": 2, **quiescent}))
+                cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=1 quiescent", {**geom, "ib_ip_interp": 1, **quiescent}))
 
             if not slip and num_fluids == 1 and len(dimInfo[0]) >= 2:
-                # Two-probe quadratic wall-normal ghost velocity (ib_wall_order = 2) at a no-slip wall, inviscid and viscous
+                # The wall-value ghost velocity (ib_wall_order = 1, the opt-out of the default quadratic fill) at a no-slip wall,
+                # inviscid and viscous
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
-                cases.append(define_case_d(stack, f"{shape} -> ib_wall_order=2", {**geom, "ib_wall_order": 2}))
+                cases.append(define_case_d(stack, f"{shape} -> ib_wall_order=1", {**geom, "ib_wall_order": 1}))
 
             if viscous and not slip and len(dimInfo[0]) >= 2:
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
@@ -1698,7 +1711,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # The 2-rank variant puts the body on a rank seam and moves it across the seam in both directions: the moving-wall term
             # (proportional to the wall's normal velocity) reads the body cell's momentum from the neighbouring rank there.
             # The periodic-edge variant (1 rank) straddles x = 1: its halo cells are filled by the periodic BC of the primitives only.
-            periodic_x = {"bc_x%beg": -1, "bc_x%end": -1, "patch_ib(1)%x_centroid": 0.9}
+            # Its centre is off the grid lines, so no stage puts it on a cell-centre line (at x = 0.9 it reached x = 0.91 at step 20).
+            periodic_x = {"bc_x%beg": -1, "bc_x%end": -1, "patch_ib(1)%x_centroid": 0.9 + 0.02 * _OFF_X, "patch_ib(1)%y_centroid": 0.5 + 0.02 * _OFF_Y}
             for label, spin, ranks, vy, extra in (
                 ("Translating Circle", 0.0, 1, 0.0, {}),
                 ("Translating Spinning Circle", 3.0, 1, 0.0, {}),
@@ -1729,7 +1743,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             **extra,
                         },
                         ppn=ranks,
-                        override_tol=1e-6 if extra else None,
+                        override_tol=1e-9 if extra else None,  # periodic edge: 1e-14 spread, 1e-10 nudge sensitivity
                     )
                 )
             # A centroid exactly on the periodic domain end is owned by no rank until it is wrapped, so with 2 ranks the body lost its
@@ -1814,13 +1828,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "IBM -> Periodic Bodies -> many_ib_patch_parallelism", ibs))
 
         if len(dimInfo[0]) == 2 and not viscous:
-            # Soft-sphere friction across the x = 10 rank seam: two circles close head-on, so the slip is round-off. With
-            # ib_friction_slip_eps = 0 that round-off sets a full mu*|F_n| force whose direction depends on the rank layout (the
-            # y force of 1 and 2 ranks has opposite sign from step 80, 0.13 apart); with it both stay ~1e-4. A seam transient in the
-            # fluid force (0.056 at step 46, also with friction off) is a separate, unexplained rank dependence. Golden: GNU 12.3 (#2432).
-            # GNU 12.3 and 15.2 stay within 1e-11 of it in double precision, and within 1.3e-5 (1 fluid) and 3.4e-5 (2 fluids) in single,
-            # also after a 1-ulp change of a centroid. override_tol: 3e-4 leaves room for Cray, which differed from the GNU lanes by up to
-            # 3.2e-5 before #2436, and stays far below the 0.13 sign flip it guards.
+            # Soft-sphere friction across the x = 10 rank seam: two circles close nearly head-on, so the slip is far below
+            # ib_friction_slip_eps. Without the regularisation a slip that small sets a full mu*|F_n| force whose direction depends on
+            # round-off and the rank layout (the y force of 1 and 2 ranks had opposite sign from step 80, 0.13 apart). The pair was
+            # mirrored about the seam with a slip of pure round-off; it is now generic (below). GNU 12.3, Intel 2024.2 (CPU), NVHPC
+            # 25.11 (CPU) and an A100 agree to 8.5e-12 and a 1e-12 nudge of a centroid moves the result by 5e-12, so override_tol =
+            # 1e-10. Golden: GNU 12.3.
             def friction_box(box, bodies, steps, eps, mu, **extra):
                 # still uniform gas in a periodic box of side box (0.25 cells), soft-sphere circles (x, y, vx, vy), mass 1
                 cells = round(box / 0.25) - 1
@@ -1856,8 +1869,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     **extra,
                 }
 
-            seam_pair = friction_box(20.0, [(9.35, 15.0, 0.3, 0.0), (10.65, 15.0, -0.3, 0.0)], 100, 0.003, 0.1)
-            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=3e-4))
+            # The pair is off the grid and the seam by (_OFF_X, _OFF_Y) cells, closes at unequal speeds, and slides by 1.37e-4 (well
+            # under ib_friction_slip_eps): a pair mirrored about the seam made the slip pure round-off.
+            ox, oy = 0.25 * _OFF_X, 0.25 * _OFF_Y
+            seam_bodies = [(9.35 + ox, 15.0 + oy, 0.3, 0.0), (10.65 + ox, 15.0 + oy, -0.2739, 1.37e-4)]
+            seam_pair = friction_box(20.0, seam_bodies, 100, 0.003, 0.1)
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=1e-10))
             # Two bodies overlapping in the first cell of a rank (#2433): that cell took the last body in the rank's slot order, so 1
             # and 2 ranks differed by O(1) from step 37. Generic placement: shifted by 0.37 cells, body 2 larger and slower.
             if num_fluids == 1:
@@ -1865,14 +1882,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, "IBM -> Collision -> Overlap cell on a rank seam", overlap, ppn=2, override_tol=3e-4))
             # Wall site: a circle pressed into the slip wall y = 0 at 0.1 with a 1e-4 slide. Without ib_friction_slip_eps the friction
             # force flips sign every step with magnitude mu*|F_n|; with it the slide dies out.
-            wall_slide = friction_box(10.0, [(5.0, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
-            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=3e-4))
+            wall_slide = friction_box(10.0, [(5.0 + ox, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=1e-10))
             if num_fluids == 1:
                 # The seam pair on 1 rank and transposed along y (#2432): ib_mass_relax gave a cell within reach of both shells to the
-                # first marker of the x-inner scan, so the two differed by 7.6e-3. The Convergence check asserts the transpose. The
-                # seam pair's tolerance, as Cray may differ from the GNU golden in the same way.
-                pair_y = friction_box(20.0, [(15.0, 9.35, 0.0, 0.3), (15.0, 10.65, 0.0, -0.3)], 100, 0.003, 0.1)
-                pairs = {a: define_case_d(stack, f"IBM -> Collision -> Contact pair along {a}", mods, override_tol=3e-4) for a, mods in (("x", seam_pair), ("y", pair_y))}
+                # first marker of the x-inner scan, so the two differed by 7.6e-3. The Convergence check asserts the transpose.
+                pair_y = friction_box(20.0, [(y, x, uy, ux) for x, y, ux, uy in seam_bodies], 100, 0.003, 0.1)
+                pairs = {a: define_case_d(stack, f"IBM -> Collision -> Contact pair along {a}", mods, override_tol=1e-10) for a, mods in (("x", seam_pair), ("y", pair_y))}
                 cases.extend(pairs.values())
                 spec = ConvergenceSpec(runner=run_transpose_check, case_path="", expected_order=0.0, tol=1e-9, params={a: {**BASE_CFG, **c.mods} for a, c in pairs.items()})
                 cases.append(define_convergence_case("Convergence -> IBM -> contact pair transposition", spec=spec))
@@ -2935,7 +2951,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     }.items()
                 },
             }
-            cases.append(define_case_d(stack, "Viscous Channel -> weno_Re_flux -> weno_Re_flux_compact", channel, override_tol=1e-6))
+            # GNU 12.3, Intel 2024.2, NVHPC 25.11 (CPU) and an A100 agree to 4e-14: the default tolerance
+            cases.append(define_case_d(stack, "Viscous Channel -> weno_Re_flux -> weno_Re_flux_compact", channel))
 
     def alter_particles(dimInfo):
         # Lagrangian solid particles; input/particles.dat is written by create_input_particles
@@ -3467,12 +3484,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     if base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace == "HLL -> Interface RHS" and alt_soundspeed == "T":
                         continue
 
-                    # The shear-stress rows of this case stay near zero, so the absolute
-                    # tolerance is the binding comparison there and compiler/backend roundoff
-                    # can exceed the suite default. This holds for both alt_soundspeed
-                    # variants -- nvhpc 25.5 drifts the alt_soundspeed=T rows to ~1.4e-6, past
-                    # the 1e-6 band. override_tol is case-wide.
+                    # Axisymmetric HLLD: the second patch ends at r = 0.7137 and its x-face is moved off the centre of cell 12,
+                    # so the shear stress is a solution, not round-off (the r-uniform state left tau_xr at 1e-7 on a 1e8 scale).
                     is_axisym_hlld = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"}
+                    cfg = {**base_cfg, "patch_icpp(2)%x_centroid": 0.75 + 0.04 * _OFF_X, "patch_icpp(2)%y_centroid": 0.35685, "patch_icpp(2)%length_y": 0.7137} if is_axisym_hlld else base_cfg
                     tol = 1e-5 if is_axisym_hlld else None
 
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
@@ -3482,7 +3497,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "",
                             mods={},
                             override_tol=tol,
-                            functor=lambda case, bc=base_cfg, sm=solver_mods, alt_ss=alt_soundspeed: apply_solver(case, bc, sm, alt_ss),
+                            functor=lambda case, bc=cfg, sm=solver_mods, alt_ss=alt_soundspeed: apply_solver(case, bc, sm, alt_ss),
                         )
                     )
 
@@ -4869,11 +4884,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "examples/2D_ibm_burning_grain/case.py",
                 ["--burn_exp", "0.5"],
                 mods={"m": 25, "n": 25, "t_step_stop": 50, "t_step_save": 50, "parallel_io": "F"},
-                # Same 1e-3 as the ibm_burning_grain Example golden this mirrors: a 50-step IBM +
-                # finite-rate-chemistry run accumulates cross-compiler roundoff well past the 1e-10
-                # the ib branch of compute_tolerance would otherwise pick. Turning the coupling on
-                # moves the solution by ~5e-3 relative, so the burn-rate path stays covered at 1e-3.
-                override_tol=1e-3,
+                functor=_ib_off_grid,
+                # The grain is off the grid's mirror lines by (_OFF_X, _OFF_Y) cells. GNU 12.3, Intel 2024.2, NVHPC 25.11 (CPU) and an
+                # A100 agree to 5e-13 and a 1e-12 nudge of the centre moves it by 2e-11, so 1e-9 (the 1e-3 hid a stale golden, 2e-7 off).
+                override_tol=1e-9,
             )
         )
 
@@ -4884,7 +4898,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D -> IBM -> Injecting Body -> ib_ip_interp=2",
                 "examples/2D_ibm_burning_grain/case.py",
                 mods={"m": 25, "n": 25, "t_step_stop": 50, "t_step_save": 50, "parallel_io": "F", "ib_ip_interp": 2},
-                override_tol=1e-3,
+                functor=_ib_off_grid,
+                override_tol=1e-8,  # spread 5e-13, nudge sensitivity 6e-10
             )
         )
 
@@ -4898,7 +4913,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "examples/2D_ibm_burning_grain/case.py",
                 ["--res", "0.2", "--T0", "1500"],
                 mods={"dt": 3.84e-7, "t_step_stop": 60, "t_step_save": 60, "parallel_io": "F"},
-                override_tol=1e-3,
+                functor=_ib_off_grid,
+                # Off the grid: centred on a cell-centre line a 1e-12 nudge moved the result by 0.34; now by 1e-9 (spread 4e-11)
+                override_tol=1e-8,
             )
         )
 
@@ -4962,20 +4979,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     cases.append(define_case_f("2D -> Chemistry -> IBM -> Cold Wall Transient -> Wall Column", "examples/2D_ibm_cold_wall_transient/case.py", override_tol=1e-6))
     # Moving circle in a closed periodic box (examples/2D_ibm_moving_mass_budget): the gas mass it creates with the solver-default
     # ib_mass_relax (30 for a moving body), and its viscous isothermal twin (cold wall, Re 40). 24 cells per diameter, 100 steps (a
-    # quarter of a diameter of travel), TSC image points: with the default inverse-distance points an A100 (NVHPC 25.11) differs from
-    # GNU 13 on a CPU by 1e-4 (4e-4 with ib_mass_relax = 0) in the energy of this case, TSC agrees to 4e-12 (the cold-wall twin: 2e-11, the
-    # stand-off case below: 2e-12; an NVHPC CPU build agrees with GNU to 3e-11). The checker script holds the physics; the goldens are
-    # regression guards, so 1e-6 is several orders above the observed spread. Skipped in the single-precision lane (see test.py).
+    # quarter of a diameter of travel), TSC image points. GNU 12.3, Intel 2024.2, NVHPC 25.11 (CPU) and an A100 agree to 5e-12 on the
+    # inviscid case and a 1e-12 nudge of the centre moves it by 4e-12, so 1e-9. The example's start offset used to put the centre on a
+    # cell-centre line at some Runge-Kutta stages, where the inverse-distance stencil is chosen by round-off (#2419). The checker
+    # script holds the physics. Skipped in the single-precision lane (see test.py).
     # The cold-wall twin is viscous: the HLLC viscous work takes the central tangential velocity at its wall faces (#2453), so an A100
     # and GNU 13 agree on it to 2e-11.
-    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Mass Budget", "examples/2D_ibm_moving_mass_budget/case.py", args=["--ip_interp", "2"], mods={"parallel_io": "F"}, override_tol=1e-6))
+    cases.append(define_case_f("2D -> IBM -> Moving Circle -> Mass Budget", "examples/2D_ibm_moving_mass_budget/case.py", args=["--ip_interp", "2"], mods={"parallel_io": "F"}, override_tol=1e-9))
     cases.append(
         define_case_f(
             "2D -> IBM -> Moving Circle -> Mass Budget -> Cold Wall",
             "examples/2D_ibm_moving_mass_budget/case.py",
             args=["--Re", "40", "--Twall", "0.9", "--ip_interp", "2"],
             mods={"parallel_io": "F"},
-            override_tol=1e-6,
+            override_tol=1e-6,  # W152-TBD: set from the measured spread with ib_wall_order = 2
         )
     )
 
@@ -5105,6 +5122,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
+            # With TSC and the quadratic wall fill (the defaults) GNU 12.3 and NVHPC 25.11 (CPU and A100) differ by 1e-7 in one value
+            override_tol=1e-6,
         )
     )
 
@@ -6273,15 +6292,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
         # fine-grid force (the coarse faces under the block are skipped)
         cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))
-        # TSC image points (ib_ip_interp = 2): the 3x3 stencil reads solid ghost cells and the fine block's halo. Quiescent at a
-        # realistic pressure, the exact solution is the initial state.
-        cases.append(define_case_d(stack, "ib_ip_interp=2", {"amr_max_grid_size": 32, "ib_ip_interp": 2}))
+        # The default TSC image points read solid ghost cells and the fine block's halo; these run the inverse-distance opt-out
+        # (ib_ip_interp = 1). Quiescent at a realistic pressure, the exact solution is the initial state.
+        cases.append(define_case_d(stack, "ib_ip_interp=1", {"amr_max_grid_size": 32, "ib_ip_interp": 1}))
         tsc_rest = {"dt": 1.0e-6, "patch_icpp(1)%pres": 1.0e5, "patch_icpp(1)%alpha_rho(1)": 1.2, "patch_icpp(1)%vel(1)": 0.0}
-        cases.append(define_case_d(stack, "ib_ip_interp=2 quiescent", {"amr_max_grid_size": 32, "ib_ip_interp": 2, **tsc_rest}))
+        cases.append(define_case_d(stack, "ib_ip_interp=1 quiescent", {"amr_max_grid_size": 32, "ib_ip_interp": 1, **tsc_rest}))
         # A circle spinning in gas at rest: the fine block's ghost pressure carries the centripetal term of the wall point
         cases.append(define_case_d(stack, "spinning", {"amr_max_grid_size": 32, "patch_ib(1)%moving_ibm": 1, "patch_ib(1)%angular_vel(3)": 300.0, **tsc_rest}))
-        # Quadratic wall-normal ghost velocity (ib_wall_order = 2): two TSC probes up to two fine cells off the no-slip wall
-        cases.append(define_case_d(stack, "ib_wall_order=2", {"amr_max_grid_size": 32, "ib_wall_order": 2}))
+        # The wall-value ghost velocity (ib_wall_order = 1, the opt-out of the default quadratic fill, whose two TSC probes reach
+        # up to two fine cells off the no-slip wall)
+        cases.append(define_case_d(stack, "ib_wall_order=1", {"amr_max_grid_size": 32, "ib_wall_order": 1}))
         # body options that act through the ghost-point update shared by the fine blocks
         cases.append(define_case_d(stack, "slip", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T"}))
         # ghost-state options of the slip and viscous walls, both checked with ./mfc.sh amr_check

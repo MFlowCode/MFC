@@ -49,8 +49,10 @@ dt = args.cfl * dx / (c + U)
 steps = math.ceil(args.travel * D / (U * dt)) if args.travel > 0 else args.steps
 steps = args.nsave * math.ceil(steps / args.nsave)
 moving = args.frame == "moving"
-# Off the grid lines by fractions of dx, so the body crosses cell faces at different phases in x and y
-xc, yc = 0.5 * L + dx / 3.0, 0.5 * L + dx / 5.0
+# Off the grid lines by fractions of dx, so the body crosses cell faces at different phases in x and y. Not dx / 3 in x: at the
+# default Mach and CFL a step moves the body dx / 15, so every Runge-Kutta stage would sit on a multiple of dx / 30 and some on a
+# cell-centre line, where round-off picks the image-point stencil.
+xc, yc = 0.5 * L + 0.1371 * dx, 0.5 * L + dx / 5.0
 
 case = {
     "run_time_info": "F",
