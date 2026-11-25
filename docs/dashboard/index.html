@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MFC | Status</title>
     <meta name="description" content="Where MFC stands right now: whether master passes on each machine and compiler, what its CI costs, and what changed in performance and tests." />
-    <link rel="icon" type="image/x-icon" href="res/icon.ico">
+    <link rel="icon" type="image/x-icon" href="../res/icon.ico">
     <style>
         :root { --page: #ffffff; --surface: #ffffff; --ink: #0f172a; --ink-2: #475569; --muted: #64748b; --grid: #e2e8f0; --axis: #cbd5e1; }
         * { box-sizing: border-box; }
@@ -18,7 +18,7 @@
         th { color: var(--ink-2); font-weight: 600; }
         .scrollx { overflow-x: auto; }
     </style>
-    <link rel="stylesheet" href="res/ci-pages.css">
+    <link rel="stylesheet" href="ci-pages.css">
 </head>
 <body>
 <header class="site" id="site-header"></header>
@@ -35,10 +35,10 @@
     <div id="key"></div>
 </div></main>
 <footer class="site" id="site-footer"></footer>
-<script src="res/ci-pages.js"></script>
+<script src="ci-pages.js"></script>
 <script>
 "use strict";
-MFCCI.chrome("status.html");
+MFCCI.chrome("index.html");
 const $ = id => document.getElementById(id), { esc, day, commitLink } = MFCCI;
 const part = (href, label, dot, text) => `<a href="${MFCCI.withParams(href)}"><span class="label">${label}</span><span class="dot ${dot}"></span><b>${text}</b></a>`;
 

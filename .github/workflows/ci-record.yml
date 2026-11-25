@@ -2,7 +2,7 @@ name: CI History
 
 # After every Test Suite or Benchmark run, append what its cluster jobs did (result, time waiting
 # for a runner, duration, SLURM node-time and queue wait) to MFlowCode/MFC-ci-data, which
-# docs/ci.html reads. Runs from the default branch with the repository's secrets, including for
+# docs/dashboard/ci.html reads. Runs from the default branch with the repository's secrets, including for
 # pull requests from forks; it never checks out or runs code from the pull request.
 on:
   workflow_run:

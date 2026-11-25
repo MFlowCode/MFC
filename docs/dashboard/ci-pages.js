@@ -1,4 +1,4 @@
-// Shared by the CI pages (status.html, benchmarks.html, ci.html, tests.html): where the data is, how it
+// Shared by the dashboard pages (index.html, benchmarks.html, ci.html, tests.html): where the data is, how it
 // is read, and the few things more than one page works out from it.
 "use strict";
 const MFCCI = (() => {
@@ -100,11 +100,11 @@ const MFCCI = (() => {
     const withParams = href => { const r = param("range"); return r ? `${href}${href.includes("?") ? "&" : "?"}range=${encodeURIComponent(r)}` : href; };
 
     // ---- the header and footer every page wears ----
-    const NAV = [["index.html", "Home"], ["status.html", "Status"], ["benchmarks.html", "Performance"], ["ci.html", "CI health"], ["tests.html", "Test health"], ["documentation/index.html", "Documentation"]];
+    const NAV = [["index.html", "Status"], ["benchmarks.html", "Performance"], ["ci.html", "CI health"], ["tests.html", "Test health"], ["../index.html", "MFC home"], ["../documentation/index.html", "Documentation"]];
     function chrome(active) {
         const head = document.getElementById("site-header"), foot = document.getElementById("site-footer");
-        if (head) head.innerHTML = `<div class="wrap"><a class="brand" href="index.html"><img src="res/banner.png" alt="MFC"><span>Multi-Component Flow Code</span></a>
-            <nav>${NAV.map(([href, text]) => `<a href="${/^(status|benchmarks|ci|tests)\.html$/.test(href) ? withParams(href) : href}"${href === active ? ' aria-current="page"' : ""}>${text}</a>`).join("")}</nav></div>`;
+        if (head) head.innerHTML = `<div class="wrap"><a class="brand" href="index.html"><img src="../res/banner.png" alt="MFC"><span>Dashboard</span></a>
+            <nav>${NAV.map(([href, text]) => `<a href="${/^(index|benchmarks|ci|tests)\.html$/.test(href) ? withParams(href) : href}"${href === active ? ' aria-current="page"' : ""}>${text}</a>`).join("")}</nav></div>`;
         if (foot) foot.innerHTML = `<div class="wrap"><strong>&copy; ${new Date().getFullYear()} Spencer H. Bryngelson and Tim Colonius</strong> &middot; <a href="https://comp-physics.group/">Computational Physics Group @ Georgia Tech</a></div>`;
     }
 

@@ -34,7 +34,7 @@ and, for any failed job whose log is there:
 leaves on each job. --compare: the API's `compare/<previous run's commit>...<this run's commit>`;
 a master run then lists the `merges` it is the first to test, as [sha, title, pull request]: a
 scheduled run covers every merge since the scheduled run before it.
-The history feeds docs/ci.html and docs/tests.html.
+The history feeds docs/dashboard/ci.html and docs/dashboard/tests.html.
 """
 
 import argparse
