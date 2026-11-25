@@ -2,7 +2,7 @@ name: CI History
 
 # After every Test Suite or Benchmark run, append what its cluster jobs did (result, time waiting
 # for a runner, duration, SLURM node-time and queue wait) to MFlowCode/MFC-ci-data, which
-# docs/ci.html reads. Runs from the default branch with the repository's secrets, including for
+# docs/dashboard/ci.html reads. Runs from the default branch with the repository's secrets, including for
 # pull requests from forks; it never checks out or runs code from the pull request.
 on:
   workflow_run:
@@ -61,7 +61,19 @@ jobs:
             gh api "$api/actions/jobs/$job/logs" > "logs/$job.txt" || rm -f "logs/$job.txt"
           done
 
-          python3 .github/scripts/ci-record.py run.json jobs.json --usage usage.txt --compare compare.json --logs logs > line.json
+          # The pull request a pull request run belongs to (the run itself names it only for same-repository PRs).
+          pr=$(jq -r '.pull_requests[0].number // empty' run.json)
+          if [ -z "$pr" ] && [ "$(jq -r '.event' run.json)" = pull_request ]; then
+            pr=$(gh api "$api/commits/$(jq -r '.head_sha' run.json)/pulls" --jq '.[0].number // empty' || true)
+          fi
+
+          python3 .github/scripts/ci-record.py run.json jobs.json --usage usage.txt --compare compare.json --logs logs ${pr:+--pr "$pr"} --problems unread.txt > line.json
+          # A job the recorder could not read means a job was renamed or the log format changed.
+          # Left open for a person to close: the fix is in ci-record.py, not in a later run.
+          if [ -s unread.txt ]; then
+            cat unread.txt
+            REPO="$GITHUB_REPOSITORY" bash .github/scripts/ci-issue.sh open "CI recorder cannot read some jobs" "$(printf 'In run %s:\n\n%s\n\nUpdate LANE or the log patterns in .github/scripts/ci-record.py.\n' "$RUN_ID" "$(sed 's/^/- /' unread.txt | head -20)")" || true
+          fi
           if [ ! -s line.json ]; then echo "No cluster job in run $RUN_ID."; exit 0; fi
 
           # Re-run the failed jobs when no failure is the change's own: every failed job is a cluster

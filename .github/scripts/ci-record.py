@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Turn one workflow run into one line of the CI history.
 
-    ci-record.py <run.json> <jobs.json> [--usage usage.txt] [--compare compare.json] [--logs DIR]
+    ci-record.py <run.json> <jobs.json> [--usage usage.txt] [--compare compare.json] [--logs DIR] [--pr N] [--problems FILE]
 
 The inputs are the GitHub API's answers for the run and for its jobs (`actions/runs/<id>` and
 `actions/runs/<id>/jobs?filter=all`). Prints nothing for a run with no cluster job. Otherwise
-one JSON object: the run (event, commit, title, pull request for a master commit) and, per
+one JSON object: the run (event, commit, title, and its pull request: --pr for a pull request
+run, the number in the title for a master commit) and, per
 cluster job, a compact entry:
 
-    l  lane, e.g. frontier_amd-gpu-omp      k  kind: test, case-opt or bench
+    l  lane, e.g. frontier_amd-gpu-omp, from the job's name "<Machine> (<Compiler>) (<device>[-<offload>])";
+       a machine or compiler this script has not seen becomes a lane of its own
+    k  kind: test, case-opt or bench
     s  shard ("1/2") or null                m  "smoke" or "full"
     a  run attempt                          c  conclusion
     w  seconds waiting for a runner         d  seconds from start to finish
@@ -17,20 +20,26 @@ cluster job, a compact entry:
 and, for a test job whose log is in DIR as <job id>.txt:
 
     n    tests that passed
-    f    tests that failed: [uuid, name, error class]
+    f    tests that failed: [uuid, name, error class, the error's first line]
     r    tests that failed and then passed on a retry: [uuid, name, error class]
+    tt   seconds the test phase took (the runner's own "Time:"), or absent if it did not finish
+    slow the six slowest tests that passed: [uuid, name, seconds]
 
 and, for any failed job whose log is there:
 
     why  what failed: tests, build, cluster (down), queue (never started), timeout (SLURM), node, checkout (git),
          upload (artifact), runner, or other. All but tests, build and other are the machine
          or the plumbing, not the change: ci-record.yml re-runs a run whose failures are all those.
+    e    the line of the log that says how: the compiler's error, SLURM's verdict, git's complaint
 
 --usage: lines "<GitHub job id> <slurm-usage notice>", the notices run_monitored_slurm_job.sh
 leaves on each job. --compare: the API's `compare/<previous run's commit>...<this run's commit>`;
 a master run then lists the `merges` it is the first to test, as [sha, title, pull request]: a
 scheduled run covers every merge since the scheduled run before it.
-The history feeds docs/ci.html and docs/tests.html.
+--problems: a file that receives one line per job this script could not read: a job on a cluster
+runner whose name has no lane, or a test job whose log's own count of passed tests is not the number read. ci-record.yml
+opens an issue from it, since either means the names or the log format changed under this script.
+The history feeds docs/dashboard/ci.html and docs/dashboard/tests.html.
 """
 
 import argparse
@@ -40,8 +49,14 @@ import re
 import sys
 from datetime import datetime
 
-LANE = re.compile(r"(Frontier|Phoenix) \((CCE|AMD|NVHPC)\) \((gpu|cpu)-(acc|omp|none)(?: \[(\d+/\d+)\])?\)")
+LANE = re.compile(r"(\w+) \(([\w.+]+)\) \((gpu|cpu)(?:-(acc|omp|none))?(?: \[(\d+/\d+)\])?\)")
 CLUSTERS = {("Frontier", "CCE"): "frontier", ("Frontier", "AMD"): "frontier_amd", ("Phoenix", "NVHPC"): "phoenix"}
+HOSTED = ("ubuntu", "macos", "windows")  # a runner label that starts with one of these is GitHub's own
+
+
+def lane(m) -> str:
+    cluster = CLUSTERS.get((m.group(1), m.group(2))) or re.sub(r"\W", "", f"{m.group(1)}_{m.group(2)}").lower()
+    return f"{cluster}-{m.group(3)}-{m.group(4) or 'none'}"
 
 
 def seconds(start, end):
@@ -78,7 +93,8 @@ def merges(compare: dict) -> list:
 
 STAMP = re.compile(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-PASSED = re.compile(r"^\s*\(\s*\d+/\d+\)\s+(.*?)\s+\d+\.\d+\s+([0-9A-F]{8})\s*$")
+PASSED = re.compile(r"^\s*\(\s*\d+\s*/\s*\d+\)\s+(.*?)\s+(\d+\.\d+)\s+([0-9A-F]{8})\s*$")
+TOOK = re.compile(r"Time: (?:(\d+)m )?(\d+(?:\.\d+)?)s")
 RECOVERED = re.compile(r"^\s*recovered on attempt \d+ \(([^)]*)\): (.*)$")
 
 
@@ -91,14 +107,43 @@ def error_class(text: str) -> str:
     return "other"
 
 
+# For each cause, what the line that says how it happened looks like; the first match is kept.
+HOW = {
+    "build": r"(?i)(\berror\b.*|ftn-\d+.*|undefined reference.*|cannot open module file.*)",
+    "cluster": r"( unavailable::.*|Batch job submission failed.*)",
+    "queue": r"(SLURM job \d+ did not start within.*)",
+    "timeout": r"(.*DUE TO TIME LIMIT.*|.*state=TIMEOUT.*)",
+    "node": r"(.*(?:Preflight failed|failed preflight).*)",
+    "checkout": r"((?:fatal|error): .*)",
+}
+NOISE = re.compile(r"(?i)\b0 errors?\b|errors? *= *0|-Werror|error_|continue-on-error|##\[error\]Process completed|if .*error|\$\{|echo ")
+
+
+def how(lines: list, why: str) -> str:
+    """The log's own words for a failure of this kind, one line, or "" when it has none."""
+    pattern = HOW.get(why)
+    if pattern:
+        for line in lines:
+            m = re.search(pattern, line)
+            if m and not NOISE.search(line):
+                return re.sub(r"^##\[error\]", "", m.group(1)).strip(" :")[:160]
+    errors = [line for line in lines if line.startswith("##[error]") and "Process completed with exit code" not in line]
+    return errors[-1][len("##[error]") :].strip()[:160] if errors and why != "tests" else ""
+
+
 def tests(log: str, failed_job: bool) -> dict:
     """What a test job's log says about its tests, and for a failed job what failed."""
     lines = [ANSI.sub("", STAMP.sub("", line)) for line in log.splitlines()]
-    passed, failed, recovered = {}, {}, {}
+    passed, failed, recovered, seconds, took = {}, {}, {}, {}, None
     for i, line in enumerate(lines):
         m = PASSED.match(line)
         if m:
-            passed[m.group(2)] = m.group(1)
+            passed[m.group(3)] = m.group(1)
+            seconds[m.group(3)] = float(m.group(2))
+            continue
+        m = TOOK.search(line)
+        if m and passed:  # the build's dry run prints a time too, before any test has passed
+            took = round(int(m.group(1) or 0) * 60 + float(m.group(2)))
             continue
         m = RECOVERED.match(line)
         if m:
@@ -108,37 +153,52 @@ def tests(log: str, failed_job: bool) -> dict:
             name, block = line.split("FAILED:", 1)[1].strip(), "\n".join(lines[i + 1 : i + 5])
             uuid, err = re.search(r"UUID: ([0-9A-F]{8})", block), re.search(r"Error: (.*)", block)
             if uuid:
-                failed[uuid.group(1)] = [uuid.group(1), name, error_class(err.group(1) if err else "")]
+                said = err.group(1).strip() if err else ""
+                said = re.sub(r"^Test tests/[0-9A-F]{8}: .*?: (?=Variable|Failed|\w+ )", "", said)  # the test is already named
+                failed[uuid.group(1)] = [uuid.group(1), name, error_class(err.group(1) if err else ""), said[:160]]
     # A retry line names the test in full; the pass line that follows has its id and a name cut to fit.
     retried = []
     for name, cls in recovered.items():
         uuid = next((u for u, shown in passed.items() if name.startswith(shown.rstrip(".").rstrip())), "")
         retried.append([uuid, name, cls])
 
-    out = {"n": len(passed), "f": list(failed.values()), "r": retried}
+    slow = sorted(seconds, key=seconds.get, reverse=True)[:6]
+    out = {"n": len(passed), "f": list(failed.values()), "r": retried, "slow": [[u, passed[u], round(seconds[u])] for u in slow]}
+    if took is not None:
+        out["tt"] = took
+    # The runner's own summaries (the build's dry run prints one too, of 0): far fewer read than it counted is a misread.
+    said = max((int(n) for n in re.findall(r"^\W*(\d+) passed\b", "\n".join(lines), re.M)), default=0)
+    if len(passed) < 0.9 * said:
+        out["miscount"] = f"the summary says {said} passed, {len(passed)} were read"
     if failed_job:
         text = "\n".join(lines)
-        out["why"] = (
+        out["why"] = why = (
             "tests" if failed or "CRITICAL:" in text
-            else "cluster" if " unavailable::" in text
+            else "cluster" if " unavailable::" in text or "Batch job submission failed" in text
             else "queue" if "QUEUE STARVATION" in text
             else "build" if "Build failed after" in text
             else "timeout" if "state=TIMEOUT" in text
             else "node" if "Preflight failed" in text or "failed preflight" in text
             else "checkout" if "The process '/usr/bin/git' failed" in text
             else "upload" if "Failed to CreateArtifact" in text or "Failed to FinalizeArtifact" in text
-            else "runner" if re.search(r"runner has received a shutdown signal|operation was canceled|has timed out after|transport endpoint", text)
+            else "runner" if re.search(r"runner has received a shutdown signal|operation was canceled|has timed out after|transport endpoint|Missing file at path|EBUSY: resource busy", text)
             else "other"
         )
+        out["e"] = how(lines, why)
     return out
 
 
-def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs: str = None):
-    entries = []
+def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs: str = None, number: int = None, problems: list = None):
+    entries, problems = [], [] if problems is None else problems
     for job in jobs:
         name = job.get("name") or ""
         m = LANE.search(name)
-        if not m or job.get("conclusion") in (None, "skipped"):
+        if job.get("conclusion") in (None, "skipped"):
+            continue
+        if not m:
+            labels = job.get("labels") or []
+            if "matrix." not in name and labels and not any(label.startswith(HOSTED) for label in labels):
+                problems.append(f"no lane in the name of cluster job {job.get('id')}: {name}")
             continue
         entry = {}
         log = os.path.join(logs, f"{job.get('id')}.txt") if logs else ""
@@ -146,10 +206,12 @@ def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs
             with open(log, errors="replace") as f:
                 entry = tests(f.read(), job["conclusion"] == "failure")
             if name.startswith(("Bench", "Case Opt")):  # not a test job: only why it failed
-                entry = {k: v for k, v in entry.items() if k == "why"}
+                entry = {k: v for k, v in entry.items() if k in ("why", "e")}
+            elif "miscount" in entry:
+                problems.append(f"test job {job.get('id')}: {entry.pop('miscount')}: {name}")
         entries.append(
             {
-                "l": f"{CLUSTERS[(m.group(1), m.group(2))]}-{m.group(3)}-{m.group(4)}",
+                "l": lane(m),
                 "k": "bench" if name.startswith("Bench") else "case-opt" if name.startswith("Case Opt") else "test",
                 "s": m.group(5),
                 "m": "smoke" if "[smoke]" in name else "full",
@@ -174,7 +236,7 @@ def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs
         "master": master,
         "sha": run.get("head_sha"),
         "title": run.get("display_title"),
-        "pr": int(pr.group(1)) if pr else None,
+        "pr": int(pr.group(1)) if pr else number,
         "date": run.get("created_at"),
         "merges": merges(compare) if master else [],
         "jobs": entries,
@@ -188,6 +250,8 @@ if __name__ == "__main__":
     ap.add_argument("--usage")
     ap.add_argument("--compare")
     ap.add_argument("--logs")
+    ap.add_argument("--pr", type=int)
+    ap.add_argument("--problems")
     args = ap.parse_args()
 
     def load(path, default):
@@ -200,6 +264,10 @@ if __name__ == "__main__":
     if args.usage:
         with open(args.usage) as f:
             slurm = usage(f)
-    rec = record(load(args.run, {}), load(args.jobs, {})["jobs"], slurm, load(args.compare, None), args.logs)
+    unread = []
+    rec = record(load(args.run, {}), load(args.jobs, {})["jobs"], slurm, load(args.compare, None), args.logs, args.pr, unread)
+    if args.problems:
+        with open(args.problems, "w") as f:
+            f.write("".join(f"{p}\n" for p in unread))
     if rec:
         print(json.dumps(rec, separators=(",", ":"), sort_keys=True))
