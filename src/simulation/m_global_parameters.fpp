@@ -519,7 +519,7 @@ contains
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
-        weno_Re_flux_compact = .false.
+        weno_Re_flux_compact = .true.
         riemann_hypo_ADC = .false.
         ADC_kappa = 1.0_wp
         hll_u_interface = .false.
@@ -1085,6 +1085,8 @@ contains
                 end do
             end if
         end if
+        ! weno_Re_flux_compact (default T) applies to Cartesian weno_Re_flux runs only
+        weno_Re_flux_compact = weno_Re_flux_compact .and. weno_Re_flux .and. .not. cyl_coord
         call s_set_visc_dt_cap()
 
         ! Herschel-Bulkley non-Newtonian viscosity: gather per-fluid parameters into device arrays
