@@ -161,20 +161,35 @@ const MFCCI = (() => {
 
     // ---- scaling: the rules of .github/scripts/scaling-check.py ----
     const SCALING = { points: 5, grind: 5, weakFloor: 80, runs: 4 };
-    // Per size of the latest run: efficiency against its smallest size, what is usual (the median of
-    // the last four runs before it on the same lane), and whether it is outside the tolerances.
+    // Per size of the latest run: efficiency against the base size, what is usual (the median of the
+    // last four accepted runs before it on the lane) and whether it is outside the tolerances. A run
+    // that regressed is not accepted, so it does not become the usual; one recorded with `accept`
+    // starts the baseline again from itself. `bad` also lists the sizes that have no result.
     function scalingStatus(records) {
         const latest = records.at(-1); if (!latest) return null;
-        const measure = r => ["weak", "strong"].flatMap(kind => { const rs = r.runs.filter(x => x.kind === kind).sort((a, b) => a.nodes - b.nodes), base = rs[0];
+        const median = a => { const s = [...a].sort((x, y) => x - y), h = s.length >> 1; return s.length ? (s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2) : null; };
+        // The base is the size the accepted runs use, or the smallest this run has.
+        const measure = (r, bases = {}) => ["weak", "strong"].flatMap(kind => { const rs = r.runs.filter(x => x.kind === kind).sort((a, b) => a.nodes - b.nodes);
+            const base = rs.find(x => x.nodes === (bases[kind] ?? rs[0]?.nodes)); if (!base) return [];
             return rs.map(x => ({ ...x, base: x === base, eff: base.grind * base.ranks / (x.grind * x.ranks) * 100 })); });
-        const past = records.slice(0, -1).filter(r => r.cluster === latest.cluster && r.interface === latest.interface).slice(-SCALING.runs).map(measure);
-        const rows = measure(latest).map(x => {
-            const before = past.map(m => m.find(y => y.kind === x.kind && y.nodes === x.nodes)).filter(Boolean), usual = med(before.map(y => x.base ? y.grind : y.eff));
-            const bad = x.base ? usual !== null && (x.grind / usual - 1) * 100 > SCALING.grind
-                               : usual !== null ? usual - x.eff > SCALING.points : x.kind === "weak" && x.eff < SCALING.weakFloor;
-            return { ...x, usual, bad };
-        });
-        return { latest, rows, bad: rows.filter(r => r.bad), measure };
+        const basesOf = accepted => Object.fromEntries((accepted.at(-1) || []).filter(x => x.base).map(x => [x.kind, x.nodes]));
+        const judge = (rows, past) => {
+            const out = rows.map(x => { const before = past.map(m => m.find(y => y.kind === x.kind && y.nodes === x.nodes && y.base === x.base)).filter(Boolean);
+                const usual = median(before.map(y => x.base ? y.grind : y.eff));
+                return { ...x, usual, bad: usual !== null && (x.base ? (x.grind / usual - 1) * 100 > SCALING.grind : usual - x.eff > SCALING.points) }; });
+            const seen = new Set(past.flat().map(y => `${y.kind} ${y.nodes}`)), missing = [...seen].filter(key => !rows.some(x => `${x.kind} ${x.nodes}` === key))
+                .map(key => ({ kind: key.split(" ")[0], nodes: +key.split(" ")[1], missing: true, bad: true }));
+            return { rows: out, missing };
+        };
+        let accepted = [];
+        for (const r of records.slice(0, -1).filter(r => r.cluster === latest.cluster && r.interface === latest.interface && r.runs)) {
+            if (r.accept) { accepted = [measure(r)]; continue; }
+            const m = measure(r, basesOf(accepted)), v = judge(m, accepted.slice(-SCALING.runs));
+            if (!v.rows.some(x => x.bad) && !v.missing.length) accepted.push(m);
+        }
+        const v = judge(measure(latest, basesOf(accepted)), latest.accept ? [] : accepted.slice(-SCALING.runs));
+        const rows = v.rows.map(x => ({ ...x, bad: x.bad || (x.kind === "weak" && !x.base && x.eff < SCALING.weakFloor) }));
+        return { latest, rows, bad: [...rows.filter(r => r.bad), ...v.missing], measure };
     }
 
     // ---- master: each run's result per lane, and each lane's standing now ----

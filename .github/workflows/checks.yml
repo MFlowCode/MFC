@@ -1,10 +1,12 @@
 name: 'Runtime Checks'
 
-# Once a week, a fifth of the tests on CPU with the compilers' runtime checks on (cmake/GPU.cmake).
-# AMD flang, one Frontier node for about half an hour: stops at an invalid operation, a division by
-# zero or an overflow, and fills uninitialised locals with NaN. NVHPC, a hosted runner for about
-# three hours: bounds and the same floating-point traps. A failure opens an issue
-# listing the tests; it closes when they pass.
+# Once a week, the tests on CPU with the compilers' runtime checks on (cmake/GPU.cmake).
+# AMD flang, the whole suite on one Frontier node in under an hour: stops at an invalid operation,
+# a division by zero or an overflow, and fills uninitialised locals with NaN. Its issue lists each
+# week's failures and closes when the suite passes.
+# NVHPC, a fifth of the tests on a hosted runner in about three hours (the whole suite would not
+# fit): bounds and the same floating-point traps. The fifth is drawn anew each week, so a week
+# that passes does not show last week's failures fixed: its issue is closed by hand.
 on:
   schedule:
     - cron: '23 5 * * 0'
@@ -47,8 +49,9 @@ jobs:
       - name: Build and test
         run: |
           rm -f checks.out
-          sbatch --wait -J MFC-checks -A CFD154 -N 1 -t 01:30:00 -o checks.out \
-            --wrap '. ./mfc.sh load -c famd -m c && ./mfc.sh test -v -a -j 32 --no-gpu --reldebug -% 20 -- -c frontier_amd'
+          # --stepmgr: the suite's srun steps otherwise congest the Frontier controller (see submit-slurm-job.sh).
+          sbatch --wait -J MFC-checks -A CFD154 -N 1 -t 01:30:00 -q normal --stepmgr -o checks.out \
+            --wrap '. ./mfc.sh load -c famd -m c && ./mfc.sh test -v -a -j 32 --no-gpu --reldebug -- -c frontier_amd'
 
       - name: Print Log
         if: always()
@@ -61,7 +64,7 @@ jobs:
       - name: Open an issue listing the failed tests
         if: failure()
         run: |
-          bash .github/scripts/ci-issue.sh open "$TITLE" "$(printf 'Run: %s\n\n%s\n' "$RUN_URL" "$(bash .github/scripts/failed-tests.sh checks.out)")"
+          bash .github/scripts/ci-issue.sh report "$TITLE" "$(printf 'Run: %s\n\n%s\n' "$RUN_URL" "$(bash .github/scripts/failed-tests.sh checks.out)")"
 
       - name: Close it once they pass
         if: success()
@@ -112,9 +115,4 @@ jobs:
       - name: Open an issue listing the failed tests
         if: failure()
         run: |
-          bash .github/scripts/ci-issue.sh open "$TITLE" "$(printf 'Run: %s\n\n%s\n' "$RUN_URL" "$(bash .github/scripts/failed-tests.sh checks.out)")"
-
-      - name: Close it once they pass
-        if: success()
-        run: |
-          bash .github/scripts/ci-issue.sh close "$TITLE" "Passing in $RUN_URL"
+          bash .github/scripts/ci-issue.sh report "$TITLE" "$(printf 'Run: %s\n\n%s\n' "$RUN_URL" "$(bash .github/scripts/failed-tests.sh checks.out)")"

@@ -4,7 +4,7 @@
     bench-comment.py <artifacts dir> [benchmarks.jsonl]
 
 The directory holds one folder per lane, bench-compare-<cluster>-<device>-<interface>, each with
-pr/bench-*.yaml and master/bench-*.yaml from the same benchmark job (same node, minutes apart).
+pr/bench-*.yaml and master/bench-*.yaml from the same benchmark job (minutes apart; on Phoenix the same node).
 benchmarks.jsonl is master's history (MFlowCode/MFC-ci-data): it says how much a lane's grind
 time moves between runs with no change at all, and a difference is only called a change when it
 is at least 3% and three times that. Prints Markdown, or nothing when no lane has both results.
@@ -96,7 +96,7 @@ def comment(root: str, history: str = "") -> str:
             "|---|---|---|---|---|---|---|",
             *rows,
             "",
-            f"Grind time, ns per grid point, equation and RK stage; lower is faster. Both sides ran in the same job on the same node. A change counts when it is at least {FLOOR:.0f}% and {SCATTERS:.0f} times the lane's usual run-to-run change on master. [History](https://mflowcode.github.io/dashboard/benchmarks.html)",
+            f"Grind time, ns per grid point, equation and RK stage; lower is faster. Both sides ran in the same benchmark job, minutes apart (on Phoenix on the same node). A change counts when it is at least {FLOOR:.0f}% and {SCATTERS:.0f} times the lane's usual run-to-run change on master. [History](https://mflowcode.github.io/dashboard/benchmarks.html)",
         ]
     )
 

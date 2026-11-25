@@ -75,6 +75,7 @@ jobs:
           path: scaling-logs
 
       - name: Append to history
+        id: record
         env:
           DEPLOY_KEY: ${{ secrets.CI_DATA_DEPLOY_KEY }}
           RECORD:     ${{ github.ref == 'refs/heads/master' && (inputs.nodes || '1 8 64') == '1 8 64' }}
@@ -85,7 +86,7 @@ jobs:
           # No history yet is a 404; anything else must not pass for an empty history, which has no baseline.
           code=$(curl -sL --max-time 60 -o before.jsonl -w '%{http_code}' https://raw.githubusercontent.com/MFlowCode/MFC-ci-data/main/scaling.jsonl) || code=000
           case "$code" in 200) ;; 404) : > before.jsonl ;; *) echo "::error::Could not read the scaling history (HTTP $code)."; exit 1 ;; esac
-          if [ "$RECORD" != true ]; then echo "Not master at the usual sizes: checked, not recorded."; exit 0; fi
+          if [ "$RECORD" != true ]; then echo "Not master at the usual sizes: checked, not recorded."; echo "partial=--partial" >> "$GITHUB_OUTPUT"; exit 0; fi
           # A re-run of this job, or a week in which master did not move: the commit is already there.
           if grep -qF "\"sha\":\"$GITHUB_SHA\"" before.jsonl && [ "$ACCEPT" != true ]; then echo "$GITHUB_SHA is already recorded."; exit 0; fi
           .github/scripts/ci-data-append.sh scaling.jsonl new.jsonl "Scaling @ ${GITHUB_SHA::7}"
@@ -97,12 +98,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO:     ${{ github.repository }}
           RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PARTIAL:  ${{ steps.record.outputs.partial }}
         run: |
           title="Scaling regressed on Frontier"
           rc=0
-          found=$(python3 .github/scripts/scaling-check.py new.jsonl before.jsonl) || rc=$?
+          # shellcheck disable=SC2086
+          found=$(python3 .github/scripts/scaling-check.py $PARTIAL new.jsonl before.jsonl) || rc=$?
           # 1 is a regression; anything else is the check itself failing, which is not one.
           if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+          # A run that is not recorded says nothing about the weekly run of master: report here, leave the issue.
+          if [ -n "$PARTIAL" ]; then
+            echo "${found:-Within tolerance at the sizes run.}" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit "$rc"
+          fi
           if [ "$rc" -eq 0 ]; then
             bash .github/scripts/ci-issue.sh close "$title" "Within tolerance again in $RUN_URL"
           else
@@ -116,14 +124,14 @@ jobs:
         run: exit 1
 
       - name: Say so when the scaling run fails
-        if: failure() && steps.check.outputs.regressed != 'true'
+        if: failure() && steps.check.outputs.regressed != 'true' && steps.record.outputs.partial == ''
         env:
           GH_TOKEN: ${{ github.token }}
           REPO:     ${{ github.repository }}
         run: bash .github/scripts/ci-issue.sh open "Weekly scaling run is failing" "No scaling result was recorded by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
 
       - name: Clear that once it records again
-        if: success() || steps.check.outputs.regressed == 'true'
+        if: (success() || steps.check.outputs.regressed == 'true') && steps.record.outputs.partial == ''
         env:
           GH_TOKEN: ${{ github.token }}
           REPO:     ${{ github.repository }}

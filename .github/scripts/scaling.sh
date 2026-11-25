@@ -6,8 +6,8 @@
 #
 # One SLURM job per node count, submitted together; each runs the weak case (SCALING_WEAK_GB per
 # GPU) and the strong case (SCALING_STRONG_GB in all) for 20 steps and leaves
-# <log dir>/<weak|strong>-<nodes>.out for scaling-record.py. A node count whose job fails is
-# missing from the result; the script fails only when none finished.
+# <log dir>/<weak|strong>-<nodes>.out for scaling-record.py. The script fails when any size
+# or kind has no result.
 set -o pipefail            # not -u: mfc.sh load reads variables it has not set
 
 logs=${1:?log directory}; shift

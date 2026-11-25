@@ -16,11 +16,13 @@ history=$(mktemp -d)
 for attempt in 1 2 3 4 5; do
     rm -rf "$history"
     git clone --depth=1 git@github.com:MFlowCode/MFC-ci-data.git "$history"
-    cat "$new" >> "$history/$target"
+    # Not the lines already there: a re-run records again what its first attempt recorded.
+    touch "$history/$target"
+    grep -vxFf "$history/$target" "$new" >> "$history/$target" || true
     git -C "$history" config user.name  'MFC Action'
     git -C "$history" config user.email '<>'
     git -C "$history" add "$target"
-    git -C "$history" commit -m "$message"
+    git -C "$history" commit -m "$message" || { echo "Already recorded."; exit 0; }
     if git -C "$history" push; then exit 0; fi
     sleep $((attempt * 7))
 done

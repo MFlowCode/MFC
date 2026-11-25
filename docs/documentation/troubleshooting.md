@@ -156,8 +156,14 @@ compiler.
 |----------|----------------------|------------------------|
 | gfortran | `-O0 -fcheck=all,no-array-temps` | `-Og -fcheck=bounds,pointer` |
 | Intel ifx | `-Og -check all` | `-Og -check bounds` |
-| NVHPC | `-O0 -C -Mbounds` | `-O1 -Mbounds` |
+| NVHPC | `-O0 -C -Mbounds`, on CPU also `-Ktrap=fp` | `-O1 -Mbounds`, on CPU also `-Ktrap=fp` |
 | Cray ftn | `-O0 -K trap=fp` | `-O1 -K trap=fp` |
+| AMD flang (CPU) | `-O1 -ffpe-trap=invalid,zero,overflow -finit-local=0xff` | the same |
+
+The floating-point traps of NVHPC and AMD flang on CPU stop some of the suite's own tests on
+`master` today, at operations whose results are never used. The weekly Runtime Checks workflow
+tracks them in the issues "Runtime checks fail with AMD flang on CPU" and "Runtime checks fail
+with NVHPC on CPU"; a trap in one of the tests listed there is not from your change.
 
 Both modes define `MFC_DEBUG` and enable debug logging via `@:LOG()`.
 
