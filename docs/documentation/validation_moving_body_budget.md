@@ -17,7 +17,7 @@ particle-resolved runs, where a particle's drag and heating are read from these 
 
 | Item | Value |
 | :--- | :--- |
-| Geometry | one circle, D = 1, centre off the grid lines by (dx/3, dx/5), in a doubly periodic square box |
+| Geometry | one circle, D = 1, centre off the grid lines by (dx/3, dx/5) in these runs (the example now starts at (0.1371 dx, dx/5): with dx/3, the default Mach and CFL put the centre on a cell-centre line at some Runge-Kutta stages), in a doubly periodic square box |
 | Gas | ideal gas, \f$\gamma\f$ = 1.4, \f$\rho\f$ = 1, p = 1/1.4 (sound speed 1), no chemistry |
 | Flow | moving twin: the circle moves at Mach 0.3 through gas at rest (`moving_ibm = 1`); fixed twin: the circle is held and the gas moves at Mach -0.3 |
 | Mass runs | inviscid, box 5 D, 16, 24 and 32 cells/D, 6 D travelled, 24 saves, no-slip wall |

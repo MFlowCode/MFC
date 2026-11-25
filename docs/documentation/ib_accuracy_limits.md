@@ -18,7 +18,7 @@ with the options named, not repeated on `master`; the options exist on `master` 
 
 | Quantity | Setup | Order (finest pairs) | Provenance |
 | :--- | :--- | :--- | :--- |
-| Wall temperature, inverse-distance image point (`ib_ip_interp = 1`, default) | annulus, exact conduction solution | 0.6 then 1.2 (idw), error 5.0e-3 of \f$T_2-T_1\f$ at 40 cells/R | `master`, @ref validation_tsc_annulus |
+| Wall temperature, inverse-distance image point (`ib_ip_interp = 1`, the default before TSC) | annulus, exact conduction solution | 0.6 then 1.2 (idw), error 5.0e-3 of \f$T_2-T_1\f$ at 40 cells/R | `master`, @ref validation_tsc_annulus |
 | Wall temperature, TSC (`ib_ip_interp = 2`) | same | 2.3 then 2.0 (inner wall), 1.1 then 1.0 (outer wall) | `master`, @ref validation_tsc_annulus |
 | Wall velocity, default | Taylor-Couette, 10-30 cells/R | about 1 to 2, not monotonic at the outer wall | pre-merge |
 | Wall shear, static curved wall, default | same | 0.7 to 1 or worse, 1.4 % error at 30 cells/R | pre-merge |

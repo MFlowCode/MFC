@@ -36,7 +36,7 @@ parser.add_argument("--tstar", type=float, default=50.0, help="Run length t U / 
 parser.add_argument("--cfl", type=float, default=0.4, help="CFL number of the fixed step (the adaptive step uses cfl_target, set from Re and --cells_per_D).")
 parser.add_argument("--frames", type=int, default=10, help="Saves of the adaptive run (a fixed-step run saves once, at the end).")
 parser.add_argument("--stride", type=int, default=20, help="ib_force_stride: steps between force and heat rows.")
-parser.add_argument("--ib_ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance, the default).")
+parser.add_argument("--ib_ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance).")
 parser.add_argument("--silo", action="store_true", help="Write density, pressure and velocity for post_process (the momentum-balance check).")
 parser.add_argument("--serial_io", action="store_true", help="parallel_io = F (a build without MPI); the checker then reads p_all/.")
 args = parser.parse_args()

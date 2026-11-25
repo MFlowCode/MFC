@@ -21,7 +21,7 @@ from the face heat of `ib_heat_wrt`, against references and against a force that
 | Grid | 10 and 20 cells/D, uniform; domain [-15 D, 25 D] x [-16 D, 16 D] (blockage 3.1 %); Re 100: [-8 D, 16 D] x [-8 D, 8 D] (6.25 %) |
 | Boundaries | subsonic characteristic inflow, characteristic outflow holding the free-stream pressure (extrapolation at the outflow lets the far-field pressure creep up), extrapolated lateral faces |
 | Wall | fixed, no slip, `thermal_bc = 1`, Twall = T_inf (drag runs) or 1.1 T_inf (heat runs) |
-| Numerics | WENO5-M, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 4`, adaptive step with CFL min(0.5, 0.4 Re/N) and `chem_params%%transport_dt`; `ib_ip_interp = 1` (the default) |
+| Numerics | WENO5-M, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 4`, adaptive step with CFL min(0.5, 0.4 Re/N) and `chem_params%%transport_dt`; `ib_ip_interp = 1` (the default when these runs were made; now set explicitly by the example) |
 | Length | \f$t U/D\f$ = 50 (Re 20, 40), 120 (Re 100); averages over the last 20 % |
 | Hardware | AMD MI300A, OpenMP offload, double precision |
 

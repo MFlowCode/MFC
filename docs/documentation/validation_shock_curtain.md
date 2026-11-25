@@ -21,7 +21,7 @@ a shock-tube experiment.
 | Bodies | fixed, D = 115 um; sphere: one body at the shock's arrival point; curtain: random sequential addition, minimum gap 0.2 D, periodic across the flow, bodies kept off the curtain faces by half a diameter |
 | Walls | inviscid no slip (`slip = F`, `viscous = F`: the ghost velocity enforces no slip) or inviscid slip (`--slip`) |
 | Grid | sphere: 12 and 14 cells/D in [-3 D, 7 D] x [-3 D, 3 D]^2; curtain: 10 cells/D, 30 D x 6 D x 6 D (1.08 M cells, 239 spheres, curtain 17.4 D thick, \f$\phi\f$ = 0.2) |
-| Numerics | WENO5-M, HLLC, SSP-RK3, `fd_order = 4`, adaptive step at CFL 0.4, `ib_ip_interp = 1` (the default) |
+| Numerics | WENO5-M, HLLC, SSP-RK3, `fd_order = 4`, adaptive step at CFL 0.4, `ib_ip_interp = 1` (the default when these runs were made; set it explicitly to repeat them) |
 | Hardware | sphere runs: GNU 13 on an x86 CPU, one rank; curtain: NVIDIA A100 80GB, NVHPC 25.11; double precision |
 
 ## Reference data
