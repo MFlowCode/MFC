@@ -1099,6 +1099,7 @@ contains
             end if
         end if
 
+        if (amr_in_fine_advance .and. amr_bat_n > 1) call s_amr_flatten_seam_faces(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
         if (chemistry) call s_bound_species_faces(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
         if (face_bound == 1) call s_bound_face_states(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
 
@@ -1130,6 +1131,41 @@ contains
         call nvtxEndRange
 
     end subroutine s_reconstruct_riemann_states
+
+    !> Batched fine advance: in the ghost band between two stacked members, stencils along the stacked dim span both members' ghosts
+    !! and sweeps across it run on ghost rows, which can give unphysical faces (negative pressure). No member's interior reads those
+    !! faces, so they take the cell state instead: the whole band for a transverse sweep id, all but each member's first ghost on
+    !! either side for the stacked one.
+    subroutine s_amr_flatten_seam_faces(q_prim_vf, vL, vR, id)
+
+        type(scalar_field), dimension(sys_size), intent(in)                                    :: q_prim_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL, vR
+        integer, intent(in)                                                                    :: id
+        type(int_bounds_info), dimension(3)                                                    :: b
+        integer                                                                                :: i, j, k, l, r, w, lo, hi, sd
+
+        sd = amr_bat_sd; w = amr_bat_w; b = idwbuff
+        lo = amr_bat_ext(sd) + 1; hi = w - 1  ! the band, as offsets in the slab stride
+        if (id == sd) then
+            lo = lo + 1; hi = hi - 1
+        end if
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l, r]', copyin='[b, w, lo, hi, sd]')
+        do i = 1, sys_size
+            do l = b(3)%beg, b(3)%end
+                do k = b(2)%beg, b(2)%end
+                    do j = b(1)%beg, b(1)%end
+                        r = modulo(merge(j, merge(k, l, sd == 2), sd == 1), w)
+                        if (r >= lo .and. r <= hi) then
+                            vL(j, k, l, i) = q_prim_vf(i)%sf(j, k, l)
+                            vR(j, k, l, i) = q_prim_vf(i)%sf(j, k, l)
+                        end if
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_flatten_seam_faces
 
     !> Computes one sweep direction's contribution to the RHS: the Riemann solve on the reconstructed cell-boundary states followed
     !! by the advection source term. For dual-pass HLLD the fused solve computes BOTH anchored flux sets in one call; this routine
