@@ -3054,7 +3054,7 @@ contains
         real(wp), dimension(3) :: cell_coord  !< Computational coordinates from s_locate_cell (unused)
         real(wp) :: cell_offset  !< Offset of loc from the stencil's centre cell, in center-to-center spacings
         real(wp) :: weight_sum, fluid_weight, cell_weight
-        integer :: ii, jj, kk
+        integer :: ii, jj, kk, n_solid
 
         stencil_center = 0
         axis_weights = 0._wp
@@ -3080,18 +3080,25 @@ contains
         #:endfor
         if (p == 0) axis_weights(1, 3) = 1._wp  ! 2D: the consumers index this slot as k - k1 + 1 = 1
 
-        weight_sum = 0._wp; fluid_weight = 0._wp
+        weight_sum = 0._wp; fluid_weight = 0._wp; n_solid = 0
         do ii = 1, 3
             do jj = 1, 3
                 do kk = 1, merge(3, 1, p /= 0)
                     cell_weight = axis_weights(ii, 1)*axis_weights(jj, 2)*axis_weights(kk, 3)
                     weight_sum = weight_sum + cell_weight
                     if (markers%sf(stencil_center(1) + ii - 2, stencil_center(2) + jj - 2, stencil_center(3) + (kk - 2)*min(p, &
-                        & 1)) == 0) fluid_weight = fluid_weight + cell_weight
+                        & 1)) == 0) then
+                        fluid_weight = fluid_weight + cell_weight
+                    else
+                        n_solid = n_solid + 1
+                    end if
                 end do
             end do
         end do
-        fluid_frac = fluid_weight/weight_sum
+        ! Exactly 1 for an all-fluid stencil: a compiler that contracts only one of the two sums into an FMA leaves the ratio an ulp
+        ! below 1, and s_lag3_weights would then switch to TSC on round-off (#2443)
+        fluid_frac = 1._wp
+        if (n_solid > 0) fluid_frac = fluid_weight/weight_sum
 
     end subroutine s_tsc_weights
 

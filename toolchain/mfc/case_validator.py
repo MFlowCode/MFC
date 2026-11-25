@@ -330,7 +330,8 @@ PHYSICS_DOCS = {
         "explanation": (
             "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, periodic x, and periodic or wall (-15, -16) "
             "boundaries in y and z. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain without a target is "
-            "rejected. mean_temp_wall (positive) requires a mean_temp target."
+            "rejected. mean_temp_wall (positive) requires a mean_temp target and Newtonian fluids; with it the viscous "
+            "dissipation is removed from the energy equation (the thermally developed state excludes it)."
         ),
     },
     "check_synthetic_turbulence": {
@@ -1847,6 +1848,11 @@ class CaseValidator:
             self.prohibit(self.get("chem_params%diffusion", "F") != "T", "mean_temp_wall requires chem_params%diffusion = T (the only conduction path)")
             flux = self.get("mean_mflux(1)")
             self.prohibit(not (self._is_numeric(flux) and flux > 0), "mean_temp_wall requires mean_mflux(1) > 0: the mixing-cup temperature needs a held streamwise flow")
+            # The removed viscous dissipation uses the Newtonian stress (s_remove_mts_dissipation)
+            self.prohibit(
+                any(self.get(f"fluid_pp({i})%non_newtonian", "F") == "T" for i in range(1, (self.get("num_fluids", 1) or 1) + 1)),
+                "mean_temp_wall does not support non_newtonian fluids",
+            )
             for d, active in (("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)):
                 for side, tag in (("beg", "in"), ("end", "out")):
                     if not active or self.get(f"bc_{d}%{side}") not in (-15, -16):

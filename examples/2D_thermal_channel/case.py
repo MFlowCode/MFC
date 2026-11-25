@@ -4,8 +4,8 @@
 (mean_mflux). The thermostat with mean_temp_wall = Tw holds the gas in the thermally fully developed state
 T = Tw + psi(y) exp(-beta x), with the mixing-cup temperature at T0. Constant-property reference (Shah & London 1978):
 Nu = q_w D_h / (k (Tw - T_m)) = 7.541, D_h = 2H, T_m the mixing-cup temperature; axial conduction changes it by
-under 0.02 % for Pe_Dh > 100. q_w = -mean_qdot V_f / (2 L_x) at steady state (mean_temp.dat). A hot/cold wall pair
-(--tw above and below --t0) cancels the viscous heating to first order.
+under 0.02 % for Pe_Dh > 100. q_w = -mean_qdot V_f / (2 L_x) at steady state (mean_temp.dat). The source removes the viscous
+dissipation; a hot/cold wall pair (--tw above and below --t0) cancels the property asymmetry to first order.
 """
 
 import argparse

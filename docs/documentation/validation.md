@@ -107,13 +107,20 @@ Periodic flow with a heated or cooled wall never reaches a uniform temperature, 
 | 32 | 0.3 | 2e-8 | 0.1457 / 0.1371 | 7.552 (+0.13 %) | 7.554 (+0.16 %) |
 | 64 | 0.15 | 7e-9 | 0.1456 / 0.1371 | 7.546 (+0.05 %) | 7.546 (+0.05 %) |
 
-- A single run is biased by viscous heating and by the property change across the gap, with opposite sign for the hot and the cold wall (32 cells: \f$\mathrm{Nu}_\mathrm{src}\f$ 7.507 (−0.46 %) hot, 7.600 (+0.77 %) cold; \f$\mathrm{Nu}_\mathrm{grad}\f$ 7.141 (−5.3 %) and 7.998 (+6.1 %), which includes the dissipation that the source removes). The pair removes both.
+The rows above predate the removal of the viscous dissipation in this mode (`mean_temp_wall` with `viscous`, \cite Patankar1977). With it removed (32 cells, 0.3 \f$H^2/\alpha\f$, NVHPC 25.11 CPU build, one rank):
+
+| Mach | \f$\mathrm{Nu}_\mathrm{src}\f$ hot / cold | \f$\mathrm{Nu}_\mathrm{grad}\f$ hot / cold | pair \f$\mathrm{Nu}_\mathrm{src}\f$ / \f$\mathrm{Nu}_\mathrm{grad}\f$ | before the removal: \f$\mathrm{Nu}_\mathrm{src}\f$ / \f$\mathrm{Nu}_\mathrm{grad}\f$ hot |
+| ---: | ---: | ---: | ---: | ---: |
+| 0.1 | 7.378 / 7.749 | 7.329 / 7.757 | 7.557 (+0.20 %) / 7.535 (-0.09 %) | 7.507 / 7.141 |
+| 0.3 | 7.407 / 7.778 | 7.164 / 7.650 | 7.586 (+0.58 %) / 7.398 (-1.9 %) | 8.565 / 5.385 |
+
+- Before the removal a single run was biased by viscous heating and by the property change across the gap, with opposite sign for the hot and the cold wall (32 cells: \f$\mathrm{Nu}_\mathrm{src}\f$ 7.507 (−0.46 %) hot, 7.600 (+0.77 %) cold; \f$\mathrm{Nu}_\mathrm{grad}\f$ 7.141 (−5.3 %) and 7.998 (+6.1 %)). With the dissipation removed the two estimates of a single run agree within 0.7 % at Mach 0.1, and what is left (hot −2.2 %, cold +2.8 %) is the property asymmetry, which the pair cancels. At Mach 0.3 the hot run's estimates differ by 3 %: the near-wall part of the dissipation that the cell-centre \f$\tau : \nabla u\f$ misses.
 - \f$\beta H\f$ of the pair mean is 0.1414 at 32 cells (+0.15 % against 0.1412) and 0.1413 at 64 (+0.06 %); the hot and the cold value differ from it by the property effect on the Peclet number.
 - The source total and the wall gradient agree within 0.1 % after pairing: the source removes the heat that crosses the walls, which closes the fluid energy budget.
 - The mixing-cup temperature is held to 2e-8 (32 cells) and 7e-9 (64 cells) of its target.
 
 Limits:
-- **Plane channel only.** In periodic arrays of spheres \f$\beta\f$ drifted by more than 1 % and the hot-wall and cold-wall runs disagreed (12 cells per diameter, cause not understood); do not take an array Nusselt number from this source (note under `mean_temp_wall` in the case-file documentation). Viscous heating also biases a single-wall-temperature run at high Mach number.
+- **Plane channel only.** In periodic arrays of spheres \f$\beta\f$ drifted by more than 1 % and the hot-wall and cold-wall runs disagreed (12 cells per diameter, cause not understood); do not take an array Nusselt number from this source (note under `mean_temp_wall` in the case-file documentation). The viscous dissipation is removed with the cell-centre velocity gradients, which miss a few percent of it next to the walls at Mach 0.3.
 - **Near-wall velocity sawtooth (open).** With the no-slip isothermal wall (`bc_y%%beg = -16`) the streamwise velocity in the first four cells next to each wall alternates about the Poiseuille profile by up to 12 % of \f$U_b\f$ (32 cells, hot wall: \f$u/U_b\f$ = 0.195, 0.147, 0.459, 0.543 against 0.092, 0.268, 0.432, 0.584). It is steady, uniform in \f$x\f$ and symmetric, and the temperature is smooth; the Nusselt numbers above are not affected at the 0.2 % level. The cause is not verified.
 - **Round-off sensitivity.** With the default mapped WENO5 and `weno_eps = 1e-16`, the transverse momentum in the wall rows differs by 2 to 3 % between a GNU 13 `-O3` build and a debug build after 20 to 200 steps. The registered test therefore uses non-mapped WENO3 with `weno_eps = 1e-6`, where the builds agree to 5e-8 (relative), and an AMD MI250X (Cray Fortran, OpenMP offload, one GCD) run agrees with the GNU CPU golden to 8e-8.
 

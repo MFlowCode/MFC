@@ -162,13 +162,6 @@ def build(args):
     case["mean_dpdx(1)"] = -32.0 * mu * W * phi / (1.0 - phi) / D**2
     if args.thermostat:
         k_gas = gas.thermal_conductivity
-        # The thermally developed source has no viscous heating in it; the controller removes that heat where rho cp u psi is
-        # largest, and the core runs away (#2418: Br 0.77, Mach 0.3, T 300 K to 1 K by tW/D = 8.3; Br 0.34 completes tW/D = 12)
-        brinkman = mu * W**2 / (k_gas * abs(args.tw_ratio - 1.0) * T_inf)
-        if brinkman > 0.5:
-            print(
-                f"warning: --thermostat at Brinkman number {brinkman:.2f} > 0.5: viscous heating swamps the wall heat and the source runs away; lower --mach or raise |tw_ratio - 1|", file=sys.stderr
-            )
         case.update({"mean_temp": T_inf, "mean_temp_gain": args.gain, "mean_temp_wall": args.tw_ratio * T_inf, "mean_qdot": -k_gas * (args.tw_ratio - 1.0) * T_inf / D**2})
         case["chem_params%diffusion"] = "T"
     info = f"{dim}D  N {n}  phi {phi:.4f}  L {L / D:.3f} D  Re_m {args.Re:g}  Mach {args.mach:g}  D {D:.4e} m  W {W:.2f} m/s  grid {cells}^{dim}  Q {Q:.5f}"
