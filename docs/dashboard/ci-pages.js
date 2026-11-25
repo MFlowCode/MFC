@@ -10,7 +10,11 @@ const MFCCI = (() => {
     const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     const day = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
     const PR_OF = r => r.pr ?? (/\(#(\d+)\)\s*$/.exec(r.subject || r.title || "") || [])[1];
-    const commitLink = (sha, pr) => pr ? `<a href="${REPO}/pull/${pr}" target="_blank" rel="noopener">#${pr}</a>`
+    // Who opened each pull request (authors.jsonl, kept by the recorder): shown beside it where there is room.
+    const AUTHORS = new Map();
+    const author = pr => AUTHORS.get(String(pr)) || "";
+    const by = pr => author(pr) ? ` <a class="by" href="https://github.com/${author(pr)}" target="_blank" rel="noopener">@${esc(author(pr))}</a>` : "";
+    const commitLink = (sha, pr) => pr ? `<a href="${REPO}/pull/${pr}" target="_blank" rel="noopener">#${pr}</a>${by(pr)}`
                                        : `<a href="${REPO}/commit/${sha}" target="_blank" rel="noopener"><code>${sha.slice(0, 7)}</code></a>`;
 
     // ---- lanes: a machine, a compiler and an offload model (and on Phoenix, for benchmarks, a GPU model) ----
@@ -48,8 +52,9 @@ const MFCCI = (() => {
     const cache = {};
     const months = (n = 4) => [...Array(n).keys()].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return `ci/${d.toISOString().slice(0, 7)}.jsonl`; });
     const load = {
-        bench: () => cache.bench ??= get("benchmarks.jsonl").then(t => lines(t).map(r => ({ ...r, lane: laneKey(r), t: Date.parse(r.date) })).sort((a, b) => a.t - b.t)),
-        runs:  () => cache.runs ??= Promise.all(months().map(get)).then(ms => { const rs = ms.flatMap(lines).map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t);
+        authors: () => cache.authors ??= get("authors.jsonl").then(t => { for (const a of lines(t)) AUTHORS.set(String(a.pr), a.by); }),
+        bench: () => cache.bench ??= Promise.all([get("benchmarks.jsonl"), load.authors()]).then(([t]) => lines(t).map(r => ({ ...r, lane: laneKey(r), t: Date.parse(r.date) })).sort((a, b) => a.t - b.t)),
+        runs:  () => cache.runs ??= Promise.all([Promise.all(months().map(get)), load.authors()]).then(([ms]) => { const rs = ms.flatMap(lines).map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t);
             seeLanes(rs.slice(-400).flatMap(r => r.jobs.map(j => j.l))); return rs; }),
         // What each lane loads today: its lines of toolchain/modules on master.
         modules: () => cache.modules ??= fetch("https://raw.githubusercontent.com/MFlowCode/MFC/master/toolchain/modules").then(r => r.ok ? r.text() : "").catch(() => "").then(text => l => {
@@ -293,6 +298,6 @@ const MFCCI = (() => {
         const first = new Map(); for (const r of records) if (!first.has(r.sha)) first.set(r.sha, r);
         return events.map(e => ({ ...e, suspects: order.slice(e.lo, e.hi + 1), r: first.get(order[e.hi][0]) || e.spans[0].hits[0].r })).sort((a, b) => b.hi - a.hi);
     }
-    return { BASE, REPO, CI_LANES, LANE_KEY, lines, get, med, esc, day, PR_OF, commitLink, laneKey, laneOf, benchLanes, load, param, withParams, chrome, SCALING, scalingStatus, updated, sortable, CAUSE, howFailed, live, liveLane, liveSummary, clock, ago,
+    return { BASE, REPO, CI_LANES, LANE_KEY, lines, get, med, esc, day, PR_OF, commitLink, author, by, laneKey, laneOf, benchLanes, load, param, withParams, chrome, SCALING, scalingStatus, updated, sortable, CAUSE, howFailed, live, liveLane, liveSummary, clock, ago,
              masterRuns, laneStatus, testStats, frontierHours, shifts, CAP: 2688 };
 })();
