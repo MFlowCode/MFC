@@ -4,10 +4,12 @@
 #          smoke  two lanes, Frontier CCE OpenACC and Phoenix NVHPC OpenMP: build, then up to 120
 #                 of the tests the change selects on each
 #          full   every cluster lane, the whole suite, case-optimization and benchmarks
-#   base   scheduled runs: the commit of the last scheduled run whose cluster jobs all passed
+#   base   scheduled runs: the commit of the last scheduled run that counts as passed
 #
 # Env: EVENT, REPO, RUN_ID, HEAD_SHA, PR_NUMBER, PR_DRAFT, CHECKALL, GH_TOKEN;
-#      WORKFLOW (default test.yml) is the workflow whose scheduled runs are compared.
+#      WORKFLOW (default test.yml) is the workflow whose scheduled runs are compared;
+#      PARTIAL=1 counts a run as passed once any cluster job passed in it (bench.yml: each lane
+#      records its own result, and one broken lane must not hold the base back or repeat the rest).
 set -euo pipefail
 
 LABEL="ci:clusters"
@@ -36,7 +38,8 @@ case "$EVENT" in
             verdict=$(gh api --paginate "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
                 --jq '[.jobs[] | select(.labels | any(. == "frontier" or . == "gt")) | .conclusion]' | jq -rs 'add
                     | if length == 0 or all(. == "skipped") then "none" elif all(. == "success" or . == "skipped") then "passed"
-                      elif any(. == "failure") then "failed" else "unfinished" end')
+                      elif $partial == "1" and any(. == "success") then "passed"
+                      elif any(. == "failure") then "failed" else "unfinished" end' --arg partial "${PARTIAL:-0}")
             if [ "$sha" = "$HEAD_SHA" ]; then
                 case "$verdict" in passed) passed=$((passed + 1)) ;; failed) failed=$((failed + 1)) ;; esac
             elif [ "$verdict" = passed ]; then

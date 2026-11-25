@@ -3,7 +3,8 @@
 #   cluster-lane.sh build <device> <interface> <cluster>
 #   cluster-lane.sh test  <device> <interface> <cluster> [shard ...]
 # build: one job, except Frontier AMD, whose variants (MFC_BUILD_VARIANTS, default "base chem-h2o2 chem-carbon eos")
-#        are concurrent jobs so the amdflang LTO links do not serialize past the 2 h walltime.
+#        are concurrent jobs so the amdflang LTO links do not serialize past the 2 h walltime, followed by a
+#        short job that builds any chemistry mechanism those did not name.
 # test:  one job per shard, concurrently, from this workspace and the binaries build left in it
 #        (test.sh passes --no-build; each shard writes only its own tests/<UUID> directories).
 #        No shard: one job. MFC_TEST_EXTRA_OPTS is appended to the test command.
@@ -19,7 +20,9 @@ case "$cluster" in
     *)       partitions="g1" ;;
 esac
 if avail=$(sinfo -h -p "$partitions" -o %a 2>/dev/null) && [ -n "$avail" ] && ! grep -q up <<<"$avail"; then
-    echo "::error title=$cluster unavailable::SLURM partition $partitions is not up. This is the machine, not this change."
+    # ci-record.py classes the job as a cluster failure by "cluster unavailable" in the log, where
+    # an annotation's title does not appear.
+    echo "::error title=$cluster unavailable::cluster unavailable: SLURM partition $partitions on $cluster is not up. This is the machine, not this change."
     exit 78
 fi
 
@@ -38,6 +41,9 @@ case "$step" in
                 pids+=($!)
             done
             wait_all "${pids[@]}"
+            # Sweep: `-o Chemistry` finds the named mechanisms built and builds any other, so a test
+            # with a new mechanism needs no change here (lint_test_suite.py counts on that).
+            "${submit[@]}" .github/workflows/common/build.sh "$device" "$interface" "$cluster" "" chem
         else
             # build.sh records the partition it ran on: a binary built on one Phoenix node type can
             # SIGILL on another, so the tests are pinned to it.

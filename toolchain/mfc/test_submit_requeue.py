@@ -39,7 +39,7 @@ def rig(tmp_path):
     # submit-slurm-job.sh inlines the payload script into the sbatch heredoc.
     payload = tmp_path / ".github" / "workflows" / "common"
     payload.mkdir(parents=True)
-    (payload / "build-and-test.sh").write_text("echo payload\n")
+    (payload / "test.sh").write_text("echo payload\n")
 
     # sbatch records each submitted script, then reports a fresh job id.
     _exe(
@@ -70,7 +70,7 @@ exit "${{code:-0}}"
 """,
     )
 
-    def run(monitor_codes, script="common/build-and-test.sh", **env_extra):
+    def run(monitor_codes, script="common/test.sh", **env_extra):
         env = {
             **os.environ,
             "PATH": f"{binz}:{os.environ['PATH']}",

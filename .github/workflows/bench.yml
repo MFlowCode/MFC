@@ -58,6 +58,7 @@ jobs:
           PR_DRAFT:  ${{ github.event.pull_request.draft }}
           CHECKALL:  ${{ steps.changes.outputs.checkall }}
           WORKFLOW:  bench.yml
+          PARTIAL:   1
         run: bash .github/scripts/cluster-mode.sh
 
   self:
@@ -252,6 +253,7 @@ jobs:
           path: results
 
       - name: Append to history
+        id: record
         env:
           DEPLOY_KEY: ${{ secrets.CI_DATA_DEPLOY_KEY }}
           GH_TOKEN: ${{ github.token }}
@@ -287,7 +289,7 @@ jobs:
             git -C ../history config user.email '<>'
             git -C ../history add benchmarks.jsonl
             git -C ../history commit -m "Benchmarks @ ${GITHUB_SHA::7}"
-            if git -C ../history push; then exit 0; fi
+            if git -C ../history push; then echo "recorded=true" >> "$GITHUB_OUTPUT"; exit 0; fi
             sleep $((attempt * 7))
           done
           echo "::error::Could not push the benchmark history after 5 attempts."; exit 1
@@ -301,7 +303,8 @@ jobs:
           bash .github/scripts/ci-issue.sh open "Benchmark history is not being recorded" "The benchmark recorder failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. The performance page stops updating until it is fixed. A missing or revoked \`CI_DATA_DEPLOY_KEY\` is the usual cause."
 
       - name: Clear that once it records again
-        if: success()
+        # Not when there was nothing to record: that says nothing about whether recording works.
+        if: success() && steps.record.outputs.recorded == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO:     ${{ github.repository }}

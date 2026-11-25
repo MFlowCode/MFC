@@ -1,8 +1,8 @@
 name: 'Cluster Bisect'
 
 # Find the merge that broke a cluster lane on master. Dispatched by the Cluster Master Alert
-# when a scheduled run goes red with more than one merge since the last green run; can also be
-# run by hand. Each step costs one build of the lane plus the failed tests.
+# when a lane that passed in its last scheduled run fails with more than one merge since; can
+# also be run by hand. Each step costs one build of the lane plus the failed tests.
 on:
   workflow_dispatch:
     inputs:
@@ -45,6 +45,8 @@ jobs:
       group:  phoenix
       labels: ${{ inputs.cluster == 'phoenix' && 'gt' || 'frontier' }}
     timeout-minutes: 1200
+    outputs:
+      message: ${{ steps.bisect.outputs.message }}
     steps:
       - name: Clone
         uses: actions/checkout@v5
@@ -54,15 +56,13 @@ jobs:
           clean: false
 
       - name: Bisect
+        id: bisect
         env:
-          GH_TOKEN:  ${{ github.token }}
-          REPO:      ${{ github.repository }}
           CLUSTER:   ${{ inputs.cluster }}
           INTERFACE: ${{ inputs.interface }}
           GOOD:      ${{ inputs.good }}
           BAD:       ${{ inputs.bad }}
           TESTS:     ${{ inputs.tests }}
-          ISSUE:     ${{ inputs.issue }}
         run: bash .github/scripts/cluster-bisect.sh
 
       - name: Cancel SLURM Jobs
@@ -71,3 +71,20 @@ jobs:
           find . -name "*.slurm_job_id" | while read -r f; do
             scancel "$(cat "$f")" 2>/dev/null || true
           done
+
+  # Posted from a hosted runner: the cluster runners are not known to have gh.
+  report:
+    name: Report
+    needs: bisect
+    if: always() && inputs.issue != '' && needs.bisect.outputs.message != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MESSAGE:  ${{ needs.bisect.outputs.message }}
+          RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ISSUE:    ${{ inputs.issue }}
+          REPO:     ${{ github.repository }}
+        run: |
+          gh issue comment "$ISSUE" -R "$REPO" --body "$(printf '%s\n\nRun: %s\n' "$MESSAGE" "$RUN_URL")"

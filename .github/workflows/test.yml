@@ -443,10 +443,9 @@ jobs:
         run:  rm -f *.out
 
       - name: Fetch merge base
-        # test.sh finds the PR's changed files with git, for coverage-based test selection. Fetch the history that
-        # needs here, once: Frontier's compute nodes cannot reach GitHub (selection there always fell back to the full
-        # suite), and concurrent test shards must not race to deepen one checkout.
-        if:   github.event_name == 'pull_request'
+        # A smoke run selects tests by the PR's changed files, which the test command finds with git. Fetch the
+        # history that needs here: Frontier's compute nodes cannot reach GitHub.
+        if:   needs.cluster-mode.outputs.mode == 'smoke'
         run:  |
           git fetch origin "+master:master" --depth=1 || true
           git fetch --deepen=200 || true
@@ -463,7 +462,7 @@ jobs:
         # A smoke run is one job.
         env:
           SHARDS: ${{ needs.cluster-mode.outputs.mode == 'smoke' && ' ' || '1/2 2/2' }}
-          MFC_TEST_EXTRA_OPTS: ${{ needs.cluster-mode.outputs.mode == 'smoke' && '--max-tests 120' || '' }}
+          MFC_TEST_EXTRA_OPTS: ${{ needs.cluster-mode.outputs.mode == 'smoke' && '--select-enforce --max-tests 120' || '' }}
         run:  bash .github/scripts/cluster-lane.sh test ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} $SHARDS
 
       - name: Cancel SLURM Jobs
@@ -608,7 +607,7 @@ jobs:
             prebuild-case-optimization-*.out
             run-case-optimization-*.out
 
-  # Phoenix (GT) runs in full mode only.
+  # Phoenix (GT): the OpenMP tests in smoke and full mode, the rest in full mode only.
   phoenix:
     name: "${{ matrix.kind == 'case-opt' && 'Case Opt | ' || '' }}Georgia Tech | Phoenix (NVHPC) (gpu-${{ matrix.interface }})${{ needs.cluster-mode.outputs.mode == 'smoke' && ' [smoke]' || '' }}"
     needs: [lint-gate, cluster-mode]
@@ -617,8 +616,9 @@ jobs:
       needs.lint-gate.result == 'success' &&
       needs.cluster-mode.result == 'success' &&
       needs.cluster-mode.outputs.mode != 'none'
-    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
-    timeout-minutes: 540
+    # Two SLURM submissions, the build and then the test shards on that build: each can wait
+    # SLURM_MAX_QUEUE_SECONDS (3 h) in the queue and run to its 3 h limit.
+    timeout-minutes: 720
     strategy:
       fail-fast: false
       matrix:
@@ -649,10 +649,9 @@ jobs:
         run:  rm -f *.out
 
       - name: Fetch merge base
-        # test.sh finds the PR's changed files with git, for coverage-based test selection. Fetch the history that
-        # needs here, once: Frontier's compute nodes cannot reach GitHub (selection there always fell back to the full
-        # suite), and concurrent test shards must not race to deepen one checkout.
-        if:   github.event_name == 'pull_request' && matrix.kind == 'test'
+        # A smoke run selects tests by the PR's changed files, which the test command finds with git. Fetch the
+        # history that needs here: Frontier's compute nodes cannot reach GitHub.
+        if:   needs.cluster-mode.outputs.mode == 'smoke' && matrix.kind == 'test'
         run:  |
           git fetch origin "+master:master" --depth=1 || true
           git fetch --deepen=200 || true
@@ -665,7 +664,7 @@ jobs:
         if:   matrix.kind == 'test'
         env:
           SHARDS: ${{ needs.cluster-mode.outputs.mode == 'smoke' && ' ' || '1/2 2/2' }}
-          MFC_TEST_EXTRA_OPTS: ${{ needs.cluster-mode.outputs.mode == 'smoke' && '--max-tests 120' || '' }}
+          MFC_TEST_EXTRA_OPTS: ${{ needs.cluster-mode.outputs.mode == 'smoke' && '--select-enforce --max-tests 120' || '' }}
         run:  bash .github/scripts/cluster-lane.sh test gpu ${{ matrix.interface }} phoenix $SHARDS
 
       - name: Pre-Build (SLURM)

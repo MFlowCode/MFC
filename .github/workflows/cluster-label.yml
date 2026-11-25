@@ -51,7 +51,8 @@ jobs:
           fi
           jobs=$(gh api --paginate "repos/$REPO/actions/runs/$run/jobs?filter=latest&per_page=100" \
               --jq '.jobs[] | [.id, (.conclusion // "none"), .name] | @tsv')
-          if [ -n "$(awk -F'\t' '$3 ~ /Phoenix/ && $2 != "skipped"' <<<"$jobs")" ]; then
+          # A smoke run has a Phoenix job too, named "... [smoke]"; only a full run has one without.
+          if [ -n "$(awk -F'\t' '$3 ~ /Phoenix/ && $3 !~ /\[smoke\]/ && $2 != "skipped"' <<<"$jobs")" ]; then
               echo "Run $run already ran the full cluster set."; exit 0
           fi
           mode_job=$(awk -F'\t' '$3 == "Cluster Mode" {print $1}' <<<"$jobs" | head -1)

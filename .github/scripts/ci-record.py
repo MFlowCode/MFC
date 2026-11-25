@@ -174,7 +174,7 @@ def tests(log: str, failed_job: bool) -> dict:
         text = "\n".join(lines)
         out["why"] = why = (
             "tests" if failed or "CRITICAL:" in text
-            else "cluster" if " unavailable::" in text or "Batch job submission failed" in text
+            else "cluster" if "cluster unavailable" in text or "Batch job submission failed" in text
             else "queue" if "QUEUE STARVATION" in text
             else "build" if "Build failed after" in text
             else "timeout" if "state=TIMEOUT" in text

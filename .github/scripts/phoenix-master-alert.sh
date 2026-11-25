@@ -62,7 +62,6 @@ done < <(api "repos/$REPO/actions/workflows/test.yml/runs?branch=master&event=$R
         api "repos/$REPO/compare/$last_green...$HEAD_SHA" \
             --jq '.commits[] | "- " + .sha[0:9] + " " + (.commit.message | split("\n")[0])' > "$body.merges"
         tail -30 "$body.merges"
-        n_merges=$(wc -l < "$body.merges")
         # One scheduled run covers every merge since the previous one.
         if [ "$(wc -l < "$body.merges")" -gt 1 ]; then
             # shellcheck disable=SC2016 # backticks are Markdown
@@ -82,15 +81,19 @@ else
     issue=${url##*/}
 fi
 
-# Bisect each test lane that has just gone red: it failed here and passed in the scheduled run
-# before, so the merges between the two are the suspects, whatever else is already red. A lane
-# that stays red is not bisected again, and a lane with no result (cancelled, timed out) has
-# nothing to bisect. The failed tests come from the job log (cluster-lane.sh prints them).
-read -r prev_id prev_attempt prev_sha < <(api "repos/$REPO/actions/workflows/test.yml/runs?branch=master&event=$RUN_EVENT&status=completed&created=<$created&per_page=1" \
-    --jq '.workflow_runs[0] | [.id, .run_attempt, .head_sha] | @tsv') || true
-if [ -z "${prev_sha:-}" ] || [ "$prev_sha" = "$HEAD_SHA" ]; then exit 0; fi
-if [ "$(api "repos/$REPO/compare/$prev_sha...$HEAD_SHA" --jq '.commits | length')" -le 1 ]; then exit 0; fi   # one merge: named above
-prev_jobs=$(phoenix_jobs "$prev_id" "$prev_attempt")
+# Bisect each test lane that has just gone red: it failed here and passed the last time a
+# scheduled run ran it, so the merges between the two are the suspects, whatever else is already
+# red. A lane that was already red is not bisected again, and a lane with no result (cancelled,
+# timed out) has nothing to bisect.
+prev_runs=$(api "repos/$REPO/actions/workflows/test.yml/runs?branch=master&event=$RUN_EVENT&status=completed&created=<$created&per_page=30" \
+    --jq '.workflow_runs[] | [.id, .run_attempt, .head_sha] | @tsv')
+declare -A prev_jobs
+# The lane's test jobs with a verdict, in one run's jobs: a skipped job keeps its unexpanded
+# matrix name and does not match, and a cancelled one says nothing.
+lane_jobs() { awk -F'\t' -v c="$compiler" -v i="gpu-$interface" 'index($2, c) && index($2, i) && $2 !~ /^Case Opt/ && ($1 == "success" || $1 == "failure" || $1 == "timed_out")'; }
+# curl, not `gh api`: gh 2.97 and later refuses to print a log, which always holds colour codes.
+job_log() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/actions/jobs/$1/logs"; }
+
 done_lanes=" "
 while IFS=$'\t' read -r conclusion name job_url; do
     [ "$conclusion" = "failure" ] || continue
@@ -105,12 +108,33 @@ while IFS=$'\t' read -r conclusion name job_url; do
     [ -n "$interface" ] || continue
     case "$done_lanes" in *" $lane-$interface "*) continue ;; esac     # one bisect per lane, not per shard
     done_lanes="$done_lanes$lane-$interface "
-    # The lane's test jobs in the previous run: all passed, or this is not new.
-    before=$(awk -F'\t' -v c="$compiler" -v i="gpu-$interface" 'index($2, c) && index($2, i) && $2 !~ /^Case Opt/' <<<"$prev_jobs")
-    if [ -z "$before" ] || [ -n "$(awk -F'\t' '$1 != "success"' <<<"$before")" ]; then continue; fi
-    tests=$(awk -F'\t' -v c="$compiler" -v i="gpu-$interface" '$1 == "failure" && index($2, c) && index($2, i) && $2 !~ /^Case Opt/ {print $3}' <<<"$failed" | while read -r u; do
-        api "repos/$REPO/actions/jobs/${u##*/}/logs" 2>/dev/null | sed -n 's/.*FAILED_TESTS: //p' | tr ' ' '\n' || true
-    done | { grep -E '^[0-9A-Fa-f]{8}$' || true; } | sort -u | head -20 | xargs)
+
+    # The last earlier run that ran this lane: a run that found master unchanged skipped it.
+    good=""
+    while IFS=$'\t' read -r rid attempt sha; do
+        [ -n "$rid" ] || continue
+        [ -n "${prev_jobs[$rid]+x}" ] || prev_jobs[$rid]=$(phoenix_jobs "$rid" "$attempt")
+        before=$(lane_jobs <<<"${prev_jobs[$rid]}")
+        [ -n "$before" ] || continue
+        if [ -z "$(awk -F'\t' '$1 != "success"' <<<"$before")" ]; then good=$sha; fi
+        break
+    done <<<"$prev_runs"
+    if [ -z "$good" ] || [ "$good" = "$HEAD_SHA" ]; then continue; fi     # already red, or never seen green
+    if [ "$(api "repos/$REPO/compare/$good...$HEAD_SHA" --jq '.commits | length')" -le 1 ]; then continue; fi   # one merge: named above
+
+    # What failed: the tests cluster-lane.sh printed in the job log, or the build step.
+    tests="" build_failed=""
+    while read -r u; do
+        [ -n "$u" ] || continue
+        tests="$tests $(job_log "${u##*/}" | sed -n 's/.*FAILED_TESTS: //p' | tr '\n' ' ' || true)"
+        if [ -n "$(api "repos/$REPO/actions/jobs/${u##*/}" --jq '.steps[] | select(.conclusion == "failure" and (.name | test("^(Build|Fetch Dependencies)$"))) | .name')" ]; then build_failed=1; fi
+    done < <(awk -F'\t' -v c="$compiler" -v i="gpu-$interface" '$1 == "failure" && index($2, c) && index($2, i) && $2 !~ /^Case Opt/ {print $3}' <<<"$failed")
+    tests=$(tr ' ' '\n' <<<"$tests" | { grep -E '^[0-9A-Fa-f]{8}$' || true; } | sort -u | head -20 | xargs)
+    # Neither a failed test nor a failed build: nothing a bisect could reproduce.
+    if [ -z "$tests" ] && [ -z "$build_failed" ]; then
+        echo "$lane gpu-$interface failed without a failed test or a failed build; not bisecting."
+        continue
+    fi
     write "bisect $lane gpu-$interface on: ${tests:-the build}" gh workflow run bisect.yml -R "$REPO" --ref master \
-        -f cluster="$lane" -f interface="$interface" -f good="$prev_sha" -f bad="$HEAD_SHA" -f tests="$tests" -f issue="$issue"
+        -f cluster="$lane" -f interface="$interface" -f good="$good" -f bad="$HEAD_SHA" -f tests="$tests" -f issue="$issue"
 done <<<"$failed"
