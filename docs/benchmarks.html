@@ -35,7 +35,11 @@
         svg text.event { fill: #b45309; font-weight: 600; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
         figure { margin: 0; background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 12px 6px; position: relative; }
-        figcaption { font-weight: 600; font-size: 14px; margin-bottom: 4px; overflow-wrap: anywhere; }
+        figcaption { font-weight: 600; font-size: 14px; margin-bottom: 8px; overflow-wrap: anywhere; }
+        figcaption .notes { display: block; font-weight: 400; font-size: 12px; color: var(--muted); min-height: 16px; }
+        .unzoom { position: absolute; top: 8px; right: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: #fef3c7; border: 1px solid #f59e0b; padding: 2px 8px; cursor: pointer; z-index: 1; }
+        #zoomed { font-size: 13px; background: #fef3c7; padding: 4px 10px; display: inline-flex; gap: 10px; align-items: baseline; }
+        #zoomed button { font: inherit; font-weight: 700; background: none; border: 0; text-decoration: underline; cursor: pointer; color: var(--ink); padding: 0; }
         svg { display: block; width: 100%; height: auto; }
         svg text { fill: var(--muted); font-size: 11px; }
         .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 6px 8px; font-size: 12px; color: var(--ink); white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.15); z-index: 2; }
@@ -88,7 +92,7 @@
             <button data-v="0" aria-pressed="false">All</button>
         </div>
         <button id="reset" class="plain" hidden>Reset zoom</button>
-        <span class="note">Drag to zoom. Click a point for its commit.</span>
+        <span class="note">Drag across a chart to zoom; Esc or double-click resets. Click a point for its commit.</span>
     </div>
     <h2 id="changes-h">Performance changes</h2>
     <p class="note">At least 3% and 5&times; the run-to-run scatter. Commits listed merged between the last benchmark at the old level and the first at the new.</p>
@@ -99,6 +103,7 @@
     <h2>Cases</h2>
     <ul class="legend" id="legend"></ul>
     <div class="scrollx"><table id="summary" class="sortable"></table></div>
+    <p id="zoomed" hidden></p>
     <div class="grid" id="charts"></div>
 
     <h2>Commits</h2>
@@ -181,7 +186,8 @@ function series(slug) {
 function chart(slug) {
     const W = 360, H = 200, L = 46, R = 8, T = 12, B = 22;
     const fig = document.createElement("figure"); fig.id = `case-${slug}`;
-    fig.innerHTML = `<figcaption>${slug}</figcaption>`;
+    fig.innerHTML = `<figcaption>${slug}<span class="notes"></span></figcaption>`;
+    const capNotes = fig.querySelector(".notes"), noteFor = text => capNotes.insertAdjacentHTML("beforeend", `${capNotes.textContent ? " · " : ""}${text}`);
     const ss = series(slug);
     if (!ss.length) { fig.insertAdjacentHTML("beforeend", `<p class="note">No runs in this range.</p>`); return fig; }
 
@@ -228,9 +234,9 @@ function chart(slug) {
         mark(x(t), T - 5, `Benchmark case changed at or just before ${named(pointAt(t))}`);
     }
     const off = all.filter(p => p.out).length;
-    if (off) fig.firstChild.insertAdjacentHTML("beforeend", ` <span class="note" style="font-weight:400">· ${off} off-scale ${off === 1 ? "run" : "runs"} ▲</span>`);
-    if (envChanged.size) fig.firstChild.insertAdjacentHTML("beforeend", ` <span class="note" style="font-weight:400">· modules changed ${envChanged.size === 1 ? "once" : envChanged.size + " times"}</span>`);
-    if (changed.size) fig.firstChild.insertAdjacentHTML("beforeend", ` <span class="note" style="font-weight:400">· case changed ${changed.size === 1 ? "once" : changed.size + " times"}</span>`);
+    if (off) noteFor(`${off} off-scale ${off === 1 ? "run" : "runs"}`);
+    if (envChanged.size) noteFor(`modules changed ${envChanged.size === 1 ? "once" : envChanged.size + " times"}`);
+    if (changed.size) noteFor(`case changed ${changed.size === 1 ? "once" : changed.size + " times"}`);
 
     for (const s of ss) {
         for (const p of s.pts) {
@@ -242,12 +248,21 @@ function chart(slug) {
             fill: "none", stroke: s.lane.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
     }
 
-    // The lasting changes found for this case on a lane shown here, marked where they happened.
+    // The lasting changes found for this case on a lane shown here, marked where they happened. Labels go on
+    // up to three rows so that neighbours do not overprint; one with no room is left to the hover.
+    const found = [];
     for (const e of state.shifts) for (const sp of e.spans) {
         const hit = sp.hits.find(h => h.slug === slug); if (!hit || !ss.some(s => s.lane.key === sp.lane.key) || e.r.t < t0 || e.r.t > t1) continue;
-        const who = e.suspects.length === 1 ? (e.suspects[0][2] ? `#${e.suspects[0][2]}` : e.suspects[0][0].slice(0, 7)) : `${e.suspects.length} commits`, xe = x(e.r.t), left = xe > W - 90;
+        found.push({ e, sp, hit, xe: x(e.r.t) });
+    }
+    const rows = [[], [], []];                                   // per row, the x-extents already taken
+    for (const f of found.sort((a, b) => a.xe - b.xe)) {
+        const { e, sp, hit, xe } = f, who = e.suspects.length === 1 ? (e.suspects[0][2] ? `#${e.suspects[0][2]}` : e.suspects[0][0].slice(0, 7)) : `${e.suspects.length} commits`;
+        const text = `${hit.pct > 0 ? "+" : ""}${hit.pct.toFixed(0)}% ${who}`, wide = text.length * 6.2 + 8, left = xe + wide > W - R, from = left ? xe - wide : xe, to = left ? xe : xe + wide;
         el("line", { x1: xe, x2: xe, y1: T, y2: H - B, stroke: "#f59e0b", "stroke-width": 1.5 }, svg);
-        el("text", { x: xe + (left ? -4 : 4), y: H - B - 5, "text-anchor": left ? "end" : "start", class: "event" }, svg).textContent = `${hit.pct > 0 ? "+" : ""}${hit.pct.toFixed(0)}% ${who}`;
+        const row = rows.findIndex(r => r.every(([a, b]) => to < a || from > b));
+        if (row >= 0 && from >= L) { rows[row].push([from, to]);
+            el("text", { x: xe + (left ? -4 : 4), y: H - B - 5 - 12 * row, "text-anchor": left ? "end" : "start", class: "event" }, svg).textContent = text; }
         mark(xe, H - B - 8, `${sp.lane.label}: grind time ${hit.pct > 0 ? "up" : "down"} ${Math.abs(hit.pct).toFixed(1)}% at ${e.suspects.length === 1 ? e.suspects[0][1] : `one of ${e.suspects.map(c => c[2] ? `#${c[2]}` : c[0].slice(0, 7)).join(", ")}`}`);
     }
 
@@ -305,6 +320,7 @@ function chart(slug) {
     hit.addEventListener("pointerleave", () => { if (drag === null) { tip.hidden = true; marks.replaceChildren(); cross.setAttribute("visibility", "hidden"); } });
     svg.addEventListener("dblclick", () => { if (state.zoom) { state.zoom = null; render(); } });
     for (const m of notes) el("title", {}, el("circle", { cx: m.cx, cy: m.cy, r: 7, fill: "transparent" }, svg)).textContent = m.text;
+    if (state.zoom) { const b = document.createElement("button"); b.className = "unzoom"; b.textContent = "Reset zoom"; b.addEventListener("click", unzoom); fig.append(b); }
     fig.append(svg, tip, pin);
     return fig;
 }
@@ -393,8 +409,15 @@ function summary(slugs) {
     }).join("");
 }
 
+function unzoom() { state.zoom = null; render(); }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && state.zoom) unzoom(); });
+
 function render() {
     const slugs = [...new Set(state.records.flatMap(r => Object.keys(r.cases)))].sort();
+    const fmtDay = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    $("zoomed").hidden = !state.zoom;
+    if (state.zoom) $("zoomed").innerHTML = `Zoomed to ${fmtDay(state.zoom[0])} – ${fmtDay(state.zoom[1])} <button id="unzoom2">Reset zoom</button> <span class="note">or press Esc, or double-click a chart</span>`;
+    if (state.zoom) $("unzoom2").addEventListener("click", unzoom);
     headline(); summary(slugs);
     $("charts").replaceChildren(...slugs.map(chart));
     $("reset").hidden = !state.zoom;
