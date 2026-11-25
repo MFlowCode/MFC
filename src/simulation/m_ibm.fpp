@@ -202,6 +202,12 @@ module m_ibm
     logical :: moving_immersed_boundary_flag
     !> Cells per direction in the image-point interpolation stencil: 2 (inverse distance, bilinear) or 3 (TSC)
     integer :: ib_ip_width
+    !> a buried-image-point ghost exists on some rank (set with the interpolation coefficients): the fallback average then needs the
+    !! corrected ghosts of the neighbouring ranks, and the halos of corrected_gps and the state are filled before it
+    logical :: ib_any_buried = .false.
+    !> corrected_gps in the real fields the halo exchange carries
+    type(scalar_field), dimension(1) :: corrected_gps_r
+    $:GPU_DECLARE(create='[corrected_gps_r]')
     logical :: ib_keep_ghost  !< The interpolation or the wall probes read solid cells, so ghost cells keep the last correction
     logical :: ib_wall_quad   !< ib_wall_order = 2: quadratic wall-normal ghost velocity at no-slip walls
     $:GPU_DECLARE(create='[ib_ip_width, ib_keep_ghost, ib_wall_quad]')
@@ -240,13 +246,18 @@ contains
         else if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
             @:ALLOCATE(corrected_gps%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
+            @:ALLOCATE(corrected_gps_r(1)%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
         else
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
             @:ALLOCATE(corrected_gps%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
+            @:ALLOCATE(corrected_gps_r(1)%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, 0:0))
         end if
 
         @:ACC_SETUP_SFs(ib_markers)
         @:ACC_SETUP_SFs(corrected_gps)
+        if (associated(corrected_gps_r(1)%sf)) then
+            @:ACC_SETUP_SFs(corrected_gps_r(1))
+        end if
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
         ib_ip_width = merge(3, 2, ib_ip_interp == 2)
@@ -1034,7 +1045,13 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+        end if
 
+        ! The ghosts corrected above and their flags, on the neighbouring ranks, are what the average below reads; collective, so
+        ! outside the num_gps test
+        if (ib_any_buried) call s_ibm_exchange_gp_halos(q_cons_vf, q_prim_vf)
+
+        if (num_gps > 0) then
             ! A ghost point whose image point is buried in a neighboring IB has no fluid to mirror, so
             ! it takes the average of the ghost points corrected above, growing the stencil until it
             ! reaches one. Those neighbors already carry the wall condition, so the average does too.
@@ -2790,6 +2807,8 @@ contains
         integer, dimension(3)        :: ic                      !< Cell centring the TSC stencil
         type(ghost_point)            :: gp
         integer                      :: q, i, j, k, ii, jj, kk  !< Grid indexes and iterators
+        integer                      :: n_buried                !< Ghost points of this rank without fluid to mirror
+        integer(kind=8)              :: n_buried_loc, n_buried_glb
 
         $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, gp, interp_coeffs, fluid_mask, stencil_coeffs, wd, fluid_w, &
                             & ic]', copyin='[ib_markers%sf]', present='[ghost_points]')
@@ -2874,7 +2893,127 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! Collective: whether any rank holds a ghost point without fluid to mirror (the AMR frames and non-polytropic QBMM
+        ! keep the rank-local average)
+        n_buried = 0
+        $:GPU_PARALLEL_LOOP(private='[q]', reduction='[[n_buried]]', reductionOp='[+]', present='[ghost_points]')
+        do q = 1, num_gps
+            if (.not. ghost_points(q)%interp_valid) n_buried = n_buried + 1
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        ! not with AMR: fine frames call this per block, on some ranks only, so it must not reach a collective
+        ib_any_buried = .false.
+        if (.not. amr .and. .not. (qbmm .and. .not. polytropic)) then
+            n_buried_loc = int(n_buried, kind=8)
+            call s_mpi_allreduce_integer_sum(n_buried_loc, n_buried_glb)
+            ib_any_buried = n_buried_glb > 0
+        end if
+
     end subroutine s_compute_interpolation_coeffs
+
+    !> Fill the halo cells of the corrected ghosts: the state (both forms) and the flags of corrected_gps, from the neighbouring
+    !! rank at a processor edge or from the periodic image, so the buried-point average sees the same ghosts as a single rank
+    impure subroutine s_ibm_exchange_gp_halos(q_cons_vf, q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_prim_vf
+        integer                                                :: j, k, l
+        integer                                                :: lo1, hi1, lo2, hi2, lo3, hi3
+
+        lo1 = lbound(corrected_gps%sf, 1); hi1 = ubound(corrected_gps%sf, 1)
+        lo2 = lbound(corrected_gps%sf, 2); hi2 = ubound(corrected_gps%sf, 2)
+        lo3 = lbound(corrected_gps%sf, 3); hi3 = ubound(corrected_gps%sf, 3)
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[lo1, hi1, lo2, hi2, lo3, hi3]')
+        do l = lo3, hi3
+            do k = lo2, hi2
+                do j = lo1, hi1
+                    corrected_gps_r(1)%sf(j, k, l) = real(corrected_gps%sf(j, k, l), kind=stp)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call s_ibm_fill_halos(q_cons_vf, sys_size)
+        call s_ibm_fill_halos(q_prim_vf, sys_size)
+        call s_ibm_fill_halos(corrected_gps_r, 1)
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[lo1, hi1, lo2, hi2, lo3, hi3]')
+        do l = lo3, hi3
+            do k = lo2, hi2
+                do j = lo1, hi1
+                    corrected_gps%sf(j, k, l) = nint(corrected_gps_r(1)%sf(j, k, l))
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ibm_exchange_gp_halos
+
+    !> Halo cells of q(1:nv) along each direction, from the neighbouring rank at a processor edge (the exchange of the RHS) and from
+    !! the periodic image where the direction has one rank; other boundaries keep their halos
+    impure subroutine s_ibm_fill_halos(q, nv)
+
+        type(scalar_field), dimension(1:), intent(inout) :: q
+        integer, intent(in)                              :: nv
+        integer                                          :: edge, loc
+
+        #:for X, D in [('x', 1), ('y', 2), ('z', 3)]
+            if (num_dims >= ${D}$) then
+                do loc = -1, 1, 2
+                    edge = merge(bc_${X}$%beg, bc_${X}$%end, loc == -1)
+                    if (edge >= 0) then
+                        call s_mpi_sendrecv_variables_buffers(q, ${D}$, loc, nv)
+                    else if (edge == BC_PERIODIC) then
+                        call s_ibm_wrap_halo(q, nv, ${D}$, loc)
+                    end if
+                end do
+            end if
+        #:endfor
+
+    end subroutine s_ibm_fill_halos
+
+    !> Copy the opposite interior cells into the halo of direction d at side loc (-1 beg, 1 end). Earlier directions are already
+    !! filled, so the corner cells come out right.
+    impure subroutine s_ibm_wrap_halo(q, nv, d, loc)
+
+        type(scalar_field), dimension(1:), intent(inout) :: q
+        integer, intent(in)                              :: nv, d, loc
+        integer                                          :: i, j, k, l
+        integer                                          :: jb, je, kb, ke, lb, le, shj, shk, shl, ext
+
+        jb = 0; je = m; kb = 0; ke = n; lb = 0; le = p
+        if (d > 1) then
+            jb = -buff_size; je = m + buff_size
+        end if
+        if (d > 2) then
+            kb = -buff_size; ke = n + buff_size
+        end if
+        shj = 0; shk = 0; shl = 0
+        ext = merge(1, -1, loc == -1)*(merge(m, merge(n, p, d == 2), d == 1) + 1)
+        if (d == 1) then
+            shj = ext
+            jb = merge(-buff_size, m + 1, loc == -1); je = merge(-1, m + buff_size, loc == -1)
+        else if (d == 2) then
+            shk = ext
+            kb = merge(-buff_size, n + 1, loc == -1); ke = merge(-1, n + buff_size, loc == -1)
+        else
+            shl = ext
+            lb = merge(-buff_size, p + 1, loc == -1); le = merge(-1, p + buff_size, loc == -1)
+        end if
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4, copyin='[jb, je, kb, ke, lb, le, shj, shk, shl]')
+        do l = lb, le
+            do k = kb, ke
+                do j = jb, je
+                    do i = 1, nv
+                        q(i)%sf(j, k, l) = q(i)%sf(j + shj, k + shk, l + shl)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ibm_wrap_halo
 
     !> Triangular-shaped-cloud (quadratic B-spline) weights of a point on the 3x3(x3) stencil centred on the cell nearest to it
     !! (Ezra, Peles & Kozak 2025, Int. J. Heat Mass Transf. 252:127314), and the fraction of that weight carried by fluid cells. The
@@ -4880,6 +5019,9 @@ contains
         deallocate (n_fill_tier)
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(corrected_gps%sf)
+        if (associated(corrected_gps_r(1)%sf)) then
+            @:DEALLOCATE(corrected_gps_r(1)%sf)
+        end if
         if (associated(ib_wall_theta%sf)) then
             do i = 1, ibw_a
                 @:DEALLOCATE(ib_wall_src(i)%sf)
