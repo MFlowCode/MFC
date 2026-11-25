@@ -62,8 +62,8 @@ jobs:
 
       # Base repo only. This job is privileged (pull_request_target / issue_comment:
       # it holds secrets and a write-capable token), so the PR head is never checked
-      # out or fetched here. The diff and per-file context are pulled through the gh
-      # API in later steps and treated purely as data.
+      # out here. A later step fetches its commits to diff them; the diff and the
+      # per-file context are treated purely as data.
       - name: Checkout base repo
         uses: actions/checkout@v5
         with:
@@ -113,22 +113,20 @@ jobs:
 
           mkdir -p .claude-review
 
-          gh pr diff "$PR_NUMBER" --repo "$REPO" > .claude-review/review.diff.raw
-          gh pr view "$PR_NUMBER" --repo "$REPO" --json files --jq '.files[].path' > .claude-review/changed_files.txt.raw
+          # Diff with git, not `gh pr diff`: GitHub refuses a diff of more than 300 files (HTTP 406),
+          # which a PR that regenerates golden files exceeds. The PR's commits are fetched as objects
+          # only; nothing from them is checked out or run. Golden files under tests/ are left out.
+          HEAD_SHA="${{ steps.state.outputs.current_head_sha }}"
+          BASE_SHA="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json baseRefOid --jq .baseRefOid)"
+          git fetch --quiet --no-tags origin "+refs/pull/$PR_NUMBER/head:refs/remotes/pr-review/head"
+          for sha in "$BASE_SHA" "$HEAD_SHA"; do
+            git cat-file -e "$sha^{commit}" 2>/dev/null || git fetch --quiet --no-tags origin "$sha"
+          done
+          git diff --no-ext-diff --no-textconv "$BASE_SHA...$HEAD_SHA" -- . ':(exclude)tests' > .claude-review/review.diff
+          git diff --no-ext-diff --name-only "$BASE_SHA...$HEAD_SHA" -- . ':(exclude)tests' > .claude-review/changed_files.txt
           # Title and description, so the review can check the change against what it claims to do.
           gh pr view "$PR_NUMBER" --repo "$REPO" --json title,body \
             --jq '"Title: " + .title + "\n\n" + (.body // "")' > .claude-review/pr_description.md
-
-          # Filter out tests/ directory — golden files don't need code review
-          grep -v '^tests/' .claude-review/changed_files.txt.raw > .claude-review/changed_files.txt || true
-          # Strip diff hunks for tests/ files
-          awk '
-            /^diff --git a\/tests\// { skip=1; next }
-            /^diff --git /           { skip=0 }
-            !skip                    { print }
-          ' .claude-review/review.diff.raw > .claude-review/review.diff
-
-          sed -i '/^[[:space:]]*$/d' .claude-review/changed_files.txt || true
 
           {
             echo "review_diff_path=.claude-review/review.diff"
@@ -336,7 +334,9 @@ jobs:
           path: ${{ steps.claude.outputs.execution_file }}
           retention-days: 14
 
+      # Runs after a failed step too, so a job that broke before the review says so on the PR.
       - name: Publish review comment
+        if: ${{ !cancelled() && steps.state.outcome == 'success' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -354,7 +354,7 @@ jobs:
           if [[ ! -s "$OUTPUT_FILE" ]] || [[ -z "$(tr -d '[:space:]' < "$OUTPUT_FILE")" ]]; then
             RUN_URL="${{ github.server_url }}/$REPO/actions/runs/${{ github.run_id }}"
             if [[ -z "${{ steps.claude.outputs.execution_file }}" ]]; then
-              REASON="Claude did not run: the action skipped this pull request or stopped before starting a session"
+              REASON="Claude did not run: an earlier step of the job failed, or the action skipped this pull request or stopped before starting a session"
             else
               REASON="Claude ran but wrote no review"
             fi
