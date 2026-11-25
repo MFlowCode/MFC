@@ -4,7 +4,7 @@
 
 AMR (@ref amr) must give the uniform fine-grid answer where the blocks cover the flow, keep the uniform grid's order of accuracy through coarse/fine seams, and must not create or destroy mass, momentum or energy at coarse/fine faces, in regrids or in subcycling. See also @ref validation.
 
-AMR must give the uniform fine-grid answer where the blocks cover the flow, and must not create or destroy mass, momentum or energy at coarse/fine faces, in regrids or in subcycling. Both checks read the fine data from the serial restart files (level 0 in `q_cons_vf*.dat`, the blocks in `amr_fine.dat`, via `mfc.viz.read_amr_restart`).
+The Sod and conservation checks read the fine data from the serial restart files (level 0 in `q_cons_vf*.dat`, the blocks in `amr_fine.dat`, via `mfc.viz.read_amr_restart`).
 
 ## Sod shock tube against the exact Riemann solution {#sec-validation-amr-sod}
 
@@ -14,7 +14,7 @@ AMR must give the uniform fine-grid answer where the blocks cover the flow, and 
 | :--- | :--- |
 | Problem | Sod: \f$(\rho, u, p)\f$ = (1, 0, 1) for x < 0.5, (0.125, 0, 0.1) for x > 0.5, \f$\gamma\f$ = 1.4, t = 0.2, outflow ends |
 | Numerics | 5-equation model, one fluid, mapped WENO5, HLLC, SSP-RK3, fixed \f$\Delta t\f$ at CFL 0.4 on the cells that set it (finest level lock-step, base level subcycled) |
-| AMR | 1 or 2 levels at 2:1, `amr_regrid_int` 2 (subcycled) or \f$2 \cdot 2^L\f$ (lock-step), `amr_tag_eps = 0.05` (shock and contact tagged, rarefaction not), `amr_buf = 8`, `amr_max_grid_size = N`, linear ghost fill |
+| AMR | 1 or 2 levels at 2:1, `amr_regrid_int` 2 (subcycled) or \f$2 \cdot 2^L\f$ (lock-step), `amr_tag_eps = 0.05` (shock and contact tagged, rarefaction not), `amr_buf = 8` (derived `amr_snap` 2 with one level, 0 with two), `amr_max_grid_size = N`, linear ghost fill |
 | Compared | AMR on base N; uniform N; uniform at the finest AMR spacing (2N, 4N); N = 100, 200, 400 |
 | Reference | exact Riemann solution (pressure function and Newton iteration, \cite Toro09 ch. 4), computed in `check_sod.py`: \f$p^*\f$ = 0.30313, \f$u^*\f$ = 0.92745, contact at 0.68549, shock at 0.85043 |
 | Measured | on the composite grid (finest level covering each point): \f$L_1 = \sum_i \vert\rho_i - \bar\rho_i^{exact}\vert\,\Delta x_i\f$ with the exact cell average, and the contact and shock positions (where \f$\rho\f$ crosses the middle of its exact jump), by `check_sod.py` |
@@ -23,23 +23,23 @@ L1 density error, and in brackets (AMR − uniform fine)/uniform fine:
 
 | N | uniform N | 1 level | 1 level, subcycled | uniform 2N | 2 levels | 2 levels, subcycled | uniform 4N |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 100 | 3.42e-3 | 1.89e-3 (+0.0 %) | 1.90e-3 (+0.1 %) | 1.89e-3 | 9.78e-4 (+4.3 %) | 9.70e-4 (+3.6 %) | 9.37e-4 |
-| 200 | 1.89e-3 | 9.35e-4 (−0.2 %) | 9.36e-4 (−0.1 %) | 9.37e-4 | 5.00e-4 (+11.1 %) | 4.98e-4 (+10.8 %) | 4.50e-4 |
-| 400 | 9.37e-4 | 4.43e-4 (−1.6 %) | 4.43e-4 (−1.6 %) | 4.50e-4 | 2.76e-4 (+5.2 %) | 2.73e-4 (+4.2 %) | 2.62e-4 |
+| 100 | 3.42e-3 | 1.89e-3 (+0.0 %) | 1.90e-3 (+0.1 %) | 1.89e-3 | 9.82e-4 (+4.9 %) | 9.87e-4 (+5.3 %) | 9.37e-4 |
+| 200 | 1.89e-3 | 9.35e-4 (−0.2 %) | 9.36e-4 (−0.1 %) | 9.37e-4 | 4.87e-4 (+8.2 %) | 4.90e-4 (+9.0 %) | 4.50e-4 |
+| 400 | 9.37e-4 | 4.43e-4 (−1.6 %) | 4.43e-4 (−1.6 %) | 4.50e-4 | 2.70e-4 (+2.9 %) | 2.71e-4 (+3.4 %) | 2.62e-4 |
 
-Contact and shock position errors (x − x_exact), lock-step; the subcycled runs agree to 2e-6 except the N = 100 two-level contact (−4.02e-4):
+Contact and shock position errors (x − x_exact), lock-step; the subcycled runs agree to 2e-6 except the N = 100 two-level contact (−4.03e-4):
 
 | N | uniform N: contact, shock | 1 level | uniform 2N | 2 levels | uniform 4N |
 | ---: | :--- | :--- | :--- | :--- | :--- |
 | 100 | −2.17e-3, +1.25e-3 | −9.49e-4, +6.87e-4 | −9.49e-4, +6.87e-4 | −3.42e-4, +3.55e-4 | −4.31e-4, +3.55e-4 |
-| 200 | −9.49e-4, +6.87e-4 | −4.29e-4, +3.55e-4 | −4.31e-4, +3.55e-4 | −2.83e-4, +2.33e-4 | −2.83e-4, +2.33e-4 |
-| 400 | −4.31e-4, +3.55e-4 | −2.85e-4, +2.34e-4 | −2.83e-4, +2.33e-4 | −1.77e-4, +1.24e-4 | −1.75e-4, +1.26e-4 |
+| 200 | −9.49e-4, +6.87e-4 | −4.29e-4, +3.55e-4 | −4.31e-4, +3.55e-4 | −2.84e-4, +2.33e-4 | −2.83e-4, +2.33e-4 |
+| 400 | −4.31e-4, +3.55e-4 | −2.85e-4, +2.34e-4 | −2.83e-4, +2.33e-4 | −1.76e-4, +1.24e-4 | −1.75e-4, +1.26e-4 |
 
-With one level the error is the uniform 2N error within 1.6 %, with two levels within 11 % of the uniform 4N error, on 40 to 48 % of its cells; the AMR error halves per doubling of N, as the uniform one does. The positions match the uniform fine grid to a fraction of a finest cell. Subcycling changes the L1 error by at most 1.0 %.
+With one level the error is the uniform 2N error within 1.6 %, with two levels within 9 % of the uniform 4N error, on 40 to 48 % of its cells; the AMR error halves per doubling of N, as the uniform one does. The positions match the uniform fine grid to a fraction of a finest cell. Subcycling changes the L1 error by at most 0.7 %.
 
 Found by this check, two levels with `amr_buf = 4`: the toolchain used to derive `amr_snap = 2` (regrid hysteresis) for every case, and with two levels the shock then ran ahead of the exact one by +3.8e-3, +3.3e-3 and +3.4e-3 at N = 100, 200, 400. That is a shock-speed error near 1 % that does not converge: L1 was 3.7 times the uniform 4N error at N = 200 and 5.9 times at N = 400. A level-2 box is clipped to its parent inset by `amr_cpat_mar` = 3 coarse cells, so at `amr_buf = 4` a box held by the snap let the shock reach the level-2 edge. With `amr_snap = 0` the same run matches the uniform fine grid (L1 4.87e-4, shock +2.32e-4 at N = 200). `amr_snap` is now derived only for one-level runs (#2474). Reproduce: `case.py -N 200 --levels 2 --buf 4`.
 
-Limits: 1D, one problem, the linear ghost fill only (`amr_prolong = 2` is not run), one rank, `amr_tag_eps` and `amr_regrid_int` fixed. The rarefaction is not refined, so the two-level error contains the base grid's rarefaction error; that is part of the 11 % at N = 200. Only density is compared.
+Limits: 1D, one problem, the linear ghost fill only (`amr_prolong = 2` is not run), one rank, `amr_tag_eps` and `amr_regrid_int` fixed. The rarefaction is not refined, so the two-level error contains the base grid's rarefaction error; that is part of the 8-9 % at N = 200. Only density is compared.
 
 ## Conservation in a periodic box {#sec-validation-amr-conservation}
 
@@ -57,10 +57,10 @@ Level 0 equals the composite grid because at the end of every step `s_amr_step_f
 
 | Mode | mass | x-momentum | y-momentum | energy | level 0 − composite |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| lock-step | −2.2e-16 | 0 | 0 | +3.3e-16 | ≤ 2.2e-16 |
-| subcycled | 0 | 0 | +2.2e-16 | 0 | ≤ 2.2e-16 |
+| lock-step | −6.6e-16 | 0 | 0 | −1.6e-16 | ≤ 4.4e-16 |
+| subcycled | 0 | 0 | +2.2e-16 | +1.6e-16 | ≤ 2.2e-16 |
 
-The largest drift over the four saves is given; all are one to two units in the last place of the totals.
+The largest drift over the four saves is given; all are one to three units in the last place of the totals.
 
 Limits: 2D, one rank, one fluid, inviscid, ratio 2, two levels, linear ghost fill, periodic boundaries only; tagging skips the global boundary cells, so no block spans the periodic seam. Viscous, chemistry, multi-fluid, multi-rank and immersed-boundary conservation are not covered here.
 
@@ -123,7 +123,7 @@ Linf density error:
 
 - **The uniform scheme is second order here**, in L1 and Linf, also from exact cell averages. The likely cause (not verified) is that MFC reconstructs primitive variables from cell averages of the conserved ones, which is second order when density, velocity and pressure all vary; the 1D tests of the fifth-order rate advect a density wave at constant velocity and pressure. The AMR rates are to be read against 2, not 5.
 - **Blocks that follow the vortex:** L1 converges at 1.94-1.98 with either fill, 1.3 (quartic) to 1.6 (linear, subcycled) times the uniform 2N error. Linf converges more slowly at N = 1024 (1.1-1.6) and its largest value sits on a seam, 1.3-2.9 times the uniform 2N value.
-- **Static block:** at t = 6 the vortex has crossed the block and sits on level 0, so the error is a level-0 error: L1 1.5 times and Linf 1.07-1.4 times the uniform N value, both converging (L1 at 2.0). Lock-step and subcycled agree to two digits.
+- **Static block:** at t = 6 the vortex has crossed the block and sits on level 0, so the error is a level-0 error: L1 1.5-1.6 times and Linf 1.07-1.4 times the uniform N value, both converging (L1 at 2.0). Lock-step and subcycled agree to two digits.
 - **Found by this check (#2473, fixed in #2482):** the volume fractions were refluxed on their flux alone, without the \f$\alpha\,\nabla\cdot u\f$ source that pairs with it, so a coarse cell beside a block face lost its uniform \f$\alpha\f$ where the velocity varies along the face. The static block then left a density error in the vortex core that did not converge (Linf 1.9e-3 at N = 1024, quartic; L1 at first order). Mass, momentum and energy were conserved throughout.
 
 Limits: one vortex strength, one flow direction (aligned with the grid), one refinement ratio and one level. Linf on the composite grid compares cells of two sizes. The tag threshold scales with \f$\Delta x\f$ so the refined region is about the same at every N, but its edges move by a cell between resolutions, which adds noise to the seam Linf rates.
@@ -137,7 +137,7 @@ Limits: one vortex strength, one flow direction (aligned with the grid), one ref
 python3 examples/2D_amr_isentropic_vortex/check_vortex.py <run directories, increasing N>
 ```
 
-Each run writes next to `case.py`, so copy the directory per run. Measured on one MI250X GCD per run (amdflang, OpenMP offload, double); the 40 runs take 3.6 minutes of one node (8 at a time), the largest (uniform 2048², 4608 steps) 140 s. The suite runs 40 steps at N = 64 as `AMR -> 2D -> Example -> isentropic vortex static block` (C409AA2D) and `... regrid subcycle quartic` (6F47EB60). Goldens: AMD CPU build (amdflang, double, Frontier); the MI250X GPU build passes them at the default tolerance.
+Each run writes next to `case.py`, so copy the directory per run. Measured on one MI250X GCD per run (amdflang, OpenMP offload, double); the 40 runs take 3.6 minutes of one node (8 at a time), the largest (uniform 2048², 4608 steps) 140 s. The suite runs 40 steps at N = 64 as `AMR -> 2D -> Example -> isentropic vortex static block` (C409AA2D) and `... regrid subcycle` (D209FD0C, linear fill) as regression guards only: they start from the hardcoded vortex `hcid` 283 (\f$\epsilon = 3.5\f$, a different profile from Shu's) so that the default build runs them, and its fine blocks start from interpolation rather than their own cell averages. Goldens: MI250X GPU build (amdflang, double, Frontier); the Cray CPU build passes them at the default tolerance.
 
 ## Sedov-Taylor blast {#sec-validation-amr-sedov}
 
@@ -184,7 +184,7 @@ Limits:
 python3 examples/3D_amr_sedov/check_sedov.py <run directories>
 ```
 
-Measured on MI250X GCDs (amdflang, OpenMP offload, double): one GCD per run, 3-4 minutes for the 96³ AMR runs, 21 (subcycled) and 25 (lock-step) minutes for the 192³ AMR runs, 2.4 minutes for uniform 192³; the uniform 384³ run on 8 GCDs in 6.4 minutes. The full check took 32 minutes of one node (the 384³ run first, then the rest side by side). The suite runs the 32³ base, subcycled, to t = 0.005 as `AMR -> 3D -> Example -> Sedov regrid subcycle` (163DBF54), golden as above (CPU golden, GPU passes at the default tolerance).
+Measured on MI250X GCDs (amdflang, OpenMP offload, double): one GCD per run, 3-4 minutes for the 96³ AMR runs, 21 (subcycled) and 25 (lock-step) minutes for the 192³ AMR runs, 2.4 minutes for uniform 192³; the uniform 384³ run on 8 GCDs in 6.4 minutes. The full check took 32 minutes of one node (the 384³ run first, then the rest side by side). The suite runs the 32³ base, subcycled, to t = 0.005 as `AMR -> 3D -> Example -> Sedov regrid subcycle` (163DBF54), golden from the AMD CPU build (amdflang); the MI250X GPU build passes it at the default tolerance.
 
 ## Cylinder wake {#sec-validation-amr-wake}
 

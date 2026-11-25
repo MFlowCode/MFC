@@ -47,6 +47,7 @@ DOCS = [
     "docs/documentation/validation_shock_tubes.md",
     "docs/documentation/validation_vortex_order.md",
     "docs/documentation/validation_blast.md",
+    "docs/documentation/validation_amr.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]

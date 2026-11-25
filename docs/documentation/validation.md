@@ -212,7 +212,7 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 ## Adaptive mesh refinement {#sec-validation-amr}
 
-**Status:** validated. **Examples:** `examples/1D_amr_sod`, `examples/2D_amr_conservation`, `examples/2D_amr_isentropic_vortex`, `examples/3D_amr_sedov`, `examples/2D_amr_cylinder_wake`. Sod against the exact Riemann solution (one and two levels within 1 % and 11 % of the uniform fine error), conservation to round-off in a periodic box, the isentropic vortex through static and regridded blocks (second order in L1), the Sedov shock radius (within 0.07 percentage points of the uniform fine grid) and the cylinder-wake drag and Strouhal number (within 0.03 % of the uniform fine grid). Results and limits: @ref validation_amr.
+**Status:** validated. **Examples:** `examples/1D_amr_sod`, `examples/2D_amr_conservation`, `examples/2D_amr_isentropic_vortex`, `examples/3D_amr_sedov`, `examples/2D_amr_cylinder_wake`. Sod against the exact Riemann solution (one and two levels within 1.6 % and 9 % of the uniform fine error), conservation to round-off in a periodic box, the isentropic vortex through static and regridded blocks (second order in L1), the Sedov shock radius (within 0.07 percentage points of the uniform fine grid) and the cylinder-wake drag and Strouhal number (within 0.03 % of the uniform fine grid). Results and limits: @ref validation_amr.
 
 ## Other families
 
