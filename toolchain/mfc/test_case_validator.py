@@ -581,6 +581,10 @@ class TestAmrDefaults(unittest.TestCase):
         e = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_snap": 0}
         self.assertTrue(apply_amr_defaults(e))
         self.assertEqual(e["amr_snap"], 0)
+        # multi-level: a child's padding is clipped by the parent inset, so snapping could let a front leave its block
+        ml = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_max_level": 2, "amr_max_blocks": 8}
+        self.assertTrue(apply_amr_defaults(ml))
+        self.assertNotIn("amr_snap", ml)
         validate_case_constraints(p, "simulation")
 
     def test_unsupported_physics_is_prohibited_under_amr(self):

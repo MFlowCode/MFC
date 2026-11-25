@@ -3929,7 +3929,9 @@ def apply_amr_defaults(params: Dict[str, Any]) -> bool:
         return False
     # fused exchange kernels: faster at every block size measured (Frontier MI250X, 8-512 GPUs)
     defaults: Dict[str, Any] = {"amr_device_pack": "T"}
-    if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1:
+    # one level only: a level >= 2 child's padding is clipped by the parent's inset, so a snapped child can lag a moving
+    # front out of its block (2-level Sod: a 1% shock-speed error that did not converge; examples/1D_amr_sod)
+    if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1 and int(params.get("amr_max_level", 1)) == 1:
         defaults["amr_snap"] = min(SNAP_DEFAULT, int(params.get("amr_buf", 3)) - 2)
     trial = dict(params)
     trial.update({k: params.get(k, v) for k, v in defaults.items()})
