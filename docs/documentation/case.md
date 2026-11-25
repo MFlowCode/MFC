@@ -826,7 +826,7 @@ restart data being resumed from. Pass `-t pre_process` explicitly (as in the res
 
 - `cfl_target` specifies the target CFL value. It bounds the acoustic number in each direction, and the diffusive numbers \f$D\,\Delta t\sum_d \Delta x_d^{-2}\f$ of viscosity (`VCFL`, \f$D = (4\mu/3 + \mu_b)/\rho\f$) and conduction (`TCFL`, \f$D = k/(\rho c_v)\f$). RK3 remains stable up to about 0.63 (0.5 for RK1 and RK2).
   The viscous number is min(`cfl_target`, cap), where the cap is about 0.9 of the largest VCFL measured stable with SSP-RK3 for the viscous stencil in use (periodic box with seeded noise, 1D/2D/3D):
-  0.56/0.61/0.64 for the face-difference gradient (`weno_Re_flux = F`, `weno_Re_flux_compact`), 0.67/0.72 (2D/3D) for `ib_visc_compact`, and 1.47/1.47/1.44 for the WENO chain of `weno_Re_flux`.
+  0.56/0.61/0.64 for the face-difference gradient (`weno_Re_flux = F`, `weno_Re_flux_compact`), 0.67/0.72 (2D/3D) for `ib_visc_compact`, and 1 for the WENO chain of `weno_Re_flux` (measured stable to about 1.6 in 2D; capped at 1 so that a run never exceeds the `VCFL <= 1` check of `run_time_info`).
   When the cap sets the step a one-time warning says so, and with a fixed `dt` the simulation warns at start-up when dt exceeds the capped viscous step of the initial state. `chem_params%%transport_dt` and `igr` are not capped.
 
 - `ramp_ratio` limits how much the adaptive time step can grow from one time step to the next: `dt` is capped at `ramp_ratio` times the previous `dt`. Must be at least 1. When unset, the time step growth is unlimited.

@@ -1285,7 +1285,8 @@ contains
 
         real(wp), dimension(3), parameter :: cap_face = [0.56_wp, 0.61_wp, 0.64_wp]  !< weno_Re_flux = F or compact
         real(wp), dimension(3), parameter :: cap_ibvc = [0.56_wp, 0.67_wp, 0.72_wp]  !< ib_visc_compact (needs 2D+)
-        real(wp), dimension(3), parameter :: cap_weno = [1.47_wp, 1.47_wp, 1.44_wp]  !< WENO chain of weno_Re_flux
+        ! WENO chain of weno_Re_flux: stable to about 1.6 (2D), capped at 1 to stay within run_time_info's VCFL <= 1 abort
+        real(wp), dimension(3), parameter :: cap_weno = [1._wp, 1._wp, 1._wp]
 
         if (.not. weno_Re_flux .or. weno_Re_flux_compact) then
             visc_dt_cap = cap_face(num_dims); visc_dt_stencil = 'the face-difference viscous gradient'
