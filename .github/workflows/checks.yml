@@ -1,0 +1,60 @@
+name: 'Runtime Checks'
+
+# Once a week, a fifth of the tests on one Frontier CPU node with AMD flang's runtime checks on:
+# it stops at an invalid operation, a division by zero or an overflow, and fills uninitialised
+# locals with NaN (cmake/GPU.cmake, LLVMFlang). About half a node-hour. NVHPC's checks run on a
+# hosted runner in test.yml. A failure opens an issue listing the tests; it closes when they pass.
+on:
+  schedule:
+    - cron: '23 5 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: checks
+  cancel-in-progress: false
+
+jobs:
+  amd:
+    name: Checks | Frontier (AMD) (cpu)
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on:
+      group: phoenix
+      labels: frontier
+    timeout-minutes: 480
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO:     ${{ github.repository }}
+      TITLE:    'Runtime checks fail with AMD flang on CPU'
+      RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          clean: false
+
+      - name: Build and test
+        run: |
+          rm -f checks.out
+          sbatch --wait -J MFC-checks -A CFD154 -N 1 -t 01:30:00 -o checks.out \
+            --wrap '. ./mfc.sh load -c famd -m c && ./mfc.sh test -v -a -j 32 --no-gpu --reldebug -% 20 -- -c frontier_amd'
+
+      - name: Print Log
+        if: always()
+        run: tail -n 400 checks.out || true
+
+      - name: Cancel SLURM Job
+        if: cancelled()
+        run: scancel --me --name=MFC-checks || true
+
+      - name: Open an issue listing the failed tests
+        if: failure()
+        run: |
+          failed=$(grep -a -A3 'FAILED:' checks.out | grep -ao 'Error: Test tests/.*' | sed 's/^Error: Test /- /; s/: Failed to execute MFC\.$//' | sort -u | head -40)
+          bash .github/scripts/ci-issue.sh open "$TITLE" "$(printf 'Run: %s\n\n%s\n' "$RUN_URL" "${failed:-The job failed before any test did.}")"
+
+      - name: Close it once they pass
+        if: success()
+        run: |
+          bash .github/scripts/ci-issue.sh close "$TITLE" "Passing in $RUN_URL"

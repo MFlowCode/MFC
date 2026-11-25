@@ -127,7 +127,15 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
             # against local symbol". Link a non-PIE executable to accept them.
             # Release links fine via LTO's link-time PIC codegen, so it is left alone.
             add_link_options(-no-pie)
-            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
+            # The checks this flang has (it has no -fcheck=bounds, and its -fsanitize=address does
+            # not instrument array accesses): trap on invalid, divide-by-zero and overflow, and fill
+            # uninitialised locals with 0xff bytes (reals NaN, integers -1) so their use shows.
+            add_compile_options(
+                $<$<COMPILE_LANGUAGE:Fortran>:-O1>
+                $<$<COMPILE_LANGUAGE:Fortran>:-g>
+                $<$<COMPILE_LANGUAGE:Fortran>:-ffpe-trap=invalid,zero,overflow>
+                $<$<COMPILE_LANGUAGE:Fortran>:-finit-local=0xff>
+            )
         endif()
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "Intel") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM"))
@@ -175,6 +183,15 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
             $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
+        )
+    endif()
+
+    # On CPU, a checked build also stops at a null or unassociated pointer and at an invalid
+    # operation, a division by zero or an overflow. Offloaded code supports neither.
+    if ((CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug") AND NOT (MFC_OpenACC OR MFC_OpenMP))
+        add_compile_options(
+            $<$<COMPILE_LANGUAGE:Fortran>:-Mchkptr>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Ktrap=fp>
         )
     endif()
 

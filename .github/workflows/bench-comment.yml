@@ -1,0 +1,49 @@
+name: 'Benchmark Comment'
+
+# Posts a pull request's benchmark results against master as one comment, kept up to date.
+# Runs from master on workflow_run, so it can comment on a fork's pull request; it never
+# checks out or runs the pull request's code, and reads its results as numbers only.
+on:
+  workflow_run:
+    workflows: ['Benchmark']
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Comment
+    if: github.repository == 'MFlowCode/MFC' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Compare and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID:   ${{ github.event.workflow_run.id }}
+          HEAD:     ${{ github.event.workflow_run.head_repository.owner.login }}:${{ github.event.workflow_run.head_branch }}
+          SHA:      ${{ github.event.workflow_run.head_sha }}
+        run: |
+          api="repos/$GITHUB_REPOSITORY"
+          gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" -p 'bench-compare-*' -D results || { echo "Run $RUN_ID left no benchmark results."; exit 0; }
+
+          # A fork's run does not say which pull request it is: find the open one with this head.
+          pr=$(gh api "$api/pulls?state=open&per_page=100" -f head="$HEAD" -X GET --jq "[.[] | select(.head.sha == \"$SHA\")][0].number // empty")
+          if [ -z "$pr" ]; then echo "No open pull request has $SHA as its head; its results are stale."; exit 0; fi
+
+          curl -sfL --max-time 60 https://raw.githubusercontent.com/MFlowCode/MFC-ci-data/main/benchmarks.jsonl -o history.jsonl || rm -f history.jsonl
+          pip install -q pyyaml
+          python3 .github/scripts/bench-comment.py results $([ -f history.jsonl ] && echo history.jsonl) > body.md
+          if [ ! -s body.md ]; then echo "No lane has both a master and a pull request result."; exit 0; fi
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
+
+          old=$(gh api --paginate "$api/issues/$pr/comments" --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- mfc-bench-comment -->"))) | .id' | head -1)
+          if [ -n "$old" ]; then gh api -X PATCH "$api/issues/comments/$old" -F body=@body.md --silent
+          else gh api "$api/issues/$pr/comments" -F body=@body.md --silent; fi

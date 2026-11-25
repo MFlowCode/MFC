@@ -1,0 +1,90 @@
+name: 'Scaling'
+
+# Weak and strong scaling of master on Frontier, once a week: 1, 8 and 64 nodes (8, 64 and 512
+# GPUs), about 15 node-hours. The result is appended to scaling.jsonl in MFlowCode/MFC-ci-data,
+# which docs/benchmarks.html draws.
+on:
+  schedule:
+    - cron: '23 9 * * 0'
+  workflow_dispatch:
+    inputs:
+      nodes:
+        description: 'Node counts, space-separated'
+        default: '1 8 64'
+
+concurrency:
+  group: scaling
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Scaling | Frontier (CCE) (gpu-acc)
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on:
+      group: phoenix
+      labels: frontier
+    # The 64-node job can wait in the queue for hours.
+    timeout-minutes: 1440
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          clean: false
+
+      - name: Run
+        env:
+          NODES: ${{ inputs.nodes || '1 8 64' }}
+        run: |
+          [[ "$NODES" =~ ^[0-9\ ]+$ ]] || { echo "::error::Node counts must be numbers."; exit 1; }
+          # shellcheck disable=SC2086
+          bash .github/scripts/scaling.sh "$PWD/scaling-logs" $NODES
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: squeue --me -h -o '%i %j' | awk '$2 ~ /^MFC-scaling-/ { print $1 }' | xargs -r scancel
+
+      - name: Archive Logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: scaling-logs
+          path: scaling-logs
+          if-no-files-found: ignore
+          retention-days: 30
+
+  record:
+    name: Record Scaling History
+    needs: run
+    if: always() && github.repository == 'MFlowCode/MFC' && needs.run.result != 'skipped' && needs.run.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # write: opens an issue when a scaling run fails or cannot be recorded.
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: scaling-logs
+          path: scaling-logs
+
+      - name: Append to history
+        env:
+          DEPLOY_KEY: ${{ secrets.CI_DATA_DEPLOY_KEY }}
+        run: |
+          python3 .github/scripts/scaling-record.py scaling-logs "$GITHUB_SHA" "$(git show -s --format=%cI "$GITHUB_SHA")" "$(git show -s --format=%s "$GITHUB_SHA")" > new.jsonl
+          .github/scripts/ci-data-append.sh scaling.jsonl new.jsonl "Scaling @ ${GITHUB_SHA::7}"
+
+      - name: Say so when the scaling run fails
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+        run: bash .github/scripts/ci-issue.sh open "Weekly scaling run is failing" "No scaling result was recorded by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+
+      - name: Clear that once it records again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+        run: bash .github/scripts/ci-issue.sh close "Weekly scaling run is failing" "Recorded again by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
