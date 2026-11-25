@@ -6909,9 +6909,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_f("AMR -> 2D -> Example -> conservation subcycle", "examples/2D_amr_conservation/case.py", ["-N", "32", "--subcycle", "--steps", "40", "--saves", "2"]))
         # Validation examples (check_vortex.py, check_sedov.py validate the physics on long runs; these are regression guards).
         # Isentropic vortex, 64^2 base, 40 steps: a static block it enters (lock-step, linear) and blocks that follow it
-        # (subcycled, quartic).
+        # (subcycled, quartic). The IC is hcid 283 (the same Gauss-averaged vortex) so the default build runs it.
         vortex = "examples/2D_amr_isentropic_vortex/case.py"
-        io = {"parallel_io": "F", "t_step_stop": 40, "t_step_save": 40}
+        io = {"parallel_io": "F", "t_step_stop": 40, "t_step_save": 40, "patch_icpp(1)%hcid": 283, "patch_icpp(1)%epsilon": 5.0}
+        io.update({"patch_icpp(1)%x_centroid": -3.0, "patch_icpp(1)%length_x": 26.0, "patch_icpp(1)%alpha_rho(1)": 1.0})
+        io.update({"patch_icpp(1)%vel(1)": 1.0, "patch_icpp(1)%vel(2)": 0.0, "patch_icpp(1)%pres": 1.0})
         cases.append(define_case_f("AMR -> 2D -> Example -> isentropic vortex static block", vortex, ["--N", "64", "--mode", "static"], mods=io))
         cases.append(define_case_f("AMR -> 2D -> Example -> isentropic vortex regrid subcycle quartic", vortex, ["--N", "64", "--mode", "regrid", "--subcycle", "--prolong", "2"], mods=io))
         # Sedov blast, 32^3 base octant, blocks regridded onto the shock, subcycled, to t = 0.005
