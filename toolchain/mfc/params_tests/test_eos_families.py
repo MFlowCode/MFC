@@ -19,9 +19,9 @@ from ..params.eos_families import EOS_COEFF_DEFAULTS, EOS_FAMILIES
 from ..params.generators.fortran_gen import generate_eos_fpp
 from ..params.namelist_parser import get_mfc_root
 
-_EXPECTED_NAMES = {"stiffened_gas": 1, "ideal_gas": 2, "mie_gruneisen": 3, "jwl": 4, "vinet": 5}
-_EXPECTED_LABELS = {1: "stiffened-gas", 2: "ideal-gas", 3: "Mie-Gruneisen", 4: "JWL", 5: "Vinet"}
-_EXPECTED_CHOICES = [1, 2, 3, 4, 5]
+_EXPECTED_NAMES = {"stiffened_gas": 1, "ideal_gas": 2, "mie_gruneisen": 3, "jwl": 4, "vinet": 5, "peng_robinson": 6}
+_EXPECTED_LABELS = {1: "stiffened-gas", 2: "ideal-gas", 3: "Mie-Gruneisen", 4: "JWL", 5: "Vinet", 6: "Peng-Robinson"}
+_EXPECTED_CHOICES = [1, 2, 3, 4, 5, 6]
 
 # Captured from `sorted(n for n in REGISTRY.all_params if n.startswith("fluid_pp(1)%"))`
 # on the unmodified tree (HEAD 949a131c), before eos_families.py existed.
@@ -56,6 +56,10 @@ _EXPECTED_FLUID_PP1_PARAMS = [
     "fluid_pp(1)%nn",
     "fluid_pp(1)%non_newtonian",
     "fluid_pp(1)%pi_inf",
+    "fluid_pp(1)%pr_omega",
+    "fluid_pp(1)%pr_pc",
+    "fluid_pp(1)%pr_r",
+    "fluid_pp(1)%pr_tc",
     "fluid_pp(1)%qv",
     "fluid_pp(1)%qvp",
     "fluid_pp(1)%tau0",
@@ -156,6 +160,10 @@ def test_every_family_has_a_reference_curve_case():
 # R1 review). Hard-coded so an edit that garbles a LaTeX symbol while keeping the parameter name
 # is caught here rather than slipping through unreviewed.
 _EXPECTED_MATH = {
+    ("peng_robinson", "tc"): "Critical temperature [K]",
+    ("peng_robinson", "pc"): "Critical pressure [Pa]",
+    ("peng_robinson", "r"): "Specific gas constant [J/(kg K)]",
+    ("peng_robinson", "omega"): "Acentric factor",
     ("mie_gruneisen", "rho0"): r"\f$\rho_{0,k}\f$",
     ("mie_gruneisen", "c0"): r"\f$c_{0,k}\f$",
     ("mie_gruneisen", "s"): r"\f$s_k\f$",

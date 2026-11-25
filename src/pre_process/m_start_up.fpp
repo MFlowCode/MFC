@@ -589,7 +589,7 @@ contains
             call s_infinite_relaxation_k(ic%q_cons_vf)
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             call s_write_data_files(ic%q_cons_vf, ic%q_prim_vf, ic%bc_type, ic%q_T_sf)
         else
             call s_write_data_files(ic%q_cons_vf, ic%q_prim_vf, ic%bc_type)

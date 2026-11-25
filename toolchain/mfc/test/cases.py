@@ -3755,6 +3755,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_acoustic_pulse_analytical",
                 "2D_isentropicvortex_analytical",
                 "1D_euler_convergence",
+                "1D_peng_robinson",  # CPU analytic wave with its own executable and verify.py checks.
+                # Standalone boundary layers use dedicated CPU runs and local verification scripts.
+                "2D_boundary_layer_ideal_gas",
+                "2D_boundary_layer_pr_normal",
+                "2D_boundary_layer_pr_supercritical",
+                # Matched KH cases need dedicated EOS builds and conservation checks.
+                "2D_kelvin_helmholtz_ideal_gas",
+                "2D_kelvin_helmholtz_pr_normal",
+                "2D_kelvin_helmholtz_pr_supercritical",
                 "1D_advection_convergence",
                 "1D_sod_convergence",
                 "2D_advection_convergence",

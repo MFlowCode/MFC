@@ -434,6 +434,10 @@ contains
         ! Fluids physical parameters
         do i = 1, num_fluids_max
             fluid_pp(i)%eos = eos_stiffened_gas
+            fluid_pp(i)%pr_tc = dflt_real
+            fluid_pp(i)%pr_pc = dflt_real
+            fluid_pp(i)%pr_omega = dflt_real
+            fluid_pp(i)%pr_r = dflt_real
             fluid_pp(i)%mg_rho0 = dflt_real
             fluid_pp(i)%mg_c0 = dflt_real
             fluid_pp(i)%mg_s = dflt_real

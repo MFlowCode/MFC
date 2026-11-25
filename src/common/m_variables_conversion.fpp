@@ -109,7 +109,12 @@ contains
                 e_int = energy - dyn_p - E_e_in
             end if
 
-            pres = f_pressure(e_int, gamma, pi_inf, qv)
+            #:if peng_robinson
+                T = f_pr_temperature_energy(rho, e_int/rho)
+                pres = f_pr_pressure(rho, T)
+            #:else
+                pres = f_pressure(e_int, gamma, pi_inf, qv)
+            #:endif
         #:else
             ! Reacting mixture pressure from temperature and species
             Y_rs(:) = rhoYks(:)/rho
@@ -851,7 +856,12 @@ contains
                                       & l) + dyn_pres + pres_mag + pi_inf + qv
                         else if (bubbles_euler .neqv. .true.) then
                             ! Five-equation model (Allaire et al. JCP 2002): E = Gamma*p + 0.5*rho*|u|^2 + pi_inf + qv
-                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
+                            #:if peng_robinson
+                                T = f_pr_temperature_pressure(rho, q_prim_vf(eqn_idx%E)%sf(j, k, l))
+                                q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*f_pr_energy(rho, T) + dyn_pres
+                            #:else
+                                q_cons_vf(eqn_idx%E)%sf(j, k, l) = gamma*q_prim_vf(eqn_idx%E)%sf(j, k, l) + dyn_pres + pi_inf + qv
+                            #:endif
                         else
                             ! Bubble-augmented energy; qv is an energy density and is not diluted
                             q_cons_vf(eqn_idx%E)%sf(j, k, l) = dyn_pres + (1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, &
@@ -1053,7 +1063,12 @@ contains
                         E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
                     else
                         ! Computing the energy from the pressure
-                        E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                        #:if peng_robinson
+                            T_K = f_pr_temperature_pressure(rho_K, pres_K)
+                            E_K = rho_K*(f_pr_energy(rho_K, T_K) + 0.5_wp*vel_K_sum)
+                        #:else
+                            E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                        #:endif
                     end if
 
                     ! mass flux, this should be \alpha_i \rho_i u_i
@@ -1225,6 +1240,10 @@ contains
 
         ! E = dyn_p + (1 - alf)(gamma p + pi_inf) + qv. Only the liquid's internal energy is diluted;
         ! qv is already an energy density.
+        #:if peng_robinson
+            E = rho*(f_pr_energy(rho, f_pr_temperature_pressure(rho, pres)) + 0.5_wp*vel_sum)
+            return
+        #:endif
         E = gamma*pres + pi_inf
         if (bubbles_euler) E = E*(1._wp - alpha_K(num_fluids))
         E = E + qv + 5.e-1_wp*rho*vel_sum

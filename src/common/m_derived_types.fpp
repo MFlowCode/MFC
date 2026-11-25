@@ -460,6 +460,10 @@ module m_derived_types
         real(wp)               :: qvp                !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp)               :: G
         integer                :: eos                !< Equation of state selector (eos_* in m_constants)
+        real(wp)               :: pr_tc              !< Peng-Robinson critical temperature
+        real(wp)               :: pr_pc              !< Peng-Robinson critical pressure
+        real(wp)               :: pr_omega           !< Peng-Robinson acentric factor
+        real(wp)               :: pr_r               !< Specific gas constant
         real(wp)               :: mg_rho0            !< Mie-Gruneisen reference density
         real(wp)               :: mg_c0              !< Mie-Gruneisen bulk sound speed at mg_rho0
         real(wp)               :: mg_s               !< Mie-Gruneisen linear Hugoniot slope, u_s = c0 + s u_p

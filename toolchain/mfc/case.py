@@ -13,7 +13,7 @@ from .params.eos_families import EOS_FAMILIES
 from .params.errors import unknown_param_error
 from .printer import cons
 from .run import case_dicts
-from .state import ARG
+from .state import ARG, CFG, gpuConfigOptions
 
 
 def _suggest_similar_params(unknown_key: str, valid_keys: list, n: int = 3) -> list:
@@ -444,7 +444,11 @@ gbl_id = patch_ib(i)%gbl_patch_id
             # PROHIBIT in s_initialize_eos_module (m_eos.fpp).
             num_fluids_case = int(self.params.get("num_fluids", 1))
             any_eos = any(int(self.params.get(f"fluid_pp({f})%eos", 1)) in EOS_STATE_DEPENDENT_VALUES for f in range(1, num_fluids_case + 1))
+            pr_eos = any(int(self.params.get(f"fluid_pp({f})%eos", 1)) == 6 for f in range(1, num_fluids_case + 1))
+            if pr_eos and CFG().gpu != gpuConfigOptions.NONE.value:
+                raise common.MFCException("Peng-Robinson currently supports CPU builds. Use --no-gpu.")
             return f"""\
+#:set peng_robinson         = {pr_eos}
 #:set chemistry             = {self.params.get("chemistry", "F") == "T"}
 #:set eos_state_dependent   = {any_eos}
 """

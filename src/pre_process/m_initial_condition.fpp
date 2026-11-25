@@ -35,7 +35,7 @@ contains
             allocate (ic%q_cons_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
         end do
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             allocate (ic%q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
         end if
 
@@ -139,6 +139,9 @@ contains
 
         call s_convert_primitive_to_conservative_variables(ic%q_prim_vf, ic%q_cons_vf)
 
+        ! Populate Fourier temperatures for saved Dirichlet boundary buffers using the active EOS.
+        if (heat_conduction) call s_convert_conservative_to_primitive_variables(ic%q_cons_vf, ic%q_T_sf, ic%q_prim_vf, idwint)
+
         if (qbmm .and. .not. polytropic) then
             call s_initialize_mv(ic%q_cons_vf, mv%sf)
             call s_initialize_pb(ic%q_cons_vf, mv%sf, pb%sf)
@@ -209,7 +212,7 @@ contains
         deallocate (ic%q_prim_vf)
         deallocate (ic%q_cons_vf)
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             deallocate (ic%q_T_sf%sf)
         end if
 

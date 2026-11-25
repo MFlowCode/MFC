@@ -46,7 +46,7 @@ class EosFamily:
     prefix: str | None  # parameter prefix (e.g. "mg"); None for stiffened_gas/ideal_gas
     required: tuple[tuple[str, str], ...] = ()
     optional: tuple[tuple[str, str], ...] = ()
-    state_dependent: bool = False
+    state_dependent: bool = False  # density-dependent Gamma/Pi reference curve; nonlinear PR dispatches separately
     isentropic_reference: bool = False  # reference curve is itself an isentrope (JWL, Vinet)
     coefficients_fn: str | None = None  # name of the mirror function in toolchain/mfc/eos.py
     # Parameter suffixes to pass to coefficients_fn after rho, in call order. A suffix listed in
@@ -58,6 +58,13 @@ class EosFamily:
 EOS_FAMILIES: tuple[EosFamily, ...] = (
     EosFamily(value=1, suffix="stiffened_gas", label="stiffened-gas", prefix=None),
     EosFamily(value=2, suffix="ideal_gas", label="ideal-gas", prefix=None),
+    EosFamily(
+        value=6,
+        suffix="peng_robinson",
+        label="Peng-Robinson",
+        prefix="pr",
+        required=(("tc", "Critical temperature [K]"), ("pc", "Critical pressure [Pa]"), ("omega", "Acentric factor"), ("r", "Specific gas constant [J/(kg K)]")),
+    ),
     EosFamily(
         value=3,
         suffix="mie_gruneisen",

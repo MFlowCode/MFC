@@ -976,7 +976,7 @@ class TestHeatConduction(ConstraintTestCase):
         self.assertRejects({**self.GOOD, "fluid_pp(1)%cv": 0.0}, "fluid_pp(1)%cv must be positive when fluid_pp(1)%k_therm is set")
 
     def test_rejects_mie_gruneisen_eos(self):
-        self.assertRejects({**self.GOOD, "fluid_pp(1)%eos": 3}, "heat conduction supports only the stiffened-gas and ideal-gas equations of state")
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%eos": 3}, "heat conduction supports only stiffened-gas, ideal-gas, and Peng-Robinson equations of state")
 
     def test_accepts_ideal_gas_eos(self):
         self.assertAccepts({**self.GOOD, "fluid_pp(1)%eos": 2, "fluid_pp(1)%pi_inf": None})

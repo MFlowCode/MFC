@@ -43,6 +43,18 @@ PHYSICS_DOCS = {
         "a non-negative duration, and f_0 in [0, 1].",
     },
     # Thermodynamic Constraints
+    "check_peng_robinson": {
+        "title": "Single-Component Peng-Robinson Closure",
+        "category": "Thermodynamic Constraints",
+        "math": r"p = \rho RT/(1-b\rho) - a(T)\rho^2/(1+2b\rho-b^2\rho^2)",
+        "explanation": (
+            "The CPU Peng-Robinson backend uses one fluid with optional Newtonian viscosity and Fourier conduction, constant ideal-gas cv, and the five-equation model. "
+            "HLLC uses direct acoustic wave speeds. Supply positive critical temperature, critical pressure, gas constant, "
+            "and ideal-gas cv, with acentric factor in [0, 0.49]. Periodic, reflective, extrapolation, no-slip wall, and fixed Dirichlet boundaries are supported. "
+            "Runtime checks reject states outside the locally stable, positive-pressure single-phase domain."
+        ),
+        "references": [],
+    },
     "check_stiffened_eos": {
         "title": "Stiffened EOS Positivity",
         "category": "Thermodynamic Constraints",
@@ -66,7 +78,7 @@ PHYSICS_DOCS = {
         "category": "Thermodynamic Constraints",
         "math": r"\rho e = \Gamma\,p + \Pi(\rho), \quad \Gamma = 1/\Gamma_G, \quad \Pi(\rho) = \rho\, e_{\mathrm{ref}}(\rho) - p_{\mathrm{ref}}(\rho)/\Gamma_G",
         "explanation": (
-            "Every backend supplies the same two coefficients, and a case may only set the parameters its backend reads: an "
+            "The Gamma/Pi backends supply two coefficients. A case may only set parameters its backend reads. An "
             "ideal gas has no pi_inf, and a state-dependent fluid (mie_gruneisen, jwl, vinet) has neither gamma nor pi_inf; qv stays "
             "a formation energy shared by every family. A family's parameters are read only when that family is selected, and a "
             "temperature (T_wrt, or an Arrhenius burn rate) needs the reference temperature *_t0 as well as cv. The initial state "
@@ -235,8 +247,8 @@ PHYSICS_DOCS = {
         "math": r"k_i \geq 0, \quad k = \sum_i \alpha_i k_i",
         "explanation": (
             "fluid_pp(i)%k_therm must be non-negative and, when positive, requires fluid_pp(i)%cv > 0 (the "
-            "thermal-equilibrium mixture temperature is undefined without it). Only the stiffened-gas and "
-            "ideal-gas equations of state are supported, and only model_eqns = 2 (5-equation) or 3 (6-equation): "
+            "thermal-equilibrium mixture temperature is undefined without it). Stiffened-gas, ideal-gas, and "
+            "single-component Peng-Robinson equations of state are supported, with model_eqns = 2 (5-equation) or 3 (6-equation): "
             "the mixture conductivity is weighted by the volume fractions those models carry, which model_eqns = 1 "
             "does not have. Not supported with igr or chemistry (which carries its own mixture-averaged conduction)."
         ),
@@ -1419,6 +1431,51 @@ class CaseValidator:
         for flag in ("bubbles_euler", "bubbles_lagrange", "particles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax", "ib"):
             self.prohibit(self.get(flag, "F") == "T", f"a state-dependent eos ({state_dependent_names}) is not supported with {flag} = T")
 
+    def check_peng_robinson(self):
+        """Single-component PR closure with primitive WENO and direct HLLC waves."""
+        selected = [i for i in range(1, (self.get("num_fluids") or 0) + 1) if self.get(f"fluid_pp({i})%eos") == 6]
+        for i in range(1, (self.get("num_fluids") or 0) + 1):
+            for key in ("tc", "pc", "r", "omega"):
+                value = self.get(f"fluid_pp({i})%pr_{key}")
+                self.prohibit(i not in selected and value is not None, f"fluid_pp({i})%pr_{key} requires eos = peng_robinson")
+        if not selected:
+            return
+        self.prohibit(self.get("num_fluids") != 1 or self.get("model_eqns") != 2, "Peng-Robinson requires num_fluids = 1 and model_eqns = 5eq")
+        self.prohibit(self.get("riemann_solver") != 2 or self.get("wave_speeds") != 1, "Peng-Robinson requires HLLC with direct wave speeds")
+        self.prohibit(self.get("avg_state") != 2, "Peng-Robinson requires arithmetic averages")
+        for key in ("tc", "pc", "r"):
+            value = self.get(f"fluid_pp(1)%pr_{key}")
+            self.prohibit(value is None or value <= 0, f"Peng-Robinson requires positive pr_{key}")
+        omega = self.get("fluid_pp(1)%pr_omega")
+        self.prohibit(omega is None or not 0 <= omega <= 0.49, "Peng-Robinson currently supports acentric factors in [0, 0.49]")
+        cv = self.get("fluid_pp(1)%cv")
+        self.prohibit(cv is None or cv <= 0, "Peng-Robinson requires positive ideal-gas cv")
+        for key in ("gamma", "pi_inf", "qvp"):
+            self.prohibit(self.get(f"fluid_pp(1)%{key}") is not None, f"Peng-Robinson does not use fluid_pp(1)%{key}")
+        for flag in (
+            "chemistry",
+            "relativity",
+            "mhd",
+            "bubbles_euler",
+            "bubbles_lagrange",
+            "particles_lagrange",
+            "igr",
+            "relax",
+            "ib",
+            "hypoelasticity",
+            "hyperelasticity",
+            "surface_tension",
+            "alt_soundspeed",
+            "acoustic_source",
+            "reactive_burn",
+        ):
+            self.prohibit(self.get(flag, "F") == "T", f"Peng-Robinson is not implemented with {flag}")
+        for axis in ("x", "y", "z"):
+            for side in ("beg", "end"):
+                bc = self.get(f"bc_{axis}%{side}")
+                self.prohibit(bc is not None and bc not in (-1, -2, -3, -16, -17), "Peng-Robinson supports periodic, reflective, extrapolation, no-slip wall, and Dirichlet boundaries")
+        self.prohibit(self.get("low_Mach", 0) != 0, "Peng-Robinson currently requires low_Mach = 0")
+
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
         num_fluids = self.get("num_fluids")
@@ -1840,7 +1897,7 @@ class CaseValidator:
             num_fluids = 1
         model_eqns = self.get("model_eqns")
         eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
-        supported_eos = {eos_names["stiffened_gas"], eos_names["ideal_gas"]}
+        supported_eos = {eos_names["stiffened_gas"], eos_names["ideal_gas"], eos_names["peng_robinson"]}
 
         # heat_conduction is derived (any fluid_pp(i)%k_therm > 0), not a case-file parameter --
         # mirrors m_global_parameters_common.fpp: heat_conduction = any(fluid_pp(:)%k_therm > 0._wp).
@@ -1859,7 +1916,7 @@ class CaseValidator:
                 )
                 eos = self.get(f"fluid_pp({i})%eos")
                 effective_eos = eos if eos is not None else eos_names["stiffened_gas"]
-                self.prohibit(effective_eos not in supported_eos, "heat conduction supports only the stiffened-gas and ideal-gas equations of state")
+                self.prohibit(effective_eos not in supported_eos, "heat conduction supports only stiffened-gas, ideal-gas, and Peng-Robinson equations of state")
                 # model_eqns = 1 (gamma law) stores gamma/pi_inf, not a volume fraction, in the slots
                 # that m_conduction.fpp reads as alpha_i; only model_eqns = 2 (5-eq) and 3 (6-eq) carry one.
                 self.prohibit(
@@ -3696,6 +3753,7 @@ class CaseValidator:
         self.check_ibm()
         self.check_inflow_ramp()
         self.check_eos_selector()
+        self.check_peng_robinson()
         self.check_stiffened_eos()
         self.check_eos_parameter_sanity()
         self.check_surface_tension()

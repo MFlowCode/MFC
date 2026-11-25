@@ -188,6 +188,7 @@ contains
             end if
         end if
 
+        ! PR has cv >= cvs(1) for the supported acentric factors; this bound is conservative.
         ! Thermal diffusion CFL
         if (heat_conduction) then
             k_mix = 0._wp
@@ -310,6 +311,7 @@ contains
             max_dt(3) = ccfl_dt
         end if
 
+        ! PR uses the conservative ideal-cv lower bound here, as in s_compute_stability_from_dt.
         ! Thermal diffusion CFL: dt <= cfl * dx^2 * rho * cv / k
         if (heat_conduction) then
             k_mix = 0._wp

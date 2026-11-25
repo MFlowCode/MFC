@@ -6,11 +6,11 @@
 #:include 'case.fpp'
 #:include 'generated_eos.fpp'
 
-!> @brief Equations of state in Gamma/Pi form, rho e = Gamma(rho) p + Pi(rho).
+!> @brief Thermodynamic closures for Gamma/Pi families and single-component Peng-Robinson.
 !!
 !! Stiffened and ideal gas keep constant coefficients, resolved once at start-up. The
 !! state-dependent families (Mie-Gruneisen, JWL, Vinet) evaluate theirs per cell from a
-!! reference curve.
+!! reference curve. Peng-Robinson uses a nonlinear caloric closure and explicit temperature recovery.
 !!
 !! The mixture closure rules that combine the phases -- Wood's law, the six-equation mean, the
 !! bubbly branch -- are not themselves equations of state, but s_compute_mixture_coefficients,
@@ -24,13 +24,13 @@
 !! not below. See docs/documentation/gpuParallelization.md, "Module boundaries and NVHPC inlining".
 !!
 !! This module is a leaf: it directly uses only m_derived_types, m_constants, and
-!! m_global_parameters_common. Adding an EOS family means one case in s_reference_curve.
+!! m_global_parameters_common. Density-dependent Gamma/Pi families dispatch through s_reference_curve.
 module m_eos
 
     use m_derived_types
     use m_global_parameters_common
     use m_mpi_common, only: s_prohibit_abort
-    use m_constants, only: eos_ideal_gas, eos_mie_gruneisen, eos_jwl, eos_vinet, eos_rk4_steps, ode_isentrope, &
+    use m_constants, only: eos_peng_robinson, eos_ideal_gas, eos_mie_gruneisen, eos_jwl, eos_vinet, eos_rk4_steps, ode_isentrope, &
         & ode_reference_temperature, sgm_eps, verysmall, dflt_real
 
     implicit none
@@ -42,6 +42,11 @@ module m_eos
         & f_relativistic_enthalpy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_mixture_temperature, &
         & f_is_state_dependent, s_phase_coefficients, s_phase_pressure_on_isentrope, s_phase_temperature, s_phase_density, &
         & s_phase_density_on_isentrope, s_phase_internal_energy, s_phase_bulk_modulus
+
+    #:if peng_robinson
+        real(wp) :: pr_a, pr_b, pr_r, pr_c, pr_d, pr_cv
+        public :: f_pr_temperature_energy, f_pr_temperature_pressure, f_pr_pressure, f_pr_energy, s_pr_properties
+    #:endif
 
 contains
 
@@ -60,15 +65,30 @@ contains
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
 
+        #:if peng_robinson
+            @:PROHIBIT(num_fluids /= 1 .or. fluid_pp(1)%eos /= eos_peng_robinson, "Rebuild with this case's EOS.")
+            pr_r = fluid_pp(1)%pr_r
+            pr_cv = fluid_pp(1)%cv
+            pr_b = 0.07780_wp*pr_r*fluid_pp(1)%pr_tc/fluid_pp(1)%pr_pc
+            pr_a = 0.45724_wp*(pr_r*fluid_pp(1)%pr_tc)**2/fluid_pp(1)%pr_pc
+            pr_c = 0.37464_wp + 1.54226_wp*fluid_pp(1)%pr_omega - 0.26992_wp*fluid_pp(1)%pr_omega**2
+            pr_d = pr_c/sqrt(fluid_pp(1)%pr_tc)
+            pr_c = 1._wp + pr_c
+        #:else
+            @:PROHIBIT(any(fluid_pp(1:num_fluids)%eos == eos_peng_robinson), "Rebuild with the Peng-Robinson case.")
+        #:endif
         state_dependent = .false.
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
+            #:if peng_robinson
+                gammas(i) = pr_cv/pr_r
+            #:endif
             isentrope_n(i) = f_isentrope_exponent(gammas(i))
 
             ! Each EOS supplies its own coefficients. Resolved once here, not per cell: a branch in the mixture loop costs
             ! registers in the Riemann kernels. An EOS whose coefficients depend on state must move to per-cell evaluation.
             select case (fluid_pp(i)%eos)
-            case (eos_ideal_gas)
+            case (eos_ideal_gas, eos_peng_robinson)
                 pi_infs(i) = 0._wp
             case default
                 pi_infs(i) = fluid_pp(i)%pi_inf
@@ -309,6 +329,10 @@ contains
         real(wp)             :: mCP  !< sum of alpha_rho_i*cp_i; cp_i = n_i*cv_i
         integer              :: i
 
+        #:if peng_robinson
+            T = f_pr_temperature_pressure(alpha_rho_K(1), pres)
+            return
+        #:endif
         mCP = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
@@ -451,6 +475,10 @@ contains
         real(wp), intent(out) :: T
         real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0, T0, T_ref
 
+        #:if peng_robinson
+            T = f_pr_temperature_pressure(rho, pres)
+            return
+        #:endif
         if (f_is_state_dependent(i)) then
             call s_reference_curve(rho, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
             T0 = eos_coeffs(i)%t0
@@ -676,6 +704,13 @@ contains
         real(wp) :: alf  !< Subgrid void fraction; dilute by construction
         real(wp) :: blkmod_q, alpha_q, alpha_rho_q, gamma_q, pi_inf_q
         integer  :: q
+        #:if peng_robinson
+            real(wp) :: temperature, energy, cv, cp, pressure_check, c2
+            temperature = f_pr_temperature_pressure(rho, pres)
+            call s_pr_properties(rho, temperature, pressure_check, energy, cv, cp, c2)
+            c = sqrt(c2)
+            return
+        #:endif
 
         if (chemistry) then  ! Reacting mixture sound speed
             c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
@@ -784,4 +819,107 @@ contains
 
     end subroutine s_compute_speed_of_sound_avg
 
+    #:if peng_robinson
+        subroutine s_pr_check_density(rho)
+
+            real(wp), intent(in) :: rho
+
+            if (.not. (rho > 0._wp .and. pr_b*rho < 1._wp)) error stop "PR requires 0 < b*rho < 1"
+
+        end subroutine s_pr_check_density
+
+        !> Positive logarithmic departure integral, in mass-specific units.
+        function f_pr_departure(rho) result(integral)
+
+            real(wp), intent(in) :: rho
+            real(wp)             :: integral, brho
+
+            call s_pr_check_density(rho)
+            brho = pr_b*rho
+            integral = log((1._wp + (1._wp + sqrt(2._wp))*brho)/(1._wp + (1._wp - sqrt(2._wp))*brho))/(2._wp*sqrt(2._wp)*pr_b)
+
+        end function f_pr_departure
+
+        !> Stable positive root of A*x*x + B*x - C = 0, with x = sqrt(T).
+        function f_pr_temperature_root(a, b, c) result(temperature)
+
+            real(wp), intent(in) :: a, b, c
+            real(wp)             :: temperature
+
+            if (.not. (a > 0._wp .and. b >= 0._wp .and. c > 0._wp)) &
+                & error stop "PR temperature inversion has no admissible positive root"
+            temperature = (2._wp*c/(b + sqrt(b*b + 4._wp*a*c)))**2
+
+        end function f_pr_temperature_root
+
+        !> Caloric inversion with e_ideal = cv_ideal*T and the PR departure energy.
+        function f_pr_temperature_energy(rho, energy) result(temperature)
+
+            real(wp), intent(in) :: rho, energy
+            real(wp)             :: temperature, integral
+
+            integral = f_pr_departure(rho)
+            temperature = f_pr_temperature_root(pr_cv, pr_a*pr_c*pr_d*integral, energy - qvs(1) + pr_a*pr_c**2*integral)
+
+        end function f_pr_temperature_energy
+
+        !> Thermal inversion at a reconstructed primitive state (rho, p).
+        function f_pr_temperature_pressure(rho, pressure) result(temperature)
+
+            real(wp), intent(in) :: rho, pressure
+            real(wp)             :: temperature, attraction, repulsion
+
+            call s_pr_check_density(rho)
+            attraction = pr_a*rho**2/(1._wp + 2._wp*pr_b*rho - (pr_b*rho)**2)
+            repulsion = rho*pr_r/(1._wp - pr_b*rho)
+            temperature = f_pr_temperature_root(repulsion - attraction*pr_d**2, 2._wp*attraction*pr_c*pr_d, &
+                                                & pressure + attraction*pr_c**2)
+
+        end function f_pr_temperature_pressure
+
+        function f_pr_pressure(rho, temperature) result(pressure)
+
+            real(wp), intent(in) :: rho, temperature
+            real(wp)             :: pressure, energy, cv, cp, c2
+
+            call s_pr_properties(rho, temperature, pressure, energy, cv, cp, c2)
+
+        end function f_pr_pressure
+
+        function f_pr_energy(rho, temperature) result(energy)
+
+            real(wp), intent(in) :: rho, temperature
+            real(wp)             :: pressure, energy, cv, cp, c2
+
+            call s_pr_properties(rho, temperature, pressure, energy, cv, cp, c2)
+
+        end function f_pr_energy
+
+        !> One thermodynamically consistent PR closure, including analytical derivatives.
+        subroutine s_pr_properties(rho, temperature, pressure, energy, cv, cp, c2)
+
+            real(wp), intent(in)  :: rho, temperature
+            real(wp), intent(out) :: pressure, energy, cv, cp, c2
+            real(wp)              :: integral, root_t, attraction, da_dt, d2a_dt2, denominator, dp_dt, dp_drho
+
+            integral = f_pr_departure(rho)
+            if (.not. (temperature > 0._wp)) error stop "PR requires positive temperature"
+            root_t = sqrt(temperature)
+            attraction = pr_a*(pr_c - pr_d*root_t)**2
+            da_dt = pr_a*(pr_d**2 - pr_c*pr_d/root_t)
+            d2a_dt2 = pr_a*pr_c*pr_d/(2._wp*temperature*root_t)
+            denominator = 1._wp + 2._wp*pr_b*rho - (pr_b*rho)**2
+            pressure = rho*pr_r*temperature/(1._wp - pr_b*rho) - attraction*rho**2/denominator
+            energy = pr_cv*temperature + (temperature*da_dt - attraction)*integral + qvs(1)
+            cv = pr_cv + temperature*d2a_dt2*integral
+            dp_dt = rho*pr_r/(1._wp - pr_b*rho) - da_dt*rho**2/denominator
+            dp_drho = pr_r*temperature/(1._wp - pr_b*rho)**2 - 2._wp*attraction*rho*(1._wp + pr_b*rho)/denominator**2
+            if (.not. (cv > 0._wp .and. dp_drho > 0._wp .and. pressure > 0._wp)) &
+                & error stop "PR state is outside the stable positive-pressure single-phase domain"
+            cp = cv + temperature*dp_dt**2/(rho**2*dp_drho)
+            c2 = dp_drho + temperature*dp_dt**2/(rho**2*cv)
+            if (.not. (c2 > 0._wp)) error stop "PR requires positive sound speed squared"
+
+        end subroutine s_pr_properties
+    #:endif
 end module m_eos

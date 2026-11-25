@@ -23,6 +23,7 @@ _EXPECTED_EOS_CONSTANT_LINES = {
     "integer, parameter :: eos_mie_gruneisen = 3",
     "integer, parameter :: eos_jwl = 4",
     "integer, parameter :: eos_vinet = 5",
+    "integer, parameter :: eos_peng_robinson = 6",
 }
 
 # eos_* identifiers that appear in src/ but are not registry-derived selector constants:
