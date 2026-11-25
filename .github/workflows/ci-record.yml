@@ -64,7 +64,9 @@ jobs:
           # The pull request a pull request run belongs to (the run itself names it only for same-repository PRs).
           pr=$(jq -r '.pull_requests[0].number // empty' run.json)
           if [ -z "$pr" ] && [ "$(jq -r '.event' run.json)" = pull_request ]; then
-            pr=$(gh api "$api/commits/$(jq -r '.head_sha' run.json)/pulls" --jq '.[0].number // empty' || true)
+            # A fork's commit is not in this repository, so look the pull request up by its branch.
+            head=$(jq -r '"\(.head_repository.owner.login):\(.head_branch)"' run.json)
+            pr=$(gh api -X GET "$api/pulls" -f head="$head" -f state=all --jq '.[0].number // empty' || true)
           fi
 
           python3 .github/scripts/ci-record.py run.json jobs.json --usage usage.txt --compare compare.json --logs logs ${pr:+--pr "$pr"} --problems unread.txt > line.json
