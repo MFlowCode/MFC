@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Turn one workflow run into one line of the CI history.
 
-    ci-record.py <run.json> <jobs.json> [--usage usage.txt] [--compare compare.json] [--logs DIR]
+    ci-record.py <run.json> <jobs.json> [--usage usage.txt] [--compare compare.json] [--logs DIR] [--pr N]
 
 The inputs are the GitHub API's answers for the run and for its jobs (`actions/runs/<id>` and
 `actions/runs/<id>/jobs?filter=all`). Prints nothing for a run with no cluster job. Otherwise
-one JSON object: the run (event, commit, title, pull request for a master commit) and, per
+one JSON object: the run (event, commit, title, and its pull request: --pr for a pull request
+run, the number in the title for a master commit) and, per
 cluster job, a compact entry:
 
     l  lane, e.g. frontier_amd-gpu-omp      k  kind: test, case-opt or bench
@@ -144,7 +145,7 @@ def tests(log: str, failed_job: bool) -> dict:
     return out
 
 
-def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs: str = None):
+def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs: str = None, number: int = None):
     entries = []
     for job in jobs:
         name = job.get("name") or ""
@@ -185,7 +186,7 @@ def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs
         "master": master,
         "sha": run.get("head_sha"),
         "title": run.get("display_title"),
-        "pr": int(pr.group(1)) if pr else None,
+        "pr": int(pr.group(1)) if pr else number,
         "date": run.get("created_at"),
         "merges": merges(compare) if master else [],
         "jobs": entries,
@@ -199,6 +200,7 @@ if __name__ == "__main__":
     ap.add_argument("--usage")
     ap.add_argument("--compare")
     ap.add_argument("--logs")
+    ap.add_argument("--pr", type=int)
     args = ap.parse_args()
 
     def load(path, default):
@@ -211,6 +213,6 @@ if __name__ == "__main__":
     if args.usage:
         with open(args.usage) as f:
             slurm = usage(f)
-    rec = record(load(args.run, {}), load(args.jobs, {})["jobs"], slurm, load(args.compare, None), args.logs)
+    rec = record(load(args.run, {}), load(args.jobs, {})["jobs"], slurm, load(args.compare, None), args.logs, args.pr)
     if rec:
         print(json.dumps(rec, separators=(",", ":"), sort_keys=True))

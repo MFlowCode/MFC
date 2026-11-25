@@ -29,6 +29,10 @@
         .legend button[aria-pressed="false"] { opacity: .4; text-decoration: line-through; }
         .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
         .legend svg { width: 10px; height: 10px; flex: none; display: inline-block; }
+        #summary { margin: 0 0 22px; } #summary td, #summary th { white-space: nowrap; } #summary td:first-child a { text-decoration: none; font-weight: 600; }
+        svg.spark { width: 84px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        select { font: inherit; color: var(--ink); background: transparent; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; }
+        svg text.event { fill: #b45309; font-weight: 600; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
         figure { margin: 0; background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 12px 6px; position: relative; }
         figcaption { font-weight: 600; font-size: 14px; margin-bottom: 4px; overflow-wrap: anywhere; }
@@ -60,69 +64,45 @@
         table { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
         th, td { padding: 4px 10px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; }
         th:first-child, td:first-child { text-align: left; }
-
-        /* The look of the MFC landing page: slate band, white body, amber accent, no cards. */
-        body { background: #0f172a; font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; }
-        .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
-        header.site { color: #ffffff; }
-        header.site .brand { display: flex; align-items: center; gap: 16px; padding: 24px 0 8px; font-weight: 700; font-size: 22px; text-decoration: none; color: #ffffff; }
-        header.site .brand img { height: 24px; }
-        header.site nav { display: flex; flex-wrap: wrap; gap: 0 28px; padding-bottom: 20px; }
-        header.site nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 17px; padding: 12px 2px; border-bottom: 2px solid #ffffff; }
-        header.site nav a:hover, header.site nav a[aria-current="page"] { border-bottom-color: #fbbf24; }
-        main { max-width: none; margin: 0; padding: 32px 0 48px; background: #ffffff; }
-        footer.site { color: #d4d4d4; font-size: 13px; padding: 28px 0; }
-        footer.site strong { color: #ffffff; } footer.site a { color: #fbbf24; text-decoration: none; }
-        h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; }
-        h2 { font-size: 20px; font-weight: 800; margin: 40px 0 6px; }
-        .seg { border: 0; border-radius: 0; gap: 20px; overflow: visible; }
-        .seg button { padding: 4px 0; border: 0; border-bottom: 2px solid transparent; font-weight: 600; color: var(--muted); }
-        .seg button + button { border-left: 0; }
-        .seg button:hover { color: var(--ink); }
-        .seg button[aria-pressed="true"] { background: none; color: var(--ink); border-bottom-color: #fbbf24; }
-        .panel, figure, .log { background: transparent; border: 0; border-top: 1px solid var(--grid); border-radius: 0; padding: 10px 0 0; }
-        .log { border-bottom: 1px solid var(--grid); padding: 0; }
-        .tiles { gap: 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
-        .tile { background: transparent; border: 0; border-radius: 0; padding: 12px 16px 12px 0; }
-        .tile .v { font-size: 24px; font-weight: 800; }
-        .tip { border-radius: 2px; box-shadow: 0 1px 4px rgba(15, 23, 42, .2); }
-        button.plain { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; font-weight: 600; }
-        input[type="search"] { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); background: transparent; padding: 4px 0; }
     </style>
+    <link rel="stylesheet" href="res/ci-pages.css">
 </head>
 <body>
-<header class="site"><div class="wrap">
-    <a class="brand" href="index.html"><img src="res/banner.png" alt="MFC"><span>Multi-Component Flow Code</span></a>
-    <nav><a href="index.html">Home</a><a href="documentation/index.html">Documentation</a><a href="benchmarks.html" aria-current="page">Performance</a><a href="ci.html">CI health</a><a href="tests.html">Test health</a></nav>
-</div></header>
+<header class="site" id="site-header"></header>
 <main><div class="wrap">
+    <p class="updated" id="updated"></p>
     <h1>Performance history</h1>
     <p class="lede">Grind time of each benchmark case for every benchmarked commit on <code>master</code>, in nanoseconds per grid point,
         equation and Runge&ndash;Kutta stage; lower is faster. Dots are runs, the line is a median of five. Phoenix is shown per GPU model.</p>
 
+    <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
     <div class="controls">
         <div class="seg" id="view" role="group" aria-label="Machine"></div>
         <div class="seg" id="metric" role="group" aria-label="Value shown">
-            <button data-v="rel" aria-pressed="true">Change since start</button>
+            <button data-v="rel" aria-pressed="false">Change since start</button>
             <button data-v="abs" aria-pressed="false">Grind time</button>
         </div>
         <div class="seg" id="range" role="group" aria-label="Time range">
+            <button data-v="14" aria-pressed="false">14 days</button>
             <button data-v="30" aria-pressed="false">30 days</button>
-            <button data-v="90" aria-pressed="true">90 days</button>
+            <button data-v="90" aria-pressed="false">90 days</button>
             <button data-v="0" aria-pressed="false">All</button>
         </div>
         <button id="reset" class="plain" hidden>Reset zoom</button>
         <span class="note">Drag across a chart to zoom all of them; click a point to keep its commit and pull request; hover a marker to see what it marks.</span>
     </div>
-    <ul class="legend" id="legend"></ul>
-    <p id="status">Loading benchmark history&hellip;</p>
-    <div class="grid" id="charts"></div>
-
-    <h2>Changes beyond the noise</h2>
+    <h2 id="changes-h">Changes beyond the noise</h2>
     <p class="note">Lasting changes of at least 3% and five times the run-to-run scatter. The commits listed merged between the last
         benchmark at the old level and the first at the new one, narrowed across the lanes that changed together: one commit is the cause, several
         cannot be told apart. A change in the machine itself appears against whatever merged at the time.</p>
+    <div class="controls"><select id="flane" aria-label="Lane"></select><select id="fcase" aria-label="Case"></select></div>
     <div class="log"><table id="changes"></table></div>
+
+
+    <h2>Each case over time</h2>
+    <ul class="legend" id="legend"></ul>
+    <div class="scrollx"><table id="summary" class="sortable"></table></div>
+    <div class="grid" id="charts"></div>
 
     <h2>Commits</h2>
     <p class="note">Each benchmarked commit in the range above, newest first. A lane's figure is its grind time against the commit benchmarked
@@ -131,37 +111,28 @@
 
     <details>
         <summary>Latest results as a table</summary>
-        <div class="scroll"><table id="table"></table></div>
+        <div class="scroll"><table id="table" class="sortable"></table></div>
     </details>
+    <div id="key"></div>
 </div></main>
-<footer class="site"><div class="wrap">
-    <strong>&copy; <span id="copyright-year"></span> Spencer H. Bryngelson and Tim Colonius</strong> &middot; <a href="https://comp-physics.group/">Computational Physics Group @ Georgia Tech</a>
-</div></footer>
+<footer class="site" id="site-footer"></footer>
+<script src="res/ci-pages.js"></script>
 <script>
 "use strict";
-document.getElementById("copyright-year").textContent = new Date().getFullYear();
+MFCCI.chrome("benchmarks.html");
 // One JSON object per line, appended by the `record` job of .github/workflows/bench.yml.
-const DATA_URL = "https://raw.githubusercontent.com/MFlowCode/MFC-ci-data/main/benchmarks.jsonl";
-// A lane is one machine, compiler and offload model, and on Phoenix one GPU model too: its nodes differ
-// by up to 3.5x. Lanes are shown a view at a time; order is fixed so a lane keeps its color.
-const FRONTIER = { "frontier-gpu-acc": "CCE · OpenACC", "frontier-gpu-omp": "CCE · OpenMP", "frontier_amd-gpu-omp": "AMD · OpenMP" };
-const GPUS = ["h200", "h100", "a100", "l40s", "v100"];
-const laneKey = r => `${r.cluster}-${r.device}-${r.interface}${r.hardware ? `-${r.hardware}` : ""}`;
-function laneOf(r) {
-    const key = laneKey(r);
-    if (r.cluster.startsWith("frontier")) return { key, view: "Frontier", label: FRONTIER[key] || key, order: Object.keys(FRONTIER).indexOf(key) };
-    const gpu = r.hardware || "unknown GPU", at = GPUS.indexOf(gpu);
-    return { key, view: `Phoenix · ${r.interface === "acc" ? "OpenACC" : "OpenMP"}`, label: gpu.toUpperCase().replace("UNKNOWN GPU", "GPU not recorded"), order: at < 0 ? GPUS.length : at };
-}
+const { laneKey, laneOf, esc, day, PR_OF } = MFCCI;
 let ALL = [], LANES = [];                                // every lane; the lanes of the current view
 function setView(view) {
     state.view = view; state.hidden.clear();
     LANES = ALL.filter(l => l.view === view).sort((x, y) => x.order - y.order).map((l, i) => ({ ...l, color: `var(--s${i % 6 + 1})` }));
     for (const o of $("view").children) o.setAttribute("aria-pressed", o.dataset.v === view);
+    MFCCI.param("view", view);
     legend(); render();
 }
 
-const state = { view: "", metric: "rel", days: 90, zoom: null, hidden: new Set(), records: [] };
+const state = { view: "", metric: MFCCI.param("metric") === "abs" ? "abs" : "rel", days: [0, 14, 30, 90].includes(+MFCCI.param("range")) && MFCCI.param("range") !== null ? +MFCCI.param("range") : 90,
+                zoom: null, hidden: new Set(), records: [], shifts: [] };
 const $ = id => document.getElementById(id);
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}, parent) => {
@@ -171,12 +142,8 @@ const el = (tag, attrs = {}, parent) => {
     return n;
 };
 const fmt = (v, metric) => metric === "rel" ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : `${v.toPrecision(4)} ns`;
-const day = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const PR_OF = r => r.pr ?? (/\(#(\d+)\)\s*$/.exec(r.subject || "") || [])[1];
 const links = r => `<a href="${COMMIT_URL(r.sha)}" target="_blank" rel="noopener"><code>${r.sha.slice(0, 7)}</code></a>`
     + (PR_OF(r) ? ` · <a href="https://github.com/MFlowCode/MFC/pull/${PR_OF(r)}" target="_blank" rel="noopener">PR #${PR_OF(r)}</a>` : "");
-const stale = t => { const d = Math.floor((Date.now() - t) / 864e5); return d >= 7 ? ` The newest record is ${d} days old: the recorder may have stopped.` : ""; };
 const COMMIT_URL = sha => `https://github.com/MFlowCode/MFC/commit/${sha}`;
 
 // Median of five runs, never mixing runs from before and after a change to the case itself.
@@ -217,7 +184,7 @@ function series(slug) {
 
 function chart(slug) {
     const W = 360, H = 200, L = 46, R = 8, T = 12, B = 22;
-    const fig = document.createElement("figure");
+    const fig = document.createElement("figure"); fig.id = `case-${slug}`;
     fig.innerHTML = `<figcaption>${slug}</figcaption>`;
     const ss = series(slug);
     if (!ss.length) { fig.insertAdjacentHTML("beforeend", `<p class="note">No runs in this range.</p>`); return fig; }
@@ -277,6 +244,15 @@ function chart(slug) {
         }
         el("path", { d: s.pts.map((p, i) => `${i && p.def === s.pts[i - 1].def ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.m).toFixed(1)}`).join(""),
             fill: "none", stroke: s.lane.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    }
+
+    // The lasting changes found for this case on a lane shown here, marked where they happened.
+    for (const e of state.shifts) for (const sp of e.spans) {
+        const hit = sp.hits.find(h => h.slug === slug); if (!hit || !ss.some(s => s.lane.key === sp.lane.key) || e.r.t < t0 || e.r.t > t1) continue;
+        const who = e.suspects.length === 1 ? (e.suspects[0][2] ? `#${e.suspects[0][2]}` : e.suspects[0][0].slice(0, 7)) : `${e.suspects.length} commits`, xe = x(e.r.t), left = xe > W - 90;
+        el("line", { x1: xe, x2: xe, y1: T, y2: H - B, stroke: "#f59e0b", "stroke-width": 1.5 }, svg);
+        el("text", { x: xe + (left ? -4 : 4), y: H - B - 5, "text-anchor": left ? "end" : "start", class: "event" }, svg).textContent = `${hit.pct > 0 ? "+" : ""}${hit.pct.toFixed(0)}% ${who}`;
+        mark(xe, H - B - 8, `${sp.lane.label}: grind time ${hit.pct > 0 ? "up" : "down"} ${Math.abs(hit.pct).toFixed(1)}% at ${e.suspects.length === 1 ? e.suspects[0][1] : `one of ${e.suspects.map(c => c[2] ? `#${c[2]}` : c[0].slice(0, 7)).join(", ")}`}`);
     }
 
     // Hover snaps to the nearest benchmarked commit and marks its point on every lane; a click opens
@@ -377,71 +353,9 @@ function log(slugs) {
         + rows.reverse().slice(0, 400).map(({ cm, cells }) => `<tr><td>${day(cm.r.t)}</td><td class="what" title="${esc(cm.r.subject || "")}">${links(cm.r)} ${esc(cm.r.subject || "")}${also(cm)}</td>${cells.map(cell).join("")}</tr>`).join("");
 }
 
-// A lasting change in level, per lane and case: at each benchmarked commit, the median of the (up to) six
-// commits before against the six from it on, at least four on each side. It counts when it is at least
-// 3% and five times the scatter on either side, and it is placed at the commit where that contrast peaks.
-// Runs across a change to the case or to the modules are never compared; a run over 3x its neighbours
-// and a run whose commit is only estimated are left out. One case moving alone has to move 10%;
-// otherwise two cases on the lane must.
-// The suspects are the commits after the lane's last benchmark at the old level, up to its first at the
-// new one. Lanes that changed over overlapping spans are one event, and its suspects are the commits
-// every one of those lanes allows.
-function shifts() {
-    const med = a => { const b = [...a].sort((x, y) => x - y); return b[b.length >> 1]; };
-    const scatter = a => { const m = med(a); return 1.4826 * med(a.map(v => Math.abs(v - m))) / m; };
-    const W = 6, MIN = 4, spans = [];
-    // master's commits in order: each benchmarked commit lists the ones it covers
-    const order = [], at = new Map();
-    for (const r of state.records) for (const c of r.covers?.length ? r.covers : [[r.sha, r.subject || "", PR_OF(r)]]) if (!at.has(c[0])) { at.set(c[0], order.length); order.push(c); }
-    const slugs = [...new Set(state.records.flatMap(r => Object.keys(r.cases)))];
-    for (const lane of ALL) {
-        const hits = [];
-        for (const slug of slugs) {
-            const runs = state.records.filter(r => r.lane === lane.key && r.cases[slug] && !r.approx && at.has(r.sha)).sort((x, y) => at.get(x.sha) - at.get(y.sha)), by = new Map();
-            runs.forEach((r, i) => {
-                const near = runs.slice(Math.max(0, i - 7), i + 8).map(q => q.cases[slug].grind);
-                if (r.cases[slug].grind > 3 * med(near)) return;                       // a stray run
-                const c = by.get(r.sha) || { r, seg: `${r.cases[slug].def || ""}|${r.env || ""}`, vs: [] };
-                c.vs.push(r.cases[slug].grind); by.set(r.sha, c);
-            });
-            const cs = [...by.values()].map(c => ({ ...c, v: med(c.vs) })), score = cs.map(() => null);
-            for (let i = 1; i < cs.length; i++) {
-                const before = [], after = [];
-                for (let k = i - 1; k >= 0 && before.length < W && cs[k].seg === cs[i].seg; k--) before.push(cs[k].v);
-                for (let k = i; k < cs.length && after.length < W && cs[k].seg === cs[i].seg; k++) after.push(cs[k].v);
-                if (before.length < MIN || after.length < MIN) continue;
-                const pct = med(after) / med(before) - 1, noise = Math.max(scatter(before), scatter(after), 0.002);
-                if (Math.abs(pct) >= 0.03 && Math.abs(pct) >= 5 * noise) score[i] = pct;
-            }
-            for (let i = 1; i < cs.length; i++) {
-                if (score[i] === null) continue;
-                // the step sits where the contrast is largest among neighbouring commits flagged the same way
-                let peak = true;
-                for (let k = Math.max(1, i - 3); k <= Math.min(cs.length - 1, i + 3); k++)
-                    if (k !== i && score[k] !== null && Math.sign(score[k]) === Math.sign(score[i]) && (Math.abs(score[k]) > Math.abs(score[i]) || Math.abs(score[k]) === Math.abs(score[i]) && k < i)) peak = false;
-                if (peak) hits.push({ lane, slug, pct: score[i] * 100, lo: at.get(cs[i - 1].r.sha) + 1, hi: at.get(cs[i].r.sha), r: cs[i].r });
-            }
-        }
-        // per lane: cases that stepped over overlapping spans, in the same direction, are one change
-        hits.sort((x, y) => x.lo - y.lo);
-        for (const h of hits) {
-            const s = spans.find(s => s.lane === lane && Math.sign(s.hits[0].pct) === Math.sign(h.pct) && h.lo <= s.hi && h.hi >= s.lo);
-            if (s) { s.lo = Math.max(s.lo, h.lo); s.hi = Math.min(s.hi, h.hi); s.hits.push(h); } else spans.push({ lane, lo: h.lo, hi: h.hi, hits: [h] });
-        }
-    }
-    // Kept: two cases together, or one moving 10% on a lane with a single hardware (a Phoenix lane is
-    // one GPU model, with fewer runs, so it needs two); and a span short enough to point at something.
-    const solid = spans.filter(s => (s.hits.length >= 2 || Math.abs(s.hits[0].pct) >= 10 && s.lane.view === "Frontier") && s.hi - s.lo < 8).sort((x, y) => x.lo - y.lo), events = [];
-    for (const s of solid) {
-        const e = events.find(e => Math.sign(e.spans[0].hits[0].pct) === Math.sign(s.hits[0].pct) && s.lo <= e.hi && s.hi >= e.lo);
-        if (e) { e.lo = Math.max(e.lo, s.lo); e.hi = Math.min(e.hi, s.hi); e.spans.push(s); } else events.push({ lo: s.lo, hi: s.hi, spans: [s] });
-    }
-    const first = new Map(); for (const r of state.records) if (!first.has(r.sha)) first.set(r.sha, r);
-    return events.map(e => ({ ...e, suspects: order.slice(e.lo, e.hi + 1), r: first.get(order[e.hi][0]) || e.spans[0].hits[0].r })).sort((a, b) => b.hi - a.hi);
-}
-
 function changes() {
-    const [from, to] = windowOf(), rows = shifts().filter(e => e.r.t >= from && e.r.t <= to);
+    const [from, to] = windowOf(), lane = $("flane").value, slug = $("fcase").value;
+    const rows = state.shifts.filter(e => e.r.t >= from && e.r.t <= to).map(e => ({ ...e, spans: e.spans.filter(s => (!lane || s.lane.key === lane) && (!slug || s.hits.some(h => h.slug === slug))) })).filter(e => e.spans.length);
     const commit = c => c[2] ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener">#${c[2]}</a> ${esc(c[1])}`
                              : `<a href="${COMMIT_URL(c[0])}" target="_blank" rel="noopener"><code>${c[0].slice(0, 7)}</code></a> ${esc(c[1])}`;
     $("changes").innerHTML = `<tr><th>First seen</th><th>Commit</th><th>Lane</th><th>Cases</th><th>Change in grind time</th></tr>`
@@ -458,8 +372,34 @@ function changes() {
         }).join("");
 }
 
+function headline() {
+    const [from, to] = windowOf(), ev = state.shifts.filter(e => e.r.t >= from && e.r.t <= to), dir = e => e.spans[0].hits[0].pct > 0;
+    const slower = ev.filter(dir).length, latest = ev[0], inRange = state.records.filter(r => r.t >= from && r.t <= to);
+    const part = (label, dot, text, href) => `<a${href ? ` href="${href}"` : ""}><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
+    $("statusline").innerHTML =
+        part("Lasting changes in this range", slower ? "bad" : "good", ev.length ? `${ev.length}: ${slower} slower, ${ev.length - slower} faster` : "none", "#changes-h")
+        + (latest ? part("Latest", dir(latest) ? "bad" : "good", `${dir(latest) ? "slower" : "faster"} at ${latest.suspects.length === 1 ? (latest.suspects[0][2] ? `#${latest.suspects[0][2]}` : latest.suspects[0][0].slice(0, 7)) : `one of ${latest.suspects.length} commits`} · ${day(latest.r.t)}`, "#changes-h") : "")
+        + part("Benchmarked", "", `${new Set(inRange.map(r => r.sha)).size} commits on ${new Set(inRange.map(r => r.lane)).size} lanes`);
+}
+
+// One row per case: for each lane shown, the trend as a small line and the change across the range.
+function summary(slugs) {
+    $("summary").innerHTML = `<tr><th>Case</th>${LANES.filter(l => !state.hidden.has(l.key)).map(l => `<th>${l.label}</th>`).join("")}</tr>` + slugs.map(slug => {
+        const by = new Map(series(slug).map(s => [s.lane.key, s]));
+        return `<tr><td><a href="#case-${slug}">${slug}</a></td>` + LANES.filter(l => !state.hidden.has(l.key)).map(l => {
+            const s = by.get(l.key); if (!s || s.pts.length < 2) return `<td class="note">–</td>`;
+            const ms = s.pts.map(p => p.m), lo = Math.min(...ms), hi = Math.max(...ms), last = s.pts.at(-1), first = s.pts[0];
+            const pct = state.metric === "rel" ? last.m - first.m : (last.m / first.m - 1) * 100;
+            const d = ms.map((m, i) => `${i ? "L" : "M"}${(2 + i / (ms.length - 1) * 80).toFixed(1)},${(17 - (hi > lo ? (m - lo) / (hi - lo) : 0.5) * 14).toFixed(1)}`).join("");
+            return `<td><svg class="spark" viewBox="0 0 84 20" aria-hidden="true"><path d="${d}" fill="none" stroke="${l.color}" stroke-width="1.5"/></svg>`
+                + `<span class="${Math.abs(pct) < 3 ? "" : pct > 0 ? "slower" : "faster"}">${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</span></td>`;
+        }).join("") + `</tr>`;
+    }).join("");
+}
+
 function render() {
     const slugs = [...new Set(state.records.flatMap(r => Object.keys(r.cases)))].sort();
+    headline(); summary(slugs);
     $("charts").replaceChildren(...slugs.map(chart));
     $("reset").hidden = !state.zoom;
     table(slugs);
@@ -472,7 +412,7 @@ function controls() {
         $(id).addEventListener("click", e => {
             const b = e.target.closest("button"); if (!b) return;
             state[key] = cast(b.dataset.v);
-            if (key === "days") state.zoom = null;
+            if (key === "days") { state.zoom = null; MFCCI.param("range", b.dataset.v); MFCCI.chrome("benchmarks.html"); } else MFCCI.param("metric", b.dataset.v);
             for (const o of $(id).children) o.setAttribute("aria-pressed", o === b);
             render();
         });
@@ -494,23 +434,27 @@ function legend() {
         $("legend").appendChild(li);
     }
     const mark = (d, text) => `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="${d}" fill="var(--ink-2)"/></svg>${text}</span></li>`;
-    $("legend").insertAdjacentHTML("beforeend", mark("M5,1l4,4l-4,4l-4,-4z", "Benchmark case changed") + mark("M2,2h6v6h-6z", "Compiler or module set changed") + mark("M5,1l4,7h-8z", "Run off the scale (over 3x the runs around it)"));
+    $("legend").insertAdjacentHTML("beforeend", mark("M5,1l4,4l-4,4l-4,-4z", "Benchmark case changed") + mark("M2,2h6v6h-6z", "Compiler or module set changed") + mark("M5,1l4,7h-8z", "Run off the scale (over 3x the runs around it)")
+        + `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><span style="width:2px;height:12px;background:#f59e0b;display:inline-block"></span>Lasting change (see the table below)</span></li>`);
 }
 
-fetch(DATA_URL).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); }).then(text => {
-    state.records = text.split("\n").filter(Boolean).map(line => {
-        const r = JSON.parse(line);
-        return { ...r, lane: laneKey(r), t: Date.parse(r.date) };
-    }).sort((a, b) => a.t - b.t);
-    if (!state.records.length) throw new Error("empty");
-    const last = state.records.at(-1);
-    $("status").textContent = `${new Set(state.records.map(r => r.sha)).size} commits benchmarked; latest ${new Date(last.t).toLocaleDateString(undefined, { dateStyle: "medium" })}.${stale(last.t)}`;
-    const seen = new Map(); for (const r of state.records) if (!seen.has(r.lane)) seen.set(r.lane, laneOf(r));
-    ALL = [...seen.values()];
+MFCCI.load.bench().then(records => {
+    if (!records.length) { $("statusline").innerHTML = `<span class="note">No benchmark history is available yet.</span>`; return; }
+    state.records = records;
+    MFCCI.updated($("updated"), records.at(-1).t, 7);
+    ALL = MFCCI.benchLanes(records);
+    state.shifts = MFCCI.shifts(records, ALL);
     const views = [...new Set(ALL.map(l => l.view))].sort();
     $("view").innerHTML = views.map(v => `<button data-v="${v}" aria-pressed="false">${v}</button>`).join("");
-    controls(); setView(views[0]);
-}).catch(() => { $("status").textContent = "No benchmark history is available yet."; });
+    for (const id of ["metric", "range"]) for (const o of $(id).children) o.setAttribute("aria-pressed", o.dataset.v === String(id === "metric" ? state.metric : state.days));
+    const slugs = [...new Set(records.flatMap(r => Object.keys(r.cases)))].sort();
+    $("flane").innerHTML = `<option value="">All lanes</option>` + ALL.map(l => `<option value="${l.key}">${l.view === "Frontier" ? l.label : `${l.view} · ${l.label}`}</option>`).join("");
+    $("fcase").innerHTML = `<option value="">All cases</option>` + slugs.map(c => `<option>${c}</option>`).join("");
+    for (const id of ["flane", "fcase"]) $(id).addEventListener("change", changes);
+    MFCCI.sortable($("table")); MFCCI.sortable($("summary"));
+    $("key").innerHTML = MFCCI.LANE_KEY;
+    controls(); setView(views.includes(MFCCI.param("view")) ? MFCCI.param("view") : views[0]);
+});
 </script>
 </body>
 </html>

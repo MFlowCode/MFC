@@ -492,6 +492,7 @@ if (MFC_DOCUMENTATION)
                         "${CMAKE_CURRENT_SOURCE_DIR}/docs/benchmarks.html"
                         "${CMAKE_CURRENT_SOURCE_DIR}/docs/ci.html"
                         "${CMAKE_CURRENT_SOURCE_DIR}/docs/tests.html"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/docs/status.html"
             DESTINATION "docs/mfc")
 endif()
 

@@ -48,47 +48,20 @@
         th, td { padding: 4px 10px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         th:first-child, td:first-child { text-align: left; }
         .bad { color: var(--critical); font-weight: 600; }
+        input[type="search"] { font: inherit; color: var(--ink); width: 360px; max-width: 100%; }
         .ok { color: var(--good); font-weight: 600; } .none { color: var(--muted); }
         #now td, #now th { text-align: left; }
-
-        /* The look of the MFC landing page: slate band, white body, amber accent, no cards. */
-        body { background: #0f172a; font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; }
-        .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
-        header.site { color: #ffffff; }
-        header.site .brand { display: flex; align-items: center; gap: 16px; padding: 24px 0 8px; font-weight: 700; font-size: 22px; text-decoration: none; color: #ffffff; }
-        header.site .brand img { height: 24px; }
-        header.site nav { display: flex; flex-wrap: wrap; gap: 0 28px; padding-bottom: 20px; }
-        header.site nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 17px; padding: 12px 2px; border-bottom: 2px solid #ffffff; }
-        header.site nav a:hover, header.site nav a[aria-current="page"] { border-bottom-color: #fbbf24; }
-        main { max-width: none; margin: 0; padding: 32px 0 48px; background: #ffffff; }
-        footer.site { color: #d4d4d4; font-size: 13px; padding: 28px 0; }
-        footer.site strong { color: #ffffff; } footer.site a { color: #fbbf24; text-decoration: none; }
-        h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; }
-        h2 { font-size: 20px; font-weight: 800; margin: 40px 0 6px; }
-        .seg { border: 0; border-radius: 0; gap: 20px; overflow: visible; }
-        .seg button { padding: 4px 0; border: 0; border-bottom: 2px solid transparent; font-weight: 600; color: var(--muted); }
-        .seg button + button { border-left: 0; }
-        .seg button:hover { color: var(--ink); }
-        .seg button[aria-pressed="true"] { background: none; color: var(--ink); border-bottom-color: #fbbf24; }
-        .panel, figure, .log { background: transparent; border: 0; border-top: 1px solid var(--grid); border-radius: 0; padding: 10px 0 0; }
-        .log { border-bottom: 1px solid var(--grid); padding: 0; }
-        .tiles { gap: 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
-        .tile { background: transparent; border: 0; border-radius: 0; padding: 12px 16px 12px 0; }
-        .tile .v { font-size: 24px; font-weight: 800; }
-        .tip { border-radius: 2px; box-shadow: 0 1px 4px rgba(15, 23, 42, .2); }
-        button.plain { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; font-weight: 600; }
-        input[type="search"] { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); background: transparent; padding: 4px 0; }
     </style>
+    <link rel="stylesheet" href="res/ci-pages.css">
 </head>
 <body>
-<header class="site"><div class="wrap">
-    <a class="brand" href="index.html"><img src="res/banner.png" alt="MFC"><span>Multi-Component Flow Code</span></a>
-    <nav><a href="index.html">Home</a><a href="documentation/index.html">Documentation</a><a href="benchmarks.html">Performance</a><a href="ci.html" aria-current="page">CI health</a><a href="tests.html">Test health</a></nav>
-</div></header>
+<header class="site" id="site-header"></header>
 <main><div class="wrap">
+    <p class="updated" id="updated"></p>
     <h1>CI health</h1>
     <p class="lede">What MFC's continuous integration did on the Frontier and Phoenix clusters: whether <code>master</code> passed on each
         machine and compiler, what the runs cost in node-hours, and how long jobs waited.</p>
+    <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
     <div class="controls">
         <div class="seg" id="range" role="group" aria-label="Time range">
             <button data-v="14" aria-pressed="false">14 days</button>
@@ -96,14 +69,12 @@
             <button data-v="90" aria-pressed="false">90 days</button>
         </div>
     </div>
-    <p id="status">Loading CI history&hellip;</p>
-    <div class="tiles" id="tiles"></div>
 
-    <h2>Master right now</h2>
+    <h2 id="now-h">Master right now</h2>
     <p class="note" id="green"></p>
-    <div class="panel scrollx"><table id="now"></table></div>
+    <div class="panel scrollx"><table id="now" class="sortable"></table></div>
 
-    <h2>Master, run by run</h2>
+    <h2 id="strip-h">Master, run by run</h2>
     <p class="note">Each column is one Test Suite run on <code>master</code>, oldest on the left; each row is a machine, compiler and kind of job.
         A scheduled run is the first to test every merge since the scheduled run before it, and names them.
         A run cancelled because a newer commit arrived shows grey. Hover for the commit; click to keep its links.</p>
@@ -115,7 +86,7 @@
     </ul>
     <div class="panel"><div class="strip"><div class="labels" id="rows"></div><div class="scroll" id="strip"></div></div><div class="pin" id="pin" hidden></div></div>
 
-    <h2>Node-hours per week</h2>
+    <h2 id="cost-h">Node-hours per week</h2>
     <p class="note">Node-hours of the SLURM jobs CI submitted, by what the job did or by what it was run for (a scheduled master run, a full
         pull request run, or a pull request smoke run). The line on Frontier is the weekly ceiling of the queue CI
         uses (16 nodes around the clock: 2,688). The current week is partial.</p>
@@ -136,20 +107,24 @@
     <ul class="legend" id="buildkeys"></ul>
     <div class="panel"><svg class="wide" id="builds"></svg></div>
 
-    <h2>Jobs by lane</h2>
+    <h2 id="pr-h">One pull request</h2>
+    <p class="note">Every run of a pull request that reached the clusters: which tier ran, what failed and why, and whether it was run again.</p>
+    <div class="controls"><input type="search" id="prfind" placeholder="Pull request number or words from its title" aria-label="Pull request number or title"></div>
+    <div class="panel scrollx"><table id="prruns"></table></div>
+
+    <h2 id="lanes-h">Jobs by lane</h2>
     <p class="note">Every cluster job in the range, on <code>master</code> and on pull requests. Smoke and full jobs are listed apart: a smoke job is one
         short slice of the suite. A pull request job can fail because the change is wrong, so compare lanes with each other: one lane failing much more than the rest points at the machine or the lane.</p>
-    <div class="panel scrollx"><table id="lanes"></table></div>
+    <div class="panel scrollx"><table id="lanes" class="sortable"></table></div>
+    <div id="key"></div>
 </div></main>
-<footer class="site"><div class="wrap">
-    <strong>&copy; <span id="copyright-year"></span> Spencer H. Bryngelson and Tim Colonius</strong> &middot; <a href="https://comp-physics.group/">Computational Physics Group @ Georgia Tech</a>
-</div></footer>
+<footer class="site" id="site-footer"></footer>
+<script src="res/ci-pages.js"></script>
 <script>
 "use strict";
-document.getElementById("copyright-year").textContent = new Date().getFullYear();
+MFCCI.chrome("ci.html");
 // Written by .github/workflows/ci-record.yml (one line per run, a file per month) and, for SLURM
 // accounting from before that recorder existed, usage.jsonl (one line per day, cluster and kind).
-const BASE = "https://raw.githubusercontent.com/MFlowCode/MFC-ci-data/main/";
 const RUN_URL = (run, job) => `https://github.com/MFlowCode/MFC/actions/runs/${run}${job ? `/job/${job}` : ""}`;
 const CAP = 2688;                                                    // Frontier: 16 nodes x 168 h
 const LANES = { "frontier-gpu-acc": "Frontier · CCE · OpenACC", "frontier-gpu-omp": "Frontier · CCE · OpenMP", "frontier_amd-gpu-omp": "Frontier · AMD · OpenMP",
@@ -161,7 +136,8 @@ const TIERS = [["sched", "Scheduled master", "var(--s1)"], ["full", "Pull reques
 const tierOf = (r, j) => r.master ? (r.event === "schedule" ? "sched" : "merge") : j.m === "smoke" ? "smoke" : "full";
 const WORST = ["success", "cancelled", "timed_out", "failure"], COLOR = { success: "var(--good)", failure: "var(--critical)", timed_out: "var(--serious)", cancelled: "var(--idle)" };
 
-const state = { days: 30, cluster: "frontier", split: "kind", runs: [], usage: [], builds: [] };
+const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 30, cluster: MFCCI.param("cluster") === "phoenix" ? "phoenix" : "frontier",
+                split: MFCCI.param("split") === "tier" ? "tier" : "kind", runs: [], usage: [], builds: [] };
 const $ = id => document.getElementById(id);
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
@@ -202,52 +178,37 @@ function daily() {
 }
 const weekOf = d => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() - (t.getUTCDay() + 6) % 7); return t.toISOString().slice(0, 10); };
 
-function tiles(rows) {
-    const master = masterRuns().filter(r => r.t >= since() && r.worst !== "cancelled");
-    const green = master.filter(r => r.worst === "success").length;
+function headline(rows) {
+    const status = MFCCI.laneStatus(state.runs), ok = status.rows.filter(r => r.ok).length, n = status.rows.length;
+    const master = masterRuns().filter(r => r.t >= since() && r.worst !== "cancelled"), green = master.filter(r => r.worst === "success").length;
     const week = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
-    const nh = rows.filter(u => u.cluster === "frontier" && u.date >= week).reduce((a, u) => a + u.nh, 0);
+    const nh = rows.filter(u => u.cluster === "frontier" && u.date >= week).reduce((a, u) => a + u.nh, 0), share = nh / CAP;
     const waits = state.runs.filter(r => r.t >= Date.now() - 7 * 864e5).flatMap(r => r.jobs.map(j => j.w).filter(w => w !== null));
     const prs = state.runs.filter(r => r.t >= Date.now() - 7 * 864e5 && !r.master && r.workflow === "test");
     const smoke = prs.filter(r => r.jobs.every(j => j.m === "smoke")).length;
-    const tile = (k, v, s) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
-    $("tiles").innerHTML =
-        tile("Master runs fully green", master.length ? `${Math.round(100 * green / master.length)}%` : "–", `${green} of ${master.length} finished runs, last ${state.days} days`)
-        + tile("Frontier node-hours, last 7 days", Math.round(nh).toLocaleString(), `${Math.round(100 * nh / CAP)}% of the ${CAP.toLocaleString()} ceiling`)
-        + tile("Wait for a runner, last 7 days", dur(med(waits)), `median over ${waits.length.toLocaleString()} cluster jobs`)
-        + tile("Pull request runs on clusters, last 7 days", prs.length.toLocaleString(), `${(prs.length - smoke).toLocaleString()} full, ${smoke.toLocaleString()} smoke only`);
+    const part = (href, label, dot, text) => `<a href="${href}"><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
+    $("statusline").innerHTML =
+        part("#now-h", "Master now", !n ? "idle" : ok === n ? "good" : "bad", n ? `passing on ${ok} of ${n} lanes` : "no runs on record")
+        + part("#strip-h", `Master runs fully green, ${state.days} days`, "", master.length ? `${green} of ${master.length}` : "–")
+        + part("#cost-h", "Frontier node-hours, 7 days", share >= 0.9 ? "bad" : share >= 0.7 ? "warn" : "good", `${Math.round(nh).toLocaleString()} of ${CAP.toLocaleString()} (${Math.round(100 * share)}%)`)
+        + part("#lanes-h", "Wait for a runner, 7 days", "", dur(med(waits)))
+        + part("#lanes-h", "Pull request runs on clusters, 7 days", "", `${(prs.length - smoke).toLocaleString()} full, ${smoke.toLocaleString()} smoke`);
 }
 
-// Master Test Suite runs with, per row (lane and kind), the worst result among the row's latest jobs.
-function masterRuns() {
-    return state.runs.filter(r => r.master && r.workflow === "test").map(r => {
-        const last = Math.max(...r.jobs.map(j => j.a)), cells = {};
-        for (const j of r.jobs.filter(j => j.a === last || !r.jobs.some(o => o.a > j.a && o.l === j.l && o.k === j.k && o.s === j.s))) {
-            const key = `${j.l}|${j.k}`, c = cells[key] ||= { c: "success", jobs: [] };
-            c.jobs.push(j); if (WORST.indexOf(j.c) > WORST.indexOf(c.c)) c.c = j.c;
-        }
-        const all = Object.values(cells).map(c => c.c);
-        return { ...r, cells, worst: all.every(c => c === "cancelled") ? "cancelled" : all.includes("failure") ? "failure" : all.includes("timed_out") ? "timed_out" : all.includes("cancelled") ? "cancelled" : "success" };
-    });
-}
+const masterRuns = () => MFCCI.masterRuns(state.runs);
 
 // Each lane's latest result on master, since when it has been failing, and the last commit it passed.
 function now() {
-    const runs = masterRuns(), keys = [], recent = runs.filter(r => r.t >= Date.now() - 30 * 864e5);
-    for (const l in LANES) for (const k of ["test", "case-opt"]) if (recent.some(r => r.cells[`${l}|${k}`])) keys.push(`${l}|${k}`);
-    const commit = r => `<a href="https://github.com/MFlowCode/MFC/commit/${r.sha}" target="_blank" rel="noopener"><code>${r.sha.slice(0, 7)}</code></a>`
-        + (r.pr ? ` <a href="https://github.com/MFlowCode/MFC/pull/${r.pr}" target="_blank" rel="noopener">#${r.pr}</a>` : "") + ` · ${day(r.t)}`;
-    const allGreen = [...runs].reverse().find(r => r.worst === "success");
+    const { rows, allGreen } = MFCCI.laneStatus(state.runs);
+    const commit = r => `${MFCCI.commitLink(r.sha, r.pr)} · ${day(r.t)}`;
     $("green").innerHTML = allGreen ? `Last commit that passed on every lane: ${commit(allGreen)} ${esc(allGreen.title)}` : "No run on record passed on every lane.";
-    $("now").innerHTML = `<tr><th>Lane</th><th>Latest result</th><th>Since</th><th>Last passed</th></tr>` + keys.map(k => {
-        const [l, kind] = k.split("|"), had = runs.filter(r => r.cells[k] && r.cells[k].c !== "cancelled");   // a cancelled job gave no result
-        const last = had.at(-1), passed = [...had].reverse().find(r => r.cells[k].c === "success");
-        const firstBad = last && last.cells[k].c !== "success" ? had[passed ? had.indexOf(passed) + 1 : 0] : null;
-        const status = !last ? `<span class="none">No result on record</span>` : last.cells[k].c === "success" ? `<span class="ok">&#10003; Passing</span>`
-            : `<a class="bad" href="${RUN_URL(last.run)}" target="_blank" rel="noopener">&#10005; ${last.cells[k].c === "timed_out" ? "Timed out" : "Failing"}</a>`;
-        return `<tr><td>${LANES[l]} · ${kind === "test" ? "tests" : "case opt."}</td><td>${status}</td>`
-            + `<td>${firstBad ? `${day(firstBad.t)} (${had.length - had.indexOf(firstBad)} ${had.length - had.indexOf(firstBad) === 1 ? "run" : "runs"})` : last ? day(last.t) : "–"}</td>`
-            + `<td>${passed ? commit(passed) : "Not in the record"}</td></tr>`;
+    $("now").innerHTML = `<tr><th>Lane</th><th>Latest result</th><th>Since</th><th>Last passed</th></tr>` + rows.map(r => {
+        const c = r.last?.cells[r.key].c, failed = !r.ok && r.last ? r.last.cells[r.key].jobs.flatMap(j => j.f || []) : [];
+        const status = !r.last ? `<span class="none">No result on record</span>` : r.ok ? `<span class="ok">&#10003; Passing</span>`
+            : `<a class="bad" href="${RUN_URL(r.last.run)}" target="_blank" rel="noopener">&#10005; ${c === "timed_out" ? "Timed out" : "Failing"}</a>`
+              + (failed.length ? ` · <a href="${MFCCI.withParams(`tests.html?scope=master&find=${failed[0][0]}`)}">${failed.length} ${failed.length === 1 ? "test" : "tests"}</a>` : "");
+        return `<tr><td>${r.lane.label} · ${r.kind === "test" ? "tests" : "case opt."}</td><td>${status}</td>`
+            + `<td>${r.firstBad ? `${day(r.firstBad.t)} (${r.badRuns} ${r.badRuns === 1 ? "run" : "runs"})` : r.last ? day(r.last.t) : "–"}</td><td>${r.passed ? commit(r.passed) : "Not in the record"}</td></tr>`;
     }).join("");
 }
 
@@ -327,6 +288,7 @@ function cost(rows) {
         hit.addEventListener("pointerleave", () => show(""));
     });
     if (state.cluster === "frontier") {
+        el("rect", { x: L, y: T, width: W - L - 8, height: Math.max(y(CAP) - T, 0), fill: "#d03b3b", opacity: .07 }, svg);
         el("line", { x1: L, x2: W - 8, y1: y(CAP), y2: y(CAP), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "4 3" }, svg);
         el("text", { x: W - 10, y: y(CAP) - 5, "text-anchor": "end" }, svg).textContent = `Ceiling ${CAP.toLocaleString()}`;
     }
@@ -339,8 +301,9 @@ function lineChart(svg, ss, unit, limit) {
     ss = ss.filter(s => s.pts.length);
     const all = ss.flatMap(s => s.pts); if (!all.length) return;
     const t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t), t0 + 1), hi = Math.max(...all.map(p => p.v), limit ? limit[0] : 1, 1) * 1.08;
-    const y = axes(svg, W, H, L, B, T, hi, v => Math.round(v)), x = t => L + (t - t0) / (t1 - t0) * (W - L - 16);
-    el("text", { x: L, y: H - 6 }, svg).textContent = day(t0); el("text", { x: W - 8, y: H - 6, "text-anchor": "end" }, svg).textContent = day(t1);
+    const RM = ss.length <= 5 ? 170 : 16;                       // room on the right to name each line where it ends
+    const y = axes(svg, W, H, L, B, T, hi, v => Math.round(v)), x = t => L + (t - t0) / (t1 - t0) * (W - L - RM);
+    el("text", { x: L, y: H - 6 }, svg).textContent = day(t0); el("text", { x: x(t1), y: H - 6, "text-anchor": "end" }, svg).textContent = day(t1);
     if (limit) {
         el("line", { x1: L, x2: W - 8, y1: y(limit[0]), y2: y(limit[0]), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "4 3" }, svg);
         el("text", { x: W - 10, y: y(limit[0]) - 5, "text-anchor": "end" }, svg).textContent = limit[1];
@@ -349,8 +312,15 @@ function lineChart(svg, ss, unit, limit) {
         el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(""), fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round" }, svg);
         const end = s.pts.at(-1); el("circle", { cx: x(end.t), cy: y(end.v), r: 4, fill: s.color, stroke: "var(--surface)", "stroke-width": 2 }, svg);
     }
+    if (RM > 16) {                                              // labels, nudged apart where lines end close together
+        const ends = ss.map(s => ({ s, at: y(s.pts.at(-1).v) })).sort((a, b) => a.at - b.at);
+        for (let i = 1; i < ends.length; i++) ends[i].at = Math.max(ends[i].at, ends[i - 1].at + 13);
+        for (const e of ends) { const end = e.s.pts.at(-1);
+            el("line", { x1: x(end.t) + 5, x2: W - RM + 22, y1: y(end.v), y2: e.at, stroke: e.s.color, "stroke-width": 1, opacity: .5 }, svg);
+            el("text", { x: W - RM + 26, y: e.at + 4, style: "fill:var(--ink);font-size:12px" }, svg).textContent = `${e.s.label} · ${Math.round(end.v)} ${unit}`; }
+    }
     const cross = el("line", { y1: T, y2: H - B, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" }, svg), show = tipOn(svg.closest(".panel"));
-    const hit = el("rect", { x: L, y: T, width: W - L - 8, height: H - T - B, fill: "transparent" }, svg), times = [...new Set(all.map(p => p.t))];
+    const hit = el("rect", { x: L, y: T, width: W - L - RM, height: H - T - B, fill: "transparent" }, svg), times = [...new Set(all.map(p => p.t))];
     hit.addEventListener("pointermove", e => {
         const box = svg.getBoundingClientRect(), px = (e.clientX - box.left) / box.width * W, t = times.reduce((a, b) => Math.abs(x(b) - px) < Math.abs(x(a) - px) ? b : a);
         cross.setAttribute("x1", x(t)); cross.setAttribute("x2", x(t)); cross.setAttribute("visibility", "visible");
@@ -400,25 +370,45 @@ function lanes() {
         + rows.map(r => `<tr><td>${LANES[r.l] || r.l}</td><td>${r.kind}</td><td>${r.mode}</td><td>${r.n.toLocaleString()}</td><td${r.done >= 20 && r.rate > 2 * typical(r.mode) && r.rate > 0.1 ? ' class="bad"' : ""}>${pct(r.failed, r.done)}</td><td>${pct(r.cancelled, r.n)}</td><td>${dur(r.d)}</td><td>${dur(r.w)}</td></tr>`).join("");
 }
 
-function render() { const rows = daily(); tiles(rows); now(); strip(); cost(rows); queue(rows); builds(); lanes(); }
+// The runs of one pull request, found by number or by words from its title.
+function pull() {
+    const q = $("prfind").value.trim().toLowerCase();
+    if (!q) { $("prruns").innerHTML = `<tr><td class="none">Enter a pull request to see its runs.</td></tr>`; return; }
+    const runs = state.runs.filter(r => !r.master && (String(r.pr) === q.replace(/^#/, "") || (!/^#?\d+$/.test(q) && (r.title || "").toLowerCase().includes(q)))).sort((a, b) => b.t - a.t).slice(0, 40);
+    if (!runs.length) { $("prruns").innerHTML = `<tr><td class="none">No run of a matching pull request reached the clusters in the record.</td></tr>`; return; }
+    $("prruns").innerHTML = `<tr><th>Run</th><th>Pull request</th><th>Tier</th><th>Result on the clusters</th><th>What failed</th><th>Attempts</th></tr>` + runs.map(r => {
+        const last = Math.max(...r.jobs.map(j => j.a)), js = r.jobs.filter(j => j.a === last), bad = js.filter(j => j.c === "failure"), cancelled = js.filter(j => j.c === "cancelled").length;
+        const why = bad.map(j => `<a href="${RUN_URL(r.run, j.id)}" target="_blank" rel="noopener">${LANES[j.l] || j.l} ${j.k}${j.s ? ` [${j.s}]` : ""}</a>: ${j.why || "not read"}`
+            + ((j.f || []).length ? ` (<a href="${MFCCI.withParams(`tests.html?scope=all&find=${j.f[0][0]}`)}">${j.f.length} ${j.f.length === 1 ? "test" : "tests"}</a>)` : "")).join("<br>");
+        return `<tr><td><a href="${RUN_URL(r.run)}" target="_blank" rel="noopener">${day(r.t)}</a> · ${r.workflow === "bench" ? "benchmark" : "tests"}</td>`
+            + `<td style="white-space:normal;text-align:left">${r.pr ? `<a href="https://github.com/MFlowCode/MFC/pull/${r.pr}" target="_blank" rel="noopener">#${r.pr}</a> ` : ""}${esc(r.title)}</td>`
+            + `<td>${js.every(j => j.m === "smoke") ? "smoke" : "full"}</td>`
+            + `<td>${bad.length ? `<span class="bad">&#10005; ${bad.length} of ${js.length} failed</span>` : cancelled === js.length ? `<span class="none">cancelled</span>` : `<span class="ok">&#10003; ${js.length - cancelled} passed</span>${cancelled ? `, ${cancelled} cancelled` : ""}`}</td>`
+            + `<td style="white-space:normal;text-align:left">${why || "–"}</td><td>${last}</td></tr>`;
+    }).join("");
+}
+
+function render() { const rows = daily(); headline(rows); now(); pull(); strip(); cost(rows); queue(rows); builds(); lanes(); }
 
 for (const [id, key, cast] of [["range", "days", Number], ["cluster", "cluster", String], ["split", "split", String]]) {
     $(id).addEventListener("click", e => {
         const b = e.target.closest("button"); if (!b) return;
         state[key] = cast(b.dataset.v);
+        MFCCI.param(id, b.dataset.v); if (id === "range") MFCCI.chrome("ci.html");
         for (const o of $(id).children) o.setAttribute("aria-pressed", o === b);
         render();
     });
 }
 
-const lines = text => text.split("\n").filter(Boolean).map(l => JSON.parse(l));
-const get = path => fetch(BASE + path).then(r => r.ok ? r.text() : "").catch(() => "");
-const months = [0, 1, 2, 3].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return `ci/${d.toISOString().slice(0, 7)}.jsonl`; });
-Promise.all([get("usage.jsonl"), get("builds.jsonl"), ...months.map(get)]).then(([usage, built, ...ci]) => {
-    state.usage = lines(usage); state.builds = lines(built);
-    state.runs = ci.flatMap(lines).map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t);
-    if (!state.runs.length && !state.usage.length) { $("status").textContent = "No CI history is available yet."; return; }
-    $("status").textContent = state.runs.length ? `${state.runs.length.toLocaleString()} runs with cluster jobs; latest ${new Date(state.runs.at(-1).t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.${stale(state.runs.at(-1).t)}` : "";
+$("prfind").value = MFCCI.param("pr") || "";
+$("prfind").addEventListener("input", () => { MFCCI.param("pr", $("prfind").value.trim()); pull(); });
+for (const [id, key] of [["range", "days"], ["cluster", "cluster"], ["split", "split"]]) for (const o of $(id).children) o.setAttribute("aria-pressed", o.dataset.v === String(state[key]));
+Promise.all([MFCCI.load.usage(), MFCCI.load.builds(), MFCCI.load.runs()]).then(([usage, built, runs]) => {
+    state.usage = usage; state.builds = built; state.runs = runs;
+    if (!runs.length && !usage.length) { $("statusline").innerHTML = `<span class="note">No CI history is available yet.</span>`; return; }
+    MFCCI.updated($("updated"), runs.at(-1)?.t, 3);
+    MFCCI.sortable($("lanes")); MFCCI.sortable($("now"));
+    $("key").innerHTML = MFCCI.LANE_KEY;
     render();
 });
 </script>

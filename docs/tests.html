@@ -48,45 +48,17 @@
         .sw { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
         .retry { color: var(--ink-2); }
         .zero { color: var(--muted); }
-
-        /* The look of the MFC landing page: slate band, white body, amber accent, no cards. */
-        body { background: #0f172a; font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; }
-        .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
-        header.site { color: #ffffff; }
-        header.site .brand { display: flex; align-items: center; gap: 16px; padding: 24px 0 8px; font-weight: 700; font-size: 22px; text-decoration: none; color: #ffffff; }
-        header.site .brand img { height: 24px; }
-        header.site nav { display: flex; flex-wrap: wrap; gap: 0 28px; padding-bottom: 20px; }
-        header.site nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 17px; padding: 12px 2px; border-bottom: 2px solid #ffffff; }
-        header.site nav a:hover, header.site nav a[aria-current="page"] { border-bottom-color: #fbbf24; }
-        main { max-width: none; margin: 0; padding: 32px 0 48px; background: #ffffff; }
-        footer.site { color: #d4d4d4; font-size: 13px; padding: 28px 0; }
-        footer.site strong { color: #ffffff; } footer.site a { color: #fbbf24; text-decoration: none; }
-        h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; }
-        h2 { font-size: 20px; font-weight: 800; margin: 40px 0 6px; }
-        .seg { border: 0; border-radius: 0; gap: 20px; overflow: visible; }
-        .seg button { padding: 4px 0; border: 0; border-bottom: 2px solid transparent; font-weight: 600; color: var(--muted); }
-        .seg button + button { border-left: 0; }
-        .seg button:hover { color: var(--ink); }
-        .seg button[aria-pressed="true"] { background: none; color: var(--ink); border-bottom-color: #fbbf24; }
-        .panel, figure, .log { background: transparent; border: 0; border-top: 1px solid var(--grid); border-radius: 0; padding: 10px 0 0; }
-        .log { border-bottom: 1px solid var(--grid); padding: 0; }
-        .tiles { gap: 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
-        .tile { background: transparent; border: 0; border-radius: 0; padding: 12px 16px 12px 0; }
-        .tile .v { font-size: 24px; font-weight: 800; }
-        .tip { border-radius: 2px; box-shadow: 0 1px 4px rgba(15, 23, 42, .2); }
-        button.plain { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; font-weight: 600; }
-        input[type="search"] { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); background: transparent; padding: 4px 0; }
     </style>
+    <link rel="stylesheet" href="res/ci-pages.css">
 </head>
 <body>
-<header class="site"><div class="wrap">
-    <a class="brand" href="index.html"><img src="res/banner.png" alt="MFC"><span>Multi-Component Flow Code</span></a>
-    <nav><a href="index.html">Home</a><a href="documentation/index.html">Documentation</a><a href="benchmarks.html">Performance</a><a href="ci.html">CI health</a><a href="tests.html" aria-current="page">Test health</a></nav>
-</div></header>
+<header class="site" id="site-header"></header>
 <main><div class="wrap">
+    <p class="updated" id="updated"></p>
     <h1>Test health</h1>
     <p class="lede">Which test cases failed or needed a retry on the Frontier and Phoenix clusters, by compiler and offload model, and what
         made cluster test jobs fail when it was not a test.</p>
+    <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
     <div class="controls">
         <div class="seg" id="range" role="group" aria-label="Time range">
             <button data-v="14" aria-pressed="false">14 days</button>
@@ -98,15 +70,13 @@
             <button data-v="all" aria-pressed="false">Master and pull requests</button>
         </div>
     </div>
-    <p id="status">Loading test history&hellip;</p>
-    <div class="tiles" id="tiles"></div>
 
-    <h2>Why test jobs failed</h2>
+    <h2 id="why-h">Why test jobs failed</h2>
     <p class="note">Each failed cluster test job, by what failed. Only the first column is about MFC's tests; the rest is the build, the
         machine or the CI plumbing. <a href="#how">What each cause means</a>.</p>
-    <div class="panel"><table id="why"></table></div>
+    <div class="panel"><table id="why" class="sortable"></table></div>
 
-    <h2>Test cases by lane</h2>
+    <h2 id="cases-h">Test cases by lane</h2>
     <p class="note">Each test case that failed (&#10005;) or passed only on a retry (&#8635;), and on which lanes. A case that fails on one
         compiler or one offload model points there; one that fails everywhere points at the change. On <code>master</code> the whole suite runs,
         so the count is out of the lane's test jobs; pull request runs select tests, so there it is a plain count. Click a row for the jobs.</p>
@@ -121,7 +91,7 @@
     </div>
     <div class="panel"><table id="tests"></table></div>
 
-    <h2>How long the tests take</h2>
+    <h2 id="took-h">How long the tests take</h2>
     <p class="note">Minutes the test phase of a full-suite job took, per day (median), by lane. A Frontier test job has 1 hour 59 minutes
         in all, so a line climbing toward it means the suite is outgrowing its shards. Hover a point for its value.</p>
     <ul class="legend" id="lanekeys"></ul>
@@ -129,7 +99,7 @@
 
     <h2>Slowest test cases</h2>
     <p class="note">Median seconds, per lane, of the cases that were among the six slowest of at least three test jobs on a lane in the range.</p>
-    <div class="panel"><table id="slow"></table></div>
+    <div class="panel"><table id="slow" class="sortable"></table></div>
 
     <h2 id="how">How a cluster test job fails</h2>
     <p class="note">A test job on a cluster checks out the code on a runner on the login node, builds MFC in a SLURM job, runs the test
@@ -177,25 +147,24 @@
         <tr><td>Timeout</td><td class="tag">The case ran past the per-case time limit, usually a hang.</td><td class="tag">Sometimes.</td></tr>
         <tr><td>NaN detected</td><td class="tag">The solution became not-a-number.</td><td class="tag">No.</td></tr>
     </table></div>
+    <div id="key"></div>
 </div></main>
-<footer class="site"><div class="wrap">
-    <strong>&copy; <span id="copyright-year"></span> Spencer H. Bryngelson and Tim Colonius</strong> &middot; <a href="https://comp-physics.group/">Computational Physics Group @ Georgia Tech</a>
-</div></footer>
+<footer class="site" id="site-footer"></footer>
+<script src="res/ci-pages.js"></script>
 <script>
 "use strict";
-document.getElementById("copyright-year").textContent = new Date().getFullYear();
+MFCCI.chrome("tests.html");
 // One line per run, a file per month, written by .github/workflows/ci-record.yml. A test job carries
 // n (tests passed), f (failed: [uuid, name, error class]), r (passed on a retry) and, if it failed, why.
-const BASE = "https://raw.githubusercontent.com/MFlowCode/MFC-ci-data/main/";
 const JOB_URL = (run, job) => `https://github.com/MFlowCode/MFC/actions/runs/${run}/job/${job}`;
 const LANES = [["frontier-gpu-acc", "Frontier", "CCE", "OpenACC"], ["frontier-gpu-omp", "Frontier", "CCE", "OpenMP"], ["frontier_amd-gpu-omp", "Frontier", "AMD", "OpenMP"],
                ["phoenix-gpu-acc", "Phoenix", "NVHPC", "OpenACC"], ["phoenix-gpu-omp", "Phoenix", "NVHPC", "OpenMP"]].map(([key, machine, compiler, offload]) => ({ key, machine, compiler, offload }));
 const WHY = [["tests", "Tests"], ["build", "Build"], ["cluster", "Cluster down"], ["queue", "Never started"], ["timeout", "SLURM time limit"], ["node", "Bad node"], ["checkout", "Git checkout"], ["upload", "Artifact upload"], ["runner", "Runner"], ["other", "Other"]];
 
-const state = { days: 30, scope: "master", pattern: "", find: "", runs: [], open: null };
+const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 30, scope: MFCCI.param("scope") === "all" ? "all" : "master",
+                pattern: ["compiler", "offload", "every"].includes(MFCCI.param("pattern")) ? MFCCI.param("pattern") : "", find: MFCCI.param("find") || "", runs: [], open: null };
 const $ = id => document.getElementById(id);
 const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const stale = t => { const d = Math.floor((Date.now() - t) / 864e5); return d >= 3 ? ` The newest record is ${d} days old: the recorder may have stopped.` : ""; };
 const day = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
 // Test jobs in range and scope whose log was read (they carry n).
@@ -225,33 +194,21 @@ function render() {
                 + WHY.map(w => { const n = bad.filter(x => (x.j.why || "other") === w[0]).length; return `<td${n ? "" : ' class="zero"'}>${n || "–"}</td>`; }).join("") + `</tr>`; }).join("");
 
     // Per test: failures and retries by lane.
-    const tests = new Map(), byName = new Map();
-    const at = (uuid, name) => {
-        const key = uuid || byName.get(name) || `name:${name}`;
-        if (uuid && !name.endsWith("...")) byName.set(name, uuid);
-        const t = tests.get(key) || { key, uuid, name, lanes: new Map(), cls: new Map(), where: [] };
-        if (name.length > t.name.length || t.name.endsWith("...") && !name.endsWith("...")) t.name = name;
-        tests.set(key, t); return t;
-    };
-    for (const kind of ["f", "r"]) for (const { r, j } of js) for (const [uuid, name, cls] of j[kind] || []) {
-        const t = at(uuid, name), c = t.lanes.get(j.l) || { f: 0, r: 0 };
-        c[kind]++; t.lanes.set(j.l, c); t.cls.set(cls, (t.cls.get(cls) || 0) + 1); t.where.push({ r, j, kind });
-    }
-    let rows = [...tests.values()].map(t => {
-        const f = [...t.lanes.values()].reduce((a, c) => a + c.f, 0), r = [...t.lanes.values()].reduce((a, c) => a + c.r, 0);
+    let rows = MFCCI.testStats(state.runs, state.days, state.scope).tests.map(t => {
         const failedOn = new Set([...t.lanes].filter(([, c]) => c.f).map(([l]) => l));
-        return { ...t, f, r, pat: failedOn.size ? pattern(failedOn) : { kind: "retry", label: "Retries only" }, top: [...t.cls].sort((a, b) => b[1] - a[1])[0][0] };
-    }).sort((a, b) => b.f - a.f || b.r - a.r);
+        return { ...t, pat: failedOn.size ? pattern(failedOn) : { kind: "retry", label: "Retries only" }, top: [...t.cls].sort((a, b) => b[1] - a[1])[0][0] };
+    });
 
     const lanesHit = new Map(LANES.map(l => [l.key, rows.filter(t => t.lanes.get(l.key)?.f).length]));
     const worst = [...lanesHit].sort((a, b) => b[1] - a[1])[0], wl = LANES.find(l => l.key === worst[0]);
-    const tile = (k, v, s) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
-    const real = failed.filter(x => x.j.why === "tests").length;
-    $("tiles").innerHTML =
-        tile("Test cases that failed", rows.filter(t => t.f).length.toLocaleString(), `in ${js.length.toLocaleString()} test jobs, last ${state.days} days`)
-        + tile("Passed only on a retry", rows.filter(t => t.r).length.toLocaleString(), "test cases, at least once")
-        + tile("Failed jobs that were not tests", failed.length ? `${Math.round(100 * (failed.length - real) / failed.length)}%` : "–", `${(failed.length - real).toLocaleString()} of ${failed.length.toLocaleString()} failed test jobs`)
-        + tile("Lane with the most failing cases", worst[1] ? `${wl.compiler} · ${wl.offload}` : "–", worst[1] ? `${wl.machine}: ${worst[1]} test cases` : "no test failed");
+    const real = failed.filter(x => x.j.why === "tests").length, nf = rows.filter(t => t.f).length, nr = rows.filter(t => !t.f && t.r).length;
+    const part = (href, label, dot, text) => `<a href="${href}"><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
+    $("statusline").innerHTML =
+        part("#cases-h", `Test cases failing, ${state.scope === "master" ? "on master" : "all runs"}, ${state.days} days`, nf ? "bad" : "good", nf.toLocaleString())
+        + part("#cases-h", "Passed only on a retry", nr ? "warn" : "good", nr.toLocaleString())
+        + part("#why-h", "Failed test jobs that were not tests", "", failed.length ? `${failed.length - real} of ${failed.length}` : "none failed")
+        + part("#cases-h", "Lane with the most failing cases", "", worst[1] ? `${wl.compiler} · ${wl.offload} (${worst[1]})` : "–")
+        + part("#took-h", "Test jobs read", "", js.length.toLocaleString());
 
     const q = state.find.trim().toLowerCase();
     rows = rows.filter(t => (!state.pattern || t.pat.kind === state.pattern) && (!q || t.name.toLowerCase().includes(q) || (t.uuid || "").toLowerCase().includes(q)));
@@ -275,7 +232,7 @@ function render() {
 // Test-phase minutes of full-suite jobs per day and lane, and the slowest cases.
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
-const med = a => [...a].sort((x, y) => x - y)[a.length >> 1];
+const { med } = MFCCI;
 function durations() {
     const js = jobs(), W = 900, H = 240, L = 46, B = 24, T = 14, svg = $("took"), LIMIT = 119;
     const color = l => `var(--s${LANES.indexOf(l) + 1})`, name = l => `${l.machine} · ${l.compiler} · ${l.offload}`;
@@ -287,17 +244,23 @@ function durations() {
     svg.replaceChildren(); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     const all = ss.flatMap(s => s.pts); if (!all.length) return;
     const t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t), t0 + 1), hi = Math.max(...all.map(p => p.v), LIMIT) * 1.06;
-    const x = t => L + (t - t0) / (t1 - t0) * (W - L - 16), y = v => T + (1 - v / hi) * (H - T - B);
+    const RM = 190, x = t => L + (t - t0) / (t1 - t0) * (W - L - RM), y = v => T + (1 - v / hi) * (H - T - B);
     for (let i = 0; i <= 4; i++) { const v = hi * i / 4;
         el("line", { x1: L, x2: W - 8, y1: y(v), y2: y(v), stroke: i ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }, svg);
         el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = Math.round(v); }
-    el("text", { x: L, y: H - 6 }, svg).textContent = day(t0); el("text", { x: W - 8, y: H - 6, "text-anchor": "end" }, svg).textContent = day(t1);
+    el("text", { x: L, y: H - 6 }, svg).textContent = day(t0); el("text", { x: x(t1), y: H - 6, "text-anchor": "end" }, svg).textContent = day(t1);
+    el("rect", { x: L, y: y(LIMIT), width: W - L - 8, height: y(LIMIT - 20) - y(LIMIT), fill: "#d03b3b", opacity: .08 }, svg);
     el("line", { x1: L, x2: W - 8, y1: y(LIMIT), y2: y(LIMIT), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "4 3" }, svg);
     el("text", { x: W - 10, y: y(LIMIT) - 5, "text-anchor": "end" }, svg).textContent = "Frontier job limit, 1 h 59 min";
     for (const s of ss) {
         el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(""), fill: "none", stroke: color(s.l), "stroke-width": 2, "stroke-linejoin": "round" }, svg);
         for (const p of s.pts) el("title", {}, el("circle", { cx: x(p.t), cy: y(p.v), r: 3.5, fill: color(s.l), stroke: "var(--surface)", "stroke-width": 1 }, svg)).textContent = `${name(s.l)}, ${day(p.t)}: ${Math.round(p.v)} min (${p.n} ${p.n === 1 ? "job" : "jobs"})`;
     }
+    const ends = ss.map(s => ({ s, at: y(s.pts.at(-1).v) })).sort((a, b) => a.at - b.at);
+    for (let i = 1; i < ends.length; i++) ends[i].at = Math.max(ends[i].at, ends[i - 1].at + 13);
+    for (const e of ends) { const end = e.s.pts.at(-1);
+        el("line", { x1: x(end.t) + 5, x2: W - RM + 22, y1: y(end.v), y2: e.at, stroke: color(e.s.l), "stroke-width": 1, opacity: .5 }, svg);
+        el("text", { x: W - RM + 26, y: e.at + 4, style: "fill:var(--ink);font-size:12px" }, svg).textContent = `${e.s.l.compiler} ${e.s.l.offload} (${e.s.l.machine}) · ${Math.round(end.v)} min`; }
 
     const cases = new Map();
     for (const { j } of js) for (const [uuid, nm, secs] of j.slow || []) {
@@ -316,21 +279,22 @@ for (const [id, key, cast] of [["range", "days", Number], ["scope", "scope", Str
     $(id).addEventListener("click", e => {
         const b = e.target.closest("button"); if (!b) return;
         state[key] = cast(b.dataset.v);
+        MFCCI.param(id, b.dataset.v); if (id === "range") MFCCI.chrome("tests.html");
         for (const o of $(id).children) o.setAttribute("aria-pressed", o === b);
         render();
     });
 }
-$("find").addEventListener("input", e => { state.find = e.target.value; render(); });
+$("find").addEventListener("input", e => { state.find = e.target.value; MFCCI.param("find", state.find); render(); });
 $("tests").addEventListener("click", e => { const tr = e.target.closest("tr.test"); if (!tr || e.target.closest("a")) return; state.open = state.open === tr.dataset.k ? null : tr.dataset.k; render(); });
 
-const lines = text => text.split("\n").filter(Boolean).map(l => JSON.parse(l));
-const get = path => fetch(BASE + path).then(r => r.ok ? r.text() : "").catch(() => "");
-const months = [0, 1, 2, 3].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return `ci/${d.toISOString().slice(0, 7)}.jsonl`; });
-Promise.all(months.map(get)).then(ci => {
-    state.runs = ci.flatMap(lines).map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t);
-    const read = state.runs.reduce((a, r) => a + r.jobs.filter(j => j.k === "test" && j.n !== undefined).length, 0);
-    if (!read) { $("status").textContent = "No test history is available yet."; return; }
-    $("status").textContent = `${read.toLocaleString()} cluster test jobs read; latest ${new Date(state.runs.at(-1).t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.${stale(state.runs.at(-1).t)}`;
+for (const [id, key] of [["range", "days"], ["scope", "scope"], ["pattern", "pattern"]]) for (const o of $(id).children) o.setAttribute("aria-pressed", o.dataset.v === String(state[key]));
+$("find").value = state.find;
+MFCCI.load.runs().then(runs => {
+    state.runs = runs;
+    if (!runs.some(r => r.jobs.some(j => j.k === "test" && j.n !== undefined))) { $("statusline").innerHTML = `<span class="note">No test history is available yet.</span>`; return; }
+    MFCCI.updated($("updated"), runs.at(-1).t, 3);
+    MFCCI.sortable($("why")); MFCCI.sortable($("slow"));
+    $("key").innerHTML = MFCCI.LANE_KEY;
     render();
 });
 </script>
