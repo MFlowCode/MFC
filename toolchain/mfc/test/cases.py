@@ -5914,6 +5914,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stiff = {"amr_regrid_int": 0, "fluid_pp(1)%eos": "stiffened_gas", "fluid_pp(1)%gamma": 1.0 / 3.4, "fluid_pp(1)%pi_inf": 4.4 * 10.0 / 3.4}
         stiff.update({"patch_icpp(2)%x_centroid": 0.175, "patch_icpp(2)%length_x": 0.15, "patch_icpp(3)%x_centroid": 0.625, "patch_icpp(3)%length_x": 0.75})
         cases.append(define_case_d(stack, "stiffened gas at a static block face", stiff))
+        # the subcycled state reflux takes alpha from the step-start state
+        cases.append(define_case_d(stack, "stiffened gas at a static block face -> subcycle", {**stiff, "amr_subcycle": "T"}))
         stack.pop()
 
         # hypoelasticity: 1D hypoelastic shock config on a static 2:1 block; the fine swap recomputes the

@@ -57,8 +57,10 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. A
   volume fraction's flux pairs with an \f$\alpha\,\nabla\cdot u\f$ source on the same faces, so the registers also hold
   the face velocity and the volume fractions' reflux corrects both: uniform \f$\alpha\f$ stays uniform, and a material
-  interface on a block face keeps pressure and velocity equilibrium (HLLC, HLL with `hll_u_interface`, exact and LF; HLL
-  Method 1 refluxes the flux alone). Each covered coarse cell is then set to the average of its fine children.
+  interface on a block face keeps pressure and velocity equilibrium (HLLC, HLL with `hll_u_interface` and LF, with two or
+  more fluids). Not corrected: the `alt_soundspeed` \f$K\,\nabla\cdot u\f$ term, HLL Method 1 (its flux alone is refluxed),
+  and the 6-equation internal energies' \f$\alpha_k p\,\nabla\cdot u\f$. Each covered coarse cell is then set to the average
+  of its fine children.
 
 ## Conservation and accuracy {#amr-conservation}
 

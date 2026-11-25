@@ -30,7 +30,7 @@ module m_amr_registers
     !! stepper's rk_c.
     real(wp), allocatable :: amr_rk_w(:), amr_rk_c(:)
 
-    !> Registers for the two block faces normal to one direction: (1:sys_size, transverse-1, transverse-2, slot).
+    !> Registers for the two block faces normal to one direction: (1:amr_nreg, transverse-1, transverse-2, slot).
     type t_face_reg
         real(wp), allocatable :: lo(:,:,:,:)
         real(wp), allocatable :: hi(:,:,:,:)
@@ -44,7 +44,7 @@ module m_amr_registers
     integer, parameter :: amr_reg_floor = 64  !< initial slot capacity; growth doubles from here
     integer            :: amr_reg_cap = 0
     !> Register channels: sys_size fluxes, plus the face-normal interface velocity when the volume fractions carry an alpha*div(u)
-    !! source (adv_src_mode_vel_iface), so their reflux can correct that source too (amr_reg_u).
+    !! source (adv_src_mode_vel_iface) and vary (num_fluids > 1), so their reflux can correct that source too (amr_reg_u).
     integer :: amr_nreg = 0, amr_reg_u = 0
     integer :: rc(3), rf(3)  !< coarse / fine transverse extents (creg is 0:rc-1, freg is 0:rf)
     !> Mesh-epoch and block-count keys of the last s_amr_reg_prepare build.
@@ -286,7 +286,8 @@ contains
         rf = merge(amr_ref_ratio*rc - 1, 0, amr_dim)
         amr_reg_cap = min(amr_max_blocks, amr_reg_floor)
         amr_nreg = sys_size; amr_reg_u = 0
-        if (adv_src_mode == adv_src_mode_vel_iface .and. eqn_idx%adv%end >= eqn_idx%adv%beg .and. eqn_idx%adv%beg >= 1) then
+        ! one fluid: alpha = 1 and its flux is the face velocity, so the correction is zero
+        if (adv_src_mode == adv_src_mode_vel_iface .and. num_fluids > 1 .and. eqn_idx%adv%beg >= 1) then
             amr_nreg = sys_size + 1; amr_reg_u = sys_size + 1
         end if
         #:for D, A, B in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
@@ -436,7 +437,15 @@ contains
             $:GPU_UPDATE(device='[bcap(:, 1:nb, 0)]')
         end if
         m1 = bmax(1, set); m2 = bmax(2, set)
-        call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, sys_size, 0)
+        if (adv_src_mode == adv_src_mode_vel_iface .and. amr_reg_u == 0 .and. eqn_idx%adv%beg >= 1 &
+            & .and. eqn_idx%adv%end >= eqn_idx%adv%beg) then
+            ! one fluid: alpha = 1 stays 1 only if its flux (the face velocity) is not refluxed (#2473), so its rows stay zero
+            call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, eqn_idx%adv%beg - 1, 0)
+            if (eqn_idx%adv%end < sys_size) call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, &
+                & eqn_idx%adv%end + 1, sys_size, 0)
+        else
+            call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, sys_size, 0)
+        end if
         ! the volume fractions' alpha*div(u) source rides on this face velocity; the apply corrects it with the flux
         if (amr_reg_u > 0) call s_amr_capture_batch(set, nb, id, fine, .false., cf, acc, m1, m2, eqn_idx%adv%beg, &
             & eqn_idx%adv%beg, amr_reg_u - eqn_idx%adv%beg)
@@ -625,7 +634,8 @@ contains
                                 end do
                                 fb = fb/real(nch, wp)
                                 if (side == 0) then
-                                    ! du = ubar_fine - u_coarse; fb absorbs alpha*du so one update carries both corrections
+                                    ! du sums the nch fine face velocities; fb absorbs alpha*(du/nch - u_coarse) so one update
+                                    ! carries both corrections
                                     if (eq >= ab .and. eq <= ae) fb = fb - q_src(eq)%sf(${IDX}$)*(du/real(nch, &
                                         & wp) - creg(${D}$)%lo(iu, c1, c2, k))
                                     rhs_vf(eq)%sf(${IDX}$) = rhs_vf(eq)%sf(${IDX}$) + (creg(${D}$)%lo(eq, c1, c2, &
