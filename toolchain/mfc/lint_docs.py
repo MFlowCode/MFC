@@ -36,6 +36,10 @@ DOCS = [
     "docs/documentation/validation_moving_body_budget.md",
     "docs/documentation/validation_sphere_drag_nu.md",
     "docs/documentation/validation_standoff.md",
+    "docs/documentation/validation_multiphase_riemann.md",
+    "docs/documentation/validation_bubbles.md",
+    "docs/documentation/validation_surface_tension.md",
+    "docs/documentation/validation_interface_instabilities.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]
