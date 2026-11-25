@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
+"""Hypoelastic water shock tube; check_elastic.py compares it with linear elastodynamics (best with a small --pL)."""
+
+import argparse
 import json
 import math
 
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default={})
+parser.add_argument("-N", type=int, default=202, help="Cells (dt scales with 202 / N)")
+parser.add_argument("--pL", type=float, default=1.0e8, help="Left pressure [Pa] (right: 1e5 Pa)")
+args = parser.parse_args()
+
 # Numerical setup
-Nx = 201
+Nx = args.N - 1
 dx = 1.0 / (1.0 * (Nx + 1))
 
 Tend = 64e-06
-Nt = 200
+Nt = 200 * args.N // 202
 mydt = Tend / (1.0 * Nt)
 
 # Configuring case dictionary
@@ -59,7 +68,7 @@ print(
             "patch_icpp(1)%x_centroid": 0.25,
             "patch_icpp(1)%length_x": 0.5,
             "patch_icpp(1)%vel(1)": 0.0,
-            "patch_icpp(1)%pres": 1.0e8,
+            "patch_icpp(1)%pres": args.pL,
             "patch_icpp(1)%alpha_rho(1)": 1000,
             "patch_icpp(1)%alpha(1)": 1.0,
             "patch_icpp(1)%tau_e(1)": 0.0,

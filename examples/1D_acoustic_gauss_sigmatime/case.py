@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
+"""Gaussian acoustic pulse from a 1D planar source in water; check_acoustic.py compares it with linear acoustics."""
+
+import argparse
 import json
 
-# Configuring case dictionary
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default={})
+parser.add_argument("-N", type=int, default=200, help="Cells (dt and steps scale with it to keep the CFL number and end time)")
+parser.add_argument("--stretch", type=float, default=0.0, help="a_x of a stretched grid clustered on 0.3-0.6 mm (0: uniform)")
+args = parser.parse_args()
+
+r = args.N / 200
+# The stretched grid ends past x = 1 mm (about 1.7 mm at a_x = 4), so the patch then covers 0-10 mm
+stretch = {"stretch_x": "T", "a_x": args.stretch, "x_a": 0.0003, "x_b": 0.0006, "loops_x": 1, "patch_icpp(1)%x_centroid": 0.005, "patch_icpp(1)%length_x": 0.01} if args.stretch > 0 else {}
+
 print(
     json.dumps(
         {
@@ -10,13 +22,13 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": 0.0,
             "x_domain%end": 0.001,
-            "m": 199,
+            "m": args.N - 1,
             "n": 0,
             "p": 0,
-            "dt": 2e-9,
+            "dt": 2e-9 / r,
             "t_step_start": 0,
-            "t_step_stop": 250,
-            "t_step_save": 1,
+            "t_step_stop": round(250 * r),
+            "t_step_save": round(r),
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": "5eq",
@@ -65,6 +77,7 @@ print(
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00),
+            **stretch,
         }
     )
 )
