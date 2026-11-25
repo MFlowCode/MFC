@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
+"""Water-air shock tube (Kapila et al. two-phase model): 1e9 Pa water against 1e5 Pa air. check_riemann.py compares it with the exact solution."""
+
+import argparse
 import json
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
+parser.add_argument("-N", type=int, default=1000, help="Cells (default 1000); dt scales with 1/N at a fixed end time.")
+args = parser.parse_args()
+
+t_end = 6025 * 4.0e-08
+Nt = round(6025 * args.N / 1000)
 
 # Configuring case dictionary
 print(
@@ -10,13 +21,13 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": 0.0e00,
             "x_domain%end": 1.0e00,
-            "m": 999,
+            "m": args.N - 1,
             "n": 0,
             "p": 0,
-            "dt": 4.0e-08,
+            "dt": t_end / Nt,
             "t_step_start": 0,
-            "t_step_stop": 6025,
-            "t_step_save": 100,
+            "t_step_stop": Nt,
+            "t_step_save": max(1, Nt // 60),
             # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": "5eq",

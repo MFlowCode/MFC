@@ -13,6 +13,7 @@ Separate pages: @ref validation_wall_order_couette "Wall-normal ghost velocity a
 Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
 Gas-dynamics pages: @ref validation_shock_tubes "Shock tubes" (Sod, Lax, 123 and Shu-Osher), @ref validation_vortex_order "Vortex order of accuracy" (isentropic vortex, Taylor-Green decay), @ref validation_blast "Circular blast wave".
 Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
+Multiphase pages: @ref validation_multiphase_riemann "Two-fluid flows" (water-air shock tube, interface advection, phase-change equilibrium), @ref validation_bubbles "Bubble dynamics" (Keller-Miksis collapse), @ref validation_surface_tension "Surface tension" (Laplace pressure jump), @ref validation_interface_instabilities "Interface instabilities" (viscous Rayleigh-Taylor growth rate).
 
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
@@ -164,6 +165,22 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 ## Bow-shock stand-off {#sec-validation-standoff}
 
 **Status:** open discrepancy (resolution-limited). **Example:** `examples/2D_ibm_cylinder_standoff`. The detached-shock distance of a cylinder and a sphere at Mach 1.5-3 against Billig's correlation and a body-fitted Euler solution. Results and limits: @ref validation_standoff.
+
+## Two-fluid shock tube, interface advection and phase-change equilibrium {#sec-validation-multiphase-riemann}
+
+**Status:** shock tube validated; interface advection and phase-change equilibrium partially validated. **Examples:** `examples/1D_kapilashocktube`, `examples/2D_advection`, `examples/1D_exp_tube_phasechange`. A water-air shock tube against the exact two-material Riemann solution (first order in pressure, contact within 0.02 cells), a water disk advected through a periodic box (pressure equilibrium to 3e-6 at 100 cells and above; open: 2.5e-3 at 50 and 64 cells), and the p-T-Gibbs equilibrium of a relaxed expansion (within 7e-4 K of saturation). Results and limits: @ref validation_multiphase_riemann.
+
+## Bubble dynamics {#sec-validation-bubbles}
+
+**Status:** validated (Euler-Euler, one bubble size, polytropic gas). **Example:** `examples/0D_bubblecollapse_adap`. The radius of a collapsing bubble in a uniform bubbly liquid against the Keller-Miksis ODE (9e-5 R0 when driven by the same mixture pressure) and the collapse time against Rayleigh's (1.04 t_c). Results and limits: @ref validation_bubbles.
+
+## Surface tension {#sec-validation-surface-tension}
+
+**Status:** validated (static 2D drop). **Example:** `examples/2D_laplace_pressure_jump`. The Laplace pressure jump of a drop against sigma/R (0.01 % at 20 cells per radius, within 0.3 % at 40) and the spurious currents (about 20 % of the capillary speed). Results and limits: @ref validation_surface_tension.
+
+## Interface instabilities {#sec-validation-interface-instabilities}
+
+**Status:** validated (viscous Rayleigh-Taylor, one wavelength). **Example:** `examples/2D_rayleigh_taylor`. The early growth rate of a viscous Rayleigh-Taylor mode against the linearized Navier-Stokes eigenvalue for the same density and viscosity profiles (-1.1 %, -0.8 %, -0.7 % at 32, 64 and 100 cells per wavelength). Kelvin-Helmholtz is not checked. Results and limits: @ref validation_interface_instabilities.
 
 ## Acoustic sources {#sec-validation-acoustics}
 

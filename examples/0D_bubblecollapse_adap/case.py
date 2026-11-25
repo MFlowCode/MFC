@@ -1,6 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+"""Collapse of a uniform bubbly mixture (Keller-Miksis, one bubble size) at 1000 times the bubble pressure; check_collapse.py compares R(t) with the Keller-Miksis ODE."""
+
+import argparse
 import json
 import math
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
+parser.add_argument("--dt", type=float, default=1.0e-4, help="Time step and save interval in R0/sqrt(p0/rho0) (default 1e-4).")
+parser.add_argument("--adap-tol", type=float, default=1.0e-4, help="adap_dt_tol of the bubble sub-steps (default 1e-4).")
+args = parser.parse_args()
 
 # FLUID PROPERTIES
 # Water
@@ -47,9 +56,9 @@ L = 20.0e-03  # [m]
 
 # TIME STEPS
 Tfinal = 1.5 * tc / t0
-Nt = int(5e2 + 1)
+Nt = round(501 * 1.0e-4 / args.dt)
 t_save = 1
-dt = 0.0001
+dt = args.dt
 
 # Configuring case dictionary
 print(
@@ -114,7 +123,7 @@ print(
             "bub_pp%gam_g": gam_g,
             "adv_n": "T",
             "adap_dt": "T",
-            "adap_dt_tol": 1e-4,
+            "adap_dt_tol": args.adap_tol,
             "adap_dt_max_iters": 10000,
             "polytropic": "T",
             "thermal": 1,

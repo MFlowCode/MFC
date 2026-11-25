@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
+"""Viscous Rayleigh-Taylor instability, heavy fluid (3 kg/m^3) over light (1 kg/m^3); check_rt.py compares the early growth with linear theory."""
+
+import argparse
 import json
 import math
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
+parser.add_argument("-N", type=int, default=200, help="Cells across one wavelength (default 200); the domain is 6 wavelengths tall.")
+parser.add_argument("--tend", type=float, default=2.0, help="End time [s] (default 2).")
+parser.add_argument("--saves", type=int, default=100, help="Number of saves (default 100).")
+args = parser.parse_args()
 
 lam = 0.2
 h = 1.2
@@ -13,8 +23,8 @@ x1 = lam / 2
 y0 = 0.0
 y1 = h
 
-Nx = 199
-Ny = 1199
+Nx = args.N - 1
+Ny = 6 * args.N - 1
 
 eps = 1e-6
 
@@ -23,8 +33,8 @@ c = math.sqrt(1.4 * 1e5 / 1)
 cfl = 0.5
 dt = cfl * dx / c
 
-Nt = math.ceil(2 / dt)
-Ns = math.ceil(Nt / 100)
+Nt = math.ceil(args.tend / dt)
+Ns = math.ceil(Nt / args.saves)
 
 # Configuration case dictionary
 data = {

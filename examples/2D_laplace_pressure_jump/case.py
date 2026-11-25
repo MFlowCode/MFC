@@ -4,8 +4,16 @@
 # and r is the radius of the droplet. The results of this simulation agree with theory to well within 1%
 # relative error.
 
+import argparse
 import json
 import math
+
+parser = argparse.ArgumentParser(description="Laplace pressure jump of a 2D drop (quarter domain); check_laplace.py compares it with sigma/R.")
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
+parser.add_argument("-N", type=int, default=50, help="Cells per direction (default 50); dt scales with 1/N.")
+parser.add_argument("--tend", type=float, default=0.5, help="End time [s] (default 0.5).")
+parser.add_argument("--saves", type=int, default=100, help="Number of saves (default 100).")
+args = parser.parse_args()
 
 l = 0.375
 
@@ -16,12 +24,13 @@ x1 = l
 y0 = 0
 y1 = l
 
-Nx = 49
-Ny = 49
+Nx = args.N - 1
+Ny = args.N - 1
 
 eps = 1e-9
 
-mydt = 5e-6
+mydt = 5e-6 * 50 / args.N
+Nt = round(args.tend / mydt)
 
 # Configuration case dictionary
 data = {
@@ -38,8 +47,8 @@ data = {
     "cyl_coord": "F",
     "dt": mydt,
     "t_step_start": 0,
-    "t_step_stop": 100000,
-    "t_step_save": 1000,
+    "t_step_stop": Nt,
+    "t_step_save": max(1, Nt // args.saves),
     # Simulation Algorithm
     "model_eqns": "6eq",
     "alt_soundspeed": "F",
