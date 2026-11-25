@@ -774,8 +774,8 @@ contains
                     q_prim_vf(eqn_idx%mom%beg)%sf(i, j, 0) = U0*sin(g%x_cc(i)/L0)*cos(g%y_cc(j)/L0)
                     q_prim_vf(eqn_idx%mom%end)%sf(i, j, 0) = -U0*cos(g%x_cc(i)/L0)*sin(g%y_cc(j)/L0)
                     q_prim_vf(eqn_idx%E)%sf(i, j, &
-                              & 0) = patch_icpp(patch_id)%pres + (cos(2*g%x_cc(i))/L0 + cos(2*g%y_cc(j))/L0)*(q_prim_vf(1)%sf(i, &
-                              & j, 0)*U0*U0)/16
+                              & 0) = patch_icpp(patch_id)%pres + (cos(2._wp*g%x_cc(i)/L0) + cos(2._wp*g%y_cc(j)/L0)) &
+                              & *q_prim_vf(1)%sf(i, j, 0)*U0*U0/4._wp
                 end if
             end do
         end do
