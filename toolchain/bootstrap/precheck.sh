@@ -125,8 +125,13 @@ PID_PARAM_DOCS=$!
 # Example case validation - validate ALL cases in ONE process (validate accepts multiple files) instead of a
 # per-case './mfc.sh validate' loop. Each invocation re-paid the mfc.sh/venv bootstrap (~2.4s), which dominated
 # (~90%) the ~6 min serial loop over 155 cases; batching drops it to well under a minute.
+# Every example directory holds its deck as case.py, so the glob below sees it (scaling/ is a benchmark harness).
 (
-    if ./mfc.sh validate examples/*/case.py > /dev/null 2>&1; then
+    missing=$(git ls-files 'examples/*/*' | cut -d/ -f2 | sort -u | while read -r d; do
+        [ -f "examples/$d/case.py" ] || [ "$d" = scaling ] || echo "examples/$d"
+    done)
+    if [ -n "$missing" ]; then echo "No case.py in: $missing" > "$TMPDIR_PC/examples_missing"; fi
+    if [ -z "$missing" ] && ./mfc.sh validate examples/*/case.py > /dev/null 2>&1; then
         echo "0" > "$TMPDIR_PC/examples_exit"
     else
         echo "1" > "$TMPDIR_PC/examples_exit"
@@ -200,6 +205,7 @@ EXAMPLES_FAILED=$(cat "$TMPDIR_PC/examples_exit" 2>/dev/null || echo "1")
 if [ "$EXAMPLES_FAILED" = "0" ]; then
     ok "All example cases are valid."
 else
+    [ -f "$TMPDIR_PC/examples_missing" ] && error "$(cat "$TMPDIR_PC/examples_missing") (name the deck case.py)."
     error "Example case validation failed. Run$MAGENTA ./mfc.sh validate examples/\*/case.py$COLOR_RESET for the failing case(s)."
     FAILED=1
 fi
