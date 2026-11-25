@@ -3349,7 +3349,8 @@ contains
 
     end subroutine s_interpolation_weights
 
-    !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
+    !> Interpolate primitive variables to a ghost point's image point with the precomputed interp_coeffs: inverse-distance weights
+    !! over the 2x2(x2) cell (ib_ip_interp = 1) or TSC weights over 3x3(x3) cells (ib_ip_interp = 2)
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
                                          & nmom_IP, pb_in, mv_in, presb_IP, massv_IP, Ys_IP)
         $:GPU_ROUTINE(parallelism='[seq]')

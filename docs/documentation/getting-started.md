@@ -227,13 +227,13 @@ For more options, see @ref visualization "Flow Visualization" or run `./mfc.sh v
 
 ### Parameter Lookup
 
-MFC has over 3,000 case parameters. Use the `params` command to search and explore them:
+MFC has over 4,000 case parameters. Use the `params` command to search and explore them:
 
 ```shell
 ./mfc.sh params dt          # Search for parameters matching "dt"
 ./mfc.sh params -d dt       # Show parameter with description
 ./mfc.sh params patch       # Find all patch-related parameters
-./mfc.sh params --family    # List all parameter families
+./mfc.sh params --families  # List all parameter families
 ```
 
 ### Creating a New Case
