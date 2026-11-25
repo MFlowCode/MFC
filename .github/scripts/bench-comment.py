@@ -7,7 +7,7 @@ The directory holds one folder per lane, bench-compare-<cluster>-<device>-<inter
 pr/bench-*.yaml and master/bench-*.yaml from the same benchmark job (same node, minutes apart).
 benchmarks.jsonl is master's history (MFlowCode/MFC-ci-data): it says how much a lane's grind
 time moves between runs with no change at all, and a difference is only called a change when it
-is at least 5% and three times that. Prints Markdown, or nothing when no lane has both results.
+is at least 3% and three times that. Prints Markdown, or nothing when no lane has both results.
 The files come from a pull request's own run: they are read as numbers and names, nothing more.
 """
 
@@ -43,7 +43,11 @@ def grinds(path: str) -> dict:
 
 
 def scatter(history: str) -> dict:
-    """(cluster, device, interface, case) -> typical run-to-run change of master's grind time, in percent."""
+    """(cluster, device, interface, case) -> typical run-to-run change of master's grind time, in percent.
+
+    Only between runs alike in everything but the commit: the same GPU model (Phoenix has several, a
+    few times apart in speed), the same case definition and the same modules.
+    """
     series = {}
     try:
         with open(history) as f:
@@ -52,12 +56,13 @@ def scatter(history: str) -> dict:
                 if r.get("approx"):
                     continue
                 for slug, case in r["cases"].items():
-                    series.setdefault((r["cluster"], r["device"], r["interface"], slug), []).append(case["grind"])
+                    lane = (r["cluster"], r["device"], r["interface"], slug)
+                    series.setdefault(lane, {}).setdefault((r.get("hardware"), case.get("def"), r.get("env")), []).append(case["grind"])
     except (OSError, ValueError, KeyError):
         return {}
     out = {}
-    for key, values in series.items():
-        steps = [abs(b / a - 1) * 100 for a, b in zip(values[-41:], values[-40:]) if a > 0]
+    for key, alike in series.items():
+        steps = [abs(b / a - 1) * 100 for values in alike.values() for a, b in zip(values, values[1:]) if a > 0][-40:]
         if len(steps) >= 10:
             out[key] = statistics.median(steps)
     return out

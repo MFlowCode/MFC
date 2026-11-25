@@ -38,6 +38,12 @@ jobs:
         with:
           clean: false
 
+      # As the other Frontier lanes: on the login node, since a compute node cannot download
+      # sources, and from a clean build directory, since the checkout is shared with other compilers.
+      - name: Fetch Dependencies
+        timeout-minutes: 120
+        run: bash .github/workflows/frontier_amd/build.sh cpu none
+
       - name: Build and test
         run: |
           rm -f checks.out

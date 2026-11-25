@@ -62,4 +62,9 @@ for N in "${nodes[@]}"; do
     [ -n "$id" ] && sacct -j "$id" -X -n -P -o JobID,JobName,NNodes,ElapsedRaw,State | sed 's/^/::notice title=scaling-usage::/'
 done
 
-grep -l "Performance:" "$logs"/weak-*.out "$logs"/strong-*.out > /dev/null 2>&1
+# Every size, both kinds: a missing result is a failed run, not a shorter record.
+for N in "${nodes[@]}"; do
+    for kind in weak strong; do
+        grep -q "Performance:" "$logs/$kind-$N.out" 2>/dev/null || { echo "::error::No $kind scaling result at $N nodes."; exit 1; }
+    done
+done
