@@ -58,7 +58,9 @@ jobs:
           # cluster job (why it failed).
           mkdir -p logs
           for job in $(jq -r '.jobs[] | select(.labels | any(. == "frontier" or . == "gt")) | select(.conclusion == "failure" or (.conclusion == "success" and (.name | test("^(Bench|Case Opt)") | not))) | .id' jobs.json); do
-            gh api "$api/actions/jobs/$job/logs" > "logs/$job.txt" || rm -f "logs/$job.txt"
+            # curl, not `gh api`: gh 2.97 and later refuses to print a log, which always holds colour codes.
+            curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/$api/actions/jobs/$job/logs" > "logs/$job.txt" \
+              || { rm -f "logs/$job.txt"; echo "::warning::Could not download the log of job $job"; }
           done
 
           # The pull request a pull request run belongs to (the run itself names it only for same-repository PRs).
