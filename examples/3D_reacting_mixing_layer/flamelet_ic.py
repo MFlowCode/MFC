@@ -14,9 +14,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "toolchain"))
 from mfc.flamelet import (
     INITIALIZER_VERSION,
+    atomic_write,
     create_simulation_fields,
     density,
     ic_cache_valid,
+    keyed_ic_dir,
     mechanism_fingerprint,
     reference_fluid_properties,
     streams,
@@ -166,7 +168,8 @@ def write_hcid370_ic(output_dir, x_coord, cross_coord, density, streamwise_veloc
     for n, values_2d in enumerate(columns_2d, start=1):
         path = os.path.join(output_dir, f"prim.{n}.00.{file_extension}.dat")
         rows = np.column_stack((xy_flat, np.asarray(values_2d, dtype=float).ravel()))
-        np.savetxt(path, rows, fmt="%.17g")
+        with atomic_write(path) as fh:
+            np.savetxt(fh, rows, fmt="%.17g")
 
     return len(columns_2d), ny
 
