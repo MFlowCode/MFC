@@ -2901,9 +2901,13 @@ contains
             if (.not. ghost_points(q)%interp_valid) n_buried = n_buried + 1
         end do
         $:END_GPU_PARALLEL_LOOP()
-        n_buried_loc = int(n_buried, kind=8)
-        call s_mpi_allreduce_integer_sum(n_buried_loc, n_buried_glb)
-        ib_any_buried = n_buried_glb > 0 .and. .not. amr .and. .not. (qbmm .and. .not. polytropic)
+        ! not with AMR: fine frames call this per block, on some ranks only, so it must not reach a collective
+        ib_any_buried = .false.
+        if (.not. amr .and. .not. (qbmm .and. .not. polytropic)) then
+            n_buried_loc = int(n_buried, kind=8)
+            call s_mpi_allreduce_integer_sum(n_buried_loc, n_buried_glb)
+            ib_any_buried = n_buried_glb > 0
+        end if
 
     end subroutine s_compute_interpolation_coeffs
 
