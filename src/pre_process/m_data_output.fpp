@@ -60,7 +60,6 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         logical                                                    :: file_exist
         character(LEN=15)                                          :: FMT
-        character(LEN=3)                                           :: status
         character(LEN=int(floor(log10(real(sys_size, wp)))) + 1)   :: file_num
         character(LEN=len_trim(t_step_dir) + name_len)             :: file_loc
         integer                                                    :: i, j, k, l, r, c
@@ -80,35 +79,29 @@ contains
 
         t_step = 0
 
-        if (old_grid) then
-            status = 'old'
-        else
-            status = 'new'
-        end if
-
         if (bc_io) then
             if (igr) then
                 call s_pack_boundary_condition_buffers(q_cons_vf)
             else
                 call s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
             end if
-            call s_write_serial_boundary_condition_files(bc_type, t_step_dir, old_grid)
+            call s_write_serial_boundary_condition_files(bc_type, t_step_dir)
         end if
 
         file_loc = trim(t_step_dir) // '/x_cb.dat'
-        open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+        open (1, FILE=trim(file_loc), form='unformatted', STATUS='replace')
         write (1) x_cb(-1:m)
         close (1)
 
         if (n > 0) then
             file_loc = trim(t_step_dir) // '/y_cb.dat'
-            open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+            open (1, FILE=trim(file_loc), form='unformatted', STATUS='replace')
             write (1) y_cb(-1:n)
             close (1)
 
             if (p > 0) then
                 file_loc = trim(t_step_dir) // '/z_cb.dat'
-                open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+                open (1, FILE=trim(file_loc), form='unformatted', STATUS='replace')
                 write (1) z_cb(-1:p)
                 close (1)
             end if
@@ -117,7 +110,7 @@ contains
         do i = 1, sys_size
             write (file_num, '(I0)') i
             file_loc = trim(t_step_dir) // '/q_cons_vf' // trim(file_num) // '.dat'
-            open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+            open (1, FILE=trim(file_loc), form='unformatted', STATUS='replace')
             write (1) q_cons_vf(i)%sf(0:m,0:n,0:p)
             close (1)
         end do
@@ -136,7 +129,7 @@ contains
                     end do
                 end do
                 write (beta_file_loc, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', sys_size + 1, '.dat'
-                open (1, FILE=trim(beta_file_loc), form='unformatted', STATUS=status)
+                open (1, FILE=trim(beta_file_loc), form='unformatted', STATUS='replace')
                 write (1) beta_ones
                 close (1)
                 deallocate (beta_ones)
@@ -148,7 +141,7 @@ contains
                 do r = 1, nnode
                     write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
                     file_loc = trim(t_step_dir) // '/pb' // trim(file_num) // '.dat'
-                    open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+                    open (1, FILE=trim(file_loc), form='unformatted', STATUS='replace')
                     write (1) pb%sf(:,:,:,r, i)
                     close (1)
                 end do
@@ -158,7 +151,7 @@ contains
                 do r = 1, nnode
                     write (file_num, '(I0)') r + (i - 1)*nnode + sys_size
                     file_loc = trim(t_step_dir) // '/mv' // trim(file_num) // '.dat'
-                    open (1, FILE=trim(file_loc), form='unformatted', STATUS=status)
+                    open (1, FILE=trim(file_loc), form='unformatted', STATUS='replace')
                     write (1) mv%sf(:,:,:,r, i)
                     close (1)
                 end do

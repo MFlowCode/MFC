@@ -11,7 +11,7 @@ import sys
 from typing import Callable, List, Optional, Set, Union
 
 from .. import case, common
-from ..build import SIMULATION, MFCTarget, get_target
+from ..build import PRE_PROCESS, SIMULATION, MFCTarget, get_target
 from ..run import input
 from ..state import ARG, CFG
 
@@ -168,7 +168,7 @@ class TestCase(case.Case):
     ppn: int
     trace: str
     override_tol: Optional[float] = None
-    restart_check: bool = False
+    restart_check: Union[bool, str] = False  # "old_ic": the restart goes through pre_process
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
@@ -180,7 +180,7 @@ class TestCase(case.Case):
         mods: dict,
         ppn: int = None,
         override_tol: float = None,
-        restart_check: bool = False,
+        restart_check: Union[bool, str] = False,
         kind: str = "golden",
         convergence_spec: Optional[dict] = None,
         canary: bool = False,
@@ -257,6 +257,9 @@ class TestCase(case.Case):
             dirpath = self.get_dirpath()
             common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
 
+            if self.restart_check == "old_ic":
+                return self._restart_through_pre_process(orig, mid_step, gpus, env)
+
             # Phase 2: Restart simulation from midpoint.  Only the simulation
             # is run — it reads grid + IC directly from p_all/p0/<mid_step>/.
             self.params = {**orig, "t_step_start": mid_step, "t_step_save": orig["t_step_stop"] - mid_step}
@@ -289,6 +292,32 @@ class TestCase(case.Case):
                 self.create_directory()
             except Exception as exc:
                 print(f"Warning: failed to restore test directory: {exc}")
+
+    def _restart_through_pre_process(self, orig, mid_step, gpus, env):
+        """Phase 2 of a serial-I/O restart through pre_process (old_ic): pre_process reads p_all/p0/<mid_step>/ and writes it
+        back as step 0, and simulation runs the remaining steps from 0. Its last save is renamed to t_step_stop, so D/ holds the
+        straight run's steps 0 and t_step_stop. Needs a constant dt and no explicit time dependence (the clock restarts at 0)."""
+        dirpath = self.get_dirpath()
+        d_dir, keep = os.path.join(dirpath, "D"), os.path.join(dirpath, "D_straight")
+        rest = orig["t_step_stop"] - mid_step
+        common.delete_directory(keep)  # left by an interrupted run
+        os.rename(d_dir, keep)
+        no_patches = {k: v for k, v in orig.items() if not k.startswith("patch_icpp")}
+        self.params = {**no_patches, "old_grid": "T", "old_ic": "T", "num_patches": 0, "t_step_start": mid_step, "t_step_old": mid_step}
+        self.create_directory()
+        result = self.run([PRE_PROCESS], gpus, env=env)
+        if result.returncode == 0:
+            self.params = {**orig, "t_step_start": 0, "t_step_stop": rest, "t_step_save": rest}
+            self.create_directory()
+            result = self.run([SIMULATION], gpus, env=env)
+        if result.returncode == 0:
+            for f in glob.glob(os.path.join(keep, f"*.{mid_step:06d}.dat")):
+                common.delete_file(f)
+            for f in glob.glob(os.path.join(d_dir, f"*.{rest:06d}.dat")):
+                os.replace(f, os.path.join(keep, os.path.basename(f).replace(f".{rest:06d}.", f".{orig['t_step_stop']:06d}.")))
+        common.delete_directory(d_dir)
+        os.rename(keep, d_dir)
+        return result
 
     def run_cfl_restarts(self, targets, gpus, env: dict = None):
         """CFL mode: restart from each interior save index and check that the
@@ -486,7 +515,7 @@ class TestCaseBuilder:
     ppn: int
     functor: Optional[Callable]
     override_tol: Optional[float] = None
-    restart_check: bool = False
+    restart_check: Union[bool, str] = False
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
@@ -546,7 +575,7 @@ class CaseGeneratorStack:
 
 
 def define_case_f(
-    trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False
+    trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None, restart_check: Union[bool, str] = False
 ) -> TestCaseBuilder:
     return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol, restart_check)
 
@@ -567,7 +596,7 @@ def define_case_d(
     ppn: int = None,
     functor: Callable = None,
     override_tol: float = None,
-    restart_check: bool = False,
+    restart_check: Union[bool, str] = False,
     honor_io_keys: bool = False,
     kind: str = "golden",
 ) -> TestCaseBuilder:
