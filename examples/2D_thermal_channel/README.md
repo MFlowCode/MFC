@@ -22,13 +22,13 @@ the developed state excludes:
 
 | run | $T_m$ hold | $\beta H$ (exact 0.1412) | $\mathrm{Nu}_\mathrm{src}$ | $\mathrm{Nu}_\mathrm{grad}$ |
 |---|---:|---:|---:|---:|
-| $T_s$ = 330 K | 7e-8 | 0.1433 | 7.378 (-2.2 %) | 7.329 (-2.8 %) |
-| $T_s$ = 270 K | 6e-9 | 0.1398 | 7.749 (+2.8 %) | 7.757 (+2.9 %) |
-| pair | | | 7.557 (+0.20 %) | 7.535 (-0.09 %) |
+| $T_s$ = 330 K | 2e-8 | 0.1432 | 7.375 (-2.2 %) | 7.342 (-2.6 %) |
+| $T_s$ = 270 K | 6e-9 | 0.1397 | 7.746 (+2.7 %) | 7.771 (+3.0 %) |
+| pair | | | 7.553 (+0.16 %) | 7.549 (+0.09 %) |
 
 A single run is biased by the property change across the gap, with opposite signs for the hot and the cold wall; the pair cancels
-it. The source and the gradient estimates of each run agree within 0.7 %, so the source removes the heat that crosses the walls.
-At Mach 0.3 the single runs stay within 5 % (pair 7.586 and 7.398); before the dissipation was removed they were off by 14 % and
+it. The source and the gradient estimates of each run agree within 0.4 %, so the source removes the heat that crosses the walls.
+At Mach 0.3 the single runs stay within 3.2 % (pair 7.556 and 7.527); before the dissipation was removed they were off by 14 % and
 29 %, and at Mach 0.1 the two estimates of a run differed by 5 %.
 
 ## Run
