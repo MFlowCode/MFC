@@ -175,7 +175,7 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 ## Two-fluid shock tube, interface advection and phase-change equilibrium {#sec-validation-multiphase-riemann}
 
-**Status:** shock tube validated; interface advection and phase-change equilibrium partially validated. **Examples:** `examples/1D_kapilashocktube`, `examples/2D_advection`, `examples/1D_exp_tube_phasechange`. A water-air shock tube against the exact two-material Riemann solution (first order in pressure, contact within 0.02 cells), a water disk advected through a periodic box (pressure equilibrium to 3e-6 at 100 cells and above; open: 2.5e-3 at 50 and 64 cells), and the p-T-Gibbs equilibrium of a relaxed expansion (within 7e-4 K of saturation). Results and limits: @ref validation_multiphase_riemann.
+**Status:** shock tube validated; interface advection validated; phase-change equilibrium partially validated. **Examples:** `examples/1D_kapilashocktube`, `examples/2D_advection`, `examples/1D_exp_tube_phasechange`. A water-air shock tube against the exact two-material Riemann solution (first order in pressure, contact within 0.02 cells), a water disk advected through a periodic box (pressure equilibrium to round-off at 50 to 200 cells once `mpp_lim`, whose volume-fraction clip breaks it, is off), and the p-T-Gibbs equilibrium of a relaxed expansion (within 7e-4 K of saturation). Results and limits: @ref validation_multiphase_riemann.
 
 ## Bubble dynamics {#sec-validation-bubbles}
 
@@ -191,7 +191,7 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 ## Acoustic sources {#sec-validation-acoustics}
 
-**Status:** partially validated. **Examples:** `examples/1D_acoustic_gauss_sigmatime` (with `_gauss_sigmadist`, `_sine_frequency`, `_dipole`). The pulses of 1D planar sources against linear acoustics from the discrete source weights: the amplitude and shape converge, but every pulse arrives \f$\Delta t/2\f$ late because the source sees the step-start time in all Runge-Kutta stages ([#2462](https://github.com/MFlowCode/MFC/issues/2462)). Results and limits: @ref validation_acoustics.
+**Status:** validated (1D planar sources). **Examples:** `examples/1D_acoustic_gauss_sigmatime` (with `_gauss_sigmadist`, `_sine_frequency`, `_dipole`). The pulses of 1D planar sources against linear acoustics from the discrete source weights: they arrive on time and converge at third order to a 2e-4 floor, with the source evaluated at each Runge-Kutta stage's time ([#2462](https://github.com/MFlowCode/MFC/issues/2462) fixed the \f$\Delta t/2\f$ lag of the step-start time). Results and limits: @ref validation_acoustics.
 
 ## Ideal MHD {#sec-validation-mhd}
 
@@ -211,7 +211,7 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 ## Smooth-flow order of accuracy {#sec-validation-vortex-order}
 
-**Status:** open discrepancy (isentropic vortex); validated (Taylor-Green decay). **Examples:** `examples/2D_isentropicvortex` (`--convect`), `examples/2D_TaylorGreenVortex`. The translating vortex converges at second order for every WENO and TENO order ([#2464](https://github.com/MFlowCode/MFC/issues/2464)); the viscous decay rate of the 2D Taylor-Green vortex is exact to 7e-7 at 32 cells. Results and limits: @ref validation_vortex_order.
+**Status:** validated (isentropic vortex, at the expected second order; Taylor-Green decay). **Examples:** `examples/2D_isentropicvortex` (`--convect`), `examples/2D_TaylorGreenVortex`. The translating vortex converges at second order for every WENO and TENO order, the expected order of primitive reconstruction from cell averages and of midpoint face fluxes on a nonlinear flow (1D smooth waves separate the two; [#2464](https://github.com/MFlowCode/MFC/issues/2464)); the viscous decay rate of the 2D Taylor-Green vortex is exact to 7e-7 at 32 cells. Results and limits: @ref validation_vortex_order.
 
 ## Circular blast wave {#sec-validation-blast}
 
