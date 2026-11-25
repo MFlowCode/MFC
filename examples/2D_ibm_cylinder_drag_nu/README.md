@@ -47,5 +47,8 @@ Cd_CV depends on the box at Re 100 in the smaller domain (1.344, 1.332, 1.302 fo
 `--tw_ratio` times the free-stream temperature and relaxes toward the adiabatic-wall temperature. With the two fixed-wall twins
 (`--tw_ratio 1` and `1.1`, same Re and grid), `check_lumped_cooling.py <lumped run> --cold <cold run> --hot <hot run> --tmin <t U/D>`
 compares the fitted decay with the time constant `rho_s c_s D^2 / (4 Nu k_f)` that the twins' Nusselt number implies, and the lumped
-body's heat rate with the twins' law at the same wall temperature. `--parallel_io F` is for a build without MPI. The results are on the
+body's heat rate with the twins' law at the same wall temperature. It also prints the booking ratio m c_s dTw/dt / Q and the decay the
+twins' own linear response predicts without the lumped update (Duhamel); the lumped run follows that prediction, and the gap to the
+steady-Nusselt time constant is the gas's transient response, about tau_bl/tau with tau_bl about 1 D/U at Re 20. Use `--stride 1` for the
+booking ratio. `--parallel_io F` is for a build without MPI. The results are on the
 @ref validation_wall_thermal page.

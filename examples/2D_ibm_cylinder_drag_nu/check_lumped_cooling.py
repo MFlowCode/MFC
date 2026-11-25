@@ -12,7 +12,11 @@ Nu k_f / D relaxes to the adiabatic-wall temperature T_aw with
 
 Prints the model tau and T_aw from the twins, the fit T_a' + A exp(-t/tau') of Twall(t) from D/ib_heat.dat over t U / D > --tmin with
 the implied Nu_fit and its difference from the fixed-wall Nu, and the ratio of the lumped body's heat rate to the one the twins'
-linear law Q(Tw) gives at the same wall temperature (the fit-free check).
+linear law Q(Tw) gives at the same wall temperature (the fit-free check). Two checks of the lumped model itself: the booking ratio
+m c_s dTw/dt / Q (1 when the update uses exactly the face heat), and the decay the twins predict without the lumped update: the hot
+twin minus the cold one is the wall heat's response G(t) to a step in the wall temperature at t = 0, and the linear (Duhamel) model
+m c_s dth/dt = Q_cold(t) + G(t) th(0) + int_0^t G(t - s) dth(s), th = Tw - T_inf, is fitted like the run. Also printed: the lag time
+tau_bl = int (G/G_inf - 1) dt; to first order a body cooling as exp(-t/tau) takes a heat rate tau_bl/tau below the steady law.
 """
 
 import argparse
@@ -32,6 +36,16 @@ def fit_exponential(t, T):
         if best is None or r < best[0]:
             best = (r, tau, c)
     return best[1], best[2]
+
+
+def duhamel(t, G, q_cold, th0, mcs):
+    """Wall temperature excess of a body of heat capacity mcs whose wall heat responds linearly with step response G(t)."""
+    th, dth = np.full_like(t, th0), np.zeros_like(t)
+    for n in range(1, len(t)):
+        q = q_cold[n - 1] + G[n - 1] * th0 + np.dot(G[n - 1 : 0 : -1], dth[1:n])
+        th[n] = th[n - 1] + (t[n] - t[n - 1]) * q / mcs
+        dth[n] = th[n] - th[n - 1]
+    return th
 
 
 def main():
@@ -69,6 +83,18 @@ def main():
     q_pred = qc + (qh - qc) * (Tw - T_inf) / (ih["Tw"] - T_inf)
     ratio = h[:, 4][m] / q_pred[m]
     print(f"heat rate / twins' law at the same Tw over the window: mean {np.average(ratio, weights=np.gradient(t[m])):.3f}, first {ratio[0]:.3f}, last {ratio[-1]:.3f}")
+    mcs = rho_cs * np.pi * il["D"] ** 2 / 4
+    dTdt = np.gradient(Tw, h[:, 1])
+    print(f"booking: m c_s dTw/dt / Q, median over t U/D > 1: {np.median(mcs * dTdt[t > 1] / h[t > 1, 4]):.4f}")
+    hc, hh = history(args.cold, "ib_heat.dat"), history(args.hot, "ib_heat.dat")
+    tg = np.linspace(0.0, h[-1, 1], 4000)
+    G = (np.interp(tg, hh[:, 1], hh[:, 4]) - np.interp(tg, hc[:, 1], hc[:, 4])) / (ih["Tw"] - T_inf)
+    th = duhamel(tg, G, np.interp(tg, hc[:, 1], hc[:, 4]), Tw[0] - T_inf, mcs)
+    mg = tg * il["U"] / il["D"] >= args.tmin
+    tau_d, _ = fit_exponential(tg[mg] * il["U"] / il["D"], th[mg] + T_inf)
+    G_inf, late = (qh - qc) / (ih["Tw"] - T_inf), tg * il["U"] / il["D"] > 0.2
+    tau_bl = np.trapezoid(G[late] / G_inf - 1.0, tg[late]) * il["U"] / il["D"]
+    print(f"twins' linear response (Duhamel, no lumped update): tau' U/D = {tau_d:.2f} (run {tau_fit:.2f}); lag time tau_bl U/D = {tau_bl:.2f}, tau_bl/tau = {tau_bl / tau_model:.1%}")
     print(f"Twall: {Tw[0]:.2f} K -> {Tw[-1]:.2f} K; model exp(-t/tau) from T_aw: {Taw + (Tw[0] - Taw) * np.exp(-t[-1] * il['D'] / il['U'] / tau):.2f} K")
 
 
