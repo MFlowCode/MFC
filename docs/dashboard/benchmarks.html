@@ -33,7 +33,7 @@
         svg.spark { width: 84px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px; }
         select { font: inherit; color: var(--ink); background: transparent; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; }
         svg text.event { fill: #b45309; font-weight: 600; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr)); gap: 16px; }
         figure { margin: 0; background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 12px 6px; position: relative; }
         figcaption { font-weight: 600; font-size: 14px; margin-bottom: 8px; overflow-wrap: anywhere; }
         figcaption .notes { display: block; font-weight: 400; font-size: 12px; color: var(--muted); min-height: 16px; }
@@ -108,7 +108,8 @@
 
     <section id="scaling" hidden>
         <h2>Scaling on Frontier</h2>
-        <p class="note">Weekly, CCE OpenACC, 8 GPUs per node. Efficiency is against the smallest run: 100% is perfect scaling. Weak: 16 GB per GPU. Strong: 256 GB in all.</p>
+        <p class="note">Weekly, AMD flang with OpenMP offload, case-optimized, 8 GPUs per node. Efficiency is against the smallest run: 100% is perfect scaling. Weak: 16 GB per GPU. Strong: 256 GB in all.</p>
+        <p id="scaleverdict"></p>
         <div class="scrollx"><table id="scaletable"></table></div>
         <figure id="scalechart" hidden><figcaption>Efficiency over time</figcaption></figure>
     </section>
@@ -191,7 +192,7 @@ function series(slug) {
 }
 
 function chart(slug) {
-    const W = 360, H = 200, L = 46, R = 8, T = 12, B = 22;
+    const W = 560, H = 260, L = 46, R = 10, T = 24, B = 22;       // the top margin holds the change labels, clear of the lines
     const fig = document.createElement("figure"); fig.id = `case-${slug}`;
     fig.innerHTML = `<figcaption>${slug}<span class="notes"></span></figcaption>`;
     const capNotes = fig.querySelector(".notes"), noteFor = text => capNotes.insertAdjacentHTML("beforeend", `${capNotes.textContent ? " · " : ""}${text}`);
@@ -255,21 +256,20 @@ function chart(slug) {
             fill: "none", stroke: s.lane.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
     }
 
-    // The lasting changes found for this case on a lane shown here, marked where they happened. Labels go on
-    // up to three rows so that neighbours do not overprint; one with no room is left to the hover.
+    // The lasting changes found for this case on a lane shown here, marked where they happened. Each is
+    // labelled above the plot with the pull request alone; one with no room, and the size, are in the hover.
     const found = [];
     for (const e of state.shifts) for (const sp of e.spans) {
         const hit = sp.hits.find(h => h.slug === slug); if (!hit || !ss.some(s => s.lane.key === sp.lane.key) || e.r.t < t0 || e.r.t > t1) continue;
         found.push({ e, sp, hit, xe: x(e.r.t) });
     }
-    const rows = [[], [], []];                                   // per row, the x-extents already taken
+    const taken = [];                                            // x-extents of the labels drawn
     for (const f of found.sort((a, b) => a.xe - b.xe)) {
-        const { e, sp, hit, xe } = f, who = e.suspects.length === 1 ? (e.suspects[0][2] ? `#${e.suspects[0][2]}` : e.suspects[0][0].slice(0, 7)) : `${e.suspects.length} commits`;
-        const text = `${hit.pct > 0 ? "+" : ""}${hit.pct.toFixed(0)}% ${who}`, wide = text.length * 6.2 + 8, left = xe + wide > W - R, from = left ? xe - wide : xe, to = left ? xe : xe + wide;
-        el("line", { x1: xe, x2: xe, y1: T, y2: H - B, stroke: "#f59e0b", "stroke-width": 1.5 }, svg);
-        const row = rows.findIndex(r => r.every(([a, b]) => to < a || from > b));
-        if (row >= 0 && from >= L) { rows[row].push([from, to]);
-            el("text", { x: xe + (left ? -4 : 4), y: H - B - 5 - 12 * row, "text-anchor": left ? "end" : "start", class: "event" }, svg).textContent = text; }
+        const { e, sp, hit, xe } = f, text = e.suspects.length === 1 ? (e.suspects[0][2] ? `#${e.suspects[0][2]}` : e.suspects[0][0].slice(0, 7)) : `${e.suspects.length} PRs`;
+        const half = text.length * 3.3 + 4, at = Math.min(Math.max(xe, L + half), W - R - half);
+        el("line", { x1: xe, x2: xe, y1: T - 4, y2: H - B, stroke: "#f59e0b", "stroke-width": 1.5 }, svg);
+        if (taken.every(([a, b]) => at + half < a || at - half > b)) { taken.push([at - half, at + half]);
+            el("text", { x: at, y: T - 9, "text-anchor": "middle", class: "event" }, svg).textContent = text; }
         mark(xe, H - B - 8, `${sp.lane.label}: grind time ${hit.pct > 0 ? "up" : "down"} ${Math.abs(hit.pct).toFixed(1)}% at ${e.suspects.length === 1 ? e.suspects[0][1] : `one of ${e.suspects.map(c => c[2] ? `#${c[2]}` : c[0].slice(0, 7)).join(", ")}`}`);
     }
 
@@ -421,12 +421,15 @@ function scaling(records) {
     if (!records.length) return;
     $("scaling").hidden = false;
     // Grind time is over all ranks: with perfect scaling it falls as 1/ranks, weak or strong.
-    const eff = (r, kind) => { const rs = r.runs.filter(x => x.kind === kind).sort((a, b) => a.nodes - b.nodes), base = rs[0];
-        return rs.map(x => ({ ...x, eff: base.grind * base.ranks / (x.grind * x.ranks) * 100 })); };
-    const latest = records.at(-1), pct = v => `${v.toFixed(0)}%`;
-    $("scaletable").innerHTML = `<tr><th>${day(latest.t)} · ${links(latest)}</th><th>Nodes</th><th>GPUs</th><th>Grid points</th><th>Grind time</th><th>Efficiency</th></tr>`
-        + ["weak", "strong"].flatMap(kind => eff(latest, kind).map(x => `<tr><td>${kind === "weak" ? "Weak" : "Strong"}</td><td>${x.nodes}</td><td>${x.ranks}</td><td>${(x.cells / 1e6).toFixed(0)} M</td><td>${x.grind.toPrecision(3)} ns</td>`
-            + `<td>${x.nodes === eff(latest, kind)[0].nodes ? "–" : pct(x.eff)}</td></tr>`)).join("");
+    const status = MFCCI.scalingStatus(records), latest = status.latest, pct = v => `${v.toFixed(0)}%`;
+    const eff = (r, kind) => status.measure(r).filter(x => x.kind === kind);
+    $("scaleverdict").innerHTML = `<span class="dot ${status.bad.length ? "bad" : "good"}"></span>` + (status.bad.length
+        ? `<b>Regressed:</b> ${status.bad.map(x => `${x.kind} at ${x.nodes} ${x.nodes === 1 ? "node" : "nodes"}`).join(", ")}.` : `<b>Within tolerance.</b>`)
+        + ` A run fails, and opens an issue, when efficiency falls more than ${MFCCI.SCALING.points} points below the median of the last ${MFCCI.SCALING.runs} runs, grind time at the smallest size rises more than ${MFCCI.SCALING.grind}%, or weak efficiency is under ${MFCCI.SCALING.weakFloor}%.`;
+    $("scaletable").innerHTML = `<tr><th>${day(latest.t)} · ${links(latest)}</th><th>Nodes</th><th>GPUs</th><th>Grid points</th><th>Grind time</th><th>Efficiency</th><th>Usual</th><th></th></tr>`
+        + status.rows.map(x => `<tr><td>${x.kind === "weak" ? "Weak" : "Strong"}</td><td>${x.nodes}</td><td>${x.ranks}</td><td>${(x.cells / 1e6).toFixed(0)} M</td><td>${x.grind.toPrecision(3)} ns</td>`
+            + `<td>${x.base ? "–" : pct(x.eff)}</td><td>${x.usual === null ? "–" : x.base ? `${x.usual.toPrecision(3)} ns` : pct(x.usual)}</td>`
+            + `<td>${x.bad ? `<span style="color:#b91c1c;font-weight:600">&#9650; regressed</span>` : ""}</td></tr>`).join("");
     if (records.length < 2) return;
     const lines = new Map();                                    // "weak 64" -> [[t, efficiency]]
     for (const r of records) for (const kind of ["weak", "strong"]) for (const x of eff(r, kind).slice(1)) {

@@ -97,7 +97,7 @@ const MFCCI = (() => {
         try { if (name === "range") localStorage.setItem("mfcci-range", value); } catch (e) { /* no storage */ }
         return value;
     };
-    const withParams = href => { const r = param("range"); return r ? `${href}${href.includes("?") ? "&" : "?"}range=${encodeURIComponent(r)}` : href; };
+    const withParams = href => { const r = param("range"), [page, hash] = href.split("#"); return (r ? `${page}${page.includes("?") ? "&" : "?"}range=${encodeURIComponent(r)}` : page) + (hash ? `#${hash}` : ""); };
 
     // ---- the header and footer every page wears ----
     const NAV = [["index.html", "Status"], ["benchmarks.html", "Performance"], ["ci.html", "CI health"], ["tests.html", "Test health"], ["../index.html", "MFC home"], ["../documentation/index.html", "Documentation"]];
@@ -138,6 +138,24 @@ const MFCCI = (() => {
         const cause = CAUSE[j.why || "not read"] || j.why, f = j.f || [];
         return { j, cause, detail: f.length ? f.slice(0, 3).map(t => `${t[1]} (${t[2]}${t[3] ? `: ${t[3]}` : ""})`).join("; ") + (f.length > 3 ? `; and ${f.length - 3} more` : "") : j.e || "" };
     });
+
+    // ---- scaling: the rules of .github/scripts/scaling-check.py ----
+    const SCALING = { points: 5, grind: 5, weakFloor: 90, runs: 4 };
+    // Per size of the latest run: efficiency against its smallest size, what is usual (the median of
+    // the last four runs before it on the same lane), and whether it is outside the tolerances.
+    function scalingStatus(records) {
+        const latest = records.at(-1); if (!latest) return null;
+        const measure = r => ["weak", "strong"].flatMap(kind => { const rs = r.runs.filter(x => x.kind === kind).sort((a, b) => a.nodes - b.nodes), base = rs[0];
+            return rs.map(x => ({ ...x, base: x === base, eff: base.grind * base.ranks / (x.grind * x.ranks) * 100 })); });
+        const past = records.slice(0, -1).filter(r => r.cluster === latest.cluster && r.interface === latest.interface).slice(-SCALING.runs).map(measure);
+        const rows = measure(latest).map(x => {
+            const before = past.map(m => m.find(y => y.kind === x.kind && y.nodes === x.nodes)).filter(Boolean), usual = med(before.map(y => x.base ? y.grind : y.eff));
+            const bad = x.base ? usual !== null && (x.grind / usual - 1) * 100 > SCALING.grind
+                               : usual !== null ? usual - x.eff > SCALING.points : x.kind === "weak" && x.eff < SCALING.weakFloor;
+            return { ...x, usual, bad };
+        });
+        return { latest, rows, bad: rows.filter(r => r.bad), measure };
+    }
 
     // ---- master: each run's result per lane, and each lane's standing now ----
     const WORST = ["success", "cancelled", "timed_out", "failure"];
@@ -255,6 +273,6 @@ const MFCCI = (() => {
         const first = new Map(); for (const r of records) if (!first.has(r.sha)) first.set(r.sha, r);
         return events.map(e => ({ ...e, suspects: order.slice(e.lo, e.hi + 1), r: first.get(order[e.hi][0]) || e.spans[0].hits[0].r })).sort((a, b) => b.hi - a.hi);
     }
-    return { BASE, REPO, CI_LANES, LANE_KEY, lines, get, med, esc, day, PR_OF, commitLink, laneKey, laneOf, benchLanes, load, param, withParams, chrome, updated, sortable, CAUSE, howFailed, live, liveLane, liveSummary, clock, ago,
+    return { BASE, REPO, CI_LANES, LANE_KEY, lines, get, med, esc, day, PR_OF, commitLink, laneKey, laneOf, benchLanes, load, param, withParams, chrome, SCALING, scalingStatus, updated, sortable, CAUSE, howFailed, live, liveLane, liveSummary, clock, ago,
              masterRuns, laneStatus, testStats, frontierHours, shifts, CAP: 2688 };
 })();

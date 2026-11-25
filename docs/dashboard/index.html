@@ -42,7 +42,8 @@ MFCCI.chrome("index.html");
 const $ = id => document.getElementById(id), { esc, day, commitLink } = MFCCI;
 const part = (href, label, dot, text) => `<a href="${MFCCI.withParams(href)}"><span class="label">${label}</span><span class="dot ${dot}"></span><b>${text}</b></a>`;
 
-Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench(), MFCCI.live()]).then(([runs, usage, bench, now]) => {
+Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench(), MFCCI.live(), MFCCI.load.scaling()]).then(([runs, usage, bench, now, scalingRuns]) => {
+    const scale = MFCCI.scalingStatus(scalingRuns), weak = scale?.rows.filter(x => x.kind === "weak" && !x.base).at(-1);
     if (!runs.length && !bench.length) { $("statusline").innerHTML = `<span class="note">No history is available yet.</span>`; return; }
     MFCCI.updated($("updated"), Math.max(runs.at(-1)?.t || 0, bench.at(-1)?.t || 0), 3);
     const DAYS = 14, from = Date.now() - DAYS * 864e5;
@@ -58,6 +59,7 @@ Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench(), MFCCI.li
         + part("ci.html", "Master", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
         + part("ci.html", "Frontier node-hours, 7 days", share >= 0.9 ? "bad" : share >= 0.7 ? "warn" : "good", `${Math.round(hours).toLocaleString()} of ${MFCCI.CAP.toLocaleString()} (${Math.round(100 * share)}%)`)
         + part("benchmarks.html", `Performance, ${DAYS} days`, slower ? "bad" : "good", shifts.length ? `${shifts.length} lasting ${shifts.length === 1 ? "change" : "changes"}, ${slower} slower` : "no lasting change")
+        + (weak ? part("benchmarks.html#scaling", `Scaling on Frontier, ${MFCCI.day(scale.latest.t)}`, scale.bad.length ? "bad" : "good", scale.bad.length ? `regressed at ${scale.bad.map(x => `${x.nodes}`).join(", ")} nodes` : `${weak.eff.toFixed(0)}% weak at ${weak.ranks} GPUs`) : "")
         + part("tests.html", "Tests on master, 30 days", failing ? "bad" : retried ? "warn" : "good", `${failing} failing, ${retried} passed only on a retry`);
 
     // Events, newest first: a lane turning red or green on master, a lasting change in grind time, a test
