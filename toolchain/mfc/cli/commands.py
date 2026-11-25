@@ -53,9 +53,9 @@ COMMON_JOBS = CommonArgumentSet(
         Argument(
             name="jobs",
             short="j",
-            help="Allows for JOBS concurrent jobs.",
+            help="Concurrent jobs. Builds default to min(cores, 16); test cases run one at a time unless -j is given.",
             type=int,
-            default=1,
+            default=None,
             metavar="JOBS",
         ),
     ],

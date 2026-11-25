@@ -206,7 +206,7 @@ class TestCase(case.Case):
 
         filepath = f"{self.get_dirpath()}/case.py"
         tasks = ["-n", str(self.ppn)]
-        jobs = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
+        jobs = ["-j", str(ARG("jobs"))] if ARG("case_optimization") and ARG("jobs") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
 
         if self.params.get("bubbles_lagrange", "F") == "T":

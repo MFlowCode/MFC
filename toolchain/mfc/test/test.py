@@ -589,7 +589,7 @@ def test():
             if slug not in unique:
                 build(code, case.to_input_file())
                 unique.add(slug)
-        build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
+        build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=ARG("jobs") or 1)
         return
 
     builders, skipped_cases = __filter(cases)
@@ -649,7 +649,7 @@ def test():
     # because running a test case may cause it to rebuild, and thus
     # interfere with the other test cases. It is a niche feature so we won't
     # engineer around this issue (for now).
-    sched.sched([sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases], ARG("jobs"), ARG("gpus"))
+    sched.sched([sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases], ARG("jobs") or 1, ARG("gpus"))
 
     # Check if we aborted due to high failure rate
     if abort_tests.is_set():
