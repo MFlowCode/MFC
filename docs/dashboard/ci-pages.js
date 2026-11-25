@@ -140,7 +140,7 @@ const MFCCI = (() => {
     });
 
     // ---- scaling: the rules of .github/scripts/scaling-check.py ----
-    const SCALING = { points: 5, grind: 5, weakFloor: 90, runs: 4 };
+    const SCALING = { points: 5, grind: 5, weakFloor: 80, runs: 4 };
     // Per size of the latest run: efficiency against its smallest size, what is usual (the median of
     // the last four runs before it on the same lane), and whether it is outside the tolerances.
     function scalingStatus(records) {
