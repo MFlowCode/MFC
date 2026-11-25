@@ -288,7 +288,7 @@ PHYSICS_DOCS = {
     "check_igr": {
         "title": "Iterative Generalized Riemann (IGR)",
         "category": "Feature Compatibility",
-        "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
+        "explanation": ("Requires model_eqns = 2 and a 2D or 3D case. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
     "check_non_newtonian": {
         "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
@@ -603,6 +603,8 @@ class CaseValidator:
 
         if not igr:
             return
+
+        self.prohibit(self.get("n", 0) == 0, "igr requires a 2D or 3D case (n > 0); m_igr has no 1D path")
 
         # m_igr.fpp discards qv (qv_igr), so a nonzero value would be silently dropped from
         # the pressure rather than applied.

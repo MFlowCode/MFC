@@ -119,8 +119,7 @@ smaller scale (densities differ by 1.1e-2; L1 8.871e-2 and 8.864e-2). WENO5-JS a
 
 ## Known limitations
 
-- **IGR has no 1D path** ([#2463](https://github.com/MFlowCode/MFC/issues/2463)): a 1D case with `igr = T` passes validation and
-  segfaults. The IGR rows use a 2D strip of 8 cells in y (periodic) with `elliptic_smoothing` (10 iterations); without the smoothing
+- **IGR has no 1D path** ([#2463](https://github.com/MFlowCode/MFC/issues/2463)): the validator refuses `igr = T` with `n = 0`. The IGR rows use a 2D strip of 8 cells in y (periodic) with `elliptic_smoothing` (10 iterations); without the smoothing
   the Sod strip gives NaN within 10 steps. With `alf_factor = 10` its error is 6 to 7 times that of WENO5-M (the regularization
   widens the shock over several cells), and it converges at the same order. The 123 problem fails with IGR (NaN, also with
   `igr_pres_lim`).
