@@ -716,7 +716,7 @@ contains
         ib_ip_min_dist = 0._wp
         ib_flux_wall = .false.
         ib_slip_ccst = .false.
-        ib_ip_interp = 1
+        ib_ip_interp = -1  ! auto (s_initialize_ibm_module): 2, or 1 with ib_second_order_vel
         ib_wall_order = -1  ! auto (s_initialize_ibm_module): 2, or 1 with ib_second_order_vel
         ib_mass_relax = -1
         wall_column_dt_frac = 0.1_wp
