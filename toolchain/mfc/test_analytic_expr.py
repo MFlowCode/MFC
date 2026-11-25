@@ -20,14 +20,14 @@ def test_simple_expression():
     from mfc.analytic_expr import fortranize_expr
 
     out = fortranize_expr("0.5 + 0.2*sin(2.0*pi*x/lx)", IC_MAP)
-    assert out.replace(" ", "") == "0.5+0.2*sin(2.0*pi*x_cc(i)/patch_icpp(1)%length_x)"
+    assert out.replace(" ", "") == "0.5_wp+0.2_wp*sin(2.0_wp*pi*x_cc(i)/patch_icpp(1)%length_x)"
 
 
 def test_parentheses_regenerated_by_precedence():
     from mfc.analytic_expr import fortranize_expr
 
     out = fortranize_expr("2.0 * (x / lx + y / ly)", IC_MAP)
-    assert out.replace(" ", "") == "2.0*(x_cc(i)/patch_icpp(1)%length_x+y_cc(j)/patch_icpp(1)%length_y)"
+    assert out.replace(" ", "") == "2.0_wp*(x_cc(i)/patch_icpp(1)%length_x+y_cc(j)/patch_icpp(1)%length_y)"
 
 
 def test_power_and_unary_minus():
@@ -44,16 +44,16 @@ def test_underscore_variable_maps_correctly():
     from mfc.analytic_expr import fortranize_expr
 
     out = fortranize_expr("tau_e * 2", IC_MAP)
-    assert out.replace(" ", "") == "patch_icpp(1)%tau_e*2"
+    assert out.replace(" ", "") == "patch_icpp(1)%tau_e*2._wp"
 
 
 def test_scientific_notation_is_safe():
     # Legacy regex corrupted the 'e' in 2e-3 inside larger expressions.
     from mfc.analytic_expr import fortranize_expr
 
-    # 2e-3 constant-folds to 0.002 (no exponent in repr), unlike 1e20 below which keeps e-form and gains _wp.
+    # 2e-3 constant-folds to 0.002 (no exponent in repr); every literal gains _wp.
     out = fortranize_expr("1.0 + 2e-3*x", IC_MAP)
-    assert out.replace(" ", "") == "1.0+0.002*x_cc(i)"
+    assert out.replace(" ", "") == "1.0_wp+0.002_wp*x_cc(i)"
 
 
 def test_unknown_variable_raises_listing_valid():
@@ -91,6 +91,22 @@ def test_exponent_literal_gets_wp_suffix():
 
     assert fortranize_expr("1e20", IC_MAP) == "1e+20_wp"
     assert fortranize_expr("1e20 * x", IC_MAP).replace(" ", "") == "1e+20_wp*x_cc(i)"
+
+
+def test_decimal_literal_is_working_precision():
+    # a plain decimal is a default-real (single-precision) literal in Fortran
+    from mfc.analytic_expr import fortranize_expr
+
+    assert fortranize_expr("0.1 * x", IC_MAP).replace(" ", "") == "0.1_wp*x_cc(i)"
+
+
+def test_integer_literal_is_real_except_as_exponent():
+    # 1/2 is integer division (0) in Fortran; x**2 keeps the integer power
+    from mfc.analytic_expr import fortranize_expr
+
+    assert fortranize_expr("1/2", IC_MAP).replace(" ", "") == "1._wp/2._wp"
+    assert fortranize_expr("x**2", IC_MAP).replace(" ", "") == "x_cc(i)**2"
+    assert fortranize_expr("x**-2", IC_MAP).replace(" ", "") == "x_cc(i)**(-2)"
 
 
 # Corpus-equivalence gate: AST translator vs legacy regex substitution
@@ -143,6 +159,7 @@ def test_corpus_equivalence_with_legacy():
         "radii": "patch_icpp(1)%radii",
     }
     for expr in CORPUS:
-        new = fortranize_expr(expr, var_map).replace(" ", "")
+        # literals now carry _wp (integers as N._wp); the gate compares structure
+        new = re.sub(r"(\d)_wp", r"\1", re.sub(r"(\d)\._wp", r"\1", fortranize_expr(expr, var_map).replace(" ", "")))
         old = _legacy_fortranize(expr, var_map).replace(" ", "")
         assert new == old, f"divergence for {expr!r}:\n  legacy: {old}\n  ast:    {new}"

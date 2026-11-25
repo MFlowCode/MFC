@@ -227,7 +227,11 @@ PHYSICS_DOCS = {
         "title": "Viscosity",
         "category": "Numerical Schemes",
         "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
-        "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
+        "explanation": (
+            "Reynolds numbers must be positive. Not supported with model_eqns = 1. weno_Re_flux requires weno_avg = T: "
+            "the cell gradient from a cell's own two WENO face values is not damped by the viscous operator once the "
+            "WENO weights are nonlinear, so grid-scale noise grows at any time step."
+        ),
     },
     "check_heat_conduction": {
         "title": "Fourier Heat Conduction",
@@ -938,6 +942,8 @@ class CaseValidator:
             ib and num_ibs <= 0 and not has_particle_clouds,
             "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_cloud with num_particles > 0)",
         )
+        num_local_ibs_max = self.get("num_local_ibs_max")
+        self.prohibit(num_local_ibs_max is not None and num_local_ibs_max < 1, "num_local_ibs_max must be >= 1")
         num_ib_patches_max = NIB
         self.prohibit(
             ib and num_ibs > num_ib_patches_max,
@@ -1888,11 +1894,10 @@ class CaseValidator:
         # weno_Re_flux requires viscous
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
-        # advisory: smooth fields are exact either way (#2391)
-        self.warn(
-            weno_Re_flux and viscous and not weno_avg,
-            "weno_Re_flux without weno_avg: a cell's velocity gradient uses only its own two face values, so the viscous flux "
-            "misses a jump between neighbouring cells (zero wall shear on an impulsive start); set weno_avg = T",
+        # The own-face gradient grows grid-scale noise with nonlinear WENO weights (#2435) and misses jumps between cells (#2391)
+        self.prohibit(
+            weno_Re_flux and not weno_avg,
+            "weno_Re_flux requires weno_avg = T: the gradient from a cell's own two face values grows grid-scale noise at any time step and misses a jump between neighbouring cells",
         )
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and not weno_Re_flux, "weno_Re_flux_compact requires weno_Re_flux")
         self.prohibit(self.get("weno_Re_flux_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "weno_Re_flux_compact requires Cartesian coordinates")
@@ -3403,6 +3408,8 @@ class CaseValidator:
         self.prohibit(self.get("p", 0) == 0, "sim_data requires p > 0 (3D)")
         self.prohibit(self.get("num_fluids") != 2, "sim_data requires num_fluids = 2")
         self.prohibit(self.get("model_eqns") not in [2, 3], "sim_data requires model_eqns = 2 or 3")
+        # Both writers read the coarse grid only: the energies and the interface come from restricted cell averages
+        self.prohibit(self.get("amr", "F") == "T", "sim_data is not supported with amr")
 
     def check_no_flow_variables(self):
         """Checks that at least one flow variable is selected (post-process)"""
@@ -3929,7 +3936,9 @@ def apply_amr_defaults(params: Dict[str, Any]) -> bool:
         return False
     # fused exchange kernels: faster at every block size measured (Frontier MI250X, 8-512 GPUs)
     defaults: Dict[str, Any] = {"amr_device_pack": "T"}
-    if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1:
+    # one level only: a level >= 2 child's padding is clipped by the parent's inset, so a snapped child can lag a moving
+    # front out of its block (2-level Sod: a 1% shock-speed error that did not converge; examples/1D_amr_sod)
+    if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1 and int(params.get("amr_max_level", 1)) == 1:
         defaults["amr_snap"] = min(SNAP_DEFAULT, int(params.get("amr_buf", 3)) - 2)
     trial = dict(params)
     trial.update({k: params.get(k, v) for k, v in defaults.items()})

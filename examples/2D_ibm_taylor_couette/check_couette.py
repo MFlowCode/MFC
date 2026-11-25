@@ -77,7 +77,8 @@ BASIS = [(i, j) for i in range(4) for j in range(4) if i + j <= 3]  # cubic in t
 def inner_wall_shear(x, y, ut, ut_exact, dx, s_exact, n_points=96):
     """Shear S = r d(u_theta/r)/dr at the inner wall from local cubic least-squares fits to the fluid cells within 3.5 to 5 cells of
     each of n_points wall points. Returns the rms over the points of (S - S_exact)/|S_exact| for the run and for the exact
-    profile (the fit's own error), and of their difference (the solution's own error; the fit is linear)."""
+    profile (the fit's own error), and of their difference (the solution's own error; the fit is linear), and the mean of that
+    difference over the points (the azimuthal-mean part, which the torque also measures)."""
     r, out = np.hypot(x, y), {"run": [], "exact": []}
     fluid = (r > R) & (r < R2)
     for a in (np.arange(n_points) + 0.5) * 2.0 * np.pi / n_points:
@@ -98,7 +99,7 @@ def inner_wall_shear(x, y, ut, ut_exact, dx, s_exact, n_points=96):
             out[key].append((c[BASIS.index((1, 0))] / dx - c[0] / R - s_exact) / abs(s_exact))
     run, exact = np.array(out["run"]), np.array(out["exact"])
     rms = lambda v: math.sqrt(np.mean(v**2))
-    return rms(run), rms(exact), rms(run - exact)
+    return rms(run), rms(exact), rms(run - exact), float(np.mean(run - exact))
 
 
 def analyze(case_dir):
@@ -126,7 +127,7 @@ def analyze(case_dir):
     w = ut / np.maximum(r, 1e-30)
     near = (r - R > 0.5 * dx) & (r - R < 4.0 * dx)
     out["w_wall_err"] = (np.polynomial.polynomial.polyfit(r[near] - R, w[near], 3)[0] - om) / om
-    out["shear_rms"], out["shear_fit_rms"], out["shear_net_rms"] = inner_wall_shear(x, y, ut, A * r + B / np.maximum(r, 1e-30), dx, -2.0 * B / R**2)
+    out["shear_rms"], out["shear_fit_rms"], out["shear_net_rms"], out["shear_net_mean"] = inner_wall_shear(x, y, ut, A * r + B / np.maximum(r, 1e-30), dx, -2.0 * B / R**2)
     if len(st) > 1:
         _, _, _, u0, v0 = velocity_field(case_dir, st[-2], dx)
         ut0 = (-u0 * y + v0 * x) / np.maximum(r, 1e-30)
@@ -147,7 +148,9 @@ if __name__ == "__main__":
     print(f"  L2 / (Omega R)          {o['L2']:.3e}  (azimuthal mean {o['L2_mean']:.3e}, rest {o['L2_rest']:.3e})")
     print(f"  torque error            inner {o['T_inner_err']:+.3e}  outer {o['T_outer_err']:+.3e}")
     print(f"  inner wall speed error  {o['w_wall_err']:+.3e}  (cubic fit)")
-    print(f"  inner wall shear error  rms {o['shear_rms']:.3e} (local cubic fits at 96 wall points), the fit's own error {o['shear_fit_rms']:.3e}, net {o['shear_net_rms']:.3e}")
+    print(
+        f"  inner wall shear error  rms {o['shear_rms']:.3e} (local cubic fits at 96 wall points), the fit's own error {o['shear_fit_rms']:.3e}, net {o['shear_net_rms']:.3e} (mean {o['shear_net_mean']:+.3e})"
+    )
     if "change_last_save" in o:
         print(f"  change over the last save interval {o['change_last_save']:.2e} (steady state when small)")
     sys.exit(0 if o["L2"] <= a.tol else 1)

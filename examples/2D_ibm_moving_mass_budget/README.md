@@ -46,17 +46,17 @@ and the total change after 6 D:
 With TSC image points (`ib_ip_interp = 2`): +0.0544 and +0.0166 %/D without the correction at 16 and 32 cells/D, +0.0024 and
 -0.0022 with it. The uncorrected drift falls with refinement at roughly first order; the correction holds it to about 0.002 %/D.
 
-Galilean twin, viscous (Re 40, Pr 0.7), Mach 0.3, box 8 D, TSC, 6 D travelled, means over the last 3 D. Moving over fixed:
+Galilean twin, viscous (Re 40, Pr 0.7, `weno_Re_flux` with `weno_avg = T`), Mach 0.3, box 8 D, TSC, 6 D travelled, means over the last 3 D, GNU 13 CPU. Moving over fixed:
 
 | wall T / gas T | cells/D | heat, `ib_mass_relax = 0` | heat, 30 | F_x, 0 | F_x, 30 |
 |---:|---:|---:|---:|---:|---:|
-| 0.9 | 16 | 0.940 | 0.993 | 0.966 | 0.963 |
-| 0.9 | 32 | 0.966 | 1.002 | 0.969 | 0.968 |
-| 0.2 | 16 | 0.760 | 0.817 | 1.248 | 1.748 |
-| 0.2 | 32 | 0.882 | 0.917 | 0.690 | 0.682 |
+| 0.9 | 16 | 0.944 | 1.009 | 0.978 | 0.976 |
+| 0.9 | 32 | 0.974 | 1.009 | 0.985 | 0.984 |
+| 0.2 | 16 | 0.764 | 0.823 | 1.400 | 1.915 |
+| 0.2 | 32 | 0.894 | 0.928 | 0.784 | 0.785 |
 
-The heat of a wall close to the gas temperature agrees with its twin within 1 % with the correction; the force differs by 3 %. A
-cold wall (0.2 of the gas temperature) is not like for like: the conducted heat is 18 % low at 16 cells/D and 8 % at 32, and the
+The heat of a wall close to the gas temperature agrees with its twin within 1 % with the correction; the force differs by 2 %. A
+cold wall (0.2 of the gas temperature) is not like for like: the conducted heat is 18 % low at 16 cells/D and 7 % at 32, and the
 force of the moving body differs from its twin by tens of percent with no consistent sign. See the page for the causes.
 
 ## Limits

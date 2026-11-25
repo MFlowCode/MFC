@@ -2,9 +2,9 @@
 
 # Wall-Normal Ghost Velocity at Viscous Walls
 
-**Status:** partially validated (`ib_wall_order = 2` is measured on a flat wall and on a rotating curved wall; 2D only, two grids per regime beyond the first, and the Mach 0.05 wall shear is open).
+**Status:** partially validated (`ib_wall_order = 2` is measured on a flat wall and on a rotating curved wall; 2D only, two grids per regime beyond the first; the near-wall shear of order 2 has a floor of 1 to 2 % with the default image points and gradients, 0.1 to 0.8 % with TSC and compact gradients).
 **Code:** channel: `master` at dd9778b26; annulus: `master` at 13b4d8b (contains #2176 `ib_wall_order`, #2169 centripetal ghost pressure, #2165 TSC image points, #2212 compact viscous gradients and #2383 wall-point ghost velocity), unmodified. NVIDIA A100, NVHPC 25.11, OpenACC, double precision, one rank.
-**Last run:** 2026-11-22. **Examples:** `examples/2D_ibm_plane_poiseuille`, `examples/2D_ibm_taylor_couette`.
+**Last run:** 2026-11-24 (order 2 wall shear: options, Mach number and the compressible reference); 2026-11-22 (the rest). **Examples:** `examples/2D_ibm_plane_poiseuille`, `examples/2D_ibm_taylor_couette`.
 
 #2176 added `ib_wall_order = 2`, a two-probe quadratic wall-normal ghost velocity at no-slip walls, and reported no accuracy gain against an exact solution. This page measures it against two exact viscous solutions, for `ib_wall_order` 1 (the default mirror) and 2, and records what happens at a rotating curved wall.
 
@@ -66,8 +66,34 @@ Wall on a cell face (offset 0) and 0.37 cell inside it. Errors are signed (MFC m
 
 - With order 2 the velocity error is 11, 24 and 60 times lower than with order 1 at 10, 20 and 40 cells per R, and converges at about second order (1.36e-3, 3.3e-4, 9.6e-5: observed orders 2.0 and 1.8). Order 1 converges at 0.9 and then 0.5 order (1.48e-2, 8.0e-3, 5.8e-3).
 - The azimuthal-mean part dominates the error for both orders. With order 1 the fitted wall speed stays 4 to 6 % low and the torque 1.3 to 3 % off at every resolution; with order 2 the wall speed deficit falls from 0.7 % to 0.07 % and the torque error from 0.2 % to 0.01 % (inner) at 10 to 40 cells per R.
-- The inner-wall shear from local cubic fits at 96 wall points, net of the fit's own error: order 2 gives 1.9e-2, 2.0e-2 and 1.9e-2 at 10, 20 and 40 cells per R (the fit's own error is 1.9e-2, 3.2e-3 and 4.5e-4 on the exact profile); order 1 gives 0.12, 0.20 and 0.98. The order 2 shear does not converge at this Mach and Reynolds number (about 2 %); the cause is not identified (not verified). At Mach 0.01 it is 0.4 to 0.6 % (next section).
+- The inner-wall shear from local cubic fits at 96 wall points, net of the fit's own error: order 2 gives 1.9e-2, 2.0e-2 and 1.9e-2 at 10, 20 and 40 cells per R (the fit's own error is 1.9e-2, 3.2e-3 and 4.5e-4 on the exact profile); order 1 gives 0.12, 0.20 and 0.98. The order 2 shear does not converge with the default image points and gradients; the next section separates the options, the Mach number and compressibility.
 - The change of the azimuthal velocity over the last save interval is below 1.1e-5 of Omega R in these runs.
+
+### Order 2 wall shear: options, Mach number and compressibility
+
+Same annulus, `ib_wall_order = 2`, Re = 10, 12 slowest viscous times (velocity change over the last save at most 3.6e-6 of Omega R), `master` at 5c43aa27d; 10 and 20 cells per R on GNU 13 CPU, 40 cells per R and the Mach 0.01 runs at 20 on an NVIDIA A100 (NVHPC 25.11). Shear error net of the fit's own error: the rms over the 96 points and their mean (the azimuthal-mean part); inner torque from the face fluxes.
+
+| Mach | Cells per R | Image points, viscous gradient | Shear rms | Shear mean | Inner torque |
+| ---: | ---: | :--- | ---: | ---: | ---: |
+| 0.05 | 10 | default | 1.90e-2 | +7.6e-3 | -2.6e-4 |
+| 0.05 | 10 | default, `ib_visc_compact` | 1.04e-2 | +1.4e-3 | -1.7e-3 |
+| 0.05 | 10 | TSC, default | 9.3e-3 | +7.4e-3 | -3.1e-3 |
+| 0.05 | 10 | TSC, `ib_visc_compact` | 2.6e-3 | +1.7e-3 | -4.4e-3 |
+| 0.05 | 20 | default | 1.99e-2 | +8.0e-3 | +7.6e-4 |
+| 0.05 | 20 | default, `ib_visc_compact` | 1.12e-2 | +1.6e-3 | +2.1e-4 |
+| 0.05 | 20 | TSC, `ib_visc_compact` | 3.2e-3 | +1.6e-3 | -1.2e-3 |
+| 0.05 | 40 | default | 1.88e-2 | +8.8e-3 | +1.4e-4 |
+| 0.05 | 40 | TSC, `ib_visc_compact` | 1.05e-3 | +6.3e-4 | -4.0e-4 |
+| 0.01 | 10 | default | 1.51e-2 | +1.17e-2 | -5.5e-4 |
+| 0.01 | 10 | TSC, `ib_visc_compact` | 8.3e-3 | +8.0e-3 | -3.1e-3 |
+| 0.01 | 20 | default | 1.30e-2 | +4.6e-3 | +2.5e-4 |
+| 0.01 | 20 | TSC, `ib_visc_compact` | 3.9e-3 | +2.3e-3 | -8.4e-4 |
+
+**Compressible reference.** `ref1d.py` (shipped with the example) solves the axisymmetric compressible Navier-Stokes equations of this case in r (constant mu, no bulk viscosity, no heat conduction, as MFC without chemistry) from rest to the same time, by central finite volumes with no immersed boundary. Viscous heating warms the gas next to the inner wall by 1.2 % at Mach 0.05 (0.04 % at 0.01) and drives a radial velocity of 6e-5 Omega R. The azimuthal velocity then differs from the incompressible profile by 2.7e-5 Omega R (L2, Mach 0.05) and 4e-6 (Mach 0.01), and the inner-wall shear changes by 3e-5 relative between the two Mach numbers at N = 100 (3.760e-3 and 3.791e-3, both mostly the shear fit's own O(1/N) error, which falls to 1.86e-3 and 9.0e-4 at N = 200 and 400). With constant mu the steady momentum balance gives \f$r^2 \tau_{r\theta}\f$ constant whatever the density and temperature, so compressibility enters only through that small radial flow.
+
+- Compressibility is not the cause: it changes the wall shear by about 3e-5 relative at Mach 0.05, under 0.2 % of the 2 % gap.
+- The floor belongs to the near-wall discretization. With the default viscous gradient the near-wall cells carry a mean shear bias of +0.8 % (+7.6e-3 to +8.8e-3 from 10 to 40 cells per R), while the torque from the face fluxes is within 1e-3: the bias lives in the one or two cells whose WENO gradient stencil reaches the ghost cells (see `ib_visc_compact`). `ib_visc_compact` removes most of the mean (+1.4e-3 at 10 cells per R); TSC image points remove most of the point-to-point scatter; together they give 2.6e-3, 3.2e-3 and 1.05e-3 at 10, 20 and 40 cells per R.
+- The Mach number changes the floor only through the numerics: at 10 cells per R the default gives 1.5 % at Mach 0.01 against 1.9 % at 0.05, and TSC with compact gradients 0.8 % against 0.26 % (0.39 % against 0.32 % at 20 cells per R), and the compressible reference rules out a physical cause for either difference. The earlier statement that Mach 0.01 is fine compared Mach 0.01 with TSC and compact gradients against Mach 0.05 with the defaults.
 
 ### Rotating inner wall with the optional wall treatments, Mach 0.01
 
@@ -92,13 +118,13 @@ Same annulus at tip Mach 0.01 and Re = 11, run for 4 slowest viscous times from 
 
 - **Flat wall:** order 2 is a large gain in the velocity profile and the flow rate (8 to 17 times at 8 to 32 cells across). The default order leaves a large first-order error because the no-slip acts about 0.75 cell outside the wall.
 - **Curved rotating wall (with #2383):** order 2 gives second-order convergence of the velocity (1.4e-3, 3.3e-4, 9.6e-5), 11 to 60 times below order 1, and removes the wall-speed deficit. Order 1 converges at 0.5 to 0.9 order and keeps a 4 to 6 % wall-speed deficit.
-- **Wall shear:** from near-wall cells it does not converge for order 1, and for order 2 it stays near 2 % at Mach 0.05 and Re 10. At Mach 0.01 with order 2, TSC and compact gradients it is 0.4 to 0.6 %. The flow rate (channel) and the torque (annulus) are the integral measures that converge.
+- **Wall shear:** from near-wall cells it does not converge for order 1. For order 2 it has a floor of 1.3 to 2 % with the default image points and viscous gradient at Mach 0.01 and 0.05, a discretization error next to the wall (compressibility changes the shear by about 3e-5 relative); TSC image points with `ib_visc_compact` bring it to 0.1 % at 40 cells per R (Mach 0.05). The flow rate (channel) and the torque (annulus) are the integral measures that converge.
 - Order 2 is not uniformly better: it splits the wall force unevenly between two walls when a wall lies inside a cell.
 
 ## Known limitations and open issues
 
 - The default order acts about 0.75 cell outside a flat wall; the same code path acts less far out at the curved fixed wall. The cause is not identified (not verified).
-- The order 2 inner-wall shear at Mach 0.05 and Re 10 stays near 2 % from 10 to 40 cells per R. The cause is not identified (not verified).
+- The order 2 inner-wall shear with the default image points and viscous gradient stays near 2 % (Mach 0.05) and 1.3 to 1.5 % (Mach 0.01) from 10 to 40 cells per R; it is a near-wall discretization error, reduced to 0.1 to 0.3 % by TSC image points with `ib_visc_compact` (Mach 0.05). At Mach 0.01 with those options it is 0.8 % at 10 and 0.39 % at 20 cells per R; Mach 0.01 at 40 cells per R was not run.
 - The wall shear read from near-wall cells (a three-cell quadratic fit in the channel, a cubic fit in the annulus) does not converge for the channel with either order.
 - 2D, two Mach numbers and Reynolds numbers, one machine and compiler. A third grid beyond 40 cells per R and 3D are not measured, so the status stays "partially validated". High-Reynolds-number boundary layers, moving flat walls and slip walls are not measured. The Mach 0.01 runs are not fully steady.
 - The rigid-rotation check (an inviscid circle in gas already in rigid rotation) was not reproduced for this page: it needs an initial condition that no case-file patch provides.
@@ -111,6 +137,7 @@ Same annulus at tip Mach 0.01 and Re = 11, run for 4 slowest viscous times from 
 python3 examples/2D_ibm_plane_poiseuille/check_poiseuille.py examples/2D_ibm_plane_poiseuille
 ./mfc.sh run examples/2D_ibm_taylor_couette/case.py -t pre_process simulation -n 1 -- --cells_per_R 20 --ntau 12 --wall_order 2
 python3 examples/2D_ibm_taylor_couette/check_couette.py examples/2D_ibm_taylor_couette
+python3 examples/2D_ibm_taylor_couette/ref1d.py --mach 0.05 --re 10 --ntau 12 --N 200
 ```
 
 Each run writes into the example directory (clear `D/`, `restart_data/` and the `.inp` files between runs). Channel: `--offset 0.37`, `--wall_order 1`. Annulus: `--wall_order 1`, `--ip_interp 2`, `--visc_compact 1`, `--mach 0.01 --re 11 --ntau 4`.

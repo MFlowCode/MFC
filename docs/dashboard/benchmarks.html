@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFC | Performance History</title>
+    <meta name="description" content="Grind time of the MFC benchmark cases on each CI machine and compiler, for every benchmarked commit on master." />
+    <link rel="icon" type="image/x-icon" href="../res/icon.ico">
+    <style>
+        :root {
+            --page: #ffffff; --surface: #ffffff; --ink: #0f172a; --ink-2: #475569; --muted: #64748b;
+            --grid: #e2e8f0; --axis: #cbd5e1;
+            --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+            --slower: #d03b3b; --faster: #0ca30c;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+        a { color: inherit; }
+        h1 { font-size: 26px; margin: 0 0 4px; }
+        p.lede { color: var(--ink-2); margin: 0 0 20px; max-width: 70ch; }
+        .controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-bottom: 14px; }
+        .seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; }
+        .seg button { font: inherit; color: var(--ink-2); background: transparent; border: 0; padding: 5px 12px; cursor: pointer; }
+        .seg button + button { border-left: 1px solid var(--axis); }
+        .seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+        .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 16px; padding: 0; list-style: none; color: var(--ink-2); font-size: 13px; }
+        .legend button { font: inherit; color: inherit; background: none; border: 0; padding: 2px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .legend button[aria-pressed="false"] { opacity: .4; text-decoration: line-through; }
+        .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+        .legend svg { width: 10px; height: 10px; flex: none; display: inline-block; }
+        #summary { margin: 0 0 22px; } #summary td, #summary th { white-space: nowrap; } #summary td:first-child a { text-decoration: none; font-weight: 600; }
+        svg.spark { width: 84px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+        select { font: inherit; color: var(--ink); background: transparent; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; }
+        svg text.event { fill: #b45309; font-weight: 600; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr)); gap: 16px; }
+        figure { margin: 0; background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 12px 6px; position: relative; }
+        figcaption { font-weight: 600; font-size: 14px; margin-bottom: 8px; overflow-wrap: anywhere; }
+        figcaption .notes { display: block; font-weight: 400; font-size: 12px; color: var(--muted); min-height: 16px; }
+        .unzoom { position: absolute; top: 8px; right: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: #fef3c7; border: 1px solid #f59e0b; padding: 2px 8px; cursor: pointer; z-index: 1; }
+        #zoomed { font-size: 13px; background: #fef3c7; padding: 4px 10px; display: inline-flex; gap: 10px; align-items: baseline; }
+        #zoomed button { font: inherit; font-weight: 700; background: none; border: 0; text-decoration: underline; cursor: pointer; color: var(--ink); padding: 0; }
+        svg { display: block; width: 100%; height: auto; }
+        svg text { fill: var(--muted); font-size: 11px; }
+        .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 6px 8px; font-size: 12px; color: var(--ink); white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.15); z-index: 2; }
+        .tip .when { color: var(--ink-2); margin-bottom: 2px; }
+        .tip .commit { max-width: 300px; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+        .tip code { font-size: 12px; }
+        button.plain { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--axis); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+        svg { user-select: none; -webkit-user-select: none; }
+        .tip .row { display: flex; align-items: center; gap: 6px; }
+        .tip .row b { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
+        .note, #status { color: var(--ink-2); font-size: 13px; }
+        .pin { font-size: 12px; color: var(--ink-2); padding: 6px 2px 4px; border-top: 1px solid var(--grid); overflow-wrap: anywhere; }
+        .pin a, td a { color: var(--ink); }
+        h2 { font-size: 18px; margin: 32px 0 4px; }
+        .log { max-height: 520px; overflow: auto; border: 1px solid var(--grid); border-radius: 8px; background: var(--surface); }
+        .log table { margin: 0; width: 100%; }
+        .log th { position: sticky; top: 0; background: var(--surface); }
+        .log td.what { text-align: left; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log td.what .note { white-space: normal; }
+        .log td.cases { text-align: left; white-space: nowrap; }
+        .log td, .log th { vertical-align: top; }
+        .slower { color: var(--slower); font-weight: 600; } .faster { color: var(--faster); font-weight: 600; }
+        details { margin-top: 24px; }
+        summary { cursor: pointer; font-weight: 600; }
+        .scroll { overflow-x: auto; }
+        table { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+        th, td { padding: 4px 10px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; }
+        th:first-child, td:first-child { text-align: left; }
+    </style>
+    <link rel="stylesheet" href="ci-pages.css">
+</head>
+<body>
+<header class="site" id="site-header"></header>
+<main><div class="wrap">
+    <p class="updated" id="updated"></p>
+    <h1>Performance</h1>
+    <p class="lede">Grind time on <code>master</code>: ns per grid point, equation and RK stage. Lower is faster.</p>
+
+    <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
+    <div class="controls">
+        <div class="seg" id="view" role="group" aria-label="Machine"></div>
+        <div class="seg" id="metric" role="group" aria-label="Value shown">
+            <button data-v="rel" aria-pressed="false">Change since start</button>
+            <button data-v="abs" aria-pressed="false">Grind time</button>
+        </div>
+        <div class="seg" id="range" role="group" aria-label="Time range">
+            <button data-v="14" aria-pressed="false">14 days</button>
+            <button data-v="30" aria-pressed="false">30 days</button>
+            <button data-v="90" aria-pressed="false">90 days</button>
+            <button data-v="0" aria-pressed="false">All</button>
+        </div>
+        <button id="reset" class="plain" hidden>Reset zoom</button>
+        <span class="note">Drag across a chart to zoom; Esc or double-click resets. Click a point for its commit.</span>
+    </div>
+    <h2 id="changes-h">Performance changes</h2>
+    <p class="note">At least 3% and 5&times; the run-to-run scatter. Commits listed merged between the last benchmark at the old level and the first at the new.</p>
+    <div class="controls"><select id="flane" aria-label="Lane"></select><select id="fcase" aria-label="Case"></select></div>
+    <div class="log"><table id="changes"></table></div>
+
+
+    <h2>Cases</h2>
+    <ul class="legend" id="legend"></ul>
+    <div class="scrollx"><table id="summary" class="sortable"></table></div>
+    <p id="zoomed" hidden></p>
+    <div class="grid" id="charts"></div>
+
+    <section id="scaling" hidden>
+        <h2>Scaling on Frontier</h2>
+        <p class="note">Weekly, AMD flang with OpenMP offload, case-optimized, 8 GPUs per node. Efficiency is against the smallest run: 100% is perfect scaling. Weak: 16 GB per GPU. Strong: 256 GB in all.</p>
+        <p id="scaleverdict"></p>
+        <div class="scrollx"><table id="scaletable"></table></div>
+        <figure id="scalechart" hidden><figcaption>Efficiency over time</figcaption></figure>
+    </section>
+
+    <h2>Commits</h2>
+    <p class="note">Grind time against the previous benchmarked commit, mean over cases. &#9650; &#9660; at 5%.</p>
+    <div class="log"><table id="log"></table></div>
+
+    <details>
+        <summary>Latest results</summary>
+        <div class="scroll"><table id="table" class="sortable"></table></div>
+    </details>
+    <div id="key"></div>
+</div></main>
+<footer class="site" id="site-footer"></footer>
+<script src="ci-pages.js"></script>
+<script>
+"use strict";
+MFCCI.chrome("benchmarks.html");
+// One JSON object per line, appended by the `record` job of .github/workflows/bench.yml.
+const { laneKey, laneOf, esc, day, PR_OF } = MFCCI;
+let ALL = [], LANES = [];                                // every lane; the lanes of the current view
+function setView(view) {
+    state.view = view; state.hidden.clear();
+    LANES = ALL.filter(l => l.view === view).sort((x, y) => x.order - y.order).map((l, i) => ({ ...l, color: `var(--s${i % 6 + 1})` }));
+    for (const o of $("view").children) o.setAttribute("aria-pressed", o.dataset.v === view);
+    MFCCI.param("view", view);
+    legend(); render();
+}
+
+const state = { view: "", metric: MFCCI.param("metric") === "abs" ? "abs" : "rel", days: [0, 14, 30, 90].includes(+MFCCI.param("range")) && MFCCI.param("range") !== null ? +MFCCI.param("range") : 90,
+                zoom: null, hidden: new Set(), records: [], shifts: [] };
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+};
+const fmt = (v, metric) => metric === "rel" ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : `${v.toPrecision(4)} ns`;
+const links = r => `<a href="${COMMIT_URL(r.sha)}" target="_blank" rel="noopener"><code>${r.sha.slice(0, 7)}</code></a>`
+    + (PR_OF(r) ? ` · <a href="https://github.com/MFlowCode/MFC/pull/${PR_OF(r)}" target="_blank" rel="noopener">PR #${PR_OF(r)}</a>` : "");
+const COMMIT_URL = sha => `https://github.com/MFlowCode/MFC/commit/${sha}`;
+
+// Median of five runs, never mixing runs from before and after a change to the case itself.
+function median5(pts) {
+    return pts.map((p, i) => {
+        const w = pts.slice(Math.max(0, i - 2), i + 3).filter(q => q.def === p.def).map(q => q.v).sort((a, b) => a - b);
+        return { ...p, m: w[w.length >> 1] };
+    });
+}
+
+// The visible time window: a dragged zoom wins over the range buttons.
+function windowOf() {
+    if (state.zoom) return state.zoom;
+    return [state.days ? Date.now() - state.days * 864e5 : 0, Infinity];
+}
+
+// Per case: for each visible lane, the points in the window, in the chosen metric.
+function series(slug) {
+    const [from, to] = windowOf();
+    return LANES.filter(l => !state.hidden.has(l.key)).map(lane => {
+        let pts = state.records
+            .filter(r => r.lane === lane.key && r.t >= from && r.t <= to && r.cases[slug])
+            .map(r => ({ t: r.t, sha: r.sha, pr: r.pr, covers: r.covers?.length || 1, subject: r.subject || "", cdef: r.cases[slug].def || "", env: r.env || "",
+                         def: `${r.cases[slug].def || ""}|${r.env || ""}`, v: r.cases[slug].grind }));
+        // Off-scale: over 3x the median of the runs around it. Judged locally so that a lasting change
+        // in level, which is the thing to see, is never mistaken for a stray run.
+        pts = pts.map((p, i) => {
+            const near = pts.slice(Math.max(0, i - 7), i + 8).map(q => q.v).sort((a, b) => a - b);
+            return { ...p, out: p.v > 3 * near[near.length >> 1] };
+        });
+        if (state.metric === "rel" && pts.length) {
+            const first = pts.slice(0, 5).map(p => p.v).sort((a, b) => a - b), base = first[first.length >> 1];
+            pts = pts.map(p => ({ ...p, v: (p.v / base - 1) * 100 }));
+        }
+        return { lane, pts: median5(pts) };
+    }).filter(s => s.pts.length);
+}
+
+function chart(slug) {
+    const W = 560, H = 260, L = 46, R = 10, T = 24, B = 22;       // the top margin holds the change labels, clear of the lines
+    const fig = document.createElement("figure"); fig.id = `case-${slug}`;
+    fig.innerHTML = `<figcaption>${slug}<span class="notes"></span></figcaption>`;
+    const capNotes = fig.querySelector(".notes"), noteFor = text => capNotes.insertAdjacentHTML("beforeend", `${capNotes.textContent ? " · " : ""}${text}`);
+    const ss = series(slug);
+    if (!ss.length) { fig.insertAdjacentHTML("beforeend", `<p class="note">No runs in this range.</p>`); return fig; }
+
+    const all = ss.flatMap(s => s.pts);
+    let t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t));
+    if (state.zoom) [t0, t1] = state.zoom;
+    if (t0 === t1) { t0 -= 432e5; t1 += 432e5; }
+    const inl = all.filter(p => !p.out), scale = inl.length ? inl : all;
+    let lo = Math.min(...scale.map(p => p.v)), hi = Math.max(...scale.map(p => p.v));
+    if (state.metric === "abs" && !state.zoom) lo = 0;
+    if (state.metric === "rel") { lo = Math.min(lo, -2); hi = Math.max(hi, 2); }
+    const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.05 || 1; hi += pad; if (lo !== 0) lo -= pad;
+    const x = t => L + (t - t0) / (t1 - t0) * (W - L - R);
+    const tOf = px => t0 + (Math.min(W - R, Math.max(L, px)) - L) / (W - L - R) * (t1 - t0);
+    const y = v => T + Math.max(0, (hi - v) / (hi - lo)) * (H - T - B);       // off-scale runs sit on the top edge
+
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${slug}: grind time history` });
+    // Markers are small: each gets a wider invisible target that says, on hover, what it marks.
+    const notes = [], pointAt = t => all.find(p => p.t === t), named = p => `${p.sha.slice(0, 7)}${PR_OF(p) ? ` (#${PR_OF(p)})` : ""} ${p.subject}`;
+    const mark = (cx, cy, text) => notes.push({ cx, cy, text });
+    for (let i = 0; i <= 4; i++) {
+        const v = lo + (hi - lo) * i / 4;
+        el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-width": 1 }, svg);
+        el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent =
+            state.metric === "rel" ? `${v > 0 ? "+" : ""}${v.toFixed(Math.abs(hi - lo) < 8 ? 1 : 0)}%` : v.toPrecision(3);
+    }
+    if (state.metric === "rel") el("line", { x1: L, x2: W - R, y1: y(0), y2: y(0), stroke: "var(--axis)", "stroke-width": 1 }, svg);
+    const span = t1 - t0 < 3 * 864e5 ? { month: "short", day: "numeric", hour: "numeric" } : { month: "short", day: "numeric" };
+    el("text", { x: L, y: H - 6 }, svg).textContent = new Date(t0).toLocaleString(undefined, span);
+    el("text", { x: W - R, y: H - 6, "text-anchor": "end" }, svg).textContent = new Date(t1).toLocaleString(undefined, span);
+
+    // Commits at which the benchmark case itself (its input file or arguments) changed.
+    const changed = new Set(ss.flatMap(s => s.pts.filter((p, i) => i && p.cdef !== s.pts[i - 1].cdef).map(p => p.t)));
+    // Commits at which the machine's compiler and module set (its lines of toolchain/modules) changed.
+    const envChanged = new Set(ss.flatMap(s => s.pts.filter((p, i) => i && p.env !== s.pts[i - 1].env).map(p => p.t)));
+    for (const t of envChanged) {
+        el("line", { x1: x(t), x2: x(t), y1: T, y2: H - B, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "1 3" }, svg);
+        el("rect", { x: x(t) - 3, y: T - 8, width: 6, height: 6, fill: "var(--ink-2)" }, svg);
+        mark(x(t), T - 5, `Compiler or module set changed at or just before ${named(pointAt(t))}`);
+    }
+    for (const t of changed) {
+        el("line", { x1: x(t), x2: x(t), y1: T, y2: H - B, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "3 3" }, svg);
+        el("path", { d: `M${x(t)},${T - 9}l4,4l-4,4l-4,-4z`, fill: "var(--ink-2)" }, svg);
+        mark(x(t), T - 5, `Benchmark case changed at or just before ${named(pointAt(t))}`);
+    }
+    const off = all.filter(p => p.out).length;
+    if (off) noteFor(`${off} off-scale ${off === 1 ? "run" : "runs"}`);
+    if (envChanged.size) noteFor(`modules changed ${envChanged.size === 1 ? "once" : envChanged.size + " times"}`);
+    if (changed.size) noteFor(`case changed ${changed.size === 1 ? "once" : changed.size + " times"}`);
+
+    for (const s of ss) {
+        for (const p of s.pts) {
+            if (p.out) { el("path", { d: `M${x(p.t)},${T - 1}l3.5,6h-7z`, fill: s.lane.color }, svg);
+                         mark(x(p.t), T + 2, `Off the scale: ${s.lane.label}, ${fmt(p.v, state.metric)} at ${named(p)}`); }
+            else el("circle", { cx: x(p.t), cy: y(p.v), r: 1.8, fill: s.lane.color, opacity: .5 }, svg);
+        }
+        el("path", { d: s.pts.map((p, i) => `${i && p.def === s.pts[i - 1].def ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.m).toFixed(1)}`).join(""),
+            fill: "none", stroke: s.lane.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    }
+
+    // The lasting changes found for this case on a lane shown here, marked where they happened. Each is
+    // labelled above the plot with the pull request alone; one with no room, and the size, are in the hover.
+    const found = [];
+    for (const e of state.shifts) for (const sp of e.spans) {
+        const hit = sp.hits.find(h => h.slug === slug); if (!hit || !ss.some(s => s.lane.key === sp.lane.key) || e.r.t < t0 || e.r.t > t1) continue;
+        found.push({ e, sp, hit, xe: x(e.r.t) });
+    }
+    const taken = [];                                            // x-extents of the labels drawn
+    for (const f of found.sort((a, b) => a.xe - b.xe)) {
+        const { e, sp, hit, xe } = f, text = e.suspects.length === 1 ? (e.suspects[0][2] ? `#${e.suspects[0][2]}` : e.suspects[0][0].slice(0, 7)) : `${e.suspects.length} PRs`;
+        const half = text.length * 3.3 + 4, at = Math.min(Math.max(xe, L + half), W - R - half);
+        el("line", { x1: xe, x2: xe, y1: T - 4, y2: H - B, stroke: "#f59e0b", "stroke-width": 1.5 }, svg);
+        if (taken.every(([a, b]) => at + half < a || at - half > b)) { taken.push([at - half, at + half]);
+            el("text", { x: at, y: T - 9, "text-anchor": "middle", class: "event" }, svg).textContent = text; }
+        mark(xe, H - B - 8, `${sp.lane.label}: grind time ${hit.pct > 0 ? "up" : "down"} ${Math.abs(hit.pct).toFixed(1)}% at ${e.suspects.length === 1 ? e.suspects[0][1] : `one of ${e.suspects.map(c => c[2] ? `#${c[2]}` : c[0].slice(0, 7)).join(", ")}`}`);
+    }
+
+    // Hover snaps to the nearest benchmarked commit and marks its point on every lane; a click opens
+    // that commit, a horizontal drag zooms every chart to the dragged span.
+    const cross = el("line", { y1: T, y2: H - B, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" }, svg);
+    const marks = el("g", {}, svg);
+    const band = el("rect", { y: T, height: H - T - B, fill: "var(--ink)", opacity: .12, visibility: "hidden" }, svg);
+    const hit = el("rect", { x: L, y: T, width: W - L - R, height: H - T - B, fill: "transparent", style: "cursor:crosshair;touch-action:pan-y" }, svg);
+    const pin = document.createElement("div"); pin.className = "pin"; pin.hidden = true;
+    let at = null;
+    const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true;
+    const times = [...new Set(all.map(p => p.t))].sort((a, b) => a - b);
+    const px = e => { const box = svg.getBoundingClientRect(); return (e.clientX - box.left) / box.width * W; };
+    let drag = null, dragged = false;
+
+    function point(e) {
+        const here = px(e), t = times.reduce((a, b) => Math.abs(x(b) - here) < Math.abs(x(a) - here) ? b : a);
+        // A commit can have been measured more than once: show the median and mark every run.
+        const rows = ss.map(s => ({ s, ps: s.pts.filter(p => p.t === t) })).filter(r => r.ps.length), c = rows[0].ps[0];
+        for (const r of rows) { const v = r.ps.map(p => p.v).sort((a, b) => a - b); r.v = v[v.length >> 1]; }
+        at = { c, rows };
+        cross.setAttribute("x1", x(t)); cross.setAttribute("x2", x(t)); cross.setAttribute("visibility", "visible");
+        marks.replaceChildren();
+        for (const r of rows) for (const p of r.ps) el("circle", { cx: x(t), cy: y(p.v), r: r.ps.length > 1 ? 3 : 4, fill: r.s.lane.color, stroke: "var(--surface)", "stroke-width": r.ps.length > 1 ? 1 : 2 }, marks);
+        tip.innerHTML = `<div class="when">${new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>`
+            + `<div class="commit"><code>${c.sha.slice(0, 7)}</code>${PR_OF(c) ? ` · PR #${PR_OF(c)}` : ""} ${esc(c.subject)}</div>`
+            + (c.covers > 1 ? `<div class="when">First benchmark of ${c.covers} commits</div>` : "")
+            + (changed.has(t) ? `<div class="when">◆ Benchmark case changed at this commit</div>` : "")
+            + (envChanged.has(t) ? `<div class="when">■ Compiler or module set changed at this commit</div>` : "")
+            + rows.map(r => `<div class="row"><span class="swatch" style="background:${r.s.lane.color}"></span>${r.s.lane.label}${r.ps.length > 1 ? ` <span class="when">(${r.ps.length} runs)</span>` : ""}<b>${fmt(r.v, state.metric)}</b></div>`).join("")
+            + `<div class="when">Click to pin · Drag to zoom</div>`;
+        tip.hidden = false;
+        const box = svg.getBoundingClientRect(), left = x(t) / W * box.width;
+        tip.style.top = "34px";
+        tip.style.left = left > box.width / 2 ? "" : `${left + 24}px`;
+        tip.style.right = left > box.width / 2 ? `${box.width - left + 24}px` : "";
+    }
+    hit.addEventListener("pointerdown", e => { drag = px(e); dragged = false; hit.setPointerCapture(e.pointerId); point(e); });
+    hit.addEventListener("pointermove", e => {
+        if (drag === null) return point(e);
+        const now = px(e), a = Math.max(L, Math.min(drag, now)), b = Math.min(W - R, Math.max(drag, now));
+        if (b - a > 6) { dragged = true; tip.hidden = true; band.setAttribute("x", a); band.setAttribute("width", b - a); band.setAttribute("visibility", "visible"); }
+    });
+    hit.addEventListener("pointerup", e => {
+        const a = drag, b = px(e); drag = null;
+        if (dragged) { state.zoom = [tOf(Math.min(a, b)), tOf(Math.max(a, b))]; render(); }
+    });
+    hit.addEventListener("pointercancel", () => { drag = null; band.setAttribute("visibility", "hidden"); });
+    hit.addEventListener("click", () => {
+        if (dragged || !at) { dragged = false; return; }
+        pin.innerHTML = `${links(at.c)} · ${esc(at.c.subject)}<br>` + at.rows.map(r => `${r.s.lane.label}: <b>${fmt(r.v, state.metric)}</b>`).join(" · ");
+        pin.hidden = false;
+    });
+    hit.addEventListener("pointerleave", () => { if (drag === null) { tip.hidden = true; marks.replaceChildren(); cross.setAttribute("visibility", "hidden"); } });
+    svg.addEventListener("dblclick", () => { if (state.zoom) { state.zoom = null; render(); } });
+    for (const m of notes) el("title", {}, el("circle", { cx: m.cx, cy: m.cy, r: 7, fill: "transparent" }, svg)).textContent = m.text;
+    if (state.zoom) { const b = document.createElement("button"); b.className = "unzoom"; b.textContent = "Reset zoom"; b.addEventListener("click", unzoom); fig.append(b); }
+    fig.append(svg, tip, pin);
+    return fig;
+}
+
+function table(slugs) {
+    const latest = l => state.records.filter(r => r.lane === l.key).at(-1);
+    const lanes = LANES.filter(latest);
+    $("table").innerHTML = `<tr><th>Case (grind time, ns)</th>${lanes.map(l => `<th>${l.label}</th>`).join("")}</tr>`
+        + slugs.map(s => `<tr><td>${s}</td>${lanes.map(l => `<td>${latest(l).cases[s]?.grind.toPrecision(4) ?? "–"}</td>`).join("")}</tr>`).join("")
+        + `<tr><td>Commit</td>${lanes.map(l => `<td><a href="${COMMIT_URL(latest(l).sha)}">${latest(l).sha.slice(0, 7)}</a></td>`).join("")}</tr>`;
+}
+
+// Every benchmarked commit in the window, newest first, with each lane's mean change in grind time
+// against the commit benchmarked before it (per case, medians, only where the case itself is unchanged).
+function log(slugs) {
+    const [from, to] = windowOf(), lanes = LANES;
+    const med = a => a.sort((x, y) => x - y)[a.length >> 1];
+    const commits = new Map();                           // sha -> { r, lane -> case -> { v, def } }
+    for (const r of state.records) {
+        if (!commits.has(r.sha)) commits.set(r.sha, { r, by: {}, covers: [] });
+        if ((r.covers?.length || 0) > commits.get(r.sha).covers.length) commits.get(r.sha).covers = r.covers;
+        const by = commits.get(r.sha).by[r.lane] ??= {};
+        for (const c in r.cases) (by[c] ??= { vs: [], def: r.cases[c].def }).vs.push(r.cases[c].grind);
+    }
+    const list = [...commits.values()], prev = {}, rows = [];
+    for (const cm of list) {
+        const cells = lanes.map(l => {
+            const now = cm.by[l.key], before = prev[l.key];
+            if (now) prev[l.key] = now;
+            if (!now || !before) return null;
+            const d = slugs.filter(c => now[c] && before[c] && now[c].def === before[c].def).map(c => med(now[c].vs) / med(before[c].vs) - 1);
+            return d.length ? d.reduce((a, b) => a + b, 0) / d.length * 100 : null;
+        });
+        if (cm.r.t >= from && cm.r.t <= to) rows.push({ cm, cells });
+    }
+    // The commits between this measurement and the one before it: any of them can be behind a change.
+    const also = cm => { const o = cm.covers.filter(c => c[0] !== cm.r.sha); return o.length ? `<br><span class="note">also since the last benchmark: ${o.map(c => c[2]
+        ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener" title="${esc(c[1])}">#${c[2]}</a>`
+        : `<a href="${COMMIT_URL(c[0])}" target="_blank" rel="noopener" title="${esc(c[1])}"><code>${c[0].slice(0, 7)}</code></a>`).join(", ")}</span>` : ""; };
+    const cell = v => v === null ? "<td>–</td>" : `<td${Math.abs(v) >= 5 ? ` class="${v > 0 ? "slower" : "faster"}"` : ""}>${Math.abs(v) >= 5 ? (v > 0 ? "▲ " : "▼ ") : ""}${v >= 0 ? "+" : ""}${v.toFixed(1)}%</td>`;
+    $("log").innerHTML = `<tr><th>Date</th><th>Commit and pull request</th>${lanes.map(l => `<th>${l.label}</th>`).join("")}</tr>`
+        + rows.reverse().slice(0, 400).map(({ cm, cells }) => `<tr><td>${day(cm.r.t)}</td><td class="what" title="${esc(cm.r.subject || "")}">${links(cm.r)} ${esc(cm.r.subject || "")}${also(cm)}</td>${cells.map(cell).join("")}</tr>`).join("");
+}
+
+function changes() {
+    const [from, to] = windowOf(), lane = $("flane").value, slug = $("fcase").value;
+    const rows = state.shifts.filter(e => e.r.t >= from && e.r.t <= to).map(e => ({ ...e, spans: e.spans.filter(s => (!lane || s.lane.key === lane) && (!slug || s.hits.some(h => h.slug === slug))) })).filter(e => e.spans.length);
+    const commit = c => c[2] ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener">#${c[2]}</a> ${esc(c[1])}`
+                             : `<a href="${COMMIT_URL(c[0])}" target="_blank" rel="noopener"><code>${c[0].slice(0, 7)}</code></a> ${esc(c[1])}`;
+    $("changes").innerHTML = `<tr><th>First seen</th><th>Commit</th><th>Lane</th><th>Cases</th><th>Change in grind time</th></tr>`
+        + (rows.length ? "" : `<tr><td colspan="5" class="note">None in this range.</td></tr>`)
+        + rows.map(e => {
+            const who = e.suspects.length === 1 ? commit(e.suspects[0]) : `One of ${e.suspects.length}:<br>` + e.suspects.map(commit).join("<br>");
+            return e.spans.map((s, i) => {
+                const pcts = s.hits.map(h => h.pct).sort((x, y) => x - y), mid = pcts[pcts.length >> 1], slower = mid > 0;
+                return `<tr>${i ? "" : `<td rowspan="${e.spans.length}">${day(e.r.t)}</td><td rowspan="${e.spans.length}" class="what" style="white-space:normal">${who}</td>`}`
+                    + `<td>${s.lane.view === "Frontier" ? s.lane.label : `${s.lane.view} · ${s.lane.label}`}</td>`
+                    + `<td class="cases">${s.hits.sort((x, y) => Math.abs(y.pct) - Math.abs(x.pct)).map(h => `${esc(h.slug)} <span class="note">${h.pct >= 0 ? "+" : ""}${h.pct.toFixed(1)}%</span>`).join("<br>")}</td>`
+                    + `<td class="${slower ? "slower" : "faster"}">${slower ? "▲ slower" : "▼ faster"} ${mid >= 0 ? "+" : ""}${mid.toFixed(1)}%</td></tr>`;
+            }).join("");
+        }).join("");
+}
+
+function headline() {
+    const [from, to] = windowOf(), ev = state.shifts.filter(e => e.r.t >= from && e.r.t <= to), dir = e => e.spans[0].hits[0].pct > 0;
+    const slower = ev.filter(dir).length, latest = ev[0], inRange = state.records.filter(r => r.t >= from && r.t <= to);
+    const part = (label, dot, text, href) => `<a${href ? ` href="${href}"` : ""}><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
+    $("statusline").innerHTML =
+        part("Changes in range", slower ? "bad" : "good", ev.length ? `${ev.length}: ${slower} slower, ${ev.length - slower} faster` : "none", "#changes-h")
+        + (latest ? part("Latest", dir(latest) ? "bad" : "good", `${dir(latest) ? "slower" : "faster"} at ${latest.suspects.length === 1 ? (latest.suspects[0][2] ? `#${latest.suspects[0][2]}` : latest.suspects[0][0].slice(0, 7)) : `one of ${latest.suspects.length} commits`} · ${day(latest.r.t)}`, "#changes-h") : "")
+        + part("Benchmarked", "", `${new Set(inRange.map(r => r.sha)).size} commits on ${new Set(inRange.map(r => r.lane)).size} lanes`);
+}
+
+// One row per case: for each lane shown, the trend as a small line and the change across the range.
+function summary(slugs) {
+    $("summary").innerHTML = `<tr><th>Case</th>${LANES.filter(l => !state.hidden.has(l.key)).map(l => `<th>${l.label}</th>`).join("")}</tr>` + slugs.map(slug => {
+        const by = new Map(series(slug).map(s => [s.lane.key, s]));
+        return `<tr><td><a href="#case-${slug}">${slug}</a></td>` + LANES.filter(l => !state.hidden.has(l.key)).map(l => {
+            const s = by.get(l.key); if (!s || s.pts.length < 2) return `<td class="note">–</td>`;
+            const ms = s.pts.map(p => p.m), lo = Math.min(...ms), hi = Math.max(...ms), last = s.pts.at(-1), first = s.pts[0];
+            const pct = state.metric === "rel" ? last.m - first.m : (last.m / first.m - 1) * 100;
+            const d = ms.map((m, i) => `${i ? "L" : "M"}${(2 + i / (ms.length - 1) * 80).toFixed(1)},${(17 - (hi > lo ? (m - lo) / (hi - lo) : 0.5) * 14).toFixed(1)}`).join("");
+            return `<td><svg class="spark" viewBox="0 0 84 20" aria-hidden="true"><path d="${d}" fill="none" stroke="${l.color}" stroke-width="1.5"/></svg>`
+                + `<span class="${Math.abs(pct) < 3 ? "" : pct > 0 ? "slower" : "faster"}">${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</span></td>`;
+        }).join("") + `</tr>`;
+    }).join("");
+}
+
+// Scaling: the latest run as a table, and each run's efficiency at each size over time.
+function scaling(records) {
+    if (!records.length) return;
+    $("scaling").hidden = false;
+    // Grind time is over all ranks: with perfect scaling it falls as 1/ranks, weak or strong.
+    const status = MFCCI.scalingStatus(records), latest = status.latest, pct = v => `${v.toFixed(0)}%`;
+    const eff = (r, kind) => status.measure(r).filter(x => x.kind === kind);
+    $("scaleverdict").innerHTML = `<span class="dot ${status.bad.length ? "bad" : "good"}"></span>` + (status.bad.length
+        ? `<b>Regressed:</b> ${status.bad.map(x => `${x.kind} at ${x.nodes} ${x.nodes === 1 ? "node" : "nodes"}`).join(", ")}.` : `<b>Within tolerance.</b>`)
+        + ` A run fails, and opens an issue, when efficiency falls more than ${MFCCI.SCALING.points} points below the median of the last ${MFCCI.SCALING.runs} runs, grind time at the smallest size rises more than ${MFCCI.SCALING.grind}%, or weak efficiency is under ${MFCCI.SCALING.weakFloor}%.`;
+    $("scaletable").innerHTML = `<tr><th>${day(latest.t)} · ${links(latest)}</th><th>Nodes</th><th>GPUs</th><th>Grid points</th><th>Grind time</th><th>Efficiency</th><th>Usual</th><th></th></tr>`
+        + status.rows.map(x => `<tr><td>${x.kind === "weak" ? "Weak" : "Strong"}</td><td>${x.nodes}</td><td>${x.ranks}</td><td>${(x.cells / 1e6).toFixed(0)} M</td><td>${x.grind.toPrecision(3)} ns</td>`
+            + `<td>${x.base ? "–" : pct(x.eff)}</td><td>${x.usual === null ? "–" : x.base ? `${x.usual.toPrecision(3)} ns` : pct(x.usual)}</td>`
+            + `<td>${x.bad ? `<span style="color:#b91c1c;font-weight:600">&#9650; regressed</span>` : ""}</td></tr>`).join("");
+    if (records.length < 2) return;
+    const lines = new Map();                                    // "weak 64" -> [[t, efficiency]]
+    for (const r of records) for (const kind of ["weak", "strong"]) for (const x of eff(r, kind).slice(1)) {
+        const key = `${kind === "weak" ? "Weak" : "Strong"}, ${x.nodes} nodes`; if (!lines.has(key)) lines.set(key, []); lines.get(key).push([r.t, x.eff, r]); }
+    const W = 720, H = 220, L = 44, R = 150, T = 10, B = 24, t0 = records[0].t, t1 = records.at(-1).t, lo = Math.min(50, ...[...lines.values()].flat().map(p => p[1])), hi = 110;
+    const x = t => L + (t - t0) / Math.max(t1 - t0, 1) * (W - L - R), y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+    const fig = $("scalechart"), svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Scaling efficiency over time" });
+    for (const v of [50, 75, 100].filter(v => v >= lo)) { el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-dasharray": v === 100 ? "none" : "2 3" }, svg); el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = pct(v); }
+    for (const t of [t0, t1]) el("text", { x: x(t), y: H - 6, "text-anchor": t === t0 ? "start" : "end" }, svg).textContent = day(t);
+    const ends = [];
+    [...lines].forEach(([key, pts], i) => { const color = `var(--s${i % 6 + 1})`;
+        el("path", { d: pts.map((p, j) => `${j ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(""), fill: "none", stroke: color, "stroke-width": 2 }, svg);
+        for (const p of pts) el("circle", { cx: x(p[0]), cy: y(p[1]), r: 3, fill: color }, svg).appendChild(el("title")).textContent = `${key}: ${pct(p[1])} at ${p[2].sha.slice(0, 7)}, ${day(p[0])}`;
+        ends.push({ at: y(pts.at(-1)[1]) + 4, text: `${key} · ${pct(pts.at(-1)[1])}` }); });
+    let floor = -Infinity;                                      // end labels, pushed apart where lines end together
+    for (const e of ends.sort((a, b) => a.at - b.at)) { floor = Math.max(e.at, floor + 13); el("text", { x: W - R + 8, y: floor }, svg).textContent = e.text; }
+    fig.hidden = false; fig.append(svg);
+}
+
+function unzoom() { state.zoom = null; render(); }
+document.addEventListener("keydown", e => { if (e.key === "Escape" && state.zoom) unzoom(); });
+
+function render() {
+    const slugs = [...new Set(state.records.flatMap(r => Object.keys(r.cases)))].sort();
+    const fmtDay = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    $("zoomed").hidden = !state.zoom;
+    if (state.zoom) $("zoomed").innerHTML = `Zoomed to ${fmtDay(state.zoom[0])} – ${fmtDay(state.zoom[1])} <button id="unzoom2">Reset zoom</button> <span class="note">or press Esc, or double-click a chart</span>`;
+    if (state.zoom) $("unzoom2").addEventListener("click", unzoom);
+    headline(); summary(slugs);
+    $("charts").replaceChildren(...slugs.map(chart));
+    $("reset").hidden = !state.zoom;
+    table(slugs);
+    log(slugs);
+    changes();
+}
+
+function controls() {
+    for (const [id, key, cast] of [["metric", "metric", String], ["range", "days", Number]]) {
+        $(id).addEventListener("click", e => {
+            const b = e.target.closest("button"); if (!b) return;
+            state[key] = cast(b.dataset.v);
+            if (key === "days") { state.zoom = null; MFCCI.param("range", b.dataset.v); MFCCI.chrome("benchmarks.html"); } else MFCCI.param("metric", b.dataset.v);
+            for (const o of $(id).children) o.setAttribute("aria-pressed", o === b);
+            render();
+        });
+    }
+    $("reset").addEventListener("click", () => { state.zoom = null; render(); });
+    $("view").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { state.zoom = null; setView(b.dataset.v); } });
+}
+
+function legend() {
+    $("legend").replaceChildren();
+    for (const lane of LANES) {
+        const li = document.createElement("li");
+        li.innerHTML = `<button aria-pressed="true" title="Show or hide this lane"><span class="swatch" style="background:${lane.color}"></span>${lane.label}</button>`;
+        li.firstChild.addEventListener("click", e => {
+            const on = state.hidden.delete(lane.key); if (!on) state.hidden.add(lane.key);
+            e.currentTarget.setAttribute("aria-pressed", on);
+            render();
+        });
+        $("legend").appendChild(li);
+    }
+    const mark = (d, text) => `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="${d}" fill="var(--ink-2)"/></svg>${text}</span></li>`;
+    $("legend").insertAdjacentHTML("beforeend", mark("M5,1l4,4l-4,4l-4,-4z", "Case changed") + mark("M2,2h6v6h-6z", "Modules changed") + mark("M5,1l4,7h-8z", "Off scale (&gt;3&times; neighbours)")
+        + `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><span style="width:2px;height:12px;background:#f59e0b;display:inline-block"></span>Performance change</span></li>`);
+}
+
+MFCCI.load.scaling().then(scaling);
+MFCCI.load.bench().then(records => {
+    if (!records.length) { $("statusline").innerHTML = `<span class="note">No benchmark history is available yet.</span>`; return; }
+    state.records = records;
+    MFCCI.updated($("updated"), records.at(-1).t, 7);
+    ALL = MFCCI.benchLanes(records);
+    state.shifts = MFCCI.shifts(records, ALL);
+    const views = [...new Set(ALL.map(l => l.view))].sort();
+    $("view").innerHTML = views.map(v => `<button data-v="${v}" aria-pressed="false">${v}</button>`).join("");
+    for (const id of ["metric", "range"]) for (const o of $(id).children) o.setAttribute("aria-pressed", o.dataset.v === String(id === "metric" ? state.metric : state.days));
+    const slugs = [...new Set(records.flatMap(r => Object.keys(r.cases)))].sort();
+    $("flane").innerHTML = `<option value="">All lanes</option>` + ALL.map(l => `<option value="${l.key}">${l.view === "Frontier" ? l.label : `${l.view} · ${l.label}`}</option>`).join("");
+    $("fcase").innerHTML = `<option value="">All cases</option>` + slugs.map(c => `<option>${c}</option>`).join("");
+    for (const id of ["flane", "fcase"]) $(id).addEventListener("change", changes);
+    MFCCI.sortable($("table")); MFCCI.sortable($("summary"));
+    $("key").innerHTML = MFCCI.LANE_KEY;
+    controls(); setView(views.includes(MFCCI.param("view")) ? MFCCI.param("view") : views[0]);
+});
+</script>
+</body>
+</html>

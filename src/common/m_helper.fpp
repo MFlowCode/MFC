@@ -803,6 +803,10 @@ contains
                         else if (glb_bounds_in(${ID}$)%end < location(${ID}$)) then
                             projected_location(${ID}$) = glb_bounds_in(${ID}$)%end - 1.0e-10_wp
                         end if
+                    else
+                        ! a periodic image (e.g. the contact point of a pair across the edge) is owned where it wraps to
+                        projected_location(${ID}$) = glb_bounds_in(${ID}$)%beg + modulo(location(${ID}$) &
+                                           & - glb_bounds_in(${ID}$)%beg, glb_bounds_in(${ID}$)%end - glb_bounds_in(${ID}$)%beg)
                     end if
                     owns_location = owns_location .and. ${X}$_cb(-1) <= projected_location(${ID}$) &
                         & .and. projected_location(${ID}$) < ${X}$_cb(${DIM}$)

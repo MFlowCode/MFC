@@ -1,0 +1,52 @@
+/* Shared by the CI pages: the look of the MFC landing page (slate band, white body, amber accent, no
+   cards) and the pieces more than one page uses. Each page keeps the rules only it needs. */
+body { background: #0f172a; font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+header.site { color: #ffffff; }
+header.site .brand { display: flex; align-items: center; gap: 16px; padding: 24px 0 8px; font-weight: 700; font-size: 22px; text-decoration: none; color: #ffffff; }
+header.site .brand img { height: 24px; }
+header.site nav { display: flex; flex-wrap: wrap; gap: 0 28px; padding-bottom: 20px; }
+header.site nav a { color: #ffffff; text-decoration: none; font-weight: 500; font-size: 17px; padding: 12px 2px; border-bottom: 2px solid #ffffff; }
+header.site nav a:hover, header.site nav a[aria-current="page"] { border-bottom-color: #fbbf24; }
+main { max-width: none; margin: 0; padding: 32px 0 48px; background: #ffffff; }
+footer.site { color: #d4d4d4; font-size: 13px; padding: 28px 0; }
+footer.site strong { color: #ffffff; } footer.site a { color: #fbbf24; text-decoration: none; }
+h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; }
+h2 { font-size: 20px; font-weight: 800; margin: 40px 0 6px; }
+.seg { border: 0; border-radius: 0; gap: 20px; overflow: visible; }
+.seg button { padding: 4px 0; border: 0; border-bottom: 2px solid transparent; font-weight: 600; color: var(--muted); }
+.seg button + button { border-left: 0; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: none; color: var(--ink); border-bottom-color: #fbbf24; }
+.panel, figure, .log { background: transparent; border: 0; border-top: 1px solid var(--grid); border-radius: 0; padding: 10px 0 0; }
+.log { border-bottom: 1px solid var(--grid); padding: 0; }
+.tiles { gap: 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
+.tile { background: transparent; border: 0; border-radius: 0; padding: 12px 16px 12px 0; }
+.tile .v { font-size: 24px; font-weight: 800; }
+.tip { border-radius: 2px; box-shadow: 0 1px 4px rgba(15, 23, 42, .2); }
+button.plain { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); padding: 4px 0; font-weight: 600; }
+input[type="search"] { border-radius: 0; border: 0; border-bottom: 2px solid var(--axis); background: transparent; padding: 4px 0; }
+
+/* the one-line answer at the top of a page */
+.statusline { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 10px 0 18px; padding: 12px 0; border-top: 2px solid #0f172a; border-bottom: 1px solid var(--grid); font-size: 16px; }
+.statusline a { text-decoration: none; color: var(--ink); }
+.statusline a:hover b { text-decoration: underline; }
+.statusline .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; display: block; }
+.statusline b { font-weight: 800; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; }
+.dot.good { background: #0ca30c; } .dot.bad { background: #d03b3b; } .dot.warn { background: #fbbf24; } .dot.idle { background: #cbd5e1; }
+.updated { color: var(--muted); font-size: 12px; margin: 0 0 4px; }
+.updated.stale { color: #92400e; background: #fef3c7; display: inline-block; padding: 2px 8px; font-weight: 600; }
+details.key { color: var(--ink-2); font-size: 13px; margin: 24px 0 0; max-width: 75ch; }
+details.key summary { cursor: pointer; font-weight: 600; }
+th[data-dir="asc"]::after { content: " \2191"; } th[data-dir="desc"]::after { content: " \2193"; }
+table.sortable th { cursor: pointer; }
+ul.events { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--grid); }
+ul.events li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 14px; }
+ul.events time { color: var(--muted); font-variant-numeric: tabular-nums; }
+ul.events .what { min-width: 0; overflow-wrap: anywhere; }
+
+/* Each group of choices says what it chooses, and a rule parts it from the next. */
+.controls .seg { align-items: baseline; }
+.controls .seg::before { content: attr(aria-label); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.controls .seg + .seg { border-left: 1px solid #cbd5e1; padding-left: 20px; }

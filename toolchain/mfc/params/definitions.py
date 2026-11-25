@@ -401,6 +401,7 @@ CONSTRAINTS = {
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
     "ib_neighborhood_radius": {"min": 0},
+    "num_local_ibs_max": {"min": 1},
     "face_bound": {"choices": [0, 1], "value_labels": {0: "off", 1: "positivity bound on face states"}},
     "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
     "ib_mass_relax": {"min": -1},
@@ -707,6 +708,7 @@ def _load():
     _r("num_stl_models", INT, {"ib"})
     _r("num_particle_clouds", INT, {"ib"})
     _r("ib_neighborhood_radius", INT, {"ib"})
+    _r("num_local_ibs_max", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
     _r("collision_temporal_resolution", INT, {"ib"})
@@ -1585,6 +1587,7 @@ _nv(
     "ib_coefficient_of_friction",
     "ib_friction_slip_eps",
     "ib_neighborhood_radius",
+    "num_local_ibs_max",
     "many_ib_patch_parallelism",
     "ib_second_order_vel",
     "ib_ip_min_dist",

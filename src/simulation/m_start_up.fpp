@@ -1611,7 +1611,7 @@ contains
 
             num_ibs = num_ibs + 1
             @:PROHIBIT(num_ibs > num_local_ibs_max, &
-                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
+                       & "Too many IBs on a single processor rank. Modify case file or increase num_local_ibs_max to resolve.")
             if (gbl_id <= size(namelist_ibs)) then
                 patch_ib(num_ibs) = namelist_ibs(gbl_id)
             else
