@@ -27,10 +27,10 @@
     <h1>Status</h1>
     <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
 
-    <h2>What changed in the last 14 days</h2>
+    <h2>Last 14 days</h2>
     <ul class="events" id="events"></ul>
 
-    <h2>Each lane on master</h2>
+    <h2>Lanes on master</h2>
     <div class="scrollx"><table id="lanes" class="sortable"></table></div>
     <div id="key"></div>
 </div></main>
@@ -53,7 +53,7 @@ Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench()]).then(([
     const tests = MFCCI.testStats(runs, 30, "master").tests, failing = tests.filter(t => t.f).length, retried = tests.filter(t => !t.f && t.r).length;
 
     $("statusline").innerHTML =
-        part("ci.html", "Master", !n ? "idle" : ok === n ? "good" : "bad", n ? `passing on ${ok} of ${n} lanes` : "no runs on record")
+        part("ci.html", "Master", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
         + part("ci.html", "Frontier node-hours, 7 days", share >= 0.9 ? "bad" : share >= 0.7 ? "warn" : "good", `${Math.round(hours).toLocaleString()} of ${MFCCI.CAP.toLocaleString()} (${Math.round(100 * share)}%)`)
         + part("benchmarks.html", `Performance, ${DAYS} days`, slower ? "bad" : "good", shifts.length ? `${shifts.length} lasting ${shifts.length === 1 ? "change" : "changes"}, ${slower} slower` : "no lasting change")
         + part("tests.html", "Tests on master, 30 days", failing ? "bad" : retried ? "warn" : "good", `${failing} failing, ${retried} passed only on a retry`);
@@ -81,10 +81,10 @@ Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench()]).then(([
     const everFailed = new Map();
     for (const r of ms) for (const j of r.jobs) for (const [uuid, name] of j.f || []) if (!everFailed.has(uuid)) everFailed.set(uuid, { r, j, name });
     for (const [uuid, x] of everFailed) if (x.r.t >= from) events.push({ t: x.r.t, dot: "bad",
-        html: `<a href="${MFCCI.withParams("tests.html")}"><b>Test ${esc(x.name)}</b></a> <code>${uuid}</code> failed on master for the first time in the record, on ${esc(MFCCI.CI_LANES.find(l => l.key === x.j.l)?.label || x.j.l)}` });
+        html: `<a href="${MFCCI.withParams("tests.html")}"><b>Test ${esc(x.name)}</b></a> <code>${uuid}</code> first failure on master, on ${esc(MFCCI.CI_LANES.find(l => l.key === x.j.l)?.label || x.j.l)}` });
     events.sort((a, b) => b.t - a.t);
     $("events").innerHTML = events.length ? events.map(e => `<li><time>${day(e.t)}</time><span class="what"><span class="dot ${e.dot}"></span>${e.html}</span></li>`).join("")
-                                          : `<li><time></time><span class="what">Nothing changed: no lane turned, no lasting change in grind time, no new failing test.</span></li>`;
+                                          : `<li><time></time><span class="what">No changes.</span></li>`;
 
     $("lanes").innerHTML = `<tr><th>Lane</th><th>Latest result</th><th>Since</th><th>Last passed</th></tr>` + status.rows.map(r =>
         `<tr><td>${r.lane.label} · ${r.kind === "test" ? "tests" : "case opt."}</td><td><span class="dot ${!r.last ? "idle" : r.ok ? "good" : "bad"}"></span>${!r.last ? "No result" : r.ok ? "Passing" : "Failing"}</td>`

@@ -71,9 +71,8 @@
 <header class="site" id="site-header"></header>
 <main><div class="wrap">
     <p class="updated" id="updated"></p>
-    <h1>Performance history</h1>
-    <p class="lede">Grind time of each benchmark case for every benchmarked commit on <code>master</code>, in nanoseconds per grid point,
-        equation and Runge&ndash;Kutta stage; lower is faster. Dots are runs, the line is a median of five. Phoenix is shown per GPU model.</p>
+    <h1>Performance</h1>
+    <p class="lede">Grind time on <code>master</code>: ns per grid point, equation and RK stage. Lower is faster.</p>
 
     <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
     <div class="controls">
@@ -89,28 +88,25 @@
             <button data-v="0" aria-pressed="false">All</button>
         </div>
         <button id="reset" class="plain" hidden>Reset zoom</button>
-        <span class="note">Drag across a chart to zoom all of them; click a point to keep its commit and pull request; hover a marker to see what it marks.</span>
+        <span class="note">Drag to zoom. Click a point for its commit.</span>
     </div>
-    <h2 id="changes-h">Changes beyond the noise</h2>
-    <p class="note">Lasting changes of at least 3% and five times the run-to-run scatter. The commits listed merged between the last
-        benchmark at the old level and the first at the new one, narrowed across the lanes that changed together: one commit is the cause, several
-        cannot be told apart. A change in the machine itself appears against whatever merged at the time.</p>
+    <h2 id="changes-h">Performance changes</h2>
+    <p class="note">At least 3% and 5&times; the run-to-run scatter. Commits listed merged between the last benchmark at the old level and the first at the new.</p>
     <div class="controls"><select id="flane" aria-label="Lane"></select><select id="fcase" aria-label="Case"></select></div>
     <div class="log"><table id="changes"></table></div>
 
 
-    <h2>Each case over time</h2>
+    <h2>Cases</h2>
     <ul class="legend" id="legend"></ul>
     <div class="scrollx"><table id="summary" class="sortable"></table></div>
     <div class="grid" id="charts"></div>
 
     <h2>Commits</h2>
-    <p class="note">Each benchmarked commit in the range above, newest first. A lane's figure is its grind time against the commit benchmarked
-        before it, averaged over the cases. Where commits went unbenchmarked in between, they are listed: any of them can be the cause. Changes of 5% or more are marked &#9650; slower or &#9660; faster; single runs on shared nodes are noisy.</p>
+    <p class="note">Grind time against the previous benchmarked commit, mean over cases. &#9650; &#9660; at 5%.</p>
     <div class="log"><table id="log"></table></div>
 
     <details>
-        <summary>Latest results as a table</summary>
+        <summary>Latest results</summary>
         <div class="scroll"><table id="table" class="sortable"></table></div>
     </details>
     <div id="key"></div>
@@ -283,7 +279,7 @@ function chart(slug) {
             + (changed.has(t) ? `<div class="when">◆ Benchmark case changed at this commit</div>` : "")
             + (envChanged.has(t) ? `<div class="when">■ Compiler or module set changed at this commit</div>` : "")
             + rows.map(r => `<div class="row"><span class="swatch" style="background:${r.s.lane.color}"></span>${r.s.lane.label}${r.ps.length > 1 ? ` <span class="when">(${r.ps.length} runs)</span>` : ""}<b>${fmt(r.v, state.metric)}</b></div>`).join("")
-            + `<div class="when">Click: keep with links · Drag: zoom</div>`;
+            + `<div class="when">Click to pin · Drag to zoom</div>`;
         tip.hidden = false;
         const box = svg.getBoundingClientRect(), left = x(t) / W * box.width;
         tip.style.top = "34px";
@@ -359,7 +355,7 @@ function changes() {
     const commit = c => c[2] ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener">#${c[2]}</a> ${esc(c[1])}`
                              : `<a href="${COMMIT_URL(c[0])}" target="_blank" rel="noopener"><code>${c[0].slice(0, 7)}</code></a> ${esc(c[1])}`;
     $("changes").innerHTML = `<tr><th>First seen</th><th>Commit</th><th>Lane</th><th>Cases</th><th>Change in grind time</th></tr>`
-        + (rows.length ? "" : `<tr><td colspan="5" class="note">No lasting change beyond the noise in this range.</td></tr>`)
+        + (rows.length ? "" : `<tr><td colspan="5" class="note">None in this range.</td></tr>`)
         + rows.map(e => {
             const who = e.suspects.length === 1 ? commit(e.suspects[0]) : `One of ${e.suspects.length}:<br>` + e.suspects.map(commit).join("<br>");
             return e.spans.map((s, i) => {
@@ -377,7 +373,7 @@ function headline() {
     const slower = ev.filter(dir).length, latest = ev[0], inRange = state.records.filter(r => r.t >= from && r.t <= to);
     const part = (label, dot, text, href) => `<a${href ? ` href="${href}"` : ""}><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
     $("statusline").innerHTML =
-        part("Lasting changes in this range", slower ? "bad" : "good", ev.length ? `${ev.length}: ${slower} slower, ${ev.length - slower} faster` : "none", "#changes-h")
+        part("Changes in range", slower ? "bad" : "good", ev.length ? `${ev.length}: ${slower} slower, ${ev.length - slower} faster` : "none", "#changes-h")
         + (latest ? part("Latest", dir(latest) ? "bad" : "good", `${dir(latest) ? "slower" : "faster"} at ${latest.suspects.length === 1 ? (latest.suspects[0][2] ? `#${latest.suspects[0][2]}` : latest.suspects[0][0].slice(0, 7)) : `one of ${latest.suspects.length} commits`} · ${day(latest.r.t)}`, "#changes-h") : "")
         + part("Benchmarked", "", `${new Set(inRange.map(r => r.sha)).size} commits on ${new Set(inRange.map(r => r.lane)).size} lanes`);
 }
@@ -434,8 +430,8 @@ function legend() {
         $("legend").appendChild(li);
     }
     const mark = (d, text) => `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="${d}" fill="var(--ink-2)"/></svg>${text}</span></li>`;
-    $("legend").insertAdjacentHTML("beforeend", mark("M5,1l4,4l-4,4l-4,-4z", "Benchmark case changed") + mark("M2,2h6v6h-6z", "Compiler or module set changed") + mark("M5,1l4,7h-8z", "Run off the scale (over 3x the runs around it)")
-        + `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><span style="width:2px;height:12px;background:#f59e0b;display:inline-block"></span>Lasting change (see the table below)</span></li>`);
+    $("legend").insertAdjacentHTML("beforeend", mark("M5,1l4,4l-4,4l-4,-4z", "Case changed") + mark("M2,2h6v6h-6z", "Modules changed") + mark("M5,1l4,7h-8z", "Off scale (&gt;3&times; neighbours)")
+        + `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><span style="width:2px;height:12px;background:#f59e0b;display:inline-block"></span>Performance change</span></li>`);
 }
 
 MFCCI.load.bench().then(records => {

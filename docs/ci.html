@@ -59,8 +59,6 @@
 <main><div class="wrap">
     <p class="updated" id="updated"></p>
     <h1>CI health</h1>
-    <p class="lede">What MFC's continuous integration did on the Frontier and Phoenix clusters: whether <code>master</code> passed on each
-        machine and compiler, what the runs cost in node-hours, and how long jobs waited.</p>
     <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
     <div class="controls">
         <div class="seg" id="range" role="group" aria-label="Time range">
@@ -70,14 +68,12 @@
         </div>
     </div>
 
-    <h2 id="now-h">Master right now</h2>
+    <h2 id="now-h">Master</h2>
     <p class="note" id="green"></p>
     <div class="panel scrollx"><table id="now" class="sortable"></table></div>
 
-    <h2 id="strip-h">Master, run by run</h2>
-    <p class="note">Each column is one Test Suite run on <code>master</code>, oldest on the left; each row is a machine, compiler and kind of job.
-        A scheduled run is the first to test every merge since the scheduled run before it, and names them.
-        A run cancelled because a newer commit arrived shows grey. Hover for the commit; click to keep its links.</p>
+    <h2 id="strip-h">Master runs</h2>
+    <p class="note">One column per <code>master</code> Test Suite run, oldest left. Grey: cancelled.</p>
     <ul class="legend">
         <li><span class="sw" style="background:var(--good)"></span>Passed</li>
         <li><span class="sw" style="background:var(--critical)"></span>Failed &#10005;</li>
@@ -87,34 +83,30 @@
     <div class="panel"><div class="strip"><div class="labels" id="rows"></div><div class="scroll" id="strip"></div></div><div class="pin" id="pin" hidden></div></div>
 
     <h2 id="cost-h">Node-hours per week</h2>
-    <p class="note">Node-hours of the SLURM jobs CI submitted, by what the job did or by what it was run for (a scheduled master run, a full
-        pull request run, or a pull request smoke run). The line on Frontier is the weekly ceiling of the queue CI
-        uses (16 nodes around the clock: 2,688). The current week is partial.</p>
+    <p class="note">SLURM node-hours of CI jobs. Dashed line: Frontier weekly ceiling (16 nodes &times; 168 h). The current week is partial.</p>
     <div class="controls"><div class="seg" id="cluster" role="group" aria-label="Cluster">
         <button data-v="frontier" aria-pressed="true">Frontier</button><button data-v="phoenix" aria-pressed="false">Phoenix</button></div>
         <div class="seg" id="split" role="group" aria-label="Split by">
-        <button data-v="kind" aria-pressed="true">By job type</button><button data-v="tier" aria-pressed="false">By what it was for</button></div></div>
+        <button data-v="kind" aria-pressed="true">By job type</button><button data-v="tier" aria-pressed="false">By trigger</button></div></div>
     <ul class="legend" id="kinds"></ul>
     <div class="panel"><svg class="wide" id="cost"></svg></div>
 
     <h2>Queue wait</h2>
-    <p class="note">Typical time a CI job waited in the SLURM queue before it started, per day, in minutes.</p>
+    <p class="note">Median SLURM queue wait per day, minutes.</p>
     <ul class="legend"><li><span class="sw" style="background:var(--s1)"></span>Frontier</li><li><span class="sw" style="background:var(--s2)"></span>Phoenix</li></ul>
     <div class="panel"><svg class="wide" id="queue"></svg></div>
 
     <h2>Build time</h2>
-    <p class="note">Median minutes a build's SLURM job ran on Frontier, per day. The AMD lane builds each variant in its own job.</p>
+    <p class="note">Median Frontier build job time per day, minutes.</p>
     <ul class="legend" id="buildkeys"></ul>
     <div class="panel"><svg class="wide" id="builds"></svg></div>
 
-    <h2 id="pr-h">One pull request</h2>
-    <p class="note">Every run of a pull request that reached the clusters: which tier ran, what failed and why, and whether it was run again.</p>
-    <div class="controls"><input type="search" id="prfind" placeholder="Pull request number or words from its title" aria-label="Pull request number or title"></div>
+    <h2 id="pr-h">Pull request</h2>
+    <div class="controls"><input type="search" id="prfind" placeholder="Number or title" aria-label="Pull request number or title"></div>
     <div class="panel scrollx"><table id="prruns"></table></div>
 
     <h2 id="lanes-h">Jobs by lane</h2>
-    <p class="note">Every cluster job in the range, on <code>master</code> and on pull requests. Smoke and full jobs are listed apart: a smoke job is one
-        short slice of the suite. A pull request job can fail because the change is wrong, so compare lanes with each other: one lane failing much more than the rest points at the machine or the lane.</p>
+    <p class="note">Cluster jobs in range, <code>master</code> and pull requests.</p>
     <div class="panel scrollx"><table id="lanes" class="sortable"></table></div>
     <div id="key"></div>
 </div></main>
@@ -132,7 +124,7 @@ const LANES = { "frontier-gpu-acc": "Frontier · CCE · OpenACC", "frontier-gpu-
 const KINDS = [["build", "Build"], ["test", "Test"], ["case-opt", "Case optimization"], ["bench", "Benchmark"]].map(([key, label], i) => ({ key, label, color: `var(--s${i + 1})` }));
 // What a job was run for. "past" is SLURM accounting from before runs were recorded one by one.
 const TIERS = [["sched", "Scheduled master", "var(--s1)"], ["full", "Pull request, full", "var(--s2)"], ["smoke", "Pull request, smoke", "var(--s3)"],
-               ["merge", "Master, per merge", "var(--s4)"], ["past", "Not attributed (older accounting)", "var(--idle)"]].map(([key, label, color]) => ({ key, label, color }));
+               ["merge", "Master, per merge", "var(--s4)"], ["past", "Unattributed", "var(--idle)"]].map(([key, label, color]) => ({ key, label, color }));
 const tierOf = (r, j) => r.master ? (r.event === "schedule" ? "sched" : "merge") : j.m === "smoke" ? "smoke" : "full";
 const WORST = ["success", "cancelled", "timed_out", "failure"], COLOR = { success: "var(--good)", failure: "var(--critical)", timed_out: "var(--serious)", cancelled: "var(--idle)" };
 
@@ -188,7 +180,7 @@ function headline(rows) {
     const smoke = prs.filter(r => r.jobs.every(j => j.m === "smoke")).length;
     const part = (href, label, dot, text) => `<a href="${href}"><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
     $("statusline").innerHTML =
-        part("#now-h", "Master now", !n ? "idle" : ok === n ? "good" : "bad", n ? `passing on ${ok} of ${n} lanes` : "no runs on record")
+        part("#now-h", "Master now", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
         + part("#strip-h", `Master runs fully green, ${state.days} days`, "", master.length ? `${green} of ${master.length}` : "–")
         + part("#cost-h", "Frontier node-hours, 7 days", share >= 0.9 ? "bad" : share >= 0.7 ? "warn" : "good", `${Math.round(nh).toLocaleString()} of ${CAP.toLocaleString()} (${Math.round(100 * share)}%)`)
         + part("#lanes-h", "Wait for a runner, 7 days", "", dur(med(waits)))
@@ -373,9 +365,9 @@ function lanes() {
 // The runs of one pull request, found by number or by words from its title.
 function pull() {
     const q = $("prfind").value.trim().toLowerCase();
-    if (!q) { $("prruns").innerHTML = `<tr><td class="none">Enter a pull request to see its runs.</td></tr>`; return; }
+    if (!q) { $("prruns").innerHTML = `<tr><td class="none">No pull request selected.</td></tr>`; return; }
     const runs = state.runs.filter(r => !r.master && (String(r.pr) === q.replace(/^#/, "") || (!/^#?\d+$/.test(q) && (r.title || "").toLowerCase().includes(q)))).sort((a, b) => b.t - a.t).slice(0, 40);
-    if (!runs.length) { $("prruns").innerHTML = `<tr><td class="none">No run of a matching pull request reached the clusters in the record.</td></tr>`; return; }
+    if (!runs.length) { $("prruns").innerHTML = `<tr><td class="none">No matching runs.</td></tr>`; return; }
     $("prruns").innerHTML = `<tr><th>Run</th><th>Pull request</th><th>Tier</th><th>Result on the clusters</th><th>What failed</th><th>Attempts</th></tr>` + runs.map(r => {
         const last = Math.max(...r.jobs.map(j => j.a)), js = r.jobs.filter(j => j.a === last), bad = js.filter(j => j.c === "failure"), cancelled = js.filter(j => j.c === "cancelled").length;
         const why = bad.map(j => `<a href="${RUN_URL(r.run, j.id)}" target="_blank" rel="noopener">${LANES[j.l] || j.l} ${j.k}${j.s ? ` [${j.s}]` : ""}</a>: ${j.why || "not read"}`

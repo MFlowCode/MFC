@@ -17,9 +17,8 @@ const MFCCI = (() => {
     const CI_LANES = [["frontier-gpu-acc", "Frontier", "CCE", "OpenACC"], ["frontier-gpu-omp", "Frontier", "CCE", "OpenMP"], ["frontier_amd-gpu-omp", "Frontier", "AMD", "OpenMP"],
                       ["phoenix-gpu-acc", "Phoenix", "NVHPC", "OpenACC"], ["phoenix-gpu-omp", "Phoenix", "NVHPC", "OpenMP"]]
         .map(([key, machine, compiler, offload]) => ({ key, machine, compiler, offload, label: `${machine} · ${compiler} · ${offload}` }));
-    const LANE_KEY = `<details class="key"><summary>What the lane names mean</summary><p><strong>Frontier</strong> is the Oak Ridge machine (AMD GPUs);
-        <strong>Phoenix</strong> is Georgia Tech's (NVIDIA GPUs of several models). <strong>CCE</strong> is the Cray compiler, <strong>AMD</strong> is AMD's flang,
-        <strong>NVHPC</strong> is NVIDIA's. <strong>OpenACC</strong> and <strong>OpenMP</strong> are the two ways MFC offloads to a GPU. A lane is one combination.</p></details>`;
+    const LANE_KEY = `<details class="key"><summary>Lane names</summary><p><strong>Frontier</strong>: OLCF, AMD GPUs. <strong>Phoenix</strong>: Georgia Tech, NVIDIA GPUs.
+        <strong>CCE</strong>: Cray compiler. <strong>AMD</strong>: AMD flang. <strong>NVHPC</strong>: NVIDIA compiler. <strong>OpenACC</strong>, <strong>OpenMP</strong>: GPU offload models.</p></details>`;
     const FRONTIER = { "frontier-gpu-acc": "CCE · OpenACC", "frontier-gpu-omp": "CCE · OpenMP", "frontier_amd-gpu-omp": "AMD · OpenMP" };
     const GPUS = ["h200", "h100", "a100", "l40s", "v100"];
     const laneKey = r => `${r.cluster}-${r.device}-${r.interface}${r.hardware ? `-${r.hardware}` : ""}`;
@@ -66,7 +65,7 @@ const MFCCI = (() => {
         if (!el || !t) return;
         const days = Math.floor((Date.now() - t) / 864e5);
         el.className = days >= staleDays ? "updated stale" : "updated";
-        el.textContent = `Updated ${new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}` + (days >= staleDays ? ` · ${days} days old: the recorder may have stopped` : "");
+        el.textContent = `Updated ${new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}` + (days >= staleDays ? ` · ${days} days old` : "");
     }
 
     // ---- sortable tables: click a header ----

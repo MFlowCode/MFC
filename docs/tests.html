@@ -56,8 +56,6 @@
 <main><div class="wrap">
     <p class="updated" id="updated"></p>
     <h1>Test health</h1>
-    <p class="lede">Which test cases failed or needed a retry on the Frontier and Phoenix clusters, by compiler and offload model, and what
-        made cluster test jobs fail when it was not a test.</p>
     <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
     <div class="controls">
         <div class="seg" id="range" role="group" aria-label="Time range">
@@ -71,15 +69,12 @@
         </div>
     </div>
 
-    <h2 id="why-h">Why test jobs failed</h2>
-    <p class="note">Each failed cluster test job, by what failed. Only the first column is about MFC's tests; the rest is the build, the
-        machine or the CI plumbing. <a href="#how">What each cause means</a>.</p>
+    <h2 id="why-h">Failed test jobs by cause</h2>
+    <p class="note">Failed cluster test jobs by cause. <a href="#how">Causes</a>.</p>
     <div class="panel"><table id="why" class="sortable"></table></div>
 
-    <h2 id="cases-h">Test cases by lane</h2>
-    <p class="note">Each test case that failed (&#10005;) or passed only on a retry (&#8635;), and on which lanes. A case that fails on one
-        compiler or one offload model points there; one that fails everywhere points at the change. On <code>master</code> the whole suite runs,
-        so the count is out of the lane's test jobs; pull request runs select tests, so there it is a plain count. Click a row for the jobs.</p>
+    <h2 id="cases-h">Test cases</h2>
+    <p class="note">&#10005; failed, &#8635; passed on retry. On <code>master</code> the count is out of the lane's test jobs. Click a row for the jobs.</p>
     <div class="controls">
         <div class="seg" id="pattern" role="group" aria-label="Pattern">
             <button data-v="" aria-pressed="true">All</button>
@@ -91,61 +86,40 @@
     </div>
     <div class="panel"><table id="tests"></table></div>
 
-    <h2 id="took-h">How long the tests take</h2>
-    <p class="note">Minutes the test phase of a full-suite job took, per day (median), by lane. A Frontier test job has 1 hour 59 minutes
-        in all, so a line climbing toward it means the suite is outgrowing its shards. Hover a point for its value.</p>
+    <h2 id="took-h">Test duration</h2>
+    <p class="note">Median test-phase minutes of full-suite jobs per day. Dashed line: Frontier job limit.</p>
     <ul class="legend" id="lanekeys"></ul>
     <div class="panel"><svg id="took"></svg></div>
 
     <h2>Slowest test cases</h2>
-    <p class="note">Median seconds, per lane, of the cases that were among the six slowest of at least three test jobs on a lane in the range.</p>
+    <p class="note">Median seconds per lane.</p>
     <div class="panel"><table id="slow" class="sortable"></table></div>
 
-    <h2 id="how">How a cluster test job fails</h2>
-    <p class="note">A test job on a cluster checks out the code on a runner on the login node, builds MFC in a SLURM job, runs the test
-        cases in SLURM jobs against that build, and uploads its logs. It can go red at any of those steps. The columns of the first table
-        above are these causes.</p>
+    <h2 id="how">Failure causes</h2>
+    <p class="note">A test job checks out the code, builds, runs the tests and uploads logs. It can fail at any step.</p>
     <div class="panel"><table class="explain">
-        <tr><th>Cause</th><th class="tag">What happened</th><th class="tag">Whose problem</th><th class="tag">What to do</th></tr>
-        <tr><td>Tests</td><td class="tag">One or more test cases failed after three attempts, or so many failed that the run stopped early
-            because the build or environment looked broken.</td><td class="tag">Usually the change. One compiler or offload model only:
-            that lane.</td><td class="tag">Look the case up in the table above. Failing on every lane: fix the change. One lane only: compare with
-            that lane on <code>master</code>.</td></tr>
-        <tr><td>Build</td><td class="tag">MFC did not compile, twice. The second attempt starts from a cleared build directory.</td>
-            <td class="tag">The change, if other lanes built it; otherwise that compiler or its modules.</td><td class="tag">Read the build log in the job.</td></tr>
-        <tr><td>Cluster down</td><td class="tag">The cluster's partitions were not accepting jobs when the lane started.</td>
-            <td class="tag">The cluster.</td><td class="tag">Nothing: it is re-run automatically after a wait.</td></tr>
-        <tr><td>Never started</td><td class="tag">The SLURM job waited in the queue past CI's limit (3 h) and was withdrawn so it would not hold a runner.</td>
-            <td class="tag">The queue: too many jobs for the nodes CI may use.</td><td class="tag">Nothing: it is re-run automatically after a wait. If it is frequent, CI is asking for more than the cluster gives it.</td></tr>
-        <tr><td>SLURM time limit</td><td class="tag">The SLURM job reached its time limit (1 h 59 min on Frontier, 3 h for tests on Phoenix) before finishing.</td>
-            <td class="tag">Usually the machine: a slow node or GPU model, or a filesystem stall.</td><td class="tag">Re-run. If it repeats on one
-            lane, the suite no longer fits there.</td></tr>
-        <tr><td>Bad node</td><td class="tag">A check run on the compute node before the tests found it unusable (for example a GPU that will not
-            initialize). CI excludes that node and tries one other; this is the second one failing too.</td><td class="tag">The cluster.</td>
-            <td class="tag">Re-run later; report the node if it keeps appearing.</td></tr>
-        <tr><td>Git checkout</td><td class="tag">The runner could not check out the code, before anything was built or run.</td>
-            <td class="tag">The runner's workspace or the cluster's filesystem.</td><td class="tag">Re-run. Nothing was tested.</td></tr>
-        <tr><td>Artifact upload</td><td class="tag">The job's work was done; uploading its logs to GitHub failed.</td><td class="tag">GitHub or the network.</td>
-            <td class="tag">Read the job's own output for the test result; re-run if a green check is needed.</td></tr>
-        <tr><td>Runner</td><td class="tag">The runner process was stopped, lost its filesystem, or a setup step ran past its limit.</td>
-            <td class="tag">The runner or the cluster.</td><td class="tag">Re-run.</td></tr>
-        <tr><td>Other</td><td class="tag">None of the above was recognized in the log.</td><td class="tag">Unknown.</td><td class="tag">Read the job.</td></tr>
+        <tr><th>Cause</th><th class="tag">What happened</th><th class="tag">Usually</th><th class="tag">Do</th></tr>
+        <tr><td>Tests</td><td class="tag">A test failed three attempts, or the run stopped early at a high failure rate.</td><td class="tag">The change; one lane only: that lane.</td><td class="tag">Find the case above.</td></tr>
+        <tr><td>Build</td><td class="tag">MFC did not compile, twice.</td><td class="tag">The change, or that compiler.</td><td class="tag">Read the build log.</td></tr>
+        <tr><td>Cluster down</td><td class="tag">Partitions were not accepting jobs.</td><td class="tag">The cluster.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Never started</td><td class="tag">The SLURM job waited past CI's 3 h queue limit.</td><td class="tag">The queue.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>SLURM time limit</td><td class="tag">The job reached its time limit (1 h 59 min on Frontier, 3 h for tests on Phoenix).</td><td class="tag">A slow node or filesystem.</td><td class="tag">Re-run once is automatic.</td></tr>
+        <tr><td>Bad node</td><td class="tag">The pre-test node check failed on two nodes in a row.</td><td class="tag">The cluster.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Git checkout</td><td class="tag">The runner could not check out the code.</td><td class="tag">The runner or filesystem.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Artifact upload</td><td class="tag">Uploading logs to GitHub failed after the work was done.</td><td class="tag">GitHub or the network.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Runner</td><td class="tag">The runner stopped, lost its filesystem, or a setup step timed out.</td><td class="tag">The runner.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Other</td><td class="tag">Not recognized in the log.</td><td class="tag">Unknown.</td><td class="tag">Read the job.</td></tr>
     </table></div>
-    <p class="note">Two outcomes are not failures. <strong>Cancelled</strong> means a newer commit arrived and replaced the run.
-        <strong>Passed on a retry</strong> means a case failed and then passed within its three attempts; the job is green, and the case is
-        counted above with &#8635; because a case that often needs a retry is unreliable on that lane.</p>
+    <p class="note"><strong>Cancelled:</strong> replaced by a newer commit. <strong>Passed on retry:</strong> failed, then passed within three attempts.</p>
 
-    <h2>How a test case fails</h2>
-    <p class="note">The "usual error" column is one of the test runner's own classes.</p>
+    <h2>Test error classes</h2>
     <div class="panel"><table class="explain">
-        <tr><th>Error</th><th class="tag">What it means</th><th class="tag">Can a retry fix it</th></tr>
-        <tr><td>Tolerance mismatch</td><td class="tag">The case ran, and its output differs from the stored reference by more than the tolerance.
-            Differences near round-off on a single compiler usually mean that compiler orders the arithmetic differently.</td>
-            <td class="tag">No: the same binary on the same input gives the same numbers.</td></tr>
-        <tr><td>Execution failed</td><td class="tag">A program did not start or exited with an error.</td><td class="tag">Sometimes: it can be the launcher or the node.</td></tr>
-        <tr><td>GPU memory fault</td><td class="tag">The program faulted in GPU memory.</td><td class="tag">No.</td></tr>
-        <tr><td>Timeout</td><td class="tag">The case ran past the per-case time limit, usually a hang.</td><td class="tag">Sometimes.</td></tr>
-        <tr><td>NaN detected</td><td class="tag">The solution became not-a-number.</td><td class="tag">No.</td></tr>
+        <tr><th>Error</th><th class="tag">Meaning</th><th class="tag">Retry helps</th></tr>
+        <tr><td>Tolerance mismatch</td><td class="tag">Output differs from the reference beyond tolerance.</td><td class="tag">No</td></tr>
+        <tr><td>Execution failed</td><td class="tag">A program did not start or exited with an error.</td><td class="tag">Sometimes</td></tr>
+        <tr><td>GPU memory fault</td><td class="tag">The program faulted in GPU memory.</td><td class="tag">No</td></tr>
+        <tr><td>Timeout</td><td class="tag">The case ran past its time limit.</td><td class="tag">Sometimes</td></tr>
+        <tr><td>NaN detected</td><td class="tag">The solution became NaN.</td><td class="tag">No</td></tr>
     </table></div>
     <div id="key"></div>
 </div></main>
