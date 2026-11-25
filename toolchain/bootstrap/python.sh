@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MFC_PYTHON_MIN_MAJOR=3
-MFC_PYTHON_MIN_MINOR=9
+MFC_PYTHON_MIN_MINOR=11
 # Newest supported release: raise once cantera (imported by every build) ships wheels for the next one.
 MFC_PYTHON_MAX_MINOR=14
 MFC_PYTHON_MIN_STR="$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR"
@@ -463,24 +463,4 @@ if ! cmp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/pyproject.toml" > /dev/
     cp "$(pwd)/toolchain/pyproject.toml" "$(pwd)/build/"
 
     fi  # end of USE_UV=0 (pip) block
-fi
-
-
-# Apply patches to installed packages.
-# fypp: always emit a resync linemarker after single-line $: macro calls so
-# that the compiler attributes the following Fortran statement to the correct
-# source line rather than the call-site line (off-by-1 in backtraces).
-# fypp >= 3.3 does this upstream, so only older versions (Python 3.9) are patched.
-FYPP_PY="$(python3 -c "import fypp; print(fypp.__file__ if tuple(map(int, fypp.VERSION.split('.')[:2])) < (3, 3) else '')" 2>/dev/null)"
-FYPP_PATCH="$(pwd)/toolchain/patches/fypp-linemarker-resync.patch"
-if [ -n "$FYPP_PY" ] && [ -f "$FYPP_PATCH" ]; then
-    if ! grep -q "Always emit a resync marker" "$FYPP_PY" 2>/dev/null; then
-        # Dry-run first so a failed patch leaves no .orig/.rej files behind.
-        if patch -p1 --forward --silent --dry-run "$FYPP_PY" < "$FYPP_PATCH" >/dev/null 2>&1 &&
-           patch -p1 --forward --silent "$FYPP_PY" < "$FYPP_PATCH" 2>/dev/null; then
-            ok "(venv) Applied$MAGENTA fypp$COLOR_RESET linemarker-resync patch."
-        else
-            warn "(venv) Failed to apply$MAGENTA fypp$COLOR_RESET linemarker-resync patch (fypp version may have changed)."
-        fi
-    fi
 fi

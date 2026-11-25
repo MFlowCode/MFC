@@ -1,5 +1,5 @@
 line-length = 200
-target-version = "py39"
+target-version = "py311"
 exclude = ["_version.py"]
 
 [lint]

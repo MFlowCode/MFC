@@ -12,8 +12,7 @@ dependencies = [
     "PyYAML",
     "argparse",
     "dataclasses",
-    "fastjsonschema<2.22; python_version < '3.10'",
-    "fastjsonschema; python_version >= '3.10'",
+    "fastjsonschema",
     "rapidfuzz",  # For "did you mean?" typo suggestions
 
     # Build System
@@ -35,7 +34,7 @@ dependencies = [
 
     # Chemistry
     "cantera>=3.1.0",
-    "pymbolic>=2022.2",  # Fortran generation; allow the last Python 3.9-compatible releases
+    "pymbolic>=2022.2",  # Fortran generation
 
     # Frontier Profiling
     "astunparse==1.6.2",
