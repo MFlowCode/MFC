@@ -14,7 +14,7 @@ JSON object, or exits non-zero when no log has a result:
 Grind time is wall time per grid point over all ranks, so with perfect scaling it falls as
 1/ranks in both cases (weak holds the cells per rank fixed, strong the cells in all), and the
 efficiency against the smallest run is grind(smallest)·ranks(smallest)/(grind(N)·ranks(N)).
-docs/benchmarks.html draws it.
+docs/dashboard/benchmarks.html draws it.
 """
 
 import glob
@@ -41,7 +41,7 @@ def runs(root: str) -> list:
         with open(path, errors="replace") as f:
             text = f.read()
         grind, step = last(r"Performance:" + NUMBER, text), last(r"\(avg" + NUMBER + r"s\)", text)
-        size = re.search(r"Simulating a regular (\d+)x(\d+)x(\d+) case on (\d+) rank", text)
+        size = re.search(r"Simulating a [\w-]+ (\d+)x(\d+)x(\d+) case on (\d+) rank", text)
         if grind is None or step is None or not size:
             continue
         cells = int(size.group(1)) * int(size.group(2)) * int(size.group(3))
@@ -55,4 +55,4 @@ if __name__ == "__main__":
     found = runs(sys.argv[1])
     if not found:
         sys.exit(f"{sys.argv[1]}: no log with a result")
-    print(json.dumps({"sha": sys.argv[2], "date": sys.argv[3], "subject": sys.argv[4], "cluster": "frontier", "interface": "acc", "runs": found}, separators=(",", ":")))
+    print(json.dumps({"sha": sys.argv[2], "date": sys.argv[3], "subject": sys.argv[4], "cluster": "frontier_amd", "interface": "omp", "runs": found}, separators=(",", ":")))
