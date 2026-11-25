@@ -352,7 +352,7 @@ contains
             max_dt(2) = cfl_target*hmin**2/maxval(1/(rho*Re_l))
         else if (viscous) then
             call s_compute_visc_diffusivity(Re_l, rho, nu)
-            max_dt(2) = cfl_target/(nu*inv_dx2)
+            max_dt(2) = min(cfl_target, visc_dt_cap)/(nu*inv_dx2)
         end if
 
         ! Capillary CFL calculations

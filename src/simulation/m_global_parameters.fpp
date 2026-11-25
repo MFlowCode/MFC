@@ -183,6 +183,12 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
 
+    !> Cap on the VCFL of the adaptive step: the measured SSP-RK3 limit of the viscous stencil in num_dims dimensions with a margin
+    !! (s_set_visc_dt_cap); visc_dt_stencil names the stencil for messages
+    real(wp)          :: visc_dt_cap
+    character(len=40) :: visc_dt_stencil
+    $:GPU_DECLARE(create='[visc_dt_cap]')
+
     ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values
     !> @{
     real(wp) :: wa_flg
@@ -1061,6 +1067,7 @@ contains
                 end do
             end if
         end if
+        call s_set_visc_dt_cap()
 
         ! Herschel-Bulkley non-Newtonian viscosity: gather per-fluid parameters into device arrays
         @:ALLOCATE(is_non_newtonian(1:num_fluids))
@@ -1270,6 +1277,28 @@ contains
         @:PREFER_GPU(dz)
 
     end subroutine s_initialize_global_parameters_module
+
+    !> visc_dt_cap: about 0.9 of the largest VCFL, (4/3 mu + mu_b)/rho*dt*sum(dx_d^-2), measured stable with SSP-RK3 (periodic box,
+    !! seeded noise, uniform grid, no bulk viscosity) for the stencil in 1D/2D/3D. Bulk viscosity raises the VCFL faster than the
+    !! stiffest mode's rate, so the cap stays conservative with it. chem_params%transport_dt and igr keep their own limits (no cap).
+    impure subroutine s_set_visc_dt_cap()
+
+        real(wp), dimension(3), parameter :: cap_face = [0.56_wp, 0.61_wp, 0.64_wp]  !< weno_Re_flux = F or compact
+        real(wp), dimension(3), parameter :: cap_ibvc = [0.56_wp, 0.67_wp, 0.72_wp]  !< ib_visc_compact (needs 2D+)
+        ! WENO chain of weno_Re_flux: stable to about 1.6 (2D), capped at 1 to stay within run_time_info's VCFL <= 1 abort
+        real(wp), dimension(3), parameter :: cap_weno = [1._wp, 1._wp, 1._wp]
+
+        if (.not. weno_Re_flux .or. weno_Re_flux_compact) then
+            visc_dt_cap = cap_face(num_dims); visc_dt_stencil = 'the face-difference viscous gradient'
+        else if (ib_visc_compact) then
+            visc_dt_cap = cap_ibvc(num_dims); visc_dt_stencil = 'ib_visc_compact'
+        else
+            visc_dt_cap = cap_weno(num_dims); visc_dt_stencil = 'the weno_Re_flux viscous gradient'
+        end if
+        if (igr .or. chem_params%transport_dt) visc_dt_cap = huge(1._wp)
+        $:GPU_UPDATE(device='[visc_dt_cap]')
+
+    end subroutine s_set_visc_dt_cap
 
     !> Initialize the Lagrangian bubble projected-field indices (bub_q_idx).
     impure subroutine s_initialize_bubble_idx
