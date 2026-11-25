@@ -1,10 +1,78 @@
-This file was created on 2026-11-19 18:03:48.740368.
+This file was created on 2026-11-21 11:46:14.766798.
 
 mfc.sh:
 
-    Invocation: test --no-build --only AMR --generate --gpu mp -j 8 --max-attempts 1 -- -c frontier_amd
-    Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        1e3f1be0b589504c52a07d83da48cedfdf64ef06 on amr-step0-regrid (dirty)
+    Invocation: test --no-build --generate --only 00EB793A 860E9D9B C4931B7D 44EAC667 3E085EAB -j 5 --max-attempts 1 --no-gpu -- -c frontier_amd
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        ae95ed6c666ad7073ccf0dd4144b6f3849fc0382 on amr-seam-nesting (dirty)
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.31.11 on login10
+    
+        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
+        Fortran : LLVMFlang v24.0.0 (/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wr/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : /sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.31.11 on login10
+    
+        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
+        Fortran : LLVMFlang v24.0.0 (/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wr/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
+        FC       : /sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 syscheck:
 
@@ -24,77 +92,9 @@ syscheck:
     
         MPI     : ON
         OpenACC : OFF
-        OpenMP  : ON
+        OpenMP  : OFF
     
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wl/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : /sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.31.11 on frontier06209
-    
-        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
-        Fortran : LLVMFlang v24.0.0 (/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : ON
-    
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wl/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
-        FC       : /sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.31.11 on frontier06209
-    
-        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
-        Fortran : LLVMFlang v24.0.0 (/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : ON
-    
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wl/build/venv/bin/fypp
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wr/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -112,7 +112,7 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.31.11 on frontier06209
+        CMake v3.31.11 on login10
     
         C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
         Fortran : LLVMFlang v24.0.0 (/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
@@ -126,9 +126,9 @@ pre_process:
     
         MPI     : ON
         OpenACC : OFF
-        OpenMP  : ON
+        OpenMP  : OFF
     
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wl/build/venv/bin/fypp
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-deps-exp/wr/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release

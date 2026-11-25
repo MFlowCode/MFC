@@ -6872,10 +6872,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # Three levels in 2D (the 1D test above is the only other one): 128x64 with amr_buf = 8 leaves level-2 boxes wide
         # enough to nest a third level; the 64x32 base stops at level 2. dt: the level-3 cells are 8x finer than level 0.
+        # The level-3 boxes facing each other across a level-2 seam are too wide to extend, so thin blocks of their own join them.
         three_2d = {"m": 127, "n": 63, "dt": 2.5e-5, "amr_block_beg(1)": 32, "amr_block_end(1)": 95, "amr_block_beg(2)": 16, "amr_block_end(2)": 47}
         three_2d.update({"amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 8, "amr_max_level": 3, "amr_max_blocks": 64})
         stack.push("AMR -> 2D -> three levels", {**amr_2d_base, **three_2d})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        stack.pop()
+        # Two levels with the level-2 region crossing a level-1 seam. The features at x = 0.1 and 0.8 run the whole height and the
+        # level-1 tiles meet at y = 31|32: the level-2 boxes on the two sides are joined across that seam, so their parent
+        # patches read the parents' seam ghosts and their reflux skips the shared face. Subcycling blends those ghosts in time.
+        seam_2d = {**amr_2d_base, **three_2d, "dt": 5.0e-5, "amr_max_level": 2, "amr_max_grid_size": 32}
+        stack.push("AMR -> 2D -> multi-level seam", seam_2d)
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
+        # np=2 with the features turned to run along x (y = 0.3 and 0.7): the joined boxes then sit on the level-1 seam
+        # x = 63|64, which is the rank boundary, and their parents are owned by different ranks (at np=2 the case above keeps
+        # each joined pair's parents on one rank)
+        turned = {f"patch_icpp({i})%{k}": v for i, yc, ly in ((1, 0.15, 0.3), (2, 0.5, 0.4), (3, 0.85, 0.3)) for k, v in (("x_centroid", 0.5), ("length_x", 1.0), ("y_centroid", yc), ("length_y", ly))}
+        cases.append(define_case_d(stack, "features along x -> 2 MPI Ranks", turned, ppn=2))
         stack.pop()
 
     amr_golden_tests()

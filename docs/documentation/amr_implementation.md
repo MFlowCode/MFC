@@ -144,7 +144,9 @@ immediately.
 
 - `amr_loc_of(k) > 0` exactly when this rank owns live block `k`; `amr_st_cap >= amr_loc_n`.
 - No box exceeds its level's cap (`s_amr_check_box_caps`); same-level boxes are disjoint (`s_amr_check_box_disjoint`);
-  a level>=2 box lies in exactly one parent.
+  a level>=2 box lies in exactly one parent, inside its nesting window or on its edge against a matching same-level box
+  (`f_amr_nested`). Such a box's parent patch reads the parent's seam ghosts (`amr_nest_seam`): each level's seams are
+  then exchanged before the next level gathers, and its reflux skips the face on the parent's edge.
 - A missing `s_amr_select_slot` makes a per-block routine act on the previous block.
 - `amr_buf` sets the tag padding and also enters the box-merge distance; changing it changes the box topology.
 - The rank-to-GPU map is `mod(local_rank, ndevices)`; `rocm-smi` numbering need not match.

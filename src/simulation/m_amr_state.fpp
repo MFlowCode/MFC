@@ -120,6 +120,8 @@ module m_amr_state
     integer              :: amr_n_own = 0
     !> cached f_amr_parent_block (0 for level <= 1), avoiding an O(global blocks) scan per block per stage
     integer, allocatable :: amr_parent_blk(:)
+    !> a level >= 2 block lies within amr_cpat_mar coarse cells of its parent's edge, so its parent patch reads the parent's ghosts
+    logical              :: amr_nest_seam = .false.
     integer, allocatable :: amr_child_ptr(:)   !< children of p = amr_child_idx(amr_child_ptr(p-1)+1 : amr_child_ptr(p)), ascending
     integer, allocatable :: amr_child_idx(:)   !< (amr_child_ptr(0) = 0)
     integer(8)           :: amr_l1r_epoch = -1_8
@@ -271,17 +273,21 @@ contains
 
     !> Fine cell coordinates of block k in dimension d, rebuilt from the global coarse boundaries gcb by replaying k's ancestor
     !! chain from replicated metadata, so any rank can reproduce them. Do not bisect amr_slots(parent)%x_cb instead: the parent's
-    !! slot exists only on its owner, which a level>=2 block's owner need not be.
-    impure subroutine s_amr_build_block_coords(k, gcb, glb, fcb, fcc, fdx, d)
+    !! slot exists only on its owner, which a level>=2 block's owner need not be. With pad, every level is widened by pad parent
+    !! cells per side, so the result holds k's boundaries over -1-pad*rr : nf+pad*rr, stored from fcb(-1).
+    impure subroutine s_amr_build_block_coords(k, gcb, glb, fcb, fcc, fdx, d, pad)
 
         integer, intent(in)                  :: k, d
         real(wp), intent(in)                 :: gcb(:)  !< global L0 cell boundaries
         integer, intent(in)                  :: glb     !< index of gcb's first element (-1, or -1 - buff_size for a padded build)
         real(wp), allocatable, intent(inout) :: fcb(:), fcc(:), fdx(:)
-        integer                              :: chain(0:amr_max_level), lev, j, a, lo, nf, span, rr, plo(3), phi(3), clb
+        integer, intent(in), optional        :: pad
+        integer                              :: chain(0:amr_max_level), lev, j, a, lo, nf, span, rr, plo(3), phi(3), clb, q
         real(wp), allocatable                :: cur(:), scb(:), scc(:), sdx(:)
 
         rr = amr_ref_ratio
+        q = 0
+        if (present(pad)) q = pad
         lev = amr_block_level(k)
         a = k
         do j = lev, 1, -1  ! chain(j) = k's ancestor at level j; chain(lev) = k
@@ -295,7 +301,7 @@ contains
         do j = 1, lev
             a = chain(j)
             span = amr_region_hi_all(d, a) - amr_region_lo_all(d, a) + 1  ! L0 cells the box covers
-            nf = rr**j*span - 1  ! its fine extent at level j
+            nf = rr**j*span - 1 + 2*q*rr  ! its fine extent at level j, padded
             if (j == 1) then
                 lo = amr_region_lo_all(d, a)  ! global L0 index of the box's low corner
             else
@@ -303,12 +309,12 @@ contains
                 lo = plo(d)
             end if
             if (j == lev) then
-                call s_build_level_coords(cur, clb, lo, nf, fcb, fcc, fdx)
+                call s_build_level_coords(cur, clb, lo - q, nf, fcb, fcc, fdx)
             else
                 if (allocated(scb)) deallocate (scb, scc, sdx)
                 allocate (scb(-1:nf), scc(0:nf), sdx(0:nf))
-                call s_build_level_coords(cur, clb, lo, nf, scb, scc, sdx)
-                cur = scb; clb = -1
+                call s_build_level_coords(cur, clb, lo - q, nf, scb, scc, sdx)
+                cur = scb; clb = -1 - q*rr
             end if
         end do
         if (allocated(scb)) deallocate (scb, scc, sdx)
