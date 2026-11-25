@@ -121,8 +121,10 @@ jobs:
     # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
     timeout-minutes: 480
     steps:
+      # The checkouts keep their files between runs (clean: false, for the .slurm_job_id files): an
+      # earlier run's logs and results there would pass for this run's.
       - name: Clean stale output files
-        run: rm -f *.out
+        run: rm -f ./*.out {pr,master}/bench*.out {pr,master}/bench*.yaml {pr,master}/bench*.gpu
 
       - name: Clone - PR
         uses: actions/checkout@v5
@@ -210,7 +212,8 @@ jobs:
       - name: Note GPU model
         if: github.event_name == 'schedule' && matrix.cluster == 'phoenix'
         run: |
-          grep -ohm1 'gres/gpu:[a-z0-9]*' pr/bench*-${{ matrix.device }}-${{ matrix.interface }}.out | cut -d: -f2 > pr/bench-${{ matrix.device }}-${{ matrix.interface }}.gpu || true
+          # This run's single-node job log only.
+          grep -ohm1 'gres/gpu:[a-z0-9]*' pr/bench-pair-${{ matrix.device }}-${{ matrix.interface }}.out | cut -d: -f2 > pr/bench-${{ matrix.device }}-${{ matrix.interface }}.gpu || true
 
       - name: Archive Result
         if: github.event_name == 'schedule'

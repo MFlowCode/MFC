@@ -15,6 +15,12 @@ if [ "${1:-}" = "step" ]; then
     lane=(gpu "$INTERFACE" "$CLUSTER")
     # 125 tells git bisect this commit cannot be judged.
     [ -f .github/scripts/cluster-lane.sh ] || exit 125
+    # Only the failed tests this commit has (tests/<UUID> holds a test's golden files): before the
+    # commit that added them, none exist and nothing here can have broken them.
+    if [ -n "$TESTS" ]; then
+        TESTS=$(for u in $TESTS; do [ -d "tests/$u" ] && echo "$u"; done | xargs)
+        [ -n "$TESTS" ] || exit 0
+    fi
     rm -f ./*.out
     if [ "$CLUSTER" != "phoenix" ]; then
         bash ".github/workflows/$CLUSTER/build.sh" gpu "$INTERFACE" || exit 125
@@ -63,6 +69,15 @@ case "$rc" in
     0)   report 1 "The failure did not reproduce at ${BAD:0:9}: no commit to blame. A flaky test or an infrastructure failure looks like this." ;;
     125) report 1 "${BAD:0:9} could not be judged (the cluster was down, or the job failed without a failed test), so nothing was bisected." ;;
 esac
+
+# And the green end: if it fails now too, what changed is the machine (a module default, a driver),
+# not a merge, and every commit in between would fail and be blamed.
+git checkout -q "$GOOD" || report 1 "Could not check out ${GOOD:0:9}."
+rc=0
+bash "$self" step || rc=$?
+if [ "$rc" -eq 1 ]; then
+    report 1 "The failure reproduces at ${GOOD:0:9}, the last green commit, too: the cluster's environment changed, not a merge. Nothing was bisected."
+fi
 
 git bisect start --first-parent "$BAD" "$GOOD" || report 1 "git bisect could not start between ${GOOD:0:9} and ${BAD:0:9}."
 git bisect run bash "$self" step | tee "$log"
