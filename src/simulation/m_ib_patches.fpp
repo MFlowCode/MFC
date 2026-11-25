@@ -63,6 +63,7 @@ contains
 
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
+        ! A cell inside several bodies is assigned by f_ib_marker, not by this rank's slot order, which depends on the decomposition
         !  3D Patch Geometries
         if (num_dims == 3) then
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
@@ -99,32 +100,35 @@ contains
                                             radius = patch_ib(patch_id)%radius
 
                                             if (f_is_inside_sphere(xyz_local(1), xyz_local(2), xyz_local(3), &
-                                                & radius)) ib_markers%sf(i, j, k) = encoded_patch_id
+                                                & radius)) ib_markers%sf(i, j, k) = f_ib_marker(ib_markers%sf(i, j, k), &
+                                                & encoded_patch_id)
                                         else if (patch_ib(patch_id)%geometry == 9) then
                                             ! cuboid geometry
                                             length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, &
                                                                & patch_ib(patch_id)%length_z]
                                             if (f_is_inside_cuboid(xyz_local(1), xyz_local(2), xyz_local(3), &
-                                                & length)) ib_markers%sf(i, j, k) = encoded_patch_id
+                                                & length)) ib_markers%sf(i, j, k) = f_ib_marker(ib_markers%sf(i, j, k), &
+                                                & encoded_patch_id)
                                         else if (patch_ib(patch_id)%geometry == 10) then
                                             ! cylinder geometry
                                             radius = patch_ib(patch_id)%radius
                                             if (f_is_inside_cylinder(xyz_local(2), xyz_local(3), xyz_local(1), radius, &
-                                                & patch_ib(patch_id)%length_x)) ib_markers%sf(i, j, k) = encoded_patch_id
+                                                & patch_ib(patch_id)%length_x)) ib_markers%sf(i, j, &
+                                                & k) = f_ib_marker(ib_markers%sf(i, j, k), encoded_patch_id)
                                         else if (patch_ib(patch_id)%geometry == 11) then
                                             ! 3D airfoil geometry
                                             airfoil_id = patch_ib(patch_id)%airfoil_id
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                             if (f_is_inside_airfoil(xyz_local(1), xyz_local(2), xyz_local(3), &
                                                 & patch_ib(patch_id)%length_z, airfoil_id)) ib_markers%sf(i, j, &
-                                                & k) = encoded_patch_id
+                                                & k) = f_ib_marker(ib_markers%sf(i, j, k), encoded_patch_id)
                                         else if (patch_ib(patch_id)%geometry == 12) then
                                             ! STL model geometry
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                             model_id = patch_ib(patch_id)%model_id
                                             eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                             if (eta > stl_models(model_id)%model_threshold) then
-                                                ib_markers%sf(i, j, k) = encoded_patch_id
+                                                ib_markers%sf(i, j, k) = f_ib_marker(ib_markers%sf(i, j, k), encoded_patch_id)
                                             end if
                                         end if
                                     end do
@@ -169,31 +173,32 @@ contains
                                     ! circular geometries
                                     radius = patch_ib(patch_id)%radius
                                     if (f_is_inside_cylinder(xyz_local(1), xyz_local(2), 0._wp, radius, 0._wp)) ib_markers%sf(i, &
-                                        & j, 0) = encoded_patch_id
+                                        & j, 0) = f_ib_marker(ib_markers%sf(i, j, 0), encoded_patch_id)
                                 else if (patch_ib(patch_id)%geometry == 3) then
                                     ! rectangular geometries
                                     length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
                                     if (f_is_inside_cuboid(xyz_local(1), xyz_local(2), xyz_local(3), length)) ib_markers%sf(i, j, &
-                                        & 0) = encoded_patch_id
+                                        & 0) = f_ib_marker(ib_markers%sf(i, j, 0), encoded_patch_id)
                                 else if (patch_ib(patch_id)%geometry == 4) then
                                     ! 2D airfoil geometry
                                     airfoil_id = patch_ib(patch_id)%airfoil_id
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                     if (f_is_inside_airfoil(xyz_local(1), xyz_local(2), 0._wp, 0._wp, &
-                                        & airfoil_id)) ib_markers%sf(i, j, 0) = encoded_patch_id
+                                        & airfoil_id)) ib_markers%sf(i, j, 0) = f_ib_marker(ib_markers%sf(i, j, 0), &
+                                        & encoded_patch_id)
                                 else if (patch_ib(patch_id)%geometry == 5) then
                                     ! STL model geometry
                                     xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
                                     model_id = patch_ib(patch_id)%model_id
                                     eta = f_model_is_inside(gpu_ntrs(model_id), model_id, xyz_local)
                                     if (eta > stl_models(model_id)%model_threshold) then
-                                        ib_markers%sf(i, j, 0) = encoded_patch_id
+                                        ib_markers%sf(i, j, 0) = f_ib_marker(ib_markers%sf(i, j, 0), encoded_patch_id)
                                     end if
                                 else if (patch_ib(patch_id)%geometry == 6) then
                                     ! ellipse geometry
                                     length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, 0._wp]
                                     if (f_is_inside_ellipse(xyz_local(1), xyz_local(2), length)) ib_markers%sf(i, j, &
-                                        & 0) = encoded_patch_id
+                                        & 0) = f_ib_marker(ib_markers%sf(i, j, 0), encoded_patch_id)
                                 end if
                             end do
                         end do
@@ -768,6 +773,20 @@ contains
     end subroutine s_encode_patch_periodicity
 
     !> Decode the encoded ID to recover the original patch ID and periodicity
+    !> Marker of a cell inside the body encoded new and already marked old: between two bodies the larger encoded id (as the
+    !! ib_parallelism path), independent of the rank's slot order; between periodic images of one body the later one, as the image
+    !! loops run in the same order on every rank
+    pure integer function f_ib_marker(old, new)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in) :: old, new
+
+        f_ib_marker = new
+        if (mod(old - 1, num_gbl_ibs + 1) /= mod(new - 1, num_gbl_ibs + 1)) f_ib_marker = max(old, new)
+
+    end function f_ib_marker
+
     subroutine s_decode_patch_periodicity(encoded_patch_id, patch_id, x_periodicity, y_periodicity, z_periodicity)
 
         $:GPU_ROUTINE(parallelism='[seq]')

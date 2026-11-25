@@ -1845,6 +1845,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             seam_pair = friction_box(20.0, [(9.35, 15.0, 0.3, 0.0), (10.65, 15.0, -0.3, 0.0)], 100, 0.003, 0.1)
             cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=3e-4))
+            # Two bodies overlapping in the first cell of a rank (#2433): that cell took the last body in the rank's slot order, so 1
+            # and 2 ranks differed by O(1) from step 37. Generic placement: shifted by 0.37 cells, body 2 larger and slower.
+            if num_fluids == 1:
+                overlap = friction_box(20.0, [(9.4425, 15.0925, 0.3, 0.0), (10.7425, 15.0925, -0.2739, 0.0)], 100, 0.003, 0.1, **{"patch_ib(2)%radius": 0.52185})
+                cases.append(define_case_d(stack, "IBM -> Collision -> Overlap cell on a rank seam", overlap, ppn=2, override_tol=3e-4))
             # Wall site: a circle pressed into the slip wall y = 0 at 0.1 with a 1e-4 slide. Without ib_friction_slip_eps the friction
             # force flips sign every step with magnitude mu*|F_n|; with it the slide dies out.
             wall_slide = friction_box(10.0, [(5.0, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
@@ -4038,6 +4043,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # whose patches are all numeric.
                 "1D_conduction_convergence",
                 "2D_axisym_conduction_convergence",
+                "2D_jet_in_crossflow",  # analytic tanh inflow profile
                 "3D_cyl_azimuthal_conduction_convergence",
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
@@ -5383,6 +5389,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # Serial I/O restart through pre_process old_ic, which read past the end of the interior-only record (#2494)
+        cases.append(define_case_d(stack, "pre_process old_ic", {"parallel_io": "F"}, restart_check="old_ic"))
         # CFL mode: restarts from save indices 1-4 must not rewrite their own checkpoint. t_save = 2^-8 keeps
         # n_start*t_save exact, so the first-step save check sees mytime - n_start*t_save within an ulp of dt.
         cases.append(define_case_d(stack, "cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.45, "n_start": 0, "t_save": 2.0**-8, "t_stop": 5 * 2.0**-8}, restart_check=True))
