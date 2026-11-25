@@ -4262,8 +4262,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
         # Burning carbon cylinder in quiescent hot air (ib_flux_wall, isothermal wall, CO flame) at 12 cells per diameter, 5e-7 s: the
-        # 1D radial reference of compare_burn_rate.py checks the burn rate on long runs. GNU 13 golden; the largest relative differences
-        # are 4e-7 (NVHPC 25.11, A100), 3e-7 (NVHPC 25.5, A100) and 6e-7 (NVHPC 25.11, CPU).
+        # 1D radial reference of compare_burn_rate.py checks the burn rate on long runs. GNU 12.3 golden (per-species ghost mirror
+        # weight); an A100 (NVHPC 25.11) agrees to 8e-9. The earlier golden spread 4e-7 (NVHPC 25.11, A100) and 6e-7 (NVHPC 25.11, CPU).
         cases.append(
             define_case_f(
                 "2D -> Chemistry -> IBM Carbon Cylinder -> Burn Rate",
