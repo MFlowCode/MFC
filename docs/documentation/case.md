@@ -652,7 +652,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `avg_state`	               | Integer | Averaged state evaluation method: [1] Roe average*; [2] Arithmetic mean  |
 | `wave_speeds`              | Integer | Wave-speed estimation: [1] Direct (\cite Batten97); [2] Pressure-velocity* (\cite Toro09)	 |
 | `weno_Re_flux`             | Logical | Compute velocity gradient using scalar divergence theorem	 |
-| `weno_Re_flux_compact`     | Logical | With `weno_Re_flux`, take the face-normal velocity gradient as the difference across the face |
+| `weno_Re_flux_compact`     | Logical | With `weno_Re_flux`, take the face-normal velocity gradient as the difference across the face (default T in Cartesian coordinates) |
 | `weno_avg`          	     | Logical | Arithmetic mean of left and right, WENO-reconstructed, cell-boundary values |
 | `dt`                       | Real    | Time step size |
 | `t_step_start`             | Integer | Simulation starting time step |
@@ -780,7 +780,7 @@ With `viscous`, the HLLC viscous work \f$\mathbf{u}\cdot\boldsymbol\tau\f$ at a 
 - `weno_Re_flux` activates the scalar divergence theorem in computing the velocity gradients using WENO-reconstructed cell boundary values.
 If this option is false, velocity gradient is computed using finite difference scheme of order 2 which is independent of the WENO order.
 
-- `weno_Re_flux_compact` (requires `weno_Re_flux`, Cartesian coordinates) replaces, on every face, the face-normal velocity gradient of the viscous flux by the difference across the face, `(u_{j+1} - u_j)/(x_{j+1} - x_j)`, the gradient that `weno_Re_flux = F` uses. The tangential and cross gradients keep the WENO chain, and the default `F` leaves every result unchanged.
+- `weno_Re_flux_compact` (requires `weno_Re_flux`, Cartesian coordinates) replaces, on every face, the face-normal velocity gradient of the viscous flux by the difference across the face, `(u_{j+1} - u_j)/(x_{j+1} - x_j)`, the gradient that `weno_Re_flux = F` uses. The tangential and cross gradients keep the WENO chain. It is on by default wherever it applies (`weno_Re_flux = T` in Cartesian coordinates); `weno_Re_flux_compact = F` gives the earlier WENO-chain face gradient. With it on, the viscous time-step cap is the face-difference one (0.56/0.61/0.64 in 1D/2D/3D) instead of 1.
   The WENO chain (face values, divergence-theorem cell gradient, reconstruction of that gradient, face mean) has a damping rate of exactly zero at the checkerboard wavenumber: a periodic box with a seeded u(y) = (-1)^j mode decays at rate 0.000 with `weno_Re_flux`, at 4 nu/dy^2 (20.5 at nu = 0.005, 32 cells) with `weno_Re_flux = F` or this option, and a smooth mode decays at the exact nu k^2 either way.
   At a no-slip wall (`bc_y%%beg = -16`) the odd-mirror ghost forces that band, and the velocity next to the wall alternates about the exact profile (up to 6 % of the bulk velocity in the first four cells of a 32-cell channel with HLLC, 12 % in the hot-wall thermal channel); the option removes it.
   The face difference has the explicit viscous time-step limit of `weno_Re_flux = F`, below that of the WENO chain, and the adaptive viscous step is capped to it (see `cfl_target`).
