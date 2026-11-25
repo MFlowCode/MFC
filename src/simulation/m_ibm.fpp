@@ -261,6 +261,8 @@ contains
         end if
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
+        ! Default (-1): the quadratic no-slip ghost, except with ib_second_order_vel, which has its own mirror
+        if (ib_wall_order < 0) ib_wall_order = merge(1, 2, ib_second_order_vel)
         ib_ip_width = merge(3, 2, ib_ip_interp == 2)
         ib_wall_quad = ib_wall_order == 2
         ib_keep_ghost = ib_ip_interp == 2 .or. ib_wall_quad
