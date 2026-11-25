@@ -106,6 +106,7 @@ print(
             "patch_icpp(2)%pres": p_dep,
             "patch_icpp(2)%alpha_rho(1)": rho0,
             "patch_icpp(2)%alpha(1)": 1.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%gamma": 1.0 / (gam - 1.0),
             **amr,
         }
