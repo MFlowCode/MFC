@@ -191,6 +191,11 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
 | `model_id`           | Integer | Not Supported         | Index into the `stl_models` array (geometry 21)              |
 | `sph_har_coeff(l,m)` | Real    | Not Supported         | Spherical-harmonic surface coefficient (geometry 14)         |
+| `r0` *               | Real    | Not Supported         | Euler-Euler bubbles: initial radius, as a multiple `r0/bub_pp%%R0ref` of each bin's equilibrium radius |
+| `v0` *               | Real    | Not Supported         | Euler-Euler bubbles: initial bubble-wall velocity (the mean, with QBMM) |
+| `p0` *               | Real    | Not Supported         | Euler-Euler bubbles, `polytropic = F`, no QBMM: initial bubble gas pressure |
+| `m0` *               | Real    | Not Supported         | Euler-Euler bubbles, `polytropic = F`, no QBMM: initial vapor mass in a bubble |
+| `non_axis_sym` *     | Logical | Not Supported         | Read and broadcast but not used by any patch                 |
 
 *: These parameters should be prepended with `patch_icpp(j)%` where $j$ is the patch index.
 
@@ -362,6 +367,7 @@ The measured accuracy of the wall value and wall-normal gradient, and which opti
 | `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
 | `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
 | `ib_neighborhood_radius`    | Integer | Parameter that controls the neighborhood size for IB detection. |
+| `num_local_ibs_max`  | Integer | Capacity of the per-rank immersed-boundary arrays: the most bodies (owned plus neighboring) one rank may hold. Default 30000. |
 | `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
 | `ib_second_order_vel` | Logical | Extrapolate the ghost-point velocity linearly through the boundary intercept. |
 | `ib_ip_min_dist`      | Real    | Minimum boundary-to-image-point distance, in local cell widths, for `ib_second_order_vel`. |
@@ -512,6 +518,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `ib_visc_compact = T` (requires `weno_Re_flux`) replaces the WENO velocity gradient on the viscous faces within two cells of a body cell by the compact one of `weno_Re_flux = F`: the normal difference across the face and the mean of the two cells' central tangential differences. The gradient of `weno_Re_flux` is built from reconstructed face values, a divergence-theorem cell gradient and a second reconstruction, a stencil about five cells wide, while the ghost values extend the flow only a layer or two into the body (the mirror leaves a kink at the wall), so the wide stencil carries the kink into the fluid faces next to the wall. Faces farther than two cells from a body are unchanged. The default `F` leaves every result unchanged.
 
 - `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
+- `num_local_ibs_max` (default 30000) sizes the per-rank immersed-boundary arrays: the body boxes, face-flux tallies, local id list, hand-off buffers and, with `collision_model`, the collision lookup (`num_local_ibs_max*27*8` rows, about 100 MB per rank at the default). A rank that holds more owned plus neighboring bodies stops with an error. Lowering it toward the largest per-rank body count saves device memory when several ranks share a GPU; results do not depend on it.
 
 #### Particle Clouds
 
@@ -687,11 +694,10 @@ See table [Boundary Conditions](#boundary-conditions) for details.
 Boundary condition patches can be used with non-characteristic boundary conditions.
 Their use is detailed in [Boundary Condition Patches](#boundary-condition-patches).
 
-- `bc_[x,y,z]%%vb[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%beg = -16`.
-Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%beg = -16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `bc_[x,y,z]%%end = -16` to work properly.
-
-- `bc_[x,y,z]%%ve[1,2,3]` specifies the velocity in the (x,1), (y,2), (z,3) direction applied to `bc_[x,y,z]%%beg` when using `bc_[x,y,z]%%end = -16`.
-Tangential velocities require viscosity, `weno_avg = T`, and `bc_[x,y,z]%%end = 16` to work properly. Normal velocities require `bc_[x,y,z]%%end = -15` or `bc_[x,y,z]%%end = -16` to work properly.
+- `bc_[x,y,z]%%vb1`, `vb2` and `vb3` are the x, y and z components of the wall velocity at `bc_[x,y,z]%%beg`, and `bc_[x,y,z]%%ve1`, `ve2` and `ve3` those at `bc_[x,y,z]%%end` (default 0).
+They are read only by the wall conditions, which set each ghost value to `2*v_wall - u` of its mirror cell.
+A no-slip wall (`-16`) applies all three components, so the wall can slide; a slip wall (`-15`) applies only the wall-normal one (`vb1`/`ve1` on an x boundary, `vb2`/`ve2` on y, `vb3`/`ve3` on z) and extrapolates the tangential velocity.
+A tangential wall velocity reaches the flow only through the viscous stress, so it needs `viscous = T`.
 
 - `model_eqns` specifies the choice of the multi-component model that is used to formulate the dynamics of the flow using integers from 1 through 3.
 `model_eqns = 1`, `2`, and `3` correspond to \f$\Gamma\f$-\f$\Pi_\infty\f$ model (\cite Johnsen08), 5-equation model (\cite Allaire02), and 6-equation model (\cite Saurel09), respectively.
@@ -765,10 +771,11 @@ If this option is false, velocity gradient is computed using finite difference s
   The WENO chain (face values, divergence-theorem cell gradient, reconstruction of that gradient, face mean) has a damping rate of exactly zero at the checkerboard wavenumber: a periodic box with a seeded u(y) = (-1)^j mode decays at rate 0.000 with `weno_Re_flux`, at 4 nu/dy^2 (20.5 at nu = 0.005, 32 cells) with `weno_Re_flux = F` or this option, and a smooth mode decays at the exact nu k^2 either way.
   At a no-slip wall (`bc_y%%beg = -16`) the odd-mirror ghost forces that band, and the velocity next to the wall alternates about the exact profile (up to 6 % of the bulk velocity in the first four cells of a 32-cell channel with HLLC, 12 % in the hot-wall thermal channel); the option removes it.
   The face difference has the explicit viscous time-step limit of `weno_Re_flux = F`, below that of the WENO chain, and the adaptive viscous step is capped to it (see `cfl_target`).
-  It does not touch the tangential and cross terms or the immersed-boundary walls (use `ib_visc_compact`, whose band covers faces near a body; the two can be combined). `weno_avg = F` with `weno_Re_flux` reads a cell's own two reconstructed face values, so it does not see a jump between two cells (an impulsive start next to a wall gives zero wall shear at the first step), and the validator warns on that combination; set `weno_avg = T`.
+  It does not touch the tangential and cross terms or the immersed-boundary walls (use `ib_visc_compact`, whose band covers faces near a body; the two can be combined). `weno_Re_flux` requires `weno_avg = T` (see `weno_avg`).
 
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
+The validator rejects `weno_Re_flux = T` with `weno_avg = F`. Without the average a cell's gradient is the difference of its own two reconstructed face values, `(vR(j) - vL(j))/dx`. With linear weights that is the fourth-order central difference, and the operator damps every mode but the checkerboard, as with the average; the nonlinear WENO weights of grid-scale noise break that: in a viscous periodic box at rest, noise of 1e-6 grows to 1e-2 by t = 10 in 2D and 3D at any time step (#2435), while with `weno_avg = T` it decays. The same gradient also misses a jump between two cells, so an impulsive start next to a wall gives zero wall shear at the first step (#2391).
 
 - `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`.
 
@@ -858,6 +865,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `E_wrt`                 | Logical | Add the total energy to the database	 |
 | `pres_wrt`              | Logical | Add the pressure to the database	|
 | `alpha_wrt(i)`          | Logical | Add the volume fraction of fluid $i$ to the database	|
+| `alpha_rho_e_wrt(i)`    | Logical | Add the partial internal energy of fluid $i$, `alpha_rho_e<i>` (6-equation model, `model_eqns = 3`, only; `cons_vars_wrt` writes all of them) |
 | `gamma_wrt`             | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
 | `ib_force_wrt`          | Logical | Record the immersed-boundary force history to `D/ib_forces.dat` (default off) |
@@ -874,6 +882,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `qm_wrt`                | Logical | Add the Q-criterion to the database|
 | `liutex_wrt`            | Logical | Add the Liutex to the database|
 | `cf_wrt`                | Logical | Write color function field |
+| `chem_wrt_Y(i)`         | Logical | Write the mass fraction of species $i$ as `Y_<species name>` (chemistry; `prim_vars_wrt` writes all of them) |
 | `chem_wrt_T`            | Logical | Write temperature field for chemistry output |
 | `fft_wrt`               | Logical | Enable FFT output |
 | `sim_data`              | Logical | Write interface and energy data files (post_process) |
@@ -1499,10 +1508,11 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | `rburn%%pref`      | Real    | Reactive-burn reference pressure for the drive [Pa] |
 | `rburn%%n`         | Real    | Reactive-burn pressure-drive exponent               |
 | `rburn%%ta`        | Real    | Reactive-burn activation temperature [K] (0 = off)  |
+| `rburn%%substeps`  | Integer | Operator-split burn sub-steps per time step (0 = source in the flow RHS) |
 
 - `cont_damage` activates the continuum damage model for hypoelastic solid materials (requires `hypoelasticity = T`; HLL/HLLC only). Damage is produced by tensile maximum principal Cauchy stress beyond `tau_star` (\f$\geq 0\f$) at rate `(alpha_bar*(sigma_1 - tau_star))**cont_damage_s` and is transported with the damageable-solid partial mass; see @ref equations for the model statement (\cite Cao19; \cite Spratt24). `tau_star`, `cont_damage_s` (\f$> 0\f$), and `alpha_bar` (\f$\geq 0\f$) are empirically determined.
 
-- `reactive_burn` converts a "reactant" fluid into a "product" fluid (`num_fluids = 2`, ``chemistry = 'F'``) via a programmed pressure burn `dlambda/dt = rburn%%k (1 - lambda) ((p - rburn%%pign)/rburn%%pref)^rburn%%n`. The two fluids share the same `gamma`/`pi_inf` and differ only in `qv`, so the conversion releases `qv` through the mixture EOS — a reactive-Euler/ZND detonation model on the diffuse-interface framework. It runs on the 5-equation (`model_eqns = 2`) and 6-equation (`model_eqns = 3`) multi-fluid models. Setting `rburn%%ta > 0` multiplies the rate by an Arrhenius factor `exp(-rburn%%ta/T)`, where `T` is the reactant phasic temperature, giving temperature-driven ignition instead of a pure pressure switch.
+- `reactive_burn` converts a "reactant" fluid into a "product" fluid (`num_fluids = 2`, ``chemistry = 'F'``) via a programmed pressure burn `dlambda/dt = rburn%%k (1 - lambda) ((p - rburn%%pign)/rburn%%pref)^rburn%%n`. The two fluids share the same `gamma`/`pi_inf` and differ only in `qv`, so the conversion releases `qv` through the mixture EOS — a reactive-Euler/ZND detonation model on the diffuse-interface framework. It runs on the 5-equation (`model_eqns = 2`) and 6-equation (`model_eqns = 3`) multi-fluid models. Setting `rburn%%ta > 0` multiplies the rate by an Arrhenius factor `exp(-rburn%%ta/T)`, where `T` is the reactant phasic temperature, giving temperature-driven ignition instead of a pure pressure switch. With `rburn%%substeps = N > 0` the burn is not added to the flow right-hand side: after each full time step the flow is frozen and the burn equation is integrated over `dt` in N equal sub-steps per cell, re-evaluating the mixture pressure from the frozen internal energy each sub-step, so a burn faster than the acoustic step does not limit it. A sub-step that would carry the progress variable past one converts the remaining reactant and ends that cell's burn for the step. It is not supported with `amr`.
 
 ### 16. Cylindrical Coordinates
 

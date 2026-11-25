@@ -2616,10 +2616,12 @@ contains
         integer :: i, j, k, ii, jj, kk, gp_layers_z  !< Iterator variables
         integer :: count, count_i, local_idx
         integer :: patch_id, encoded_patch_id, neighborhood_patch_id, xp, yp, zp
+        integer :: min_id  !< smallest neighborhood id seen; <= 0 means a marker's body is not in this rank's list
         logical :: is_gp
 
         count = 0
         count_i = 0
+        min_id = huge(1)
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
 
@@ -2633,7 +2635,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, local_idx, patch_id, encoded_patch_id, neighborhood_patch_id, &
                             & xp, yp, zp]', copyin='[count, count_i, glb_bounds, ib_markers%sf]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', present='[ghost_points]', collapse=3)
+                            & gp_layers_z]', reduction='[[min_id]]', reductionOp='[min]', present='[ghost_points]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -2662,6 +2664,8 @@ contains
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             call s_get_neighborhood_idx(patch_id, neighborhood_patch_id)
+                            min_id = min(min_id, neighborhood_patch_id)
+                            neighborhood_patch_id = max(neighborhood_patch_id, 1)
                             ghost_points(local_idx)%ib_patch_id = neighborhood_patch_id
                             ghost_points(local_idx)%x_periodicity = xp
                             ghost_points(local_idx)%y_periodicity = yp
@@ -2688,6 +2692,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        call s_check_gp_patch_ids(min_id)
 
     end subroutine s_find_ghost_points
 
@@ -2697,8 +2702,10 @@ contains
 
         integer :: i, j, k, ii, jj, kk, gp_layers_z, slab_n, run, c
         integer :: patch_id, encoded_patch_id, neighborhood_patch_id, xp, yp, zp
+        integer :: min_id  !< smallest neighborhood id seen (see s_check_gp_patch_ids)
         logical :: is_gp
 
+        min_id = huge(1)
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
         slab_n = m
@@ -2743,7 +2750,7 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, c, patch_id, encoded_patch_id, neighborhood_patch_id, xp, yp, &
                             & zp]', copyin='[ib_markers%sf, glb_bounds]', firstprivate='[gp_layers, gp_layers_z]', &
-                            & present='[ghost_points, gp_slab]')
+                            & reduction='[[min_id]]', reductionOp='[min]', present='[ghost_points, gp_slab]')
         do i = 0, m
             c = gp_slab(i)
             do j = 0, n
@@ -2766,6 +2773,8 @@ contains
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             call s_get_neighborhood_idx(patch_id, neighborhood_patch_id)
+                            min_id = min(min_id, neighborhood_patch_id)
+                            neighborhood_patch_id = max(neighborhood_patch_id, 1)
                             ghost_points(c)%ib_patch_id = neighborhood_patch_id
                             ghost_points(c)%x_periodicity = xp
                             ghost_points(c)%y_periodicity = yp
@@ -2792,8 +2801,19 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        call s_check_gp_patch_ids(min_id)
 
     end subroutine s_find_ghost_points_ordered
+
+    !> Abort if a ghost point's body was not in the rank's neighborhood list (s_get_neighborhood_idx returned -1). The setters clamp
+    !! the id to 1 so no device read of patch_ib(id <= 0) happens before this check.
+    subroutine s_check_gp_patch_ids(min_id)
+
+        integer, intent(in) :: min_id
+
+        if (min_id <= 0) call s_mpi_abort('IBM: a ghost point marks a body that is not in this rank''s IB neighborhood list')
+
+    end subroutine s_check_gp_patch_ids
 
     !> Compute the interpolation coefficients for image points
     subroutine s_compute_interpolation_coeffs()
@@ -4476,7 +4496,7 @@ contains
         real(wp), dimension(3)                          :: centroid
         logical                                         :: is_new
         type(ib_patch_parameters)                       :: tmp_patch
-        integer, dimension(num_local_ibs_max)           :: local_ib_idx_old
+        integer, allocatable                            :: local_ib_idx_old(:)
         integer, dimension(num_ib_patches_max_namelist) :: old_to_new  ! old patch_ib slot -> slot after compaction
         ! (2R+1)^num_dims - 1 neighbors in the radius-R neighborhood; each gets its own recv buffer
         integer                       :: max_nbrs
@@ -4490,6 +4510,7 @@ contains
 
         if (num_procs > 1) then
             ! save a copy of the local IB's global indices to cross-reference for later.
+            allocate (local_ib_idx_old(num_local_ibs_max))
             local_ib_idx_old = 0
             old_num_local_ibs = num_local_ibs
             do i = 1, num_local_ibs
@@ -4523,7 +4544,7 @@ contains
                     if (f_local_rank_owns_location(centroid, glb_bounds)) then
                         local_output_idx = local_output_idx + 1
                         @:PROHIBIT(local_output_idx > num_local_ibs_max, &
-                                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
+                                   & "Too many IBs on a single processor rank. Modify case file or increase num_local_ibs_max to resolve.")
                         local_ib_patch_ids(local_output_idx) = output_idx
                         if (patch_ib(output_idx)%owner_rank /= proc_rank) then
                             ! gained from a neighbor, which sends the ib_mass_relax bank (s_ib_migrate_banks)
@@ -4654,7 +4675,7 @@ contains
             @:PROHIBIT(num_ibs > num_gbl_ibs, "IB handoff duplicated a patch: num_ibs exceeds num_gbl_ibs.")
             deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
             if (ib_mass_relax > 0) call s_ib_migrate_banks(n_gain, gain_gid, gain_from, num_ibs_pre)
-            deallocate (gain_gid, gain_from)
+            deallocate (gain_gid, gain_from, local_ib_idx_old)
             $:GPU_UPDATE(device='[patch_ib(1:num_ibs), num_ibs]')
             call s_merge_ib_lookup(num_ibs_pre)
             @:PROHIBIT(ib_slot_cap > 0 .and. num_ibs > ib_slot_cap, &
