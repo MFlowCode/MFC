@@ -4091,6 +4091,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_amr_blast",
                 "1D_amr_sod",
                 "2D_amr_conservation",
+                # Registered in amr_golden_tests at their own sizes (validation examples)
+                "2D_amr_isentropic_vortex",
+                "3D_amr_sedov",
                 # Finite-rate propellant flame: the flame-front position after 50 steps is set by
                 # accumulated stiff-kinetics roundoff, so it drifts past the 1e-3 Example tolerance
                 # across compilers (nvhpc 25.11 golden vs 24.3/GNU/Intel/CCE/AMD disagree by ~1-5e-3).
@@ -6902,6 +6905,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # a 32^2 base (check_conservation.py)
         cases.append(define_case_f("AMR -> 1D -> Example -> Sod two levels", "examples/1D_amr_sod/case.py", ["-N", "32"]))
         cases.append(define_case_f("AMR -> 2D -> Example -> conservation subcycle", "examples/2D_amr_conservation/case.py", ["-N", "32", "--subcycle", "--steps", "40", "--saves", "2"]))
+        # Validation examples (check_vortex.py, check_sedov.py validate the physics on long runs; these are regression guards).
+        # Isentropic vortex, 64^2 base, 40 steps: a static block it enters (lock-step, linear) and blocks that follow it
+        # (subcycled, quartic).
+        vortex = "examples/2D_amr_isentropic_vortex/case.py"
+        io = {"parallel_io": "F", "t_step_stop": 40, "t_step_save": 40}
+        cases.append(define_case_f("AMR -> 2D -> Example -> isentropic vortex static block", vortex, ["--N", "64", "--mode", "static"], mods=io))
+        cases.append(define_case_f("AMR -> 2D -> Example -> isentropic vortex regrid subcycle quartic", vortex, ["--N", "64", "--mode", "regrid", "--subcycle", "--prolong", "2"], mods=io))
+        # Sedov blast, 32^3 base octant, blocks regridded onto the shock, subcycled, to t = 0.005
+        sedov_io = {"parallel_io": "F", "t_stop": 0.005, "t_save": 0.005, **{k: None for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT")}}
+        cases.append(define_case_f("AMR -> 3D -> Example -> Sedov regrid subcycle", "examples/3D_amr_sedov/case.py", ["--N", "32", "--mode", "amr", "--subcycle"], mods=sedov_io))
 
     amr_golden_tests()
 
