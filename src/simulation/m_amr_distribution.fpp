@@ -21,6 +21,7 @@ module m_amr_distribution
     use m_mpi_proxy, only: s_mpi_abort
     use m_ibm, only: ib_markers
     use m_amr_state
+    use m_phase_timing, only: s_mem_note_level
 
     implicit none
 
@@ -577,15 +578,18 @@ contains
 
         real(wp), intent(in)  :: wt(:)
         integer, intent(in)   :: maxlev
-        real(wp), allocatable :: rw(:), tw(:), rc(:)
+        real(wp), allocatable :: rw(:), tw(:), rc(:), fill(:)
         real(wp)              :: mx, mean, cmx, cmean
         integer               :: k, lev, nb, empty
+        integer(kind=8)       :: col_bytes
 
         if (.not. rank_time_wrt .or. proc_rank /= 0) return
 
         ! heap: num_procs long
-        allocate (rw(0:num_procs - 1), tw(0:num_procs - 1), rc(0:num_procs - 1))
+        allocate (rw(0:num_procs - 1), tw(0:num_procs - 1), rc(0:num_procs - 1), fill(amr_num_blocks))
         tw = 0._wp
+        ! cons + RK copy column of the flat store
+        col_bytes = 2_8*product(int(mbuf_hi - mbuf_lo + 1, 8))*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
         do lev = 1, maxlev
             rw = 0._wp; rc = 0._wp
             nb = 0
@@ -594,8 +598,11 @@ contains
                 rw(amr_block_owner(k)) = rw(amr_block_owner(k)) + wt(k)
                 rc(amr_block_owner(k)) = rc(amr_block_owner(k)) + 1._wp
                 nb = nb + 1
+                fill(nb) = product(merge(real((amr_region_hi_all(:,k) - amr_region_lo_all(:,k) + 1)*amr_ref_ratio**lev, &
+                     & wp)/real(max_f + 1, wp), 1._wp, amr_dim))
             end do
             if (nb == 0) cycle
+            call s_mem_note_level(lev, nint(maxval(rc)), fill(1:nb), col_bytes)
             tw = tw + rw
             mx = maxval(rw); mean = sum(rw)/real(num_procs, wp)
             empty = count(rw <= 0._wp)
@@ -613,7 +620,7 @@ contains
         ! fine_work = sum of assigned weights = fine cells advanced per step
         if (mean > 0._wp) print '(A,F8.3,A,I0,A,I0)', ' [amr-balance] TOTAL   : max/mean ', maxval(tw)/mean, &
             & ' ranks_with_no_fine_block ', count(tw <= 0._wp), ' fine_work ', nint(sum(tw), kind=8)
-        deallocate (rw, tw, rc)
+        deallocate (rw, tw, rc, fill)
 
     end subroutine s_amr_report_balance
 
