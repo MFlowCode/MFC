@@ -177,11 +177,12 @@ cases on 8 MPI ranks of one Frontier node (amdflang, CPU), relative to the unifo
 | 512^2 | 1024^2 | 0.41 | 0.27 |
 | 2048^2 | 4096^2 | 0.36 | 0.22 |
 
-- **Size.** On a GPU, below a few million cells on the grid AMR would replace, run the uniform grid: a GPU advances
-  those cells at nearly no extra cost. On CPUs AMR paid off from the smallest case above.
-- **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
-  blast's 54% would need a far larger grid.
-- **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
+- **Size.** On a GPU, AMR breaks even near a million cells on the grid it replaces (the subcycled droplet at 1.0 M
+  cells, 1.04) and pays well above that (0.32 at 16.8 M). Below that, run the uniform grid: a GPU advances those cells
+  at little extra cost. On CPUs AMR paid off from the smallest case above.
+- **Coverage.** The smaller the part of the fine grid the blocks hold, the sooner AMR pays: the blast's blocks hold
+  54% of a 2.1 M-cell grid and only its subcycled run is faster than the uniform one.
+- **Subcycling.** `amr_subcycle = T` took 26% to 39% less time than lock-step in every case above.
 - **Accuracy.** In the droplet runs the AMR solution reproduces the uniform fine one: the L1 density difference from
   it is 6.1e-8 at the 512^2 base, against 5.0e-4 for the uniform 512^2 grid. The blocks cover the interface from the
   first step and start from the patches evaluated at the fine resolution.
