@@ -106,6 +106,10 @@
     <ul class="legend" id="buildkeys"></ul>
     <div class="panel"><svg class="wide" id="builds"></svg></div>
 
+    <h2 id="built-h">Built with</h2>
+    <p class="note">The modules each lane loads on <code>master</code> today (<code>toolchain/modules</code>), and when its set last changed.</p>
+    <div class="scrollx"><table id="built"></table></div>
+
     <h2 id="pr-h">Pull request</h2>
     <div class="controls"><input type="search" id="prfind" placeholder="Number or title" aria-label="Pull request number or title"></div>
     <div class="panel scrollx"><table id="prruns"></table></div>
@@ -124,7 +128,8 @@ MFCCI.chrome("ci.html");
 // accounting from before that recorder existed, usage.jsonl (one line per day, cluster and kind).
 const RUN_URL = (run, job) => `https://github.com/MFlowCode/MFC/actions/runs/${run}${job ? `/job/${job}` : ""}`;
 const CAP = 2688;                                                    // Frontier: 16 nodes x 168 h
-const LANES = Object.fromEntries(MFCCI.CI_LANES.map(l => [l.key, l.label]));
+const LANES = new Proxy({}, { get: (_, key) => MFCCI.CI_LANES.find(l => l.key === key)?.label,        // the lanes known once the records load
+    ownKeys: () => MFCCI.CI_LANES.map(l => l.key), getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }) });
 const KINDS = [["build", "Build"], ["test", "Test"], ["case-opt", "Case optimization"], ["bench", "Benchmark"]].map(([key, label], i) => ({ key, label, color: `var(--s${i + 1})` }));
 // What a job was run for. "past" is SLURM accounting from before runs were recorded one by one.
 const TIERS = [["sched", "Scheduled master", "var(--s1)"], ["full", "Pull request, full", "var(--s2)"], ["smoke", "Pull request, smoke", "var(--s3)"],
@@ -444,6 +449,14 @@ Promise.all([MFCCI.load.usage(), MFCCI.load.builds(), MFCCI.load.runs()]).then((
     if (!runs.length && !usage.length) { $("statusline").innerHTML = `<span class="note">No CI history is available yet.</span>`; return; }
     MFCCI.updated($("updated"), runs.at(-1)?.t, 3);
     MFCCI.sortable($("lanes")); MFCCI.sortable($("now"));
+    // What each current lane is built with. The benchmark history says when a lane's module set last changed.
+    Promise.all([MFCCI.load.modules(), MFCCI.load.bench()]).then(([modulesOf, bench]) => {
+        const current = new Set(MFCCI.laneStatus(runs).rows.map(r => r.lane.key));
+        $("built").innerHTML = `<tr><th>Lane</th><th>Modules</th><th>Set last changed</th></tr>` + MFCCI.CI_LANES.filter(l => current.has(l.key)).map(l => {
+            const mine = bench.filter(r => r.cluster === l.cluster && r.env && !r.approx), now = mine.at(-1), first = now && mine.find((r, i) => mine.slice(i).every(x => x.env === now.env));
+            const since = !first ? "–" : first === mine[0] ? `before ${MFCCI.day(first.t)}` : `${MFCCI.day(first.t)} · ${MFCCI.commitLink(first.sha, first.pr)}`;
+            return `<tr><td>${l.label}</td><td style="white-space:normal;text-align:left">${modulesOf(l).map(m => `<code>${esc(m)}</code>`).join(" ") || "–"}</td><td>${since}</td></tr>`; }).join("");
+    });
     $("key").innerHTML = MFCCI.LANE_KEY;
     render();
     MFCCI.live().then(now => { if (now) { state.live = now; render(); } });

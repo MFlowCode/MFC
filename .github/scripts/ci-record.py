@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turn one workflow run into one line of the CI history.
 
-    ci-record.py <run.json> <jobs.json> [--usage usage.txt] [--compare compare.json] [--logs DIR] [--pr N]
+    ci-record.py <run.json> <jobs.json> [--usage usage.txt] [--compare compare.json] [--logs DIR] [--pr N] [--problems FILE]
 
 The inputs are the GitHub API's answers for the run and for its jobs (`actions/runs/<id>` and
 `actions/runs/<id>/jobs?filter=all`). Prints nothing for a run with no cluster job. Otherwise
@@ -9,7 +9,9 @@ one JSON object: the run (event, commit, title, and its pull request: --pr for a
 run, the number in the title for a master commit) and, per
 cluster job, a compact entry:
 
-    l  lane, e.g. frontier_amd-gpu-omp      k  kind: test, case-opt or bench
+    l  lane, e.g. frontier_amd-gpu-omp, from the job's name "<Machine> (<Compiler>) (<device>[-<offload>])";
+       a machine or compiler this script has not seen becomes a lane of its own
+    k  kind: test, case-opt or bench
     s  shard ("1/2") or null                m  "smoke" or "full"
     a  run attempt                          c  conclusion
     w  seconds waiting for a runner         d  seconds from start to finish
@@ -34,6 +36,9 @@ and, for any failed job whose log is there:
 leaves on each job. --compare: the API's `compare/<previous run's commit>...<this run's commit>`;
 a master run then lists the `merges` it is the first to test, as [sha, title, pull request]: a
 scheduled run covers every merge since the scheduled run before it.
+--problems: a file that receives one line per job this script could not read: a job on a cluster
+runner whose name has no lane, or a test job whose log's own count of passed tests is not the number read. ci-record.yml
+opens an issue from it, since either means the names or the log format changed under this script.
 The history feeds docs/dashboard/ci.html and docs/dashboard/tests.html.
 """
 
@@ -44,8 +49,14 @@ import re
 import sys
 from datetime import datetime
 
-LANE = re.compile(r"(Frontier|Phoenix) \((CCE|AMD|NVHPC)\) \((gpu|cpu)-(acc|omp|none)(?: \[(\d+/\d+)\])?\)")
+LANE = re.compile(r"(\w+) \(([\w.+]+)\) \((gpu|cpu)(?:-(acc|omp|none))?(?: \[(\d+/\d+)\])?\)")
 CLUSTERS = {("Frontier", "CCE"): "frontier", ("Frontier", "AMD"): "frontier_amd", ("Phoenix", "NVHPC"): "phoenix"}
+HOSTED = ("ubuntu", "macos", "windows")  # a runner label that starts with one of these is GitHub's own
+
+
+def lane(m) -> str:
+    cluster = CLUSTERS.get((m.group(1), m.group(2))) or re.sub(r"\W", "", f"{m.group(1)}_{m.group(2)}").lower()
+    return f"{cluster}-{m.group(3)}-{m.group(4) or 'none'}"
 
 
 def seconds(start, end):
@@ -82,7 +93,7 @@ def merges(compare: dict) -> list:
 
 STAMP = re.compile(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-PASSED = re.compile(r"^\s*\(\s*\d+/\d+\)\s+(.*?)\s+(\d+\.\d+)\s+([0-9A-F]{8})\s*$")
+PASSED = re.compile(r"^\s*\(\s*\d+\s*/\s*\d+\)\s+(.*?)\s+(\d+\.\d+)\s+([0-9A-F]{8})\s*$")
 TOOK = re.compile(r"Time: (?:(\d+)m )?(\d+(?:\.\d+)?)s")
 RECOVERED = re.compile(r"^\s*recovered on attempt \d+ \(([^)]*)\): (.*)$")
 
@@ -155,6 +166,10 @@ def tests(log: str, failed_job: bool) -> dict:
     out = {"n": len(passed), "f": list(failed.values()), "r": retried, "slow": [[u, passed[u], round(seconds[u])] for u in slow]}
     if took is not None:
         out["tt"] = took
+    # The runner's own summaries (the build's dry run prints one too, of 0): far fewer read than it counted is a misread.
+    said = max((int(n) for n in re.findall(r"^\W*(\d+) passed\b", "\n".join(lines), re.M)), default=0)
+    if len(passed) < 0.9 * said:
+        out["miscount"] = f"the summary says {said} passed, {len(passed)} were read"
     if failed_job:
         text = "\n".join(lines)
         out["why"] = why = (
@@ -173,12 +188,17 @@ def tests(log: str, failed_job: bool) -> dict:
     return out
 
 
-def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs: str = None, number: int = None):
-    entries = []
+def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs: str = None, number: int = None, problems: list = None):
+    entries, problems = [], [] if problems is None else problems
     for job in jobs:
         name = job.get("name") or ""
         m = LANE.search(name)
-        if not m or job.get("conclusion") in (None, "skipped"):
+        if job.get("conclusion") in (None, "skipped"):
+            continue
+        if not m:
+            labels = job.get("labels") or []
+            if "matrix." not in name and labels and not any(label.startswith(HOSTED) for label in labels):
+                problems.append(f"no lane in the name of cluster job {job.get('id')}: {name}")
             continue
         entry = {}
         log = os.path.join(logs, f"{job.get('id')}.txt") if logs else ""
@@ -187,9 +207,11 @@ def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs
                 entry = tests(f.read(), job["conclusion"] == "failure")
             if name.startswith(("Bench", "Case Opt")):  # not a test job: only why it failed
                 entry = {k: v for k, v in entry.items() if k in ("why", "e")}
+            elif "miscount" in entry:
+                problems.append(f"test job {job.get('id')}: {entry.pop('miscount')}: {name}")
         entries.append(
             {
-                "l": f"{CLUSTERS[(m.group(1), m.group(2))]}-{m.group(3)}-{m.group(4)}",
+                "l": lane(m),
                 "k": "bench" if name.startswith("Bench") else "case-opt" if name.startswith("Case Opt") else "test",
                 "s": m.group(5),
                 "m": "smoke" if "[smoke]" in name else "full",
@@ -229,6 +251,7 @@ if __name__ == "__main__":
     ap.add_argument("--compare")
     ap.add_argument("--logs")
     ap.add_argument("--pr", type=int)
+    ap.add_argument("--problems")
     args = ap.parse_args()
 
     def load(path, default):
@@ -241,6 +264,10 @@ if __name__ == "__main__":
     if args.usage:
         with open(args.usage) as f:
             slurm = usage(f)
-    rec = record(load(args.run, {}), load(args.jobs, {})["jobs"], slurm, load(args.compare, None), args.logs, args.pr)
+    unread = []
+    rec = record(load(args.run, {}), load(args.jobs, {})["jobs"], slurm, load(args.compare, None), args.logs, args.pr, unread)
+    if args.problems:
+        with open(args.problems, "w") as f:
+            f.write("".join(f"{p}\n" for p in unread))
     if rec:
         print(json.dumps(rec, separators=(",", ":"), sort_keys=True))

@@ -14,11 +14,25 @@ const MFCCI = (() => {
                                        : `<a href="${REPO}/commit/${sha}" target="_blank" rel="noopener"><code>${sha.slice(0, 7)}</code></a>`;
 
     // ---- lanes: a machine, a compiler and an offload model (and on Phoenix, for benchmarks, a GPU model) ----
-    const CI_LANES = [["frontier-gpu-acc", "Frontier", "CCE", "OpenACC"], ["frontier-gpu-omp", "Frontier", "CCE", "OpenMP"], ["frontier_amd-gpu-omp", "Frontier", "AMD", "OpenMP"],
-                      ["phoenix-gpu-acc", "Phoenix", "NVIDIA", "OpenACC"], ["phoenix-gpu-omp", "Phoenix", "NVIDIA", "OpenMP"]]
-        .map(([key, machine, compiler, offload]) => ({ key, machine, compiler, offload, label: machine === "Phoenix" ? `${compiler} · ${offload}` : `${machine} · ${compiler} · ${offload}` }));
+    // The lanes are whatever the records name (ci-record.py: "<cluster>-<device>-<offload>"). The clusters
+    // known here get their names and their order; any other shows as its record spells it.
+    const CLUSTERS = { frontier: ["Frontier", "CCE"], frontier_amd: ["Frontier", "AMD"], phoenix: ["Phoenix", "NVIDIA"] };
+    const OFFLOAD = { acc: "OpenACC", omp: "OpenMP", none: "CPU" }, MODULES = { frontier: "f", frontier_amd: "famd", phoenix: "p" };
+    function describe(key) {
+        const [cluster, device, offload] = key.split("-"), words = cluster.split("_").map(w => w[0].toUpperCase() + w.slice(1));
+        const [machine, compiler] = CLUSTERS[cluster] || [words[0], (words[1] || "").toUpperCase()];
+        const how = OFFLOAD[offload] || offload;
+        return { key, cluster, device, machine, compiler, offload: how, label: [machine === "Phoenix" && compiler === "NVIDIA" ? "" : machine, compiler, how].filter(Boolean).join(" · ") };
+    }
+    const rank = l => [Object.keys(CLUSTERS).indexOf(l.cluster) + 1 || 99, l.device === "gpu" ? 0 : 1, l.cluster, l.offload];
+    const CI_LANES = [];                                         // filled, in place, as records load
+    function seeLanes(keys) {
+        for (const key of new Set(keys)) if (!CI_LANES.some(l => l.key === key)) CI_LANES.push(describe(key));
+        CI_LANES.sort((a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; return 0; });
+    }
+    seeLanes(["frontier-gpu-acc", "frontier-gpu-omp", "frontier_amd-gpu-omp", "phoenix-gpu-acc", "phoenix-gpu-omp"]);
     const LANE_KEY = `<details class="key"><summary>Lane names</summary><p><strong>Frontier</strong>: OLCF, AMD GPUs. <strong>Phoenix</strong>: Georgia Tech, NVIDIA GPUs.
-        <strong>CCE</strong>: Cray compiler. <strong>AMD</strong>: AMD flang. <strong>NVIDIA</strong>: NVHPC compiler, on Phoenix. <strong>OpenACC</strong>, <strong>OpenMP</strong>: GPU offload models.</p></details>`;
+        <strong>CCE</strong>: Cray compiler. <strong>AMD</strong>: AMD flang. <strong>NVIDIA</strong>: NVHPC compiler, on Phoenix. <strong>OpenACC</strong>, <strong>OpenMP</strong>: GPU offload models. <strong>CPU</strong>: no offload.</p></details>`;
     const FRONTIER = { "frontier-gpu-acc": "CCE · OpenACC", "frontier-gpu-omp": "CCE · OpenMP", "frontier_amd-gpu-omp": "AMD · OpenMP" };
     const GPUS = ["h200", "h100", "a100", "l40s", "v100"];
     const laneKey = r => `${r.cluster}-${r.device}-${r.interface}${r.hardware ? `-${r.hardware}` : ""}`;
@@ -35,7 +49,13 @@ const MFCCI = (() => {
     const months = (n = 4) => [...Array(n).keys()].map(i => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); return `ci/${d.toISOString().slice(0, 7)}.jsonl`; });
     const load = {
         bench: () => cache.bench ??= get("benchmarks.jsonl").then(t => lines(t).map(r => ({ ...r, lane: laneKey(r), t: Date.parse(r.date) })).sort((a, b) => a.t - b.t)),
-        runs:  () => cache.runs ??= Promise.all(months().map(get)).then(ms => ms.flatMap(lines).map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t)),
+        runs:  () => cache.runs ??= Promise.all(months().map(get)).then(ms => { const rs = ms.flatMap(lines).map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t);
+            seeLanes(rs.slice(-400).flatMap(r => r.jobs.map(j => j.l))); return rs; }),
+        // What each lane loads today: its lines of toolchain/modules on master.
+        modules: () => cache.modules ??= fetch("https://raw.githubusercontent.com/MFlowCode/MFC/master/toolchain/modules").then(r => r.ok ? r.text() : "").catch(() => "").then(text => l => {
+            const slug = MODULES[l.cluster], found = [];
+            if (slug) for (const line of text.split("\n")) { const m = line.match(new RegExp(`^${slug}-(all|${l.device})\\s+(.*)`)); if (m) found.push(...m[2].trim().split(/\s+/).filter(w => !w.includes("="))); }
+            return found; }),
         usage: () => cache.usage ??= get("usage.jsonl").then(lines),
         builds: () => cache.builds ??= get("builds.jsonl").then(lines),
         scaling: () => cache.scaling ??= get("scaling.jsonl").then(lines, () => []).then(rs => rs.map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t)),
@@ -172,7 +192,7 @@ const MFCCI = (() => {
         });
     }
     function laneStatus(runs) {
-        const ms = masterRuns(runs), recent = ms.filter(r => r.t >= Date.now() - 30 * 864e5), rows = [];
+        const ms = masterRuns(runs), recent = ms.filter(r => r.t >= Date.now() - 7 * 864e5), rows = [];     // a lane is current if master ran it this week
         for (const l of CI_LANES) for (const kind of ["test", "case-opt"]) {
             const k = `${l.key}|${kind}`; if (!recent.some(r => r.cells[k])) continue;
             const had = ms.filter(r => r.cells[k] && r.cells[k].c !== "cancelled"), last = had.at(-1), passed = [...had].reverse().find(r => r.cells[k].c === "success");

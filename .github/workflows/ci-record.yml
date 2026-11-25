@@ -67,7 +67,13 @@ jobs:
             pr=$(gh api "$api/commits/$(jq -r '.head_sha' run.json)/pulls" --jq '.[0].number // empty' || true)
           fi
 
-          python3 .github/scripts/ci-record.py run.json jobs.json --usage usage.txt --compare compare.json --logs logs ${pr:+--pr "$pr"} > line.json
+          python3 .github/scripts/ci-record.py run.json jobs.json --usage usage.txt --compare compare.json --logs logs ${pr:+--pr "$pr"} --problems unread.txt > line.json
+          # A job the recorder could not read means a job was renamed or the log format changed.
+          # Left open for a person to close: the fix is in ci-record.py, not in a later run.
+          if [ -s unread.txt ]; then
+            cat unread.txt
+            REPO="$GITHUB_REPOSITORY" bash .github/scripts/ci-issue.sh open "CI recorder cannot read some jobs" "$(printf 'In run %s:\n\n%s\n\nUpdate LANE or the log patterns in .github/scripts/ci-record.py.\n' "$RUN_ID" "$(sed 's/^/- /' unread.txt | head -20)")" || true
+          fi
           if [ ! -s line.json ]; then echo "No cluster job in run $RUN_ID."; exit 0; fi
 
           # Re-run the failed jobs when no failure is the change's own: every failed job is a cluster

@@ -91,6 +91,10 @@
     <ul class="legend" id="lanekeys"></ul>
     <div class="panel"><svg id="took"></svg></div>
 
+    <h2 id="size-h">Test suite size</h2>
+    <p class="note">Tests run by a full run on each lane, median per day.</p>
+    <div class="panel"><svg id="size"></svg></div>
+
     <h2>Slowest test cases</h2>
     <p class="note">Median seconds per lane.</p>
     <div class="panel"><table id="slow" class="sortable"></table></div>
@@ -199,21 +203,30 @@ function render() {
                 return `${day(w.r.t)} · <a href="${JOB_URL(w.r.run, w.j.id)}" target="_blank" rel="noopener">${lane}${w.j.s ? ` [${w.j.s}]` : ""}</a> · ${w.kind === "f" ? "failed" : "passed on a retry"}${(e => e ? ` — ${esc(e)}` : "")(((w.j[w.kind] || []).find(x => (x[0] || x[1]) === (t.uuid || t.name)) || [])[3])} · ${w.r.master ? "master" : "pull request"}: ${esc(w.r.title)}`; }).join("<br>")
                 + (t.where.length > 12 ? `<br>and ${t.where.length - 12} more` : "") + `</td></tr>` : "")).join("")
         + (rows.length > 200 ? `<tr><td colspan="${3 + LANES.length}" class="zero">Showing the 200 worst of ${rows.length}.</td></tr>` : "");
-    durations();
+    durations(); slowest();
 }
 
 // Test-phase minutes of full-suite jobs per day and lane, and the slowest cases.
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
 const { med } = MFCCI;
+const perDay = (l, values) => { const d = new Map();                // [date, value] pairs -> one median point per day
+    for (const [date, v] of values) d.set(date, [...(d.get(date) || []), v]);
+    return { l, pts: [...d].sort().map(([date, v]) => ({ t: Date.parse(date + "T12:00:00Z"), v: med(v), n: v.length })) }; };
 function durations() {
-    const js = jobs(), W = 900, H = 240, L = 46, B = 24, T = 14, svg = $("took"), LIMIT = 119;
-    const color = l => `var(--s${LANES.indexOf(l) + 1})`, name = l => l.label;
-    $("lanekeys").innerHTML = LANES.map(l => `<li><span class="sw" style="background:${color(l)}"></span>${name(l)}</li>`).join("");
+    const js = jobs();
+    $("lanekeys").innerHTML = LANES.map(l => `<li><span class="sw" style="background:var(--s${LANES.indexOf(l) % 6 + 1})"></span>${l.label}</li>`).join("");
     // A whole shard of the suite: a run that selected a few tests says nothing about how long the suite takes.
-    const ss = LANES.map(l => { const d = new Map();
-        for (const { r, j } of js) if (j.l === l.key && j.tt && j.n >= 300) d.set(r.date.slice(0, 10), [...(d.get(r.date.slice(0, 10)) || []), j.tt / 60]);
-        return { l, pts: [...d].sort().map(([date, v]) => ({ t: Date.parse(date + "T12:00:00Z"), v: med(v), n: v.length })) }; }).filter(s => s.pts.length);
+    trend($("took"), LANES.map(l => perDay(l, js.filter(({ j }) => j.l === l.key && j.tt && j.n >= 300).map(({ r, j }) => [r.date.slice(0, 10), j.tt / 60]))), "min", "job", 119, "Frontier job limit, 1 h 59 min");
+    // The suite's size: tests run by a full run on a lane, its shards added up.
+    trend($("size"), LANES.map(l => { const runs = new Map();
+        for (const { r, j } of js) if (j.l === l.key && j.m === "full") runs.set(r.run, { date: r.date.slice(0, 10), n: (runs.get(r.run)?.n || 0) + j.n + (j.f || []).length });
+        return perDay(l, [...runs.values()].filter(x => x.n >= 300).map(x => [x.date, x.n])); }), "tests", "run");
+}
+// One line per lane over time, each labelled at its end; an optional limit is drawn dashed.
+function trend(svg, series, unit, counted, LIMIT = 0, limitText = "") {
+    const W = 900, H = 240, L = 46, B = 24, T = 14, ss = series.filter(s => s.pts.length);
+    const color = l => `var(--s${LANES.indexOf(l) % 6 + 1})`, name = l => l.label;
     svg.replaceChildren(); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     const all = ss.flatMap(s => s.pts); if (!all.length) return;
     const t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t), t0 + 1), hi = Math.max(...all.map(p => p.v), LIMIT) * 1.06;
@@ -222,19 +235,26 @@ function durations() {
         el("line", { x1: L, x2: W - 8, y1: y(v), y2: y(v), stroke: i ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }, svg);
         el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = Math.round(v); }
     el("text", { x: L, y: H - 6 }, svg).textContent = day(t0); el("text", { x: x(t1), y: H - 6, "text-anchor": "end" }, svg).textContent = day(t1);
-    el("rect", { x: L, y: y(LIMIT), width: W - L - 8, height: y(LIMIT - 20) - y(LIMIT), fill: "#d03b3b", opacity: .08 }, svg);
-    el("line", { x1: L, x2: W - 8, y1: y(LIMIT), y2: y(LIMIT), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "4 3" }, svg);
-    el("text", { x: W - 10, y: y(LIMIT) - 5, "text-anchor": "end" }, svg).textContent = "Frontier job limit, 1 h 59 min";
+    if (LIMIT) {
+        el("rect", { x: L, y: y(LIMIT), width: W - L - 8, height: y(LIMIT - 20) - y(LIMIT), fill: "#d03b3b", opacity: .08 }, svg);
+        el("line", { x1: L, x2: W - 8, y1: y(LIMIT), y2: y(LIMIT), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "4 3" }, svg);
+        el("text", { x: W - 10, y: y(LIMIT) - 5, "text-anchor": "end" }, svg).textContent = limitText;
+    }
     for (const s of ss) {
         el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(""), fill: "none", stroke: color(s.l), "stroke-width": 2, "stroke-linejoin": "round" }, svg);
-        for (const p of s.pts) el("title", {}, el("circle", { cx: x(p.t), cy: y(p.v), r: 3.5, fill: color(s.l), stroke: "var(--surface)", "stroke-width": 1 }, svg)).textContent = `${name(s.l)}, ${day(p.t)}: ${Math.round(p.v)} min (${p.n} ${p.n === 1 ? "job" : "jobs"})`;
+        for (const p of s.pts) el("title", {}, el("circle", { cx: x(p.t), cy: y(p.v), r: 3.5, fill: color(s.l), stroke: "var(--surface)", "stroke-width": 1 }, svg)).textContent = `${name(s.l)}, ${day(p.t)}: ${Math.round(p.v)} ${unit} (${p.n} ${p.n === 1 ? counted : counted + "s"})`;
     }
     const ends = ss.map(s => ({ s, at: y(s.pts.at(-1).v) })).sort((a, b) => a.at - b.at);
     for (let i = 1; i < ends.length; i++) ends[i].at = Math.max(ends[i].at, ends[i - 1].at + 13);
     for (const e of ends) { const end = e.s.pts.at(-1);
         el("line", { x1: x(end.t) + 5, x2: W - RM + 22, y1: y(end.v), y2: e.at, stroke: color(e.s.l), "stroke-width": 1, opacity: .5 }, svg);
-        el("text", { x: W - RM + 26, y: e.at + 4, style: "fill:var(--ink);font-size:12px" }, svg).textContent = `${e.s.l.label} · ${Math.round(end.v)} min`; }
+        el("text", { x: W - RM + 26, y: e.at + 4, style: "fill:var(--ink);font-size:12px" }, svg).textContent = `${e.s.l.label} · ${Math.round(end.v)} ${unit}`; }
 
+}
+
+// The slowest cases, by median seconds per lane.
+function slowest() {
+    const js = jobs();
     const cases = new Map();
     for (const { j } of js) for (const [uuid, nm, secs] of j.slow || []) {
         const c = cases.get(uuid) || { uuid, name: nm, by: new Map() };
