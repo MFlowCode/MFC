@@ -16,7 +16,7 @@ module m_body_forces
     use m_ibm, only: ib_markers
     use m_viscous, only: Res_viscous
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cp_mass, &
-        & get_mixture_thermal_conductivity_mixavg
+        & get_mixture_thermal_conductivity_mixavg, get_mixture_viscosity_mixavg
     use m_nvtx
 
     implicit none
@@ -486,18 +486,21 @@ contains
 
     !> With mean_temp_wall, remove the viscous dissipation Phi = tau : grad u (cell-centre gradients of the viscous stresses) from
     !! the energy of each fluid cell: the developed state T_s + psi exp(-beta x) excludes it (Patankar et al. 1977), and the
-    !! controller would otherwise remove it through the mode, biasing Nu and cooling a fast core without bound (#2418).
-    subroutine s_remove_mts_dissipation(q_prim_vf, rhs_vf, dqx_vf, dqy_vf, dqz_vf)
+    !! controller would otherwise remove it through the mode, biasing Nu and cooling a fast core without bound (#2418). The shear
+    !! viscosity is the one the viscous fluxes use: Cantera's mixture average at the cell's T and Y with chemistry.
+    subroutine s_remove_mts_dissipation(q_prim_vf, q_T_sf, rhs_vf, dqx_vf, dqy_vf, dqz_vf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf, dqx_vf, dqy_vf, dqz_vf
+        type(scalar_field), intent(in)                         :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp), dimension(3, 3)                              :: g
         real(wp), dimension(2)                                 :: mu  !< shear and bulk viscosity
-        real(wp)                                               :: dv, s2
+        real(wp), dimension(num_species)                       :: Ys
+        real(wp)                                               :: dv, s2, T, mu_c
         integer                                                :: i, j, k, l, q, r
 
         if (.not. mts_sim) return
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, q, r, g, mu, dv, s2]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, q, r, g, mu, Ys, dv, s2, T, mu_c]', collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -526,6 +529,15 @@ contains
                                 mu(i) = mu(i) + q_prim_vf(eqn_idx%adv%beg + Re_idx(i, q) - 1)%sf(j, k, l)/Res_viscous(i, q)
                             end do
                         end do
+                        if (chemistry) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, num_species
+                                Ys(q) = q_prim_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l)
+                            end do
+                            T = q_T_sf%sf(j, k, l)
+                            call get_mixture_viscosity_mixavg(T, Ys, mu_c)
+                            mu(1) = mu_c
+                        end if
                         rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
                                & l) - mu(1)*(2._wp*s2 - 2._wp/3._wp*dv**2) - mu(2)*dv**2
                     end if

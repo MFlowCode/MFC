@@ -3089,8 +3089,8 @@ contains
                     if (markers%sf(stencil_center(1) + ii - 2, stencil_center(2) + jj - 2, stencil_center(3) + (kk - 2)*min(p, &
                         & 1)) == 0) then
                         fluid_weight = fluid_weight + cell_weight
-                    else
-                        n_solid = n_solid + 1
+                    else if (cell_weight > 0._wp) then
+                        n_solid = n_solid + 1  ! a solid cell in a zero-weight plane (offset exactly 1/2) takes no weight
                     end if
                 end do
             end do

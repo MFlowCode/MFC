@@ -1853,6 +1853,7 @@ class CaseValidator:
                 any(self.get(f"fluid_pp({i})%non_newtonian", "F") == "T" for i in range(1, (self.get("num_fluids", 1) or 1) + 1)),
                 "mean_temp_wall does not support non_newtonian fluids",
             )
+            self.prohibit(self.get("igr", "F") == "T", "mean_temp_wall does not support igr (the viscous dissipation is not removed there)")
             for d, active in (("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)):
                 for side, tag in (("beg", "in"), ("end", "out")):
                     if not active or self.get(f"bc_{d}%{side}") not in (-15, -16):
