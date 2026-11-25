@@ -38,6 +38,7 @@ const MFCCI = (() => {
         runs:  () => cache.runs ??= Promise.all(months().map(get)).then(ms => ms.flatMap(lines).map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t)),
         usage: () => cache.usage ??= get("usage.jsonl").then(lines),
         builds: () => cache.builds ??= get("builds.jsonl").then(lines),
+        scaling: () => cache.scaling ??= get("scaling.jsonl").then(lines, () => []).then(rs => rs.map(r => ({ ...r, t: Date.parse(r.date) })).sort((a, b) => a.t - b.t)),
     };
 
     // ---- what is running now: asked of GitHub when the page loads (the history holds finished runs only) ----

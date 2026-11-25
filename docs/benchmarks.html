@@ -106,6 +106,13 @@
     <p id="zoomed" hidden></p>
     <div class="grid" id="charts"></div>
 
+    <section id="scaling" hidden>
+        <h2>Scaling on Frontier</h2>
+        <p class="note">Weekly, CCE OpenACC, 8 GPUs per node. Efficiency is against the smallest run: 100% is perfect scaling. Weak: 16 GB per GPU. Strong: 256 GB in all.</p>
+        <div class="scrollx"><table id="scaletable"></table></div>
+        <figure id="scalechart" hidden><figcaption>Efficiency over time</figcaption></figure>
+    </section>
+
     <h2>Commits</h2>
     <p class="note">Grind time against the previous benchmarked commit, mean over cases. &#9650; &#9660; at 5%.</p>
     <div class="log"><table id="log"></table></div>
@@ -409,6 +416,36 @@ function summary(slugs) {
     }).join("");
 }
 
+// Scaling: the latest run as a table, and each run's efficiency at each size over time.
+function scaling(records) {
+    if (!records.length) return;
+    $("scaling").hidden = false;
+    // Grind time is over all ranks: with perfect scaling it falls as 1/ranks, weak or strong.
+    const eff = (r, kind) => { const rs = r.runs.filter(x => x.kind === kind).sort((a, b) => a.nodes - b.nodes), base = rs[0];
+        return rs.map(x => ({ ...x, eff: base.grind * base.ranks / (x.grind * x.ranks) * 100 })); };
+    const latest = records.at(-1), pct = v => `${v.toFixed(0)}%`;
+    $("scaletable").innerHTML = `<tr><th>${day(latest.t)} · ${links(latest)}</th><th>Nodes</th><th>GPUs</th><th>Grid points</th><th>Grind time</th><th>Efficiency</th></tr>`
+        + ["weak", "strong"].flatMap(kind => eff(latest, kind).map(x => `<tr><td>${kind === "weak" ? "Weak" : "Strong"}</td><td>${x.nodes}</td><td>${x.ranks}</td><td>${(x.cells / 1e6).toFixed(0)} M</td><td>${x.grind.toPrecision(3)} ns</td>`
+            + `<td>${x.nodes === eff(latest, kind)[0].nodes ? "–" : pct(x.eff)}</td></tr>`)).join("");
+    if (records.length < 2) return;
+    const lines = new Map();                                    // "weak 64" -> [[t, efficiency]]
+    for (const r of records) for (const kind of ["weak", "strong"]) for (const x of eff(r, kind).slice(1)) {
+        const key = `${kind === "weak" ? "Weak" : "Strong"}, ${x.nodes} nodes`; if (!lines.has(key)) lines.set(key, []); lines.get(key).push([r.t, x.eff, r]); }
+    const W = 720, H = 220, L = 44, R = 150, T = 10, B = 24, t0 = records[0].t, t1 = records.at(-1).t, lo = Math.min(50, ...[...lines.values()].flat().map(p => p[1])), hi = 110;
+    const x = t => L + (t - t0) / Math.max(t1 - t0, 1) * (W - L - R), y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+    const fig = $("scalechart"), svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Scaling efficiency over time" });
+    for (const v of [50, 75, 100].filter(v => v >= lo)) { el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--grid)", "stroke-dasharray": v === 100 ? "none" : "2 3" }, svg); el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = pct(v); }
+    for (const t of [t0, t1]) el("text", { x: x(t), y: H - 6, "text-anchor": t === t0 ? "start" : "end" }, svg).textContent = day(t);
+    const ends = [];
+    [...lines].forEach(([key, pts], i) => { const color = `var(--s${i % 6 + 1})`;
+        el("path", { d: pts.map((p, j) => `${j ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(""), fill: "none", stroke: color, "stroke-width": 2 }, svg);
+        for (const p of pts) el("circle", { cx: x(p[0]), cy: y(p[1]), r: 3, fill: color }, svg).appendChild(el("title")).textContent = `${key}: ${pct(p[1])} at ${p[2].sha.slice(0, 7)}, ${day(p[0])}`;
+        ends.push({ at: y(pts.at(-1)[1]) + 4, text: `${key} · ${pct(pts.at(-1)[1])}` }); });
+    let floor = -Infinity;                                      // end labels, pushed apart where lines end together
+    for (const e of ends.sort((a, b) => a.at - b.at)) { floor = Math.max(e.at, floor + 13); el("text", { x: W - R + 8, y: floor }, svg).textContent = e.text; }
+    fig.hidden = false; fig.append(svg);
+}
+
 function unzoom() { state.zoom = null; render(); }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && state.zoom) unzoom(); });
 
@@ -457,6 +494,7 @@ function legend() {
         + `<li><span style="padding:2px 0;display:inline-flex;align-items:center;gap:6px"><span style="width:2px;height:12px;background:#f59e0b;display:inline-block"></span>Performance change</span></li>`);
 }
 
+MFCCI.load.scaling().then(scaling);
 MFCCI.load.bench().then(records => {
     if (!records.length) { $("statusline").innerHTML = `<span class="note">No benchmark history is available yet.</span>`; return; }
     state.records = records;
