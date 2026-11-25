@@ -17,7 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        # The ends of the range mfc.sh accepts (toolchain/bootstrap/python.sh): in the last 40 failed
+        # runs, a version in between never failed without 3.9 or 3.14 failing too.
+        python-version: ['3.9', '3.14']
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
