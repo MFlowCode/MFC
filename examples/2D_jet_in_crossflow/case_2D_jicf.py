@@ -50,7 +50,7 @@ print(
             "model_eqns": 3,
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
+            "mpp_lim": "F",
             "mixture_err": "F",
             "time_stepper": 3,
             "recon_type": 2,

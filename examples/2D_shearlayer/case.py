@@ -27,7 +27,7 @@ print(
             "model_eqns": "5eq",
             "num_fluids": 2,
             "num_patches": 2,
-            "mpp_lim": "T",
+            "mpp_lim": "F",
             "mixture_err": "T",
             "time_stepper": "rk3",
             "weno_order": 5,

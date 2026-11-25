@@ -23,7 +23,7 @@ print(
             "model_eqns": 3,
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
+            "mpp_lim": "F",
             "mixture_err": "T",
             "time_stepper": 3,
             "weno_order": 3,

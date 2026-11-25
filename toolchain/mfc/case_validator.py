@@ -1712,6 +1712,13 @@ class CaseValidator:
         avg_state = self.get("avg_state")
         wave_speeds = self.get("wave_speeds")
 
+        # advisory (#2476): AMR requires mpp_lim, and with Euler-Euler bubbles it selects the multi-fluid model
+        self.warn(
+            self.get("mpp_lim", "F") == "T" and self.get("amr", "F") != "T" and self.get("bubbles_euler", "F") != "T",
+            "mpp_lim clips volume fractions to [0, 1] where the mixture equation of state is formed, which breaks pressure "
+            "equilibrium at material interfaces; use it only if the case fails without it (see mpp_lim in docs/documentation/case.md)",
+        )
+
         if model_eqns != 3:
             return
 

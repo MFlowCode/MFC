@@ -66,7 +66,7 @@ case = {
     "model_eqns": args.model,
     "num_fluids": 2,
     "num_patches": 2,
-    "mpp_lim": "T",
+    "mpp_lim": "F",
     "mixture_err": "T",
     "time_stepper": 3,
     "weno_order": 5,

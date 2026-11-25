@@ -89,7 +89,7 @@ data = {
     "model_eqns": 2,
     "alt_soundspeed": "F",
     "mixture_err": "F",
-    "mpp_lim": "T",
+    "mpp_lim": "F",
     "time_stepper": 3,
     "weno_order": 5,
     "mapped_weno": "T",
