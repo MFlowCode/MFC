@@ -1974,10 +1974,8 @@ class CaseValidator:
         # m_time_steppers.fpp but deallocated unconditionally, so heat_conduction + igr would
         # deallocate an unallocated field.
         self.prohibit(heat_conduction and igr, "heat conduction is not supported with igr")
-        # Load-bearing, not cosmetic: with chemistry, m_rhs.fpp allocates the energy flux_src slot
-        # under chemistry and chem_params%diffusion and not viscous, which conduction also allocates
-        # when heat_conduction is on -- the combination double-allocates and aborts in the allocator.
-        # Chemistry also carries its own mixture-averaged conduction, so the physics would double-count.
+        # Chemistry carries its own mixture-averaged conduction (chem_params%diffusion), so adding
+        # Fourier conduction would double-count the heat flux.
         self.prohibit(
             heat_conduction and chemistry,
             "heat conduction is not supported with chemistry: the reacting path already carries mixture-averaged conduction through chem_params%diffusion",

@@ -1990,7 +1990,7 @@ contains
                                            & i) - flux_src_rsx_vf(j, k, l, i))
                                 end do
 
-                                if (.not. viscous) then
+                                if (.not. (viscous .or. surface_tension .or. heat_conduction)) then
                                     rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
                                            & l) + 1._wp/dx(j)*(flux_src_rsx_vf(j - 1, k, l, eqn_idx%E) - flux_src_rsx_vf(j, k, l, &
                                            & eqn_idx%E))
@@ -2075,7 +2075,7 @@ contains
                                         rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_src_rsx_vf(j, k - 1, l, &
                                                & i) - flux_src_rsx_vf(j, k, l, i))
                                     end do
-                                    if (.not. viscous) then
+                                    if (.not. (viscous .or. surface_tension .or. heat_conduction)) then
                                         rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
                                                & l) + 1._wp/dy(k)*(flux_src_rsx_vf(j, k - 1, l, eqn_idx%E) - flux_src_rsx_vf(j, &
                                                & k, l, eqn_idx%E))
@@ -2167,7 +2167,7 @@ contains
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)*(flux_src_rsx_vf(j, k, l - 1, &
                                            & i) - flux_src_rsx_vf(j, k, l, i))
                                 end do
-                                if (.not. viscous) then
+                                if (.not. (viscous .or. surface_tension .or. heat_conduction)) then
                                     rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
                                            & l) + 1._wp/dz(l)*(flux_src_rsx_vf(j, k, l - 1, eqn_idx%E) - flux_src_rsx_vf(j, k, l, &
                                            & eqn_idx%E))
@@ -2447,8 +2447,13 @@ contains
                         end do
                     end if
 
-                    if (chemistry .and. chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
-                        @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
+                    if (chemistry) then
+                        do l = eqn_idx%species%beg, eqn_idx%species%end
+                            @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
+                        end do
+                        if (chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
+                            @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
+                        end if
                     end if
 
                     if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
