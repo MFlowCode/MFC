@@ -15,8 +15,7 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "2D_amr_isentropic_vortex"))
-from amr_composite import _num, leaves, read_inp  # noqa: E402
+from mfc.viz.amr_composite import leaves, parse_num, read_inp
 
 GAM, RHO0, P0 = 1.4, 1.0, 1.0e-3
 
@@ -99,9 +98,9 @@ def main(dirs):
     for d in dirs:
         inp = read_inp(d)
         label = os.path.basename(os.path.normpath(d))
-        times = save_times(d, _num(inp["t_save"]))
+        times = save_times(d, parse_num(inp["t_save"]))
         # the last save is at t_stop: the run shortens its last step to land there
-        times.setdefault(round(_num(inp["t_stop"]) / _num(inp["t_save"])), _num(inp["t_stop"]))
+        times.setdefault(round(parse_num(inp["t_stop"]) / parse_num(inp["t_save"])), parse_num(inp["t_stop"]))
         for k, t in sorted(times.items()):
             if not os.path.isfile(os.path.join(d, "restart_data", f"lustre_{k}.dat")):
                 continue

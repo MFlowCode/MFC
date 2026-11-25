@@ -602,6 +602,13 @@ class TestAmrDefaults(unittest.TestCase):
         self.assertNotIn("amr_snap", ml)
         validate_case_constraints(p, "simulation")
 
+    def test_snap_needs_one_level_under_regrid(self):
+        dyn = {**self.AMR, "amr_regrid_int": 4, "amr_buf": 4, "amr_snap": 2}
+        validate_case_constraints(dyn, "simulation")
+        with self.assertRaises(CaseConstraintError):
+            validate_case_constraints({**dyn, "amr_max_level": 2}, "simulation")
+        validate_case_constraints({**dyn, "amr_max_level": 2, "amr_snap": 0}, "simulation")
+
     def test_unsupported_physics_is_prohibited_under_amr(self):
         for k in ("qbmm", "stretch_x", "cyl_coord", "relax"):
             with self.assertRaises(CaseConstraintError, msg=k):

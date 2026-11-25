@@ -59,8 +59,9 @@ module m_phase_timing
     character(len=8), parameter :: MEM_NAME(MEM_N + 1) = [character(len=8)::'store','scratch', 'patch', 'register', 'ib park', &
               & 'ib marks', 'total']
     real(wp) :: mem_mib(MEM_N) = 0._wp
-    !> Per level over every regrid (rank 0, s_mem_note_level): high-water blocks on the busiest rank, and the share of its store
-    !! column each block's interior fills. Every column is sized to the largest block, so memory goes by block count, not size.
+    !> Per level over every layout (rank 0, s_mem_note_level): high-water blocks on the busiest rank, and the share of its store
+    !! column (ghost layers included) each block's interior fills. Every column is sized to the block size cap, so memory goes by
+    !! block count, not size.
     integer, allocatable  :: mem_lev_hw(:)
     real(wp), allocatable :: mem_fill_min(:), mem_fill_max(:), mem_fill_sum(:), mem_fill_n(:)
     real(wp)              :: mem_col_mib = 0._wp
@@ -150,7 +151,7 @@ contains
             & product(real(idwbuff_alloc%end - idwbuff_alloc%beg + 1, wp))/product(real(idwbuff%end - idwbuff%beg + 1, wp)), &
             & 'x the coarse extent (largest block or batch slab)'
         if (.not. allocated(mem_lev_hw)) return
-        print '(A,F10.2,A)', '[amr-mem] per block ', mem_col_mib, ' MiB of store (every block is sized to the largest)'
+        print '(A,F10.2,A)', '[amr-mem] per block ', mem_col_mib, ' MiB of store (every block is sized to the size cap)'
         print '(A)', '[amr-mem] level  blocks/rank  store MiB   fill min    mean     max  (busiest rank, high-water over regrids)'
         do i = 1, size(mem_lev_hw)
             if (mem_fill_n(i) <= 0._wp) cycle

@@ -6564,6 +6564,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16},
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        # the per-level memory table (rank_time_wrt): a static multi-level layout is recorded without a regrid
+        cases.append(define_case_d(stack, "rank_time_wrt", {"amr_max_grid_size": 16, "rank_time_wrt": "T"}, ppn=2))
         stack.pop()
 
         # 2D dynamic regrid at np=2: a level-1 block whose owner holds none of its covered coarse cells, so the fold-back
@@ -6581,6 +6583,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ("subcycle -> quartic prolongation", {"amr_subcycle": "T", "amr_prolong": 2}),
             # viscous fluxes reflux across the seam too; the 1D viscous tests cannot split
             ("viscous", {"viscous": "T", "fluid_pp(1)%Re(1)": 100.0}),
+            # amr_buf = 4 derives amr_snap = 2 (one level): the regrid snap's only golden in 2D
+            ("derived snap", {"amr_buf": 4}),
         )
         for label, mods in np2_variants:
             cases.append(define_case_d(stack, label, {"amr_max_grid_size": 16, **mods}, ppn=2))

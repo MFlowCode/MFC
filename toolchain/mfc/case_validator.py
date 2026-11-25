@@ -2426,7 +2426,13 @@ class CaseValidator:
         self.prohibit(amr_snap is not None and amr_snap < 0, "amr_snap must be >= 0")
         self.prohibit(
             (amr_snap or 0) > 0 and amr_buf is not None and amr_snap > amr_buf - 2,
-            "amr_snap must leave two cells of amr_buf (amr_snap <= amr_buf - 2): a snapped box keeps at least that much " "tag padding on every face",
+            "amr_snap must leave two cells of amr_buf (amr_snap <= amr_buf - 2): with one refined level a snapped box keeps at " "least that much tag padding on every face",
+        )
+        # a level >= 2 child is clamped into its parent's inset (amr_cpat_mar), so a snapped child can lag a front out of its block
+        # (2-level Sod: a 1 % shock-speed error that does not converge; validation_amr.md)
+        self.prohibit(
+            (amr_regrid_int or 0) > 0 and (amr_snap or 0) > 0 and (amr_max_level or 1) > 1,
+            "amr_snap > 0 needs amr_max_level = 1 under dynamic regrid: a snapped level-2 box can lag a front out of its block",
         )
         # advisory, not a prohibit: low-CFL cases are legitimately below this worst-case bound
         self.warn(
@@ -3925,7 +3931,7 @@ class CaseValidator:
 
 # AMR defaults the toolchain derives for a case that leaves them unset. The Fortran defaults stay off on purpose: a
 # default set there bypasses every rule above, so the decision lives here, under the same prohibitions.
-# Regrid hysteresis under dynamic regrid when the tag buffer leaves room (amr_snap <= amr_buf - 2).
+# Regrid hysteresis under dynamic regrid with one refined level when the tag buffer leaves room (amr_snap <= amr_buf - 2).
 SNAP_DEFAULT = 2
 
 

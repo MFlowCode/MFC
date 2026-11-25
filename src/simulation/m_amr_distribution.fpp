@@ -26,10 +26,11 @@ module m_amr_distribution
     implicit none
 
     private
-    public :: f_amr_overlap_count, f_amr_rank_overlaps, s_amr_adopt_block_owners, s_amr_assign_block_owners, s_amr_body_bbox, &
-        & s_amr_box_isect, s_amr_compute_isect, s_amr_expand_box_over_bodies, s_amr_rank_coarse_range, s_amr_rank_decomp, &
-        & s_amr_rank_interior, s_amr_ranks_overlapping, s_amr_refresh_lists, s_amr_refresh_my_blocks, s_amr_sfc_cut, &
-        & s_amr_sort_by_key, s_amr_tile_box, f_amr_rank_tile, s_amr_validate_decomp, s_amr_validate_owner
+    public :: s_amr_note_level_fill, f_amr_overlap_count, f_amr_rank_overlaps, s_amr_adopt_block_owners, &
+        & s_amr_assign_block_owners, s_amr_body_bbox, s_amr_box_isect, s_amr_compute_isect, s_amr_expand_box_over_bodies, &
+        & s_amr_rank_coarse_range, s_amr_rank_decomp, s_amr_rank_interior, s_amr_ranks_overlapping, s_amr_refresh_lists, &
+        & s_amr_refresh_my_blocks, s_amr_sfc_cut, s_amr_sort_by_key, s_amr_tile_box, f_amr_rank_tile, s_amr_validate_decomp, &
+        & s_amr_validate_owner
 
 contains
 
@@ -572,24 +573,45 @@ contains
 
     end subroutine s_amr_adopt_block_owners
 
+    !> Note each level's per-rank block high-water mark and the share of its store column each block's fine cells fill (rank 0,
+    !! rank_time_wrt) for the end-of-run memory table. The column includes the ghost layers, so a block at the size cap fills less
+    !! than 1. Called from s_amr_reconcile_slots, which every layout change passes through.
+    impure subroutine s_amr_note_level_fill()
+
+        real(wp), allocatable :: rc(:), fill(:)
+        integer               :: k, lev, nb
+
+        if (.not. rank_time_wrt .or. proc_rank /= 0) return
+        allocate (rc(0:num_procs - 1), fill(amr_num_blocks))
+        do lev = 1, amr_max_level
+            rc = 0._wp; nb = 0
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= lev) cycle
+                rc(amr_block_owner(k)) = rc(amr_block_owner(k)) + 1._wp
+                nb = nb + 1
+                fill(nb) = product(merge(real((amr_region_hi_all(:,k) - amr_region_lo_all(:,k) + 1)*amr_ref_ratio**lev, &
+                     & wp)/real(mbuf_hi - mbuf_lo + 1, wp), 1._wp, amr_dim))
+            end do
+            if (nb > 0) call s_mem_note_level(lev, nint(maxval(rc)), fill(1:nb), 2_8*f_amr_col_bytes())
+        end do
+
+    end subroutine s_amr_note_level_fill
+
     !> Per-level and total load-balance report (rank 0, rank_time_wrt): max/mean assigned block weight over ranks (1 = perfect).
     !! no_blocks_ranks is the granularity floor of a level with fewer boxes than ranks, not idleness.
     impure subroutine s_amr_report_balance(wt, maxlev)
 
         real(wp), intent(in)  :: wt(:)
         integer, intent(in)   :: maxlev
-        real(wp), allocatable :: rw(:), tw(:), rc(:), fill(:)
+        real(wp), allocatable :: rw(:), tw(:), rc(:)
         real(wp)              :: mx, mean, cmx, cmean
         integer               :: k, lev, nb, empty
-        integer(kind=8)       :: col_bytes
 
         if (.not. rank_time_wrt .or. proc_rank /= 0) return
 
         ! heap: num_procs long
-        allocate (rw(0:num_procs - 1), tw(0:num_procs - 1), rc(0:num_procs - 1), fill(amr_num_blocks))
+        allocate (rw(0:num_procs - 1), tw(0:num_procs - 1), rc(0:num_procs - 1))
         tw = 0._wp
-        ! cons + RK copy column of the flat store
-        col_bytes = 2_8*product(int(mbuf_hi - mbuf_lo + 1, 8))*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
         do lev = 1, maxlev
             rw = 0._wp; rc = 0._wp
             nb = 0
@@ -598,11 +620,8 @@ contains
                 rw(amr_block_owner(k)) = rw(amr_block_owner(k)) + wt(k)
                 rc(amr_block_owner(k)) = rc(amr_block_owner(k)) + 1._wp
                 nb = nb + 1
-                fill(nb) = product(merge(real((amr_region_hi_all(:,k) - amr_region_lo_all(:,k) + 1)*amr_ref_ratio**lev, &
-                     & wp)/real(max_f + 1, wp), 1._wp, amr_dim))
             end do
             if (nb == 0) cycle
-            call s_mem_note_level(lev, nint(maxval(rc)), fill(1:nb), col_bytes)
             tw = tw + rw
             mx = maxval(rw); mean = sum(rw)/real(num_procs, wp)
             empty = count(rw <= 0._wp)
@@ -620,7 +639,7 @@ contains
         ! fine_work = sum of assigned weights = fine cells advanced per step
         if (mean > 0._wp) print '(A,F8.3,A,I0,A,I0)', ' [amr-balance] TOTAL   : max/mean ', maxval(tw)/mean, &
             & ' ranks_with_no_fine_block ', count(tw <= 0._wp), ' fine_work ', nint(sum(tw), kind=8)
-        deallocate (rw, tw, rc, fill)
+        deallocate (rw, tw, rc)
 
     end subroutine s_amr_report_balance
 

@@ -648,4 +648,14 @@ contains
 
     end subroutine s_amr_size_real
 
+    !> Bytes of one block's column of the flat store (one field family): the mbuf extents (interior plus ghost layers) x sys_size at
+    !! the store's precision.
+    pure function f_amr_col_bytes() result(b)
+
+        integer(8) :: b
+
+        b = product(int(mbuf_hi - mbuf_lo + 1, 8))*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
+
+    end function f_amr_col_bytes
+
 end module m_amr_state

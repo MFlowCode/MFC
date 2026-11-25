@@ -9,7 +9,7 @@ not visible, the dependent target cannot configure, and nothing ever rebuilt it.
 
 import os
 
-from mfc.build import _stale_dependencies, cmake_cache_compilers, compiler_fingerprint, compiler_mismatches
+from mfc.build import _interrupted_build_mismatch, _stale_dependencies, cmake_cache_compilers, compiler_fingerprint, compiler_mismatches
 
 GFORTRAN = "/opt/gcc/bin/gfortran"
 AMDFLANG = "/opt/rocm/bin/amdflang"
@@ -224,3 +224,26 @@ def test_compiler_fingerprint_ignores_the_build_hosts_cpu(tmp_path, monkeypatch)
     monkeypatch.setenv("HOST_CPU", "emeraldrapids")
     assert compiler_fingerprint() == build_node
     assert "nvfortran 25.5-0" in build_node
+
+
+def test_an_interrupted_dependency_with_another_compiler_is_reported(tmp_path):
+    # #2501: a dependency build stopped before install keeps its CMakeCache.txt, and CMake keeps the cached compiler whatever
+    # FC is, so the next configure would reuse the old toolchain
+    dep = FakeTarget(str(tmp_path), "hipfort", True, installed=False)
+    write_cache(dep.get_staging_dirpath(None), fortran=GFORTRAN)
+    reason = _interrupted_build_mismatch(dep, None, {"Fortran": AMDFLANG})
+    assert reason is not None and GFORTRAN in reason and AMDFLANG in reason
+
+
+def test_an_interrupted_dependency_with_the_same_compiler_is_kept(tmp_path):
+    dep = FakeTarget(str(tmp_path), "hipfort", True, installed=False)
+    write_cache(dep.get_staging_dirpath(None), fortran=AMDFLANG)
+    assert _interrupted_build_mismatch(dep, None, {"Fortran": AMDFLANG}) is None
+
+
+def test_an_installed_dependency_or_an_unset_environment_is_left_alone(tmp_path):
+    dep = FakeTarget(str(tmp_path), "hipfort", True, installed=True)
+    write_cache(dep.get_staging_dirpath(None), fortran=GFORTRAN)
+    assert _interrupted_build_mismatch(dep, None, {"Fortran": AMDFLANG}) is None  # _stale_dependencies owns installed ones
+    dep.installed = False
+    assert _interrupted_build_mismatch(dep, None, {}) is None

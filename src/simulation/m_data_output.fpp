@@ -38,11 +38,12 @@ module m_data_output
 
     !> @name ICFL, VCFL, CCFL, TCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
-    real(wp) :: icfl_max  !< ICFL criterion maximum
-    real(wp) :: vcfl_max  !< VCFL criterion maximum
-    real(wp) :: ccfl_max  !< CCFL criterion maximum
-    real(wp) :: tcfl_max  !< TCFL criterion maximum
-    real(wp) :: Rc_min    !< Rc criterion maximum
+    real(wp)   :: icfl_max         !< ICFL criterion maximum
+    real(wp)   :: vcfl_max         !< VCFL criterion maximum
+    real(wp)   :: ccfl_max         !< CCFL criterion maximum
+    real(wp)   :: tcfl_max         !< TCFL criterion maximum
+    real(wp)   :: Rc_min           !< Rc criterion maximum
+    integer(8) :: rt_clock0 = 0_8  !< system_clock count when run_time.inf was opened
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
@@ -85,6 +86,7 @@ contains
         character(LEN=path_len + name_len) :: file_path                   !< Relative path to a file in the case directory
         character(LEN=8)                   :: file_date                   !< Creation date of the run-time information file
 
+        call system_clock(rt_clock0)
         file_path = trim(case_dir) // '/' // trim(file_name)
 
         open (3, FILE=trim(file_path), form='formatted', STATUS='replace')
@@ -1933,7 +1935,8 @@ contains
     !> Write footer with stability criteria extrema and run-time to the information file, then close it
     impure subroutine s_close_run_time_information_file
 
-        real(wp) :: run_time  !< Run-time of the simulation
+        real(wp)   :: run_time  !< Wall time since the file was opened (cpu_time overstates GPU runs)
+        integer(8) :: c1, rate
 
         write (3, '(A)') '    '
         write (3, '(A)') ''
@@ -1944,7 +1947,8 @@ contains
         if (viscous) write (3, '(A,ES10.3)') 'VCFL Max: ', vcfl_max
         if (viscous) write (3, '(A,ES10.3)') 'Rc Min: ', Rc_min
 
-        call cpu_time(run_time)
+        call system_clock(c1, rate)
+        run_time = real(c1 - rt_clock0, wp)/real(max(rate, 1_8), wp)
 
         write (3, '(A)') ''
         write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'

@@ -147,7 +147,7 @@ The blocks follow a strong spherical shock through regrids. The self-similar sol
 
 | Item | Value |
 | :--- | :--- |
-| Blast | energy \f$E = 1\f$ in a sphere of radius 0.04 at the center of \f$[-0.6, 0.6]^3\f$; \f$\rho_0 = 1\f$, \f$p_0 = 10^{-3}\f$, \f$\gamma = 1.4\f$, extrapolation boundaries; to \f$t = 0.16\f$ (\f$R = 0.50\f$, shock Mach number about 11) |
+| Blast | energy \f$E = 1\f$ in a sphere of radius 0.04 at the center of \f$[-0.6, 0.6]^3\f$; \f$\rho_0 = 1\f$, \f$p_0 = 10^{-3}\f$, \f$\gamma = 1.4\f$, extrapolation boundaries; to \f$t = 0.16\f$ (\f$R = 0.50\f$, shock Mach number about 33) |
 | Grids | base 96³ and 192³; one 2:1 level, absolute density-jump tags (`amr_tag_abs`, 0.1), `amr_buf = 4`, regrid every 4 steps, lock-step and subcycled; uniform 96³, 192³ and 384³ |
 | Numerics | MUSCL-2 (minmod), HLLC, SSP-RK3, CFL 0.3 (adaptive) |
 | Reference | \f$R = \xi_0 (E t^2/\rho_0)^{1/5}\f$ \cite TaylorBlast1950 \cite Sedov1959 with \f$\xi_0 = 1.0328\f$ for \f$\gamma = 1.4\f$, from the energy integral of the similarity equations (`check_sedov.py` integrates them; \f$\gamma = 5/3\f$ gives 1.1517); post-shock density \f$(\gamma + 1)/(\gamma - 1) = 6\f$ |
@@ -171,7 +171,7 @@ Peak shell-averaged density over \f$\rho_0\f$ at t = 0.16: 3.25 (uniform 96³), 
 
 Limits:
 - **Early times.** The energy sits in a finite sphere (0.04, 3-13 cells) with a staircase surface, which shifts the virtual origin; the first save (t = 0.02, R = 5.4 r0) carries that and the startup transient. The patch stair-step loses 0.9 % of the energy at 96³/192³ and 0.5 % at 384³; the reference uses the measured energy.
-- **Counter-pressure.** \f$p_0 = 10^{-3}\f$ leaves the shock at Mach 11 at the end; the strong-shock solution ignores \f$p_0\f$ (an effect of order \f$1/M^2\f$, about 1 %, not separated from the discretization error here).
+- **Counter-pressure.** \f$p_0 = 10^{-3}\f$ leaves the shock at Mach 33 at the end (\f$\dot R = 0.4 R/t\f$ against \f$c_0 = \sqrt{\gamma p_0/\rho_0}\f$); the strong-shock solution ignores \f$p_0\f$ (an effect of order \f$1/M^2\f$, about 0.1 %, not separated from the discretization error here).
 - **Scheme.** WENO5 with `mp_weno = T` went NaN next to the blast at t = 0.004 on a uniform 256³ octant (no AMR), so the check uses MUSCL with minmod. An octant with symmetry walls cannot be refined at the walls (a block must lie `buff_size` cells inside the domain), so the whole sphere is simulated.
 - Save times come from `run_time.inf`, which has four significant digits (0.04 % in R).
 - Only the radius and the peak density are checked; the interior profiles are not compared.

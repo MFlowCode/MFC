@@ -20,7 +20,7 @@ def read_inp(run_dir):
     return out
 
 
-def _num(s):
+def parse_num(s):
     return float(s.replace("d", "e").replace("D", "e"))
 
 
@@ -31,7 +31,7 @@ def grid(inp):
         c = int(inp.get(k, "0")) + 1
         if c == 1:
             break
-        beg, end = _num(inp[f"{ax}_domain%beg"]), _num(inp[f"{ax}_domain%end"])
+        beg, end = parse_num(inp[f"{ax}_domain%beg"]), parse_num(inp[f"{ax}_domain%end"])
         cells.append(c)
         lo.append(beg)
         dx.append((end - beg) / c)

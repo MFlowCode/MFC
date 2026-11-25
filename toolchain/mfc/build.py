@@ -640,6 +640,11 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
     if target.isDependency and target.is_installed(case):
         return
 
+    reason = _interrupted_build_mismatch(target, case, _env_compilers())
+    if reason:
+        cons.print(f"  [bold yellow]Reconfiguring[/bold yellow] [magenta]{target.name}[/magenta] from scratch: {reason}")
+        delete_directory(target.get_staging_dirpath(case))
+
     # CI's retry clears only the slugs its own build touched (.github/scripts/retry-build.sh).
     slug_log = os.environ.get("MFC_SLUG_LOG")
     if slug_log:
@@ -734,6 +739,32 @@ def cmake_cache_compilers(staging_dirpath: str) -> typing.Dict[str, str]:
 def compiler_mismatches(ours: typing.Dict[str, str], theirs: typing.Dict[str, str]) -> typing.List[str]:
     # Compare resolved paths: module systems often reach one compiler through several symlinks.
     return [lang for lang in ("Fortran", "C", "CXX") if lang in ours and lang in theirs and os.path.realpath(ours[lang]) != os.path.realpath(theirs[lang])]
+
+
+def _env_compilers() -> typing.Dict[str, str]:
+    """The compilers FC, CC and CXX select now (what a fresh CMake configure would cache)."""
+    found = {}
+    for lang, var in (("Fortran", "FC"), ("C", "CC"), ("CXX", "CXX")):
+        path = shutil.which(os.environ.get(var, "")) if os.environ.get(var) else None
+        if path:
+            found[lang] = path
+    return found
+
+
+def _interrupted_build_mismatch(target: MFCTarget, case: input.MFCInputFile, env: typing.Dict[str, str]) -> typing.Optional[str]:
+    """Why a dependency's leftover staging cache cannot be reused, or None.
+
+    A dependency build stopped before install leaves CMakeCache.txt behind, and CMake keeps
+    the cached compiler whatever FC/CC/CXX now say, so reconfiguring over it reuses the old
+    toolchain (#2501). Installed dependencies are _stale_dependencies' concern.
+    """
+    if not target.isDependency or target.is_installed(case):
+        return None
+    theirs = cmake_cache_compilers(target.get_staging_dirpath(case))
+    langs = compiler_mismatches(env, theirs)
+    if not langs:
+        return None
+    return "; ".join(f"{lang} compiler was {theirs[lang]}, now {env[lang]}" for lang in langs)
 
 
 def _all_dependencies(target: MFCTarget) -> typing.List[MFCTarget]:
