@@ -740,26 +740,31 @@ contains
 
     end subroutine s_amr_expand_box_over_bodies
 
-    !> Tile size for the level-1 regrid boxes: amr_maxc_fit, halved (not below amr_rank_tile_min cells) until the boxes make
-    !! amr_rank_tiles tiles per rank, so a small refined region still gives every rank work while blocks stay as large as that
-    !! allows. amr_maxc_fit as is with amr_max_grid_size set or on one rank. Replicated input: rank-invariant.
+    !> Tile size for the level-1 regrid boxes: from amr_maxc_fit, shrink one cell in one dimension at a time (in turn, not below
+    !! amr_rank_tile_min) until there is at least one tile per rank, so a small refined region gives every rank work while blocks
+    !! stay as large as that allows (a box splits into 8x8x8 tiles for 512 ranks, not 7x7x7). amr_maxc_fit as is with
+    !! amr_max_grid_size set or on one rank. Replicated input: rank-invariant.
     pure function f_amr_rank_tile(boxes, nboxes) result(tc)
 
         type(t_box), intent(in) :: boxes(:)
         integer, intent(in)     :: nboxes
-        integer, parameter      :: amr_rank_tile_min = 32, amr_rank_tiles = 2
-        integer                 :: tc(3), k
+        integer, parameter      :: amr_rank_tile_min = 16
+        integer                 :: tc(3), k, d
         integer(8)              :: n
 
-        tc = amr_maxc_fit
+        tc = amr_maxc_fit; d = 0
         if (amr_max_grid_size > 0 .or. num_procs == 1) return
         do
             n = 0_8
             do k = 1, nboxes
                 n = n + product(int((boxes(k)%hi - boxes(k)%lo + tc)/tc, 8))
             end do
-            if (n >= int(amr_rank_tiles, 8)*num_procs .or. all(.not. amr_dim .or. tc <= amr_rank_tile_min)) return
-            tc = merge(max(tc/2, min(tc, amr_rank_tile_min)), tc, amr_dim)
+            if (n >= num_procs .or. all(.not. amr_dim .or. tc <= amr_rank_tile_min)) return
+            do
+                d = mod(d, 3) + 1
+                if (amr_dim(d) .and. tc(d) > amr_rank_tile_min) exit
+            end do
+            tc(d) = tc(d) - 1
         end do
 
     end function f_amr_rank_tile
