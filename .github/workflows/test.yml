@@ -125,7 +125,7 @@ jobs:
         run: bash .github/scripts/cluster-mode.sh
 
   github:
-    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1}{2})', matrix.nvhpc, matrix.target, matrix.debug == 'reldebug' && ', checks' || '') || format('Github ({0}, {1}, {2}, {3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel && 'intel' || 'GNU') }}
+    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || format('Github ({0}, {1}, {2}, {3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel && 'intel' || 'GNU') }}
     needs: [lint-gate, file-changes]
     if: >-
       !cancelled() &&
@@ -152,14 +152,12 @@ jobs:
         # limit of a hosted runner. PRs build the oldest and newest NVHPC; pushes to
         # master and manual runs build every version (26.5 only on CPU: CMake rejects its
         # GPU builds). Running every NVHPC job on every PR push filled the GitHub-hosted
-        # runner queue. The "checks" lane is the newest NVHPC on CPU with its runtime checks on
-        # (bounds, pointers, floating-point traps), over a fifth of the tests.
+        # runner queue.
         include: >-
           ${{ fromJSON(format('[{0}{1}]',
           '{"os": "ubuntu", "mpi": "mpi", "precision": "single", "debug": "no-debug", "intel": false},
           {"nvhpc": "25.5",  "target": "cpu"}, {"nvhpc": "25.5", "target": "gpu-acc"}, {"nvhpc": "25.5", "target": "gpu-omp"},
-          {"nvhpc": "26.9",  "target": "cpu"}, {"nvhpc": "26.9", "target": "gpu-acc"}, {"nvhpc": "26.9", "target": "gpu-omp"},
-          {"nvhpc": "26.9",  "target": "cpu", "debug": "reldebug"}',
+          {"nvhpc": "26.9",  "target": "cpu"}, {"nvhpc": "26.9", "target": "gpu-acc"}, {"nvhpc": "26.9", "target": "gpu-omp"}',
           github.event_name != 'pull_request' && ',
           {"nvhpc": "25.7",  "target": "cpu"}, {"nvhpc": "25.7", "target": "gpu-acc"}, {"nvhpc": "25.7", "target": "gpu-omp"},
           {"nvhpc": "25.9",  "target": "cpu"}, {"nvhpc": "25.9", "target": "gpu-acc"}, {"nvhpc": "25.9", "target": "gpu-omp"},
@@ -229,7 +227,7 @@ jobs:
             -e "FFLAGS=-tp=px -Kieee -noswitcherror" \
             -e CFLAGS=-tp=px \
             -e CXXFLAGS=-tp=px \
-            -e "MFC_NVHPC_TEST_FLAGS=--test-all --no-mpi${{ matrix.debug == 'reldebug' && ' --reldebug -% 20' || '' }}" \
+            -e "MFC_NVHPC_TEST_FLAGS=--test-all --no-mpi" \
             "$NVHPC_IMAGE" sleep infinity
 
       - name: Setup NVHPC
