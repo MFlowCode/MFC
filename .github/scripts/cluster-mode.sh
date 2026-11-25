@@ -14,7 +14,7 @@ LABEL="ci:clusters"
 WORKFLOW="${WORKFLOW:-test.yml}"
 
 # Changes that only a real cluster run can vouch for: full run without waiting for the label.
-# So is any source change that adds or removes a GPU_PARALLEL_LOOP or GPU_ROUTINE (see below).
+# So is any source change that adds or removes a line with a GPU_* macro (see below).
 RISKY='^(src/common/include/[^/]*macros\.fpp|src/[^/]+/m_mpi_(common|proxy)\.fpp|CMakeLists\.txt|cmake/|toolchain/cmake/|toolchain/modules$|toolchain/templates/|\.github/scripts/|\.github/workflows/(common|frontier|frontier_amd)/|\.github/workflows/(test|bench|bisect)\.yml$)'
 # Changes no cluster job reads: a PR made only of these runs nothing there.
 IRRELEVANT='(\.md$|^(docs|misc|\.claude)/|^toolchain/mfc/(lint_|test_)[^/]*\.py$|^\.github/workflows/(docs|formatting|spelling|lint-toolchain|line-count|cleanliness|claude|claude-code-review|homebrew|homebrew-release|deploy-tap|docker|coverage|coverage-health|coverage-refresh|phoenix-alert|cluster-label|ci-record|runner-watch|test-toolchain-compat)\.yml$)'
@@ -50,10 +50,10 @@ case "$EVENT" in
             # Both read live, not from the event payload: a re-run after labelling carries the old payload.
             changes=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" | jq -s 'add')
             files=$(jq -r '.[].filename' <<<"$changes")
-            # Source files whose diff adds or removes a GPU loop or routine macro: where the compilers
-            # differ most. A diff too large for the API to return counts, since it cannot be read.
+            # Source files whose diff adds or removes a line with a GPU macro (GPU_PARALLEL_LOOP, GPU_ROUTINE,
+            # GPU_UPDATE, GPU_DECLARE, ...): where the compilers differ most. A diff too large for the API to return counts, since it cannot be read.
             gpu=$(jq '[.[] | select(.filename | test("^src/.*\\.fpp$")) | select(.status != "removed")
-                | select(.patch == null or (.patch | split("\n") | any(test("^[+-].*GPU_(PARALLEL_LOOP|ROUTINE)"))))] | length' <<<"$changes")
+                | select(.patch == null or (.patch | split("\n") | any(test("^[+-].*GPU_[A-Z_]+"))))] | length' <<<"$changes")
             labels=$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name')
             if grep -qxF "$LABEL" <<<"$labels" || grep -qE "$RISKY" <<<"$files" || [ "$gpu" -gt 0 ]; then
                 mode=full

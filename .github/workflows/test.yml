@@ -90,7 +90,7 @@ jobs:
   #                              run up to 120 of the tests the change selects; nothing if no
   #                              cluster job reads what it changed
   #   ready PR labelled ci:clusters, touching GPU macros, MPI, the build system or cluster CI, or
-  #   adding or changing a GPU_PARALLEL_LOOP or GPU_ROUTINE,
+  #   adding or changing a line with a GPU_* macro,
   #   manual run, or the 6-hourly schedule when master has moved
   #                              full: every lane, whole suite, case-optimization
   # Its own job so that re-running it (cluster-label.yml does, when the label is added) re-runs
