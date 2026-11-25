@@ -214,3 +214,5 @@ cases on 8 MPI ranks of one Frontier node (amdflang, CPU), relative to the unifo
   Step 0 is pre_process's output: level 0 only, with no blocks and no `amr_levels` file, since simulation regrids at
   step 0 but first saves at step `t_step_save`. A run started at step 0 is therefore always a fresh start: it redoes
   the initial regrid and fills the blocks from the patches.
+  The overlay carries density, pressure, velocity and volume fractions only; probes, `run_time_info` and derived
+  post_process fields read level 0, and `sim_data` is rejected.

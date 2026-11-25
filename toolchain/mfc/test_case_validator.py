@@ -1141,6 +1141,9 @@ class TestSimData(ConstraintTestCase):
     def test_rejects_gamma_law(self):
         self.assertRejects({**self.GOOD, "model_eqns": 1}, "sim_data requires model_eqns = 2 or 3")
 
+    def test_rejects_amr(self):
+        self.assertRejects({**self.GOOD, "amr": "T"}, "sim_data is not supported with amr")
+
     def test_not_tripped_when_disabled(self):
         self.assertAccepts({**BASE_2D, "rho_wrt": "T", "sim_data": "F"})
 
