@@ -82,8 +82,8 @@
         <li><span class="sw" style="background:var(--good);position:relative"><span style="position:absolute;right:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:#fbbf24"></span></span>A test passed on retry</li>
         <li><span class="sw" style="background:var(--serious)"></span>Timed out</li>
         <li><span class="sw" style="background:var(--idle)"></span>Cancelled</li>
-        <li><span class="sw" style="border:1px dashed var(--ink-2)"></span>Queued now</li>
-        <li><span class="sw" style="border:1px solid var(--ink-2)"></span>Running now</li>
+        <li><span class="sw" style="background:#e2e8f0;border:1.5px dashed #64748b"></span>Queued now</li>
+        <li><span class="sw" style="background:#bfdbfe;border:1.5px solid #2563eb"></span>Running now</li>
     </ul>
     <div class="panel"><div class="strip"><div class="labels" id="rows"></div><div class="scroll" id="strip"></div></div><div class="pin" id="pin" hidden></div></div>
 
@@ -260,15 +260,17 @@ function strip() {
         });
     });
     if (now) {                                                  // the master run in progress: outlines, filled in as its lanes finish
-        const x = runs.length * cw + GAP, run = now.master.run, states = new Map(keys.map(k => [k, MFCCI.liveLane(now, ...k.split("|"))]));
-        keys.forEach((k, row) => { const l = states.get(k); if (!l) return; const y = row * ch + 1;
-            if (l.state === "passed" || l.state === "failed") el("rect", { x, y, width: cw - 2, height: ch - 3, rx: 2, fill: COLOR[l.state === "passed" ? "success" : "failure"], opacity: .55 }, svg);
-            else { el("rect", { x: x + .5, y: y + .5, width: cw - 3, height: ch - 4, rx: 2, fill: "none", stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": l.state === "queued" ? "2 2" : "none" }, svg);
-                   if (l.state === "running") el("circle", { cx: x + (cw - 2) / 2, cy: y + (ch - 3) / 2, r: 2.5, fill: "var(--ink-2)" }, svg); } });
+        // Until the run has created its cluster jobs (they wait for the lint gate), every lane is queued.
+        const x = runs.length * cw + GAP, run = now.master.run, states = new Map(keys.map(k => [k, MFCCI.liveLane(now, ...k.split("|")) || { state: "queued" }]));
+        keys.forEach((k, row) => { const l = states.get(k), y = row * ch + 1;
+            if (l.state === "passed" || l.state === "failed") el("rect", { x, y, width: cw - 2, height: ch - 3, rx: 2, fill: COLOR[l.state === "passed" ? "success" : "failure"] }, svg);
+            else if (l.state === "running") { el("rect", { x: x + .75, y: y + .75, width: cw - 3.5, height: ch - 4.5, rx: 2, fill: "#bfdbfe", stroke: "#2563eb", "stroke-width": 1.5 }, svg);
+                                              el("circle", { cx: x + (cw - 2) / 2, cy: y + (ch - 3) / 2, r: 2.5, fill: "#2563eb" }, svg); }
+            else el("rect", { x: x + .75, y: y + .75, width: cw - 3.5, height: ch - 4.5, rx: 2, fill: "#e2e8f0", stroke: "#64748b", "stroke-width": 1.5, "stroke-dasharray": "3 2" }, svg); });
         el("text", { x: x + cw + 2, y: H - 3, "text-anchor": "end" }, svg).textContent = "now";
         const hit = el("rect", { x: x - 1, y: 0, width: cw, height: keys.length * ch, fill: "transparent", style: "cursor:pointer" }, svg);
         hit.addEventListener("pointermove", e => show(`<div class="when">In progress since ${MFCCI.clock(run.t)} · ${run.sha.slice(0, 7)}</div><div>${esc(run.title)}</div>`
-            + keys.filter(k => states.get(k)).map(k => `<div class="row">${label(k)}<b>${states.get(k).state}</b></div>`).join(""), e));
+            + keys.map(k => `<div class="row">${label(k)}<b>${states.get(k).state}</b></div>`).join(""), e));
         hit.addEventListener("pointerleave", () => show(""));
         hit.addEventListener("click", () => { $("pin").hidden = false; $("pin").innerHTML = `<a href="${RUN_URL(run.id)}" target="_blank" rel="noopener">Run ${run.id}</a>, in progress · ${MFCCI.commitLink(run.sha)} ${esc(run.title)}`; });
     }
