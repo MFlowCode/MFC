@@ -301,7 +301,6 @@ contains
                 if (patch_ib(i)%moving_ibm == 1 .and. patch_ib(i)%kin_model <= 0) then
                     @:mib_analytical()
                 end if
-                call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, patch_ib(i)%moment)
             end if
             call s_update_ib_rotation_matrix(i)
         end do
@@ -340,6 +339,15 @@ contains
         do i = 1, num_ibs
             $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
+
+        ! after the markers and centroid offsets: bodies without an analytic moment sum it over their marked cells
+        $:GPU_PARALLEL_LOOP(private='[i]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, &
+                & patch_ib(i)%moment)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps)
@@ -4127,28 +4135,21 @@ contains
         type(ib_patch_parameters), intent(in) :: patch
         real(wp), dimension(3), intent(in)    :: axis
         real(wp), intent(out)                 :: moment
-        real(wp)                              :: distance_to_axis, cell_volume
-        real(wp), dimension(3)                :: position, closest_point_along_axis, vector_to_axis, normal_axis
-        integer                               :: i, j, k, count, ib_marker
+        real(wp)                              :: distance_to_axis
+        real(wp), dimension(3)                :: position, closest_point_along_axis, vector_to_axis, normal_axis, centroid
+        integer                               :: i, j, k, count, gbl_id, xp, yp, zp
 
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
         if (patch%geometry == 2) then  ! circle
             moment = 0.5_wp*patch%mass*(patch%radius)**2
         else if (patch%geometry == 3) then  ! rectangle
-            moment = patch%mass*(patch%length_x**2 + patch %length_y**2)/6._wp
+            moment = patch%mass*(patch%length_x**2 + patch%length_y**2)/12._wp
         else if (patch%geometry == 6) then  ! ellipse
             moment = 0.0625_wp*patch%mass*(patch%length_x**2 + patch %length_y**2)
         else if (patch%geometry == 8) then  ! sphere
-            moment = 0.4*patch%mass*(patch%radius)**2
+            moment = 0.4_wp*patch%mass*(patch%radius)**2
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
-            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
-            ! computed without grid stretching. Update in the loop to perform with stretching
-            if (p /= 0) then
-                cell_volume = cell_volume*(z_cc(1) - z_cc(0))
-            end if
-
-            ib_marker = patch%gbl_patch_id
 
             if (p == 0) then
                 normal_axis = [0, 0, 1]
@@ -4165,14 +4166,19 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        if (ib_markers%sf(i, j, k) == ib_marker) then
+                        if (ib_markers%sf(i, j, k) == 0) cycle
+                        call s_decode_patch_periodicity(ib_markers%sf(i, j, k), gbl_id, xp, yp, zp)
+                        if (gbl_id == patch%gbl_patch_id) then
                             count = count + 1  ! increment the count of total cells in the boundary
 
-                            ! get the position in local coordinates so that the axis passes through 0, 0, 0
+                            ! position relative to the centroid of the periodic image this cell belongs to
+                            centroid(1) = patch%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                            centroid(2) = patch%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
                             if (num_dims < 3) then
-                                position = [x_cc(i), y_cc(j), 0._wp] - [patch%x_centroid, patch%y_centroid, 0._wp]
+                                position = [x_cc(i) - centroid(1), y_cc(j) - centroid(2), 0._wp]
                             else
-                                position = [x_cc(i), y_cc(j), z_cc(k)] - [patch%x_centroid, patch%y_centroid, patch%z_centroid]
+                                centroid(3) = patch%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+                                position = [x_cc(i), y_cc(j), z_cc(k)] - centroid
                             end if
 
                             ! project the position along the axis to find the closest distance to the rotation axis
@@ -4187,8 +4193,12 @@ contains
                 end do
             end do
 
-            ! write the final moment assuming the points are all uniform density
-            moment = moment*patch%mass/(count*cell_volume)
+            ! uniform density: each of the count cells carries mass/count; a rank holding none of the body gets the dummy value
+            if (count > 0) then
+                moment = moment*patch%mass/count
+            else
+                moment = 1._wp
+            end if
         end if
 
     end subroutine s_compute_moment_of_inertia
