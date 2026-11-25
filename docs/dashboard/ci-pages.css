@@ -35,6 +35,8 @@ input[type="search"] { border-radius: 0; border: 0; border-bottom: 2px solid var
 .statusline b { font-weight: 800; }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; }
 .dot.good { background: #0ca30c; } .dot.bad { background: #d03b3b; } .dot.warn { background: #fbbf24; } .dot.idle { background: #cbd5e1; }
+a.by { color: var(--muted); font-size: .92em; text-decoration: none; white-space: nowrap; }
+a.by:hover { text-decoration: underline; }
 .updated { color: var(--muted); font-size: 12px; margin: 0 0 4px; }
 .updated.stale { color: #92400e; background: #fef3c7; display: inline-block; padding: 2px 8px; font-weight: 600; }
 details.key { color: var(--ink-2); font-size: 13px; margin: 24px 0 0; max-width: 75ch; }

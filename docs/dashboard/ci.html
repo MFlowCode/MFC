@@ -246,12 +246,13 @@ function strip() {
         const hit = el("rect", { x: i * cw - 1, y: 0, width: cw, height: keys.length * ch, fill: "transparent", style: "cursor:pointer" }, svg);
         // A scheduled run is the first to test every merge since the scheduled run before it.
         const merged = r.merges?.length ? r.merges : [[r.sha, r.title, r.pr]];
+        const who = pr => MFCCI.author(pr) ? ` @${esc(MFCCI.author(pr))}` : "";
         const line = k => { const c = r.cells[k], t = info.get(k), hows = MFCCI.howFailed(c.jobs);
             return `<div class="row">${label(k)}<b>${c.c === "success" ? "" : c.c === "failure" ? [...new Set(hows.map(h => h.cause))].join(", ") : c.c.replace("_", " ")}`
                 + (t.read ? `${c.c === "success" ? "" : " · "}${t.passed} passed${t.failed.length ? `, ${t.failed.length} failed` : ""}${t.retried.length ? `, ${t.retried.length} on retry` : ""}` : c.c === "success" ? "passed" : "") + `</b></div>`
                 + hows.filter(h => h.detail).map(h => `<div class="how">${esc(h.detail)}</div>`).join(""); };
         hit.addEventListener("pointermove", e => show(`<div class="when">${new Date(r.t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · ${r.sha.slice(0, 7)}</div>`
-            + (merged.length > 1 ? `<div>First run to test ${merged.length} merges: ${merged.map(m => m[2] ? `#${m[2]}` : m[0].slice(0, 7)).join(", ")}</div>` : `<div>${esc(r.title)}</div>`)
+            + (merged.length > 1 ? `<div>First run to test ${merged.length} merges: ${merged.map(m => m[2] ? `#${m[2]}${who(m[2])}` : m[0].slice(0, 7)).join(", ")}</div>` : `<div>${esc(r.title)}${who(merged[0][2])}</div>`)
             + keys.filter(k => r.cells[k]).map(line).join(""), e));
         hit.addEventListener("pointerleave", () => show(""));
         hit.addEventListener("click", () => {
@@ -422,7 +423,7 @@ function pull() {
         const why = bad.map(j => `<a href="${RUN_URL(r.run, j.id)}" target="_blank" rel="noopener">${LANES[j.l] || j.l} ${j.k}${j.s ? ` [${j.s}]` : ""}</a>: <span title="${esc(j.e || "")}">${MFCCI.CAUSE[j.why || "not read"] || j.why}</span>${j.e ? ` <span class="none">${esc(j.e.slice(0, 90))}</span>` : ""}`
             + ((j.f || []).length ? ` (<a href="${MFCCI.withParams(`tests.html?scope=all&find=${j.f[0][0]}`)}">${j.f.length} ${j.f.length === 1 ? "test" : "tests"}</a>)` : "")).join("<br>");
         return `<tr><td><a href="${RUN_URL(r.run)}" target="_blank" rel="noopener">${day(r.t)}</a> · ${r.workflow === "bench" ? "benchmark" : "tests"}</td>`
-            + `<td style="white-space:normal;text-align:left">${r.pr ? `<a href="https://github.com/MFlowCode/MFC/pull/${r.pr}" target="_blank" rel="noopener">#${r.pr}</a> ` : ""}${esc(r.title)}</td>`
+            + `<td style="white-space:normal;text-align:left">${r.pr ? `<a href="https://github.com/MFlowCode/MFC/pull/${r.pr}" target="_blank" rel="noopener">#${r.pr}</a>${MFCCI.by(r.pr)} ` : ""}${esc(r.title)}</td>`
             + `<td>${js.every(j => j.m === "smoke") ? "smoke" : "full"}</td>`
             + `<td>${bad.length ? `<span class="bad">&#10005; ${bad.length} of ${js.length} failed</span>` : cancelled === js.length ? `<span class="none">cancelled</span>` : `<span class="ok">&#10003; ${js.length - cancelled} passed</span>${cancelled ? `, ${cancelled} cancelled` : ""}`}</td>`
             + `<td style="white-space:normal;text-align:left">${why || "–"}</td><td>${last}</td></tr>`;

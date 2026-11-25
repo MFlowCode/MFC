@@ -109,6 +109,13 @@ jobs:
           case " $causes " in *" cluster "*|*" queue "*) wait=45 ;; *) wait=0 ;; esac
           { echo "retry=$retry"; echo "wait=$wait"; } >> "$GITHUB_OUTPUT"
 
+          # Who opened each pull request this line names: the pages show it beside the number.
+          : > authors.new
+          for n in $(jq -r '[.pr, (.merges[]? | .[2])] | map(select(. != null)) | unique | .[]' line.json); do
+            by=$(gh api "$api/pulls/$n" --jq .user.login || true)
+            [ -z "$by" ] || printf '{"pr":%s,"by":"%s"}\n' "$n" "$by" >> authors.new
+          done
+
           install -m 600 /dev/null ~/deploy_key && printf '%s\n' "$DEPLOY_KEY" > ~/deploy_key
           export GIT_SSH_COMMAND="ssh -i ~/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
           # Several recorders can finish together: on a rejected push, start again from a fresh clone.
@@ -122,7 +129,9 @@ jobs:
             cat line.json >> merged.jsonl && mv merged.jsonl "../history/$file"
             git -C ../history config user.name  'MFC Action'
             git -C ../history config user.email '<>'
-            git -C ../history add "$file"
+            touch ../history/authors.jsonl
+            while read -r a; do grep -qF "${a%%,*}," ../history/authors.jsonl || echo "$a" >> ../history/authors.jsonl; done < authors.new
+            git -C ../history add "$file" authors.jsonl
             git -C ../history commit -m "CI run $RUN_ID" || exit 0
             if git -C ../history push; then exit 0; fi
             sleep $((attempt * 7))

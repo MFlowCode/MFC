@@ -130,7 +130,7 @@
 "use strict";
 MFCCI.chrome("benchmarks.html");
 // One JSON object per line, appended by the `record` job of .github/workflows/bench.yml.
-const { laneKey, laneOf, esc, day, PR_OF } = MFCCI;
+const { laneKey, laneOf, esc, day, PR_OF, author, by } = MFCCI;
 let ALL = [], LANES = [];                                // every lane; the lanes of the current view
 function setView(view) {
     state.view = view; state.hidden.clear();
@@ -152,7 +152,7 @@ const el = (tag, attrs = {}, parent) => {
 };
 const fmt = (v, metric) => metric === "rel" ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : `${v.toPrecision(4)} ns`;
 const links = r => `<a href="${COMMIT_URL(r.sha)}" target="_blank" rel="noopener"><code>${r.sha.slice(0, 7)}</code></a>`
-    + (PR_OF(r) ? ` · <a href="https://github.com/MFlowCode/MFC/pull/${PR_OF(r)}" target="_blank" rel="noopener">PR #${PR_OF(r)}</a>` : "");
+    + (PR_OF(r) ? ` · <a href="https://github.com/MFlowCode/MFC/pull/${PR_OF(r)}" target="_blank" rel="noopener">PR #${PR_OF(r)}</a>${by(PR_OF(r))}` : "");
 const COMMIT_URL = sha => `https://github.com/MFlowCode/MFC/commit/${sha}`;
 
 // Median of five runs, never mixing runs from before and after a change to the case itself.
@@ -296,7 +296,7 @@ function chart(slug) {
         marks.replaceChildren();
         for (const r of rows) for (const p of r.ps) el("circle", { cx: x(t), cy: y(p.v), r: r.ps.length > 1 ? 3 : 4, fill: r.s.lane.color, stroke: "var(--surface)", "stroke-width": r.ps.length > 1 ? 1 : 2 }, marks);
         tip.innerHTML = `<div class="when">${new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>`
-            + `<div class="commit"><code>${c.sha.slice(0, 7)}</code>${PR_OF(c) ? ` · PR #${PR_OF(c)}` : ""} ${esc(c.subject)}</div>`
+            + `<div class="commit"><code>${c.sha.slice(0, 7)}</code>${PR_OF(c) ? ` · PR #${PR_OF(c)}${author(PR_OF(c)) ? ` @${esc(author(PR_OF(c)))}` : ""}` : ""} ${esc(c.subject)}</div>`
             + (c.covers > 1 ? `<div class="when">First benchmark of ${c.covers} commits</div>` : "")
             + (changed.has(t) ? `<div class="when">◆ Benchmark case changed at this commit</div>` : "")
             + (envChanged.has(t) ? `<div class="when">■ Compiler or module set changed at this commit</div>` : "")
@@ -365,7 +365,7 @@ function log(slugs) {
     }
     // The commits between this measurement and the one before it: any of them can be behind a change.
     const also = cm => { const o = cm.covers.filter(c => c[0] !== cm.r.sha); return o.length ? `<br><span class="note">also since the last benchmark: ${o.map(c => c[2]
-        ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener" title="${esc(c[1])}">#${c[2]}</a>`
+        ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener" title="${esc(c[1])}">#${c[2]}</a>${by(c[2])}`
         : `<a href="${COMMIT_URL(c[0])}" target="_blank" rel="noopener" title="${esc(c[1])}"><code>${c[0].slice(0, 7)}</code></a>`).join(", ")}</span>` : ""; };
     const cell = v => v === null ? "<td>–</td>" : `<td${Math.abs(v) >= 5 ? ` class="${v > 0 ? "slower" : "faster"}"` : ""}>${Math.abs(v) >= 5 ? (v > 0 ? "▲ " : "▼ ") : ""}${v >= 0 ? "+" : ""}${v.toFixed(1)}%</td>`;
     $("log").innerHTML = `<tr><th>Date</th><th>Commit and pull request</th>${lanes.map(l => `<th>${l.label}</th>`).join("")}</tr>`
@@ -375,7 +375,7 @@ function log(slugs) {
 function changes() {
     const [from, to] = windowOf(), lane = $("flane").value, slug = $("fcase").value;
     const rows = state.shifts.filter(e => e.r.t >= from && e.r.t <= to).map(e => ({ ...e, spans: e.spans.filter(s => (!lane || s.lane.key === lane) && (!slug || s.hits.some(h => h.slug === slug))) })).filter(e => e.spans.length);
-    const commit = c => c[2] ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener">#${c[2]}</a> ${esc(c[1])}`
+    const commit = c => c[2] ? `<a href="https://github.com/MFlowCode/MFC/pull/${c[2]}" target="_blank" rel="noopener">#${c[2]}</a>${by(c[2])} ${esc(c[1])}`
                              : `<a href="${COMMIT_URL(c[0])}" target="_blank" rel="noopener"><code>${c[0].slice(0, 7)}</code></a> ${esc(c[1])}`;
     $("changes").innerHTML = `<tr><th>First seen</th><th>Commit</th><th>Lane</th><th>Cases</th><th>Change in grind time</th></tr>`
         + (rows.length ? "" : `<tr><td colspan="5" class="note">None in this range.</td></tr>`)
