@@ -10,6 +10,9 @@
   <a href="https://github.com/MFlowCode/MFC/actions">
     <img src="https://img.shields.io/github/actions/workflow/status/mflowcode/mfc/test.yml?style=flat&label=Tests&color=slateblue" alt="Tests"/>
   </a>
+  <a href="https://mflowcode.github.io/status.html">
+    <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FMFlowCode%2FMFC-ci-data%2Fmain%2Fbadge.json&style=flat" alt="Status of master on the HPC clusters"/>
+  </a>
   <a href="https://github.com/MFlowCode/MFC/blob/master/.github/CONTRIBUTING.md">
     <img src="https://img.shields.io/github/contributors-anon/mflowcode/mfc?style=flat&color=darkslategrey" alt="Contributors"/>
   </a>

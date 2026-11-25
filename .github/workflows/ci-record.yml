@@ -112,7 +112,9 @@ jobs:
             cat line.json >> merged.jsonl && mv merged.jsonl "../history/$file"
             git -C ../history config user.name  'MFC Action'
             git -C ../history config user.email '<>'
-            git -C ../history add "$file"
+            # The README's badge: how many lanes pass on master now.
+            python3 .github/scripts/ci-badge.py ../history > ../history/badge.json
+            git -C ../history add "$file" badge.json
             git -C ../history commit -m "CI run $RUN_ID" || exit 0
             if git -C ../history push; then exit 0; fi
             sleep $((attempt * 7))
