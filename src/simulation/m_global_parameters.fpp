@@ -721,7 +721,7 @@ contains
         ib_mass_relax = -1
         wall_column_dt_frac = 0.1_wp
         ib_smooth_contact = .false.
-        ib_visc_compact = .false.
+        ib_visc_compact = .true.
         ib_uncover_fill = .false.
 
         ! Bubble modeling (sim-specific)
@@ -1087,6 +1087,9 @@ contains
         end if
         ! weno_Re_flux_compact (default T) applies to Cartesian weno_Re_flux runs only
         weno_Re_flux_compact = weno_Re_flux_compact .and. weno_Re_flux .and. .not. cyl_coord
+        ! ib_visc_compact (default T) applies to Cartesian viscous weno_Re_flux runs with a body: the wide WENO gradient would read
+        ! solid cells past the filled ghost layers, which hold the frozen wall velocity, not the ghost fill (#2041)
+        ib_visc_compact = ib_visc_compact .and. ib .and. viscous .and. weno_Re_flux .and. .not. cyl_coord
         call s_set_visc_dt_cap()
 
         ! Herschel-Bulkley non-Newtonian viscosity: gather per-fluid parameters into device arrays
