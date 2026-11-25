@@ -195,7 +195,7 @@ jobs:
         id: claude
         continue-on-error: true
         # A review that runs out of time still publishes its draft; see step 7 of the prompt.
-        timeout-minutes: 45
+        timeout-minutes: 90
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -212,8 +212,8 @@ jobs:
           claude_args: >
             --model opus
             --fallback-model sonnet
-            --effort high
-            --max-turns 150
+            --effort max
+            --max-turns 300
             --allowedTools
             "Read,Write,Edit,Glob,Grep,Task,Agent,TodoWrite,WebFetch,WebSearch,Bash"
             "mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details,mcp__github_ci__download_job_log"
