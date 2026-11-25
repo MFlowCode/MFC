@@ -9,8 +9,8 @@
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine block boundary. Depends only on m_derived_types and
 !! m_global_parameters so m_rhs (capture) and m_time_steppers (apply) can use it without cycles. creg is indexed 0-based relative to
 !! the rank's block intersection; freg 0-based local fine (children of coarse cell t are 2*t, 2*t+1). The slot dimension grows on
-!! demand (s_amr_reg_reserve). The captured flux is the 1:sys_size advective flux of flux_rsx_vf plus the viscous, species-diffusion
-!! and conduction fluxes of flux_src_rsx_vf; the non-conservative alpha*div(u) remainder is not captured (held by mpp_lim).
+!! demand (s_amr_reg_reserve). The captured flux is the advective flux of flux_rsx_vf plus the viscous, species-diffusion and
+!! conduction fluxes of flux_src_rsx_vf. The volume fractions are not refluxed (s_amr_capture_total).
 module m_amr_registers
 
     use m_derived_types
@@ -418,14 +418,23 @@ contains
         integer, intent(in)  :: set, nb, id
         logical, intent(in)  :: fine, acc
         real(wp), intent(in) :: cf
-        integer              :: m1, m2
+        integer              :: m1, m2, ae
 
         if (.not. any(bcap(11,1:nb,set) == 1)) return
         if (set == 0) then
             $:GPU_UPDATE(device='[bcap(:, 1:nb, 0)]')
         end if
         m1 = bmax(1, set); m2 = bmax(2, set)
-        call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, sys_size)
+        ! Volume fractions: their rhs pairs this flux with an alpha*div(u) source on the same coarse faces, so refluxing the flux
+        ! alone breaks uniform-alpha preservation; their registers stay zero.
+        ae = sys_size
+        if (adv_src_mode /= adv_src_mode_none .and. eqn_idx%adv%beg >= 1 .and. eqn_idx%adv%end >= eqn_idx%adv%beg) then
+            ae = eqn_idx%adv%beg - 1
+        end if
+        call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, ae)
+        if (ae < sys_size .and. eqn_idx%adv%end < sys_size) then
+            call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, eqn_idx%adv%end + 1, sys_size)
+        end if
         if (viscous) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%mom%beg, eqn_idx%E)
         if (chemistry .and. chem_params%diffusion) then
             call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%species%beg, eqn_idx%species%end)
