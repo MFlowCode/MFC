@@ -301,11 +301,12 @@ module m_global_parameters
     !> @{
     !> @}
 
-    real(wp)                                    :: mytime  !< Current simulation time
+    real(wp)                                    :: mytime  !< Current simulation time (start of the step)
+    real(wp)                                    :: t_rhs   !< Time of the state the current RHS evaluates (its RK stage time)
     type(pres_field), allocatable, dimension(:) :: pb_ts
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
-    $:GPU_DECLARE(create='[mytime, pb_ts, mv_ts]')
+    $:GPU_DECLARE(create='[t_rhs, pb_ts, mv_ts]')
 
     !> @name lagrangian subgrid bubble parameters
     !> lag_params: auto-generated in generated_decls.fpp
@@ -437,6 +438,22 @@ contains
         if (allocated(amr_reg_of)) amr_reg_cur = amr_reg_of(islot)
 
     end subroutine s_amr_select_slot
+
+    !> Time at the fraction c of the step of length dt_step that starts at mytime. A fixed dt uses the t_step*dt form a restart
+    !! resumes from (m_start_up), so a restarted run sees bitwise the same times.
+    pure function f_step_time(c, t_step, dt_step) result(t)
+
+        real(wp), intent(in) :: c, dt_step
+        integer, intent(in)  :: t_step
+        real(wp)             :: t
+
+        if (cfl_dt) then
+            t = mytime + c*dt_step
+        else
+            t = (t_step + c)*dt_step
+        end if
+
+    end function f_step_time
 
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
     !! parameters once they are read from the input file.

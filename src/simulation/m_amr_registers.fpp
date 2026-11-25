@@ -713,21 +713,21 @@ contains
 
     end subroutine s_amr_reflux_apply_faces
 
-    !> amr_rk_w and amr_rk_c from the rows (c1, c2, c3, c4) of q <- (c1*q + c2*q^n + c3*dt*L(q))/c4, one per stage.
-    impure subroutine s_amr_set_rk_table(coef)
+    !> amr_rk_w from the rows (c1, c2, c3, c4) of q <- (c1*q + c2*q^n + c3*dt*L(q))/c4, one per stage; amr_rk_c are the stage times
+    !! c(1:ns) of the stepper.
+    impure subroutine s_amr_set_rk_table(coef, c)
 
-        real(wp), intent(in) :: coef(:,:)
+        real(wp), intent(in) :: coef(:,:), c(:)
         integer              :: s, t, ns
 
         ns = size(coef, 1)
         allocate (amr_rk_w(ns), amr_rk_c(ns))
-        amr_rk_c(1) = 0._wp
+        amr_rk_c = c(1:ns)
         do s = 1, ns
             amr_rk_w(s) = coef(s, 3)/coef(s, 4)
             do t = s + 1, ns
                 amr_rk_w(s) = amr_rk_w(s)*coef(t, 1)/coef(t, 4)
             end do
-            if (s < ns) amr_rk_c(s + 1) = (coef(s, 1)*amr_rk_c(s) + coef(s, 3))/coef(s, 4)
         end do
 
     end subroutine s_amr_set_rk_table
