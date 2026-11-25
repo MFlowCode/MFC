@@ -4094,6 +4094,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Registered in amr_golden_tests at their own sizes (validation examples)
                 "2D_amr_isentropic_vortex",
                 "3D_amr_sedov",
+                # A long validation run (Cd and St over many shedding periods); the same AMR+IB path is in amr_golden_tests.
+                "2D_amr_cylinder_wake",
                 # Finite-rate propellant flame: the flame-front position after 50 steps is set by
                 # accumulated stiff-kinetics roundoff, so it drifts past the 1e-3 Example tolerance
                 # across compilers (nvhpc 25.11 golden vs 24.3/GNU/Intel/CCE/AMD disagree by ~1-5e-3).
