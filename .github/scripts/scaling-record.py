@@ -11,9 +11,10 @@ JSON object, or exits non-zero when no log has a result:
     runs                  per log: kind (weak|strong), nodes, ranks, cells (in all), grind (ns per
                           grid point, equation and RK stage) and step (seconds per time step)
 
-Weak scaling holds the cells per rank fixed, so its efficiency against the smallest run is
-step(smallest)/step(N); strong scaling holds the cells fixed, so its efficiency is
-step(smallest)·nodes(smallest)/(step(N)·N). docs/benchmarks.html draws both.
+Grind time is wall time per grid point over all ranks, so with perfect scaling it falls as
+1/ranks in both cases (weak holds the cells per rank fixed, strong the cells in all), and the
+efficiency against the smallest run is grind(smallest)·ranks(smallest)/(grind(N)·ranks(N)).
+docs/benchmarks.html draws it.
 """
 
 import glob
@@ -39,12 +40,12 @@ def runs(root: str) -> list:
             continue
         with open(path, errors="replace") as f:
             text = f.read()
-        grind, step = last(r"Performance:" + NUMBER, text), last(r"Time Avg =" + NUMBER, text)
-        if grind is None or step is None:
+        grind, step = last(r"Performance:" + NUMBER, text), last(r"\(avg" + NUMBER + r"s\)", text)
+        size = re.search(r"Simulating a regular (\d+)x(\d+)x(\d+) case on (\d+) rank", text)
+        if grind is None or step is None or not size:
             continue
-        cells = [int(v) + 1 for k in "mnp" for v in re.findall(rf"^\s*{k}\s*=?\s*(\d+)\s*$", text, re.M)[:1]]
-        size = cells[0] * cells[1] * cells[2] if len(cells) == 3 else None
-        out.append({"kind": m.group(1), "nodes": int(m.group(2)), "ranks": int(m.group(2)) * 8, "cells": size, "grind": grind, "step": step})
+        cells = int(size.group(1)) * int(size.group(2)) * int(size.group(3))
+        out.append({"kind": m.group(1), "nodes": int(m.group(2)), "ranks": int(size.group(4)), "cells": cells, "grind": grind, "step": step})
     return sorted(out, key=lambda r: (r["kind"], r["nodes"]))
 
 

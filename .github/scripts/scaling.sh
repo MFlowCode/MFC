@@ -7,9 +7,9 @@
 # GPU) and the strong case (SCALING_STRONG_GB in all) for 20 steps and leaves
 # <log dir>/<weak|strong>-<nodes>.out for scaling-record.py. A node count whose job fails is
 # missing from the result; the script fails only when none finished.
-set -uo pipefail
+set -o pipefail            # not -u: mfc.sh load reads variables it has not set
 
-logs=$1; shift
+logs=${1:?log directory}; shift
 nodes=("$@"); [ ${#nodes[@]} -gt 0 ] || nodes=(1 8 64)
 weak_gb=${SCALING_WEAK_GB:-16}
 strong_gb=${SCALING_STRONG_GB:-256}

@@ -1,7 +1,7 @@
 name: 'Scaling'
 
 # Weak and strong scaling of master on Frontier, once a week: 1, 8 and 64 nodes (8, 64 and 512
-# GPUs), about 15 node-hours. The result is appended to scaling.jsonl in MFlowCode/MFC-ci-data,
+# GPUs), a few node-hours. The result is appended to scaling.jsonl in MFlowCode/MFC-ci-data,
 # which docs/benchmarks.html draws.
 on:
   schedule:
