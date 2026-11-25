@@ -5,6 +5,9 @@
 # contact behind it are thin shells, so dynamic regridding (amr_regrid_int > 0) keeps a set of
 # 2:1 blocks on them while the interior and the far field stay coarse. With amr_subcycle the
 # refined level takes two steps per coarse step, so dt is set by the coarse cells.
+#
+# The run stops at t = 0.1875, before the inward secondary shock collapses on the near-vacuum
+# center (t ~ 0.21): at the fine 128^3 spacing WENO5 then drives the pressure negative.
 import json
 
 N = 64
@@ -31,7 +34,7 @@ print(
             # Coarse-cell CFL about 0.2 at the post-shock wave speed (subcycled: the fine level halves it)
             "dt": 0.1 * dx,
             "t_step_start": 0,
-            "t_step_stop": 200,
+            "t_step_stop": 120,
             "t_step_save": 20,
             # Simulation algorithm
             "num_patches": 2,

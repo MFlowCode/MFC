@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
+"""Circularly polarized Alfven wave, one period (t = 1) in a periodic box; check_alfven.py compares it with the initial state.
+
+Case of section 6.3.1 of Toth, "The div B = 0 constraint in shock-capturing magnetohydrodynamics codes" (2000).
+"""
+
+import argparse
 import json
 import math
 
-# Case for smooth Alfven waves from section 6.3.1 of:
-# The ∇·B=0 Constraint in Shock-Capturing Magnetohydrodynamics Codes
-# Gábor Tóth
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default={})
+parser.add_argument("-N", type=int, default=1024, help="Cells")
+parser.add_argument("--cfl", type=float, default=0.0, help="Fast-wave CFL number (0: the fixed dt = 1e-5 of the example)")
+parser.add_argument("--weno", type=int, default=3, help="weno_order")
+args = parser.parse_args()
+
+# One period in steps; c_f = sqrt(gamma p / rho + |B|^2 / rho) = 1.085 bounds the fast speed
+nt = 100000 if args.cfl <= 0 else math.ceil(1.085 * args.N / args.cfl)
 
 print(
     json.dumps(
@@ -14,13 +26,13 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": 0.0,
             "x_domain%end": 1.0,
-            "m": 1023,
+            "m": args.N - 1,
             "n": 0,
             "p": 0,
-            "dt": 1.0e-5,
+            "dt": 1.0 / nt,
             "t_step_start": 0,
-            "t_step_stop": 100000,
-            "t_step_save": 10000,
+            "t_step_stop": nt,
+            "t_step_save": nt // 10 if args.cfl <= 0 else nt,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": "5eq",
@@ -29,7 +41,7 @@ print(
             "mpp_lim": "F",
             "mixture_err": "F",
             "time_stepper": "rk3",
-            "weno_order": 3,
+            "weno_order": args.weno,
             "weno_eps": 1e-7,
             "null_weights": "F",
             "mp_weno": "F",

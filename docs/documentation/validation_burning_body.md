@@ -2,7 +2,7 @@
 
 # Burning carbon body validation
 
-**Status:** cylinder burn rate against a 1D radial reference: validated with `ib_ip_interp = 2` at 24 cells per diameter (+0.3 % at 10 us, +0.2 % at 20 us), +0.8 to +1.4 % at 12; with the default image points +0.6 to +0.9 % at 24 and +1.3 to +1.9 % at 12; sphere: partially validated with `ib_ip_interp = 2` (+2.5 to +4 % at 12 cells per diameter), +6 to +9 % with the default. **Code:** `master` at 0cdfdf02a. **Example:** `examples/nD_ibm_carbon_burn`. See also @ref validation.
+**Status:** cylinder burn rate against a 1D radial reference: validated with `ib_ip_interp = 2` (+0.15 % at 10 us and -0.11 % at 20 us at 24 cells per diameter, +0.90 % and +0.07 % at 12), which with the per-species ghost mirror weight reproduces the earlier study; with the default image points +0.6 to +0.9 % at 24 and +1.3 to +1.9 % at 12; sphere: partially validated with `ib_ip_interp = 2` (+2.1 % at 10 us, +1.1 % at 20 us at 12 cells per diameter), +6 to +9 % with the default. **Code:** `master` at 0cdfdf02a; the per-species ghost mirror weight and its numbers: 5c43aa27d with this change. **Example:** `examples/nD_ibm_carbon_burn`. See also @ref validation.
 
 A carbon body at fixed temperature gasifies in hot, high-pressure moist air with a CO flame off the surface. The reference is an independent 1D radially symmetric transient solution of the same model (`ref1d.py`, shipped), so the comparison checks the immersed-boundary surface chemistry (`ib_flux_wall`, the surface solve's species fluxes through the wall faces) and the reacting transport around a staircase body, with the mechanisms (`2D_ibm_reacting_surface`) shared. Tables marked "earlier" were measured on a pre-merge build and were not repeated.
 
@@ -44,7 +44,7 @@ The cause of the gap to the earlier study was traced by rerunning the 12-cell cy
 | `master`, `weno_Re_flux_compact = T` | +1.86 % | +1.85 % (end of run) |
 | `master` before #2248 (wall conduction through the unbounded mirror temperature) | burn rate equal to `master` to 5 digits through 5 us | |
 
-The earlier study's build reproduces its numbers exactly with this case file, so the case and the reference are not the difference. The default that moves the burn rate is the image-point interpolation: the earlier build used triangular-shaped-cloud weights (`ib_ip_interp = 2`), `master` uses inverse-distance weights (`ib_ip_interp = 1`). Setting it recovers about half of the gap at 12 cells per diameter and nearly all of it at 24 (below). The other options of the earlier build do not matter here (`ib_smooth_contact`, `ib_mass_relax`, which the flux wall makes redundant, `weno_Re_flux_compact`). What remains at 12 cells per diameter (+0.5 and +0.7 percentage points at 10 and 20 us) comes from changes of the earlier build that are not in `master` (for example the mirrored temperature of the advected ghost of an isothermal or reacting wall); this was not isolated. The recommended setting for these cases is `--set ib_ip_interp=2`.
+The earlier study's build reproduces its numbers exactly with this case file, so the case and the reference are not the difference. The default that moves the burn rate is the image-point interpolation: the earlier build used triangular-shaped-cloud weights (`ib_ip_interp = 2`), `master` uses inverse-distance weights (`ib_ip_interp = 1`). Setting it recovers about half of the gap at 12 cells per diameter and nearly all of it at 24 (below). The other options of the earlier build do not matter here (`ib_smooth_contact`, `ib_mass_relax`, which the flux wall makes redundant, `weno_Re_flux_compact`). What remained at 12 cells per diameter (+0.5 and +0.7 percentage points at 10 and 20 us) is the species ghost (next section). The recommended setting for these cases is `--set ib_ip_interp=2`.
 
 With `ib_ip_interp = 2` (A100, NVHPC 25.11):
 
@@ -52,6 +52,23 @@ With `ib_ip_interp = 2` (A100, NVHPC 25.11):
 | ---: | ---: | ---: | ---: |
 | 10 | +1.39 % | +0.32 % | +0.92 % / +0.16 % |
 | 20 | +0.80 % | +0.16 % | +0.08 % / -0.11 % |
+
+**The per-species ghost mirror weight.** The ghost state of a chemistry wall blends each mass fraction from the mirror back toward the surface value, \f$Y_g = Y_s + \theta (Y_s - Y_{IP})\f$, with \f$\theta\f$ the largest weight up to 1 that keeps \f$Y_g\f$ positive. `master` used one \f$\theta\f$ for all species, the smallest; at a carbon wall the surface consumes the trace radicals (O, OH), their \f$Y_s\f$ is far below \f$Y_{IP}\f$, and the shared weight falls to about 0.006, so every species ghost is the first-order Dirichlet value \f$Y_s\f$. The earlier build gave each species its own \f$\theta\f$ and let the most abundant species at the surface close \f$\sum Y_g = 1\f$ (the shared weight only if that species would go negative). With that rule (now in `master` through this change; A100, NVHPC 25.11, error of column 4):
+
+| Body, cells/D, image points | t [us] | shared \f$\theta\f$ | per-species \f$\theta\f$ | earlier study |
+| :--- | ---: | ---: | ---: | ---: |
+| cylinder, 12, `ib_ip_interp = 2` | 10 | +1.39 % | +0.90 % | +0.92 % |
+| cylinder, 12, `ib_ip_interp = 2` | 20 | +0.80 % | +0.07 % | +0.08 % |
+| cylinder, 24, `ib_ip_interp = 2` | 10 | +0.32 % | +0.15 % | +0.16 % |
+| cylinder, 24, `ib_ip_interp = 2` | 20 | +0.16 % | -0.11 % | -0.11 % |
+| sphere, 12, `ib_ip_interp = 2` | 10 | +3.17 % | +2.07 % | +2.07 % |
+| sphere, 12, `ib_ip_interp = 2` | 20 | +2.49 % | +1.15 % | +1.14 % |
+| cylinder, 12, default | 10 | +1.87 % | +1.87 % | |
+| cylinder, 12, default | 20 | +1.36 % | +1.35 % | |
+| sphere, 12, default | 10 | +7.35 % | +7.34 % | |
+| sphere, 12, default | 20 | +6.22 % | +6.20 % | |
+
+The per-species weight reproduces the earlier study on both bodies and both grids to 0.02 percentage points, so the rest of the gap was this rule and not the advected-ghost temperature mentioned before: that mirror applies to moving walls only, in `master` and in the earlier build alike. With the default inverse-distance image points the weight changes the burn rate by under 0.02 percentage points (cylinder and sphere). The TSC stencil reads the solid cells next to the image point, which hold the last ghost values (`ib_keep_ghost`), so the species ghost feeds back into the image-point state there; this is the likely reason the two settings act together (not separately verified).
 
 ### Sphere
 
@@ -63,7 +80,7 @@ Same setup in 3D (`--ndim 3`), 12 cells per diameter (72 x 72 x 72 cells) to 30 
 | 20 | 1.5750e-8 | 1.6730e-8 | +6.22 % | 1.6785e-8 | +6.57 % |
 | 30 | 1.4490e-8 | 1.5416e-8 | +6.39 % | 1.5464e-8 | +6.72 % |
 
-With TSC image points (`ib_ip_interp = 2`, the recommended setting) the error is +4.05 % at 5 us, +3.17 % at 10 us and +2.49 % at 20 us (default: +9.14 %, +7.35 %, +6.22 %), against +2.07 %, +1.14 % (10, 20 us) of the earlier study (pre-merge build with `ib_ip_interp = 2` as the default and an older flux-wall face rule). The flame peak is 2247.5 K at r = 1.59 R at 30 us with the default settings (reference 2236.1 K at 1.61 R). The remaining 1 to 1.3 percentage points are not isolated (see the cylinder). Finer grids were not run (a 24-cell sphere is 144^3 cells). Status: partially validated with `ib_ip_interp = 2` (within 3.2 % at 12 cells per diameter), open discrepancy with the default image points.
+With TSC image points (`ib_ip_interp = 2`, the recommended setting) the error is +4.05 % at 5 us, +3.17 % at 10 us and +2.49 % at 20 us (default: +9.14 %, +7.35 %, +6.22 %), against +2.07 %, +1.14 % (10, 20 us) of the earlier study (pre-merge build with `ib_ip_interp = 2` as the default and an older flux-wall face rule); with the per-species ghost mirror weight +2.72 %, +2.07 % and +1.15 % (above). The flame peak is 2247.5 K at r = 1.59 R at 30 us with the default settings (reference 2236.1 K at 1.61 R). The remaining 1 to 1.3 percentage points were the shared species mirror weight (see the cylinder). Finer grids were not run (a 24-cell sphere is 144^3 cells). Status: partially validated with `ib_ip_interp = 2` (within 2.1 % from 10 us on at 12 cells per diameter, one grid), open discrepancy with the default image points.
 
 ## Known limitations {#sec-validation-burning-body-limits}
 

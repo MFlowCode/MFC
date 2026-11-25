@@ -77,6 +77,7 @@ print(
             "weno_order": 5,
             "weno_eps": 1.0e-16,
             "weno_Re_flux": "T",
+            "weno_avg": "T",
             "mapped_weno": "T",
             "riemann_solver": "hllc",
             "wave_speeds": "direct",

@@ -533,23 +533,38 @@ class TestAltSoundspeedHlld(ConstraintTestCase):
         self.assertNotIn(self.MSG, self.errors_for({**TWO_FLUID, "riemann_solver": 4}))
 
 
-class TestWenoReFluxWithoutAvg(unittest.TestCase):
-    """weno_Re_flux without weno_avg misses a jump between cells: a warning, not an error."""
+class TestWenoReFluxWithoutAvg(ConstraintTestCase):
+    """weno_Re_flux without weno_avg grows grid-scale noise (#2435) and misses jumps between cells (#2391): an error."""
 
-    MSG = "weno_Re_flux without weno_avg"
+    MSG = "weno_Re_flux requires weno_avg = T"
     VISCOUS = {**BASE, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "weno_Re_flux": "T"}
 
-    def warnings_for(self, params):
-        return CaseValidator(dict(params)).validate("simulation")
+    def test_rejects_without_weno_avg(self):
+        self.assertRejects(self.VISCOUS, self.MSG)
 
-    def test_warns_without_weno_avg(self):
-        self.assertTrue(any(self.MSG in w for w in self.warnings_for(self.VISCOUS)))
+    def test_rejects_weno_avg_false(self):
+        self.assertRejects({**self.VISCOUS, "weno_avg": "F"}, self.MSG)
 
-    def test_silent_with_weno_avg(self):
-        self.assertFalse(any(self.MSG in w for w in self.warnings_for({**self.VISCOUS, "weno_avg": "T"})))
+    def test_accepts_with_weno_avg(self):
+        self.assertAccepts({**self.VISCOUS, "weno_avg": "T"})
 
-    def test_silent_without_weno_Re_flux(self):
-        self.assertFalse(any(self.MSG in w for w in self.warnings_for({**self.VISCOUS, "weno_Re_flux": "F"})))
+    def test_accepts_without_weno_Re_flux(self):
+        self.assertAccepts({**self.VISCOUS, "weno_Re_flux": "F"})
+
+
+class TestNumLocalIbsMax(ConstraintTestCase):
+    """num_local_ibs_max sizes the per-rank IB arrays and must be positive."""
+
+    MSG = "num_local_ibs_max must be >= 1"
+
+    def test_default_accepted(self):
+        self.assertAccepts({**BASE_2D, **CYLINDER})
+
+    def test_positive_accepted(self):
+        self.assertAccepts({**BASE_2D, **CYLINDER, "num_local_ibs_max": 64})
+
+    def test_non_positive_rejected(self):
+        self.assertRejects({**BASE_2D, **CYLINDER, "num_local_ibs_max": 0}, self.MSG)
 
 
 class TestAmrDefaults(unittest.TestCase):
@@ -581,6 +596,10 @@ class TestAmrDefaults(unittest.TestCase):
         e = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_snap": 0}
         self.assertTrue(apply_amr_defaults(e))
         self.assertEqual(e["amr_snap"], 0)
+        # multi-level: a child's padding is clipped by the parent inset, so snapping could let a front leave its block
+        ml = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_max_level": 2, "amr_max_blocks": 8}
+        self.assertTrue(apply_amr_defaults(ml))
+        self.assertNotIn("amr_snap", ml)
         validate_case_constraints(p, "simulation")
 
     def test_unsupported_physics_is_prohibited_under_amr(self):
@@ -1136,6 +1155,9 @@ class TestSimData(ConstraintTestCase):
 
     def test_rejects_gamma_law(self):
         self.assertRejects({**self.GOOD, "model_eqns": 1}, "sim_data requires model_eqns = 2 or 3")
+
+    def test_rejects_amr(self):
+        self.assertRejects({**self.GOOD, "amr": "T"}, "sim_data is not supported with amr")
 
     def test_not_tripped_when_disabled(self):
         self.assertAccepts({**BASE_2D, "rho_wrt": "T", "sim_data": "F"})

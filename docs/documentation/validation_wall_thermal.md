@@ -4,7 +4,7 @@
 
 **Status:** partially validated. **Code:** `master` at 0cdfdf02a. **Examples:** `examples/2D_ibm_cylinder_drag_nu` (lumped cooling,
 `--thermal_bc 3`) and `examples/2D_ibm_cold_wall_transient`.
-**Last run:** 2026-11-23.
+**Last run:** 2026-11-24 (cause of the lumped gap); 2026-11-23 (the rest).
 
 ## Purpose
 
@@ -55,6 +55,16 @@ its own fixed-wall Nusselt number implies, and the second against a body-fitted 
 
 The fit window starts at \f$tU/D\f$ = 6 (Re 40, \f$\tau\f$ about 12), 3 (Re 20, \f$\tau\f$ about 6) and 8 (Re 20, \f$\tau\f$ about 24); the twins ran to \f$tU/D\f$ = 30 (Re 40) and 20 (Re 20). The last heat-rate entry of a window is sensitive: \f$T_w - T_{aw}\f$ has fallen to 2 K there, so 0.2 K in \f$T_{aw}\f$ moves the ratio by 10 %.
 
+**Cause of the lumped gap** (Re 20, 12 cells per D, box 16 D by 10 D, twins run to \f$tU/D\f$ = 60, GNU 13 CPU, `master` at 5c43aa27d; `check_lumped_cooling.py`). Booking is \f$m c_s\,dT_w/dt\f$ over column 5. The linear-response prediction treats the hot twin minus the cold twin as the wall heat's response \f$G(t)\f$ to a wall-temperature step at \f$t = 0\f$ and integrates \f$m c_s\,d\theta/dt = Q_\mathrm{cold}(t) + G(t)\theta(0) + \int_0^t G(t-s)\,d\theta(s)\f$ (\f$\theta = T_w - T_\infty\f$), fitted over the same window as the run; it uses no lumped-model code.
+
+| \f$\rho_s c_s\f$ | \f$T_w(0)\f$ | model \f$\tau U/D\f$ | run \f$\tau' U/D\f$ | gap | booking | twins' linear response \f$\tau' U/D\f$ | \f$\tau_{bl}/\tau\f$ |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 5.1e3 | 330 K | 5.9 | 7.02 | -15.5 % | 0.9995 | 7.04 | 18 % |
+| 2.05e4 | 330 K | 23.8 | 25.09 | -5.0 % | 0.9999 | 25.16 | 4.5 % |
+| 5.1e3 | 306 K | 6.0 | 7.48 | -20.0 % | 0.9996 | 7.52 | 18 % |
+
+The run and the prediction from the fixed walls agree, at both decay times and with a five times smaller temperature step (so the conductivity's temperature dependence does not explain it). The step response is 1.080, 1.029 and 1.009 of its late value at \f$tU/D\f$ = 3, 6 and 12, so a body that cools over a few \f$D/U\f$ sees a heat rate below the steady law; \f$\tau_{bl} = \int (G/G_\infty - 1)\,dt\f$ = 1.07 \f$D/U\f$ (from \f$tU/D\f$ = 0.2). With the smaller step (306 K wall, \f$T_{aw}\f$ = 301.9 K) the twins' Nusselt number and the fit are less certain (4 K of excess temperature).
+
 **Cold cylinder in 1500 K gas, heat absorbed against the reference** (7.4 us = 1 \f$R^2/\alpha_\infty\f$; error \f$Q_\mathrm{MFC}/Q_\mathrm{ref} - 1\f$):
 
 | cells per R | wall | 0.003 | 0.01 | 0.03 | 0.1 |
@@ -68,8 +78,9 @@ The fit window starts at \f$tU/D\f$ = 6 (Re 40, \f$\tau\f$ about 12), 3 (Re 20, 
 
 ## Assessment
 
-- The lumped cylinder decays as an exponential but 5.5 to 16 % more slowly than its fixed-wall Nusselt number implies. The gap does not depend on the grid (-8.9 % at 12 cells per D and -9.2 % at 16 for Re 40; -15.9 % and -16.1 % for Re 20) and falls as the decay time grows (-16 % at \f$\tau U/D\f$ = 6 to -5.5 % at 24 for Re 20): a short \f$\tau\f$ makes the thermal boundary layer lag the falling wall temperature, so the heat rate sits below the steady law. A gap of about 5 % remained at the longest decay time run (the Re 40 run at \f$\tau U/D\f$ about 48 was not completed). The heat the faces report is 0.89 to 0.96 of the steady law at the same wall temperature early in the window.
-- Status of the lumped model: partially validated: a 5 % under-prediction of the heat rate against MFC's own fixed-wall result, cause not found (not verified: the face energy flux of the first-order wall, which also carries a small spurious mass flux, see the discussion of `ib_heat_wrt` in the case documentation).
+- The lumped cylinder decays as an exponential but 5.5 to 16 % more slowly than its fixed-wall Nusselt number implies. The gap does not depend on the grid (-8.9 % at 12 cells per D and -9.2 % at 16 for Re 40; -15.9 % and -16.1 % for Re 20) and falls as the decay time grows (-16 % at \f$\tau U/D\f$ = 6 to -5.5 % at 24 for Re 20).
+- The gap is the transient response of the gas, not an error of the lumped model (see "Cause of the gap" below): the body's temperature change equals the heat its faces book to 1e-3, and the decay that the fixed-wall twins' own linear response predicts, with no lumped update, matches the run to 0.3 % in the decay time at both decay times run. The fixed wall's heat is still 8 % above its steady value at \f$tU/D\f$ = 3 and 3 % at 6 after the impulsive start, and the gas next to a cooling wall holds heat from when the wall was hotter; the steady Nusselt number assumes neither. The lag time of the twins' step response, 1.07 \f$D/U\f$, gives the first-order gap \f$\tau_{bl}/\tau\f$ = 18 % at \f$\tau U/D\f$ = 5.9 and 4.5 % at 23.8 (measured 15.5 % and 5.0 %).
+- Status of the lumped model: validated against MFC's own fixed-wall response (the twins' linear response reproduces the decay); the comparison with the steady Nusselt number is a quasi-steady estimate whose error is about \f$\tau_{bl}/\tau\f$ (about 1 \f$D/U\f$ over the decay time at Re 20).
 - The default wall under-predicts the heat a cold wall absorbs from hot gas by 21 to 52 % at the earliest time and by 1.4 to 9.6 % at 0.1 \f$R^2/\alpha_\infty\f$, falling with refinement at roughly first order (21 % at 40 cells per R at 0.003 against 52 % at 10). The wall layer is thinner than a cell for most of this transient, and the ghost mirror carries at most the flux of a layer one cell thick.
 - With `patch_ib(1)%%wall_column` the heat is within 1.3 % of the reference from 0.01 \f$R^2/\alpha_\infty\f$ on at 20 and 40 cells per R, and within 2.5 % at 0.03 on all three grids. It over-predicts at the earliest time (+6.0 % at 40 cells per R, +12.7 % at 10), a bias that does not fall with refinement in the range run.
 - Partially validated: the lumped cooling is two Reynolds numbers on two coarse grids against MFC's own fixed-wall Nusselt number; the cold wall has a low-Mach reference only; a moving or reacting wall and a sphere were not run.
@@ -80,7 +91,7 @@ The fit window starts at \f$tU/D\f$ = 6 (Re 40, \f$\tau\f$ about 12), 3 (Re 20, 
 - The heat booked on the body at the first step of a run differs from what the columns drain by several percent (observed on a reacting wall, not traced); the earliest entries of the cold-wall table may include it.
 - The column applies to a fixed isothermal circle or sphere with chemistry, `chem_params%%diffusion`, `chem_params%%transport_model = 1` and an adaptive or constant CFL step, and was run on circles here.
 - The lumped model is one temperature per body (small Biot number), explicit in the update and has no recession.
-- The lumped reference is MFC's own fixed-wall Nusselt number: an error common to the fixed and lumped runs (for example the first-order wall) does not appear in it.
+- The lumped reference is MFC's own fixed-wall Nusselt number: an error common to the fixed and lumped runs (for example the first-order wall) does not appear in it. A lumped body's decay agrees with the steady Nusselt number only to about \f$\tau_{bl}/\tau\f$, with \f$\tau_{bl}\f$ about 1 \f$D/U\f$ at Re 20.
 
 ## Reproduce
 
@@ -89,6 +100,8 @@ The fit window starts at \f$tU/D\f$ = 6 (Re 40, \f$\tau\f$ about 12), 3 (Re 20, 
 ./mfc.sh run examples/2D_ibm_cylinder_drag_nu/case.py -t pre_process simulation -n 1 -- --Re 40 --cells_per_D 16 --xu 5 --xd 11 --hy 5 --steps 0 --tstar 30 --tw_ratio 1.1
 ./mfc.sh run examples/2D_ibm_cylinder_drag_nu/case.py -t pre_process simulation -n 1 -- --Re 40 --cells_per_D 16 --xu 5 --xd 11 --hy 5 --steps 0 --tstar 36 --tw_ratio 1.1 --thermal_bc 3 --rho_cs 6.9e3
 python3 examples/2D_ibm_cylinder_drag_nu/check_lumped_cooling.py <lumped run> --cold <cold run> --hot <hot run> --tmin 6
+# cause of the gap (Re 20): twins to t U/D = 60 (--tw_ratio 1.0 and 1.1), lumped runs, then the checker with --tmin 3 or 8
+./mfc.sh run examples/2D_ibm_cylinder_drag_nu/case.py -t pre_process simulation -n 1 -- --Re 20 --cells_per_D 12 --xu 5 --xd 11 --hy 5 --steps 0 --stride 1 --tstar 60 --tw_ratio 1.1 --thermal_bc 3 --rho_cs 2.05e4
 
 ./mfc.sh run examples/2D_ibm_cold_wall_transient/case.py -t pre_process simulation -n 1 -- --cells_per_R 40 --half 4 --tend 0.1 --wall_column 1
 python3 examples/2D_ibm_cold_wall_transient/check_heat.py examples/2D_ibm_cold_wall_transient

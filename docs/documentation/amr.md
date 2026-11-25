@@ -78,11 +78,13 @@ owner and the ranks it overlaps. All exchanges are posted in a fixed order, so r
 On GPUs every block array is device-resident. A rank advances its blocks of equal level in batches stacked along the
 last dimension, one solver call per batch; this is why AMR needs a uniform Cartesian grid. The toolchain enables
 `amr_device_pack` (fused exchange kernels) and sets `amr_snap = min(2, amr_buf - 2)`
-(regrid hysteresis) under dynamic regrid, unless they are set explicitly.
+(regrid hysteresis) under dynamic regrid with one refined level, unless they are set explicitly.
 
 `rank_time_wrt = T` prints a per-phase time budget of the AMR step, the block-balance report, and at the end of the run
 the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, advance scratch, coarse patches, flux
-registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies).
+registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies). Every block's store column is
+sized to the largest block, so it also prints that column's size and, per level, the most blocks any rank held over
+the run, their store, and how much of its column a block's interior fills (min, mean, max).
 
 ## Supported physics {#amr-physics}
 
@@ -122,7 +124,7 @@ Full descriptions: @ref case.
 | `amr_buf` | 3 | Padding around tagged cells, coarse cells (>= 1 with regrid) |
 | `amr_cluster_eff` | 0.7 | Minimum tag efficiency of a clustered box |
 | `amr_blocking_factor` | 4 | Minimum box width, coarse cells |
-| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition (and, on several ranks, tiles regrid boxes smaller, not below 32, until there are two per rank) |
+| `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition (and, on several ranks, tiles regrid boxes smaller, not below 16, until there is one per rank) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
 | `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: one level only) |
@@ -156,23 +158,33 @@ regrids. On a GPU it pays only when the grid it replaces is large enough that th
 sets the time per step.
 
 Measured on one MI250X GCD (amdflang, OpenMP offload): `examples/2D_amr_droplet` with one refined level, against the
-same case on a uniform grid at the fine resolution. Time is the solver's time to the same physical time; below 1 the
-AMR run is faster.
+same case on a uniform grid at the fine resolution. Time is the wall time of the step loop to the same physical time;
+below 1 the AMR run is faster.
 
 | Base grid | Uniform fine grid | Fine cells held by AMR | Lock-step / uniform fine | Subcycled / uniform fine |
 | :--- | :--- | ---: | ---: | ---: |
-| 128^2 | 256^2 (0.07 M cells) | 11% | 2.98 | 2.19 |
-| 512^2 | 1024^2 (1.0 M cells) | 7% | 2.05 | 1.54 |
-| 2048^2 | 4096^2 (16.8 M cells) | 6% | 1.05 | 0.70 |
+| 128^2 | 256^2 (0.07 M cells) | 11% | 2.49 | 1.77 |
+| 512^2 | 1024^2 (1.0 M cells) | 7% | 1.49 | 1.04 |
+| 2048^2 | 4096^2 (16.8 M cells) | 6% | 0.51 | 0.32 |
 
-The last row is from the time per step over 400 steps. A 3D spherical blast (`examples/3D_amr_blast`, 64^3 base
-against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lock-step) and 1.40 (subcycled) times the uniform run.
+The last row runs 400 fine steps. A 3D spherical blast (`examples/3D_amr_blast`, 64^3 base against a uniform 128^3 to
+t = 0.1875, the blocks holding 54% of the fine cells) took 1.17 (lock-step) and 0.87 (subcycled) times the uniform run.
 
-- **Size.** Below a few million cells on the grid AMR would replace, run the uniform grid: a GPU advances those
-  cells at nearly no extra cost.
-- **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
-  blast's 54% would need a far larger grid.
-- **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
+On CPUs the cost per cell is higher and the fixed cost matters less, so AMR pays at every size measured. Same droplet
+cases on 8 MPI ranks of one Frontier node (amdflang, CPU), relative to the uniform fine grid:
+
+| Base grid | Uniform fine grid | Lock-step / uniform fine | Subcycled / uniform fine |
+| :--- | :--- | ---: | ---: |
+| 128^2 | 256^2 | 0.54 | 0.37 |
+| 512^2 | 1024^2 | 0.41 | 0.27 |
+| 2048^2 | 4096^2 | 0.36 | 0.22 |
+
+- **Size.** On a GPU, AMR breaks even near a million cells on the grid it replaces (the subcycled droplet at 1.0 M
+  cells, 1.04) and pays well above that (0.32 at 16.8 M). Below that, run the uniform grid: a GPU advances those cells
+  at little extra cost. On CPUs AMR paid off from the smallest case above.
+- **Coverage.** The smaller the part of the fine grid the blocks hold, the sooner AMR pays: the blast's blocks hold
+  54% of a 2.1 M-cell grid and only its subcycled run is faster than the uniform one.
+- **Subcycling.** `amr_subcycle = T` took 26% to 39% less time than lock-step in every case above.
 - **Accuracy.** In the droplet runs the AMR solution reproduces the uniform fine one: the L1 density difference from
   it is 6.1e-8 at the 512^2 base, against 5.0e-4 for the uniform 512^2 grid. The blocks cover the interface from the
   first step and start from the patches evaluated at the fine resolution.
@@ -180,8 +192,8 @@ against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lo
 ## Limitations {#amr-limitations}
 
 - **Block size.** A block spans at most about half a rank's subdomain per dimension unless `amr_max_grid_size` is set;
-  larger features are covered by several blocks. On several ranks, regrid tiles the level-1 boxes smaller (not below 32
-  coarse cells) until there are at least two per rank, so a small refined region still spreads over the ranks.
+  larger features are covered by several blocks. On several ranks, regrid tiles the level-1 boxes smaller (not below 16
+  coarse cells) until there is at least one per rank, so a small refined region still spreads over the ranks.
 - **Restart.** `parallel_io` restarts work on any rank count when `amr_max_grid_size` is set; otherwise restart on no
   more ranks than wrote the checkpoint. The serial format needs the rank count that wrote it.
   The file header records `amr_ref_ratio`, `amr_max_level` and the storage precision, which must match (the level count may
@@ -199,3 +211,8 @@ against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lo
 - **Output.** Field output is at level-0 resolution with the fine solution restricted into it; post_process with
   `amr = T` overlays the blocks as separate SILO domains. Each save also writes `D/amr_levels.<step>.dat`: one line per
   refined level with its fine cell count and the mean of `|q|` over its cells for each conserved variable.
+  Step 0 is pre_process's output: level 0 only, with no blocks and no `amr_levels` file, since simulation regrids at
+  step 0 but first saves at step `t_step_save`. A run started at step 0 is therefore always a fresh start: it redoes
+  the initial regrid and fills the blocks from the patches.
+  The overlay carries density, pressure, velocity and volume fractions only; probes, `run_time_info` and derived
+  post_process fields read level 0, and `sim_data` is rejected.

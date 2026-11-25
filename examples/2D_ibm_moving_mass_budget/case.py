@@ -119,7 +119,7 @@ if moving:
     case.update({"patch_ib(1)%moving_ibm": 1, "patch_ib(1)%vel(1)": U, "patch_ib(1)%vel(2)": 0.0})
 if args.Re > 0:
     mu = rho * U * D / args.Re
-    case.update({"viscous": "T", "weno_Re_flux": "T", "fd_order": 4, "fluid_pp(1)%Re(1)": 1.0 / mu})
+    case.update({"viscous": "T", "weno_Re_flux": "T", "weno_avg": "T", "fd_order": 4, "fluid_pp(1)%Re(1)": 1.0 / mu})
     if args.Twall > 0:
         case.update(
             {

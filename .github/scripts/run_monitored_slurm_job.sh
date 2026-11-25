@@ -18,6 +18,15 @@ output_file="$2"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# However this ends, leave one notice with what the job cost: ci-record.py reads these for the
+# CI history (node-hours and queue wait). Fields: id|name|nodes|elapsed s|submit|start|state.
+report_usage() {
+    local usage
+    usage=$(SLURM_TIME_FORMAT=%s sacct -j "$job_id" -X -n -P -o JobName,NNodes,ElapsedRaw,Submit,Start,State 2>/dev/null | head -n1) || true
+    if [ -n "$usage" ]; then echo "::notice title=slurm-usage::$job_id|$usage"; fi
+}
+trap report_usage EXIT
+
 monitor_exit=0
 bash "$SCRIPT_DIR/monitor_slurm_job.sh" "$job_id" "$output_file" || monitor_exit=$?
 

@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
+"""Axisymmetric focused transducer (support 6) in water; check_focus.py compares the focal pressure with the on-axis
+solution of a spherical cap. --probe records the pressure at the focus every step."""
+
+import argparse
 import json
 
-# Configuring case dictionary
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default={})
+parser.add_argument("--refine", type=int, default=1, help="Refinement factor of the 100 x 50 grid (dt scales with it)")
+parser.add_argument("--probe", action="store_true", help="Write the focal pressure (D/probe1_prim.dat) every step")
+args = parser.parse_args()
+k = args.refine
+# Probe in the cell just past the focus (source x + focal length) on the axis; off the cell faces
+probe = {"probe_wrt": "T", "fd_order": 2, "num_probes": 1, "probe(1)%x": 0.00006 + 0.00054 + 2.5e-6 / k, "probe(1)%y": 2.5e-6 / k} if args.probe else {}
+
 print(
     json.dumps(
         {
@@ -13,13 +25,13 @@ print(
             "y_domain%beg": 0.0,
             "y_domain%end": 0.0005,
             "cyl_coord": "T",
-            "m": 99,
-            "n": 49,
+            "m": 100 * k - 1,
+            "n": 50 * k - 1,
             "p": 0,
-            "dt": 2e-9,
+            "dt": 2e-9 / k,
             "t_step_start": 0,
-            "t_step_stop": 400,
-            "t_step_save": 20,
+            "t_step_stop": 400 * k,
+            "t_step_save": 20 * k,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": "5eq",
@@ -74,6 +86,7 @@ print(
             "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
             "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00),
+            **probe,
         }
     )
 )

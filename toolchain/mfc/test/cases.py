@@ -914,7 +914,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     alter_igr()
 
                 cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
-                cases.append(define_case_d(stack, "weno_Re_flux", {"weno_Re_flux": "T"}))
                 cases.append(define_case_d(stack, "riemann_solver=5", {"riemann_solver": 5}))
 
                 for weno_Re_flux in ["T"]:
@@ -982,7 +981,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     alter_igr()
 
                 cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
-                cases.append(define_case_d(stack, "weno_Re_flux", {"weno_Re_flux": "T"}))
                 cases.append(define_case_d(stack, "riemann_solver=5", {"riemann_solver": 5}))
                 for weno_Re_flux in ["T"]:
                     stack.push("weno_Re_flux" if weno_Re_flux == "T" else "", {"weno_Re_flux": "T"})
@@ -1063,7 +1061,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
-        cases.append(define_case_d(stack, "weno_Re_flux", {"weno_Re_flux": "T"}))
         for weno_Re_flux in ["T"]:
             stack.push("weno_Re_flux" if weno_Re_flux == "T" else "", {"weno_Re_flux": "T"})
             cases.append(define_case_d(stack, "weno_avg", {"weno_avg": "T"}))
@@ -1195,7 +1192,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-10, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
-        cases.append(define_case_d(stack, "weno_Re_flux", {"weno_Re_flux": "T"}))
         for weno_Re_flux in ["T"]:
             stack.push("weno_Re_flux" if weno_Re_flux == "T" else "", {"weno_Re_flux": "T"})
             cases.append(define_case_d(stack, "weno_avg", {"weno_avg": "T"}))
@@ -1397,7 +1393,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if viscous and not slip and len(dimInfo[0]) >= 2:
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
                 cases.append(define_case_d(stack, f"{shape} -> ib_smooth_contact", {**geom, "ib_smooth_contact": "T"}))
-                cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact", {**geom, "weno_Re_flux": "T", "ib_visc_compact": "T"}))
+                cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact", {**geom, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "T"}))
 
             stack.pop()
 
@@ -4263,8 +4259,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
         # Burning carbon cylinder in quiescent hot air (ib_flux_wall, isothermal wall, CO flame) at 12 cells per diameter, 5e-7 s: the
-        # 1D radial reference of compare_burn_rate.py checks the burn rate on long runs. GNU 13 golden; the largest relative differences
-        # are 4e-7 (NVHPC 25.11, A100), 3e-7 (NVHPC 25.5, A100) and 6e-7 (NVHPC 25.11, CPU).
+        # 1D radial reference of compare_burn_rate.py checks the burn rate on long runs. GNU 12.3 golden (per-species ghost mirror
+        # weight); an A100 (NVHPC 25.11) agrees to 8e-9. The earlier golden spread 4e-7 (NVHPC 25.11, A100) and 6e-7 (NVHPC 25.11, CPU).
         cases.append(
             define_case_f(
                 "2D -> Chemistry -> IBM Carbon Cylinder -> Burn Rate",
@@ -4842,13 +4838,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # GNU 13 on a CPU by 1e-4 (4e-4 with ib_mass_relax = 0) in the energy of this case, TSC agrees to 4e-12 (the cold-wall twin: 2e-11, the
     # stand-off case below: 2e-12; an NVHPC CPU build agrees with GNU to 3e-11). The checker script holds the physics; the goldens are
     # regression guards, so 1e-6 is several orders above the observed spread. Skipped in the single-precision lane (see test.py).
+    # The cold-wall twin is viscous: with weno_avg = T (required by weno_Re_flux) the wall shear is nonzero, and the HLLC viscous work
+    # switches between the two tangential velocities on the sign of a round-off s_S at the wall faces, so an A100 differed from GNU by
+    # 1e-5 after 10 steps; ib_smooth_contact = T blends them there and the two agree within 1e-6 again. A test-configuration choice
+    # that avoids the pre-existing sensitivity (#2453), not a fix of it.
     cases.append(define_case_f("2D -> IBM -> Moving Circle -> Mass Budget", "examples/2D_ibm_moving_mass_budget/case.py", args=["--ip_interp", "2"], mods={"parallel_io": "F"}, override_tol=1e-6))
     cases.append(
         define_case_f(
             "2D -> IBM -> Moving Circle -> Mass Budget -> Cold Wall",
             "examples/2D_ibm_moving_mass_budget/case.py",
             args=["--Re", "40", "--Twall", "0.9", "--ip_interp", "2"],
-            mods={"parallel_io": "F"},
+            mods={"parallel_io": "F", "ib_smooth_contact": "T"},
             override_tol=1e-6,
         )
     )
@@ -5158,8 +5158,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # example's mapped WENO5 and weno_eps = 1e-16, round-off in the weights moves the wall-row transverse momentum by 2-3 % between GNU
     # -O3 and debug builds within 20 steps. With these settings GNU 13 double -O3, reldebug and debug agree to 5e-8 (-O3 repeats
     # bitwise) and an AMD MI250X (Cray Fortran, OpenMP offload) run and an AMD CPU build (amdflang) differ from the GNU golden by 8e-8 and 6e-8, so 1e-6 leaves a factor 12.
-    # Single precision differs from double by 4e-4: skipped there (label "Chemistry", test.py).
-    channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "weno_avg": "F", "t_step_stop": 100, "t_step_save": 100}
+    # Single precision differs from double by 4e-4: skipped there (label "Chemistry", test.py). Those spreads were measured with
+    # weno_avg = F, which saw no wall shear; with weno_avg = T the HLLC viscous work switches on the sign of a round-off s_S at the
+    # no-slip wall faces and an A100 (NVHPC 25.11) differed from GNU by 3e-5 after 10 steps, so the golden uses HLL (no such switch),
+    # with which A100 and GNU 13 agree within 1e-6: a test-configuration choice that avoids that pre-existing sensitivity (#2453).
+    channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "riemann_solver": 1, "t_step_stop": 100, "t_step_save": 100}
     cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=channel_mods, override_tol=1e-6))
 
     def direction_symmetry_tests():

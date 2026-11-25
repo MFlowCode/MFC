@@ -11,6 +11,7 @@ Errors are (MFC − reference)/reference.
 
 Separate pages: @ref validation_wall_order_couette "Wall-normal ghost velocity at viscous walls" (`ib_wall_order` against plane Poiseuille and Taylor-Couette flow).
 Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
+Gas-dynamics pages: @ref validation_shock_tubes "Shock tubes" (Sod, Lax, 123 and Shu-Osher), @ref validation_vortex_order "Vortex order of accuracy" (isentropic vortex, Taylor-Green decay), @ref validation_blast "Circular blast wave".
 Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
 Multiphase pages: @ref validation_multiphase_riemann "Two-fluid flows" (water-air shock tube, interface advection, phase-change equilibrium), @ref validation_bubbles "Bubble dynamics" (Keller-Miksis collapse), @ref validation_surface_tension "Surface tension" (Laplace pressure jump), @ref validation_interface_instabilities "Interface instabilities" (viscous Rayleigh-Taylor growth rate).
 
@@ -180,6 +181,34 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 ## Interface instabilities {#sec-validation-interface-instabilities}
 
 **Status:** validated (viscous Rayleigh-Taylor, one wavelength). **Example:** `examples/2D_rayleigh_taylor`. The early growth rate of a viscous Rayleigh-Taylor mode against the linearized Navier-Stokes eigenvalue for the same density and viscosity profiles (-1.1 %, -0.8 %, -0.7 % at 32, 64 and 100 cells per wavelength). Kelvin-Helmholtz is not checked. Results and limits: @ref validation_interface_instabilities.
+
+## Acoustic sources {#sec-validation-acoustics}
+
+**Status:** partially validated. **Examples:** `examples/1D_acoustic_gauss_sigmatime` (with `_gauss_sigmadist`, `_sine_frequency`, `_dipole`). The pulses of 1D planar sources against linear acoustics from the discrete source weights: the amplitude and shape converge, but every pulse arrives \f$\Delta t/2\f$ late because the source sees the step-start time in all Runge-Kutta stages ([#2462](https://github.com/MFlowCode/MFC/issues/2462)). Results and limits: @ref validation_acoustics.
+
+## Ideal MHD {#sec-validation-mhd}
+
+**Status:** Alfven wave validated; Brio-Wu and Orszag-Tang partially validated. **Examples:** `examples/1D_mhd_smooth_alfven_wave`, `examples/1D_brio_wu_hlld`, `examples/2D_orszag_tang_hyper_cleaning`. The circularly polarized Alfven wave against its exact solution (third order with WENO5), the Brio-Wu shock tube by grid convergence and against the compound-wave states of Ryu and Jones, and the divergence error of the Orszag-Tang vortex with and without hyperbolic cleaning. Results and limits: @ref validation_mhd.
+
+## Elastic waves {#sec-validation-elastic-waves}
+
+**Status:** validated. **Examples:** `examples/1D_sodHypo`, `examples/2D_hypo_shear_contact`. Hypoelastic longitudinal and shear Riemann problems against linear elastodynamics: wave speeds \f$\sqrt{(K + 4G/3)/\rho}\f$ and \f$\sqrt{G/\rho}\f$, plateau velocities and stresses. Results and limits: @ref validation_elastic_waves.
+
+## Axisymmetric coordinates and stretched grids {#sec-validation-coordinates}
+
+**Status:** partially validated. **Examples:** `examples/2D_acoustic_support6_axisym`, `examples/1D_acoustic_gauss_sigmatime` (`--stretch`). The focal pressure of an axisymmetric focused transducer against the on-axis solution of a spherical cap, and the 1D acoustic pulse on a stretched grid against the same linear solution as on the uniform grid. Results and limits: @ref validation_coordinates.
+
+## Shock tubes {#sec-validation-shock-tubes}
+
+**Status:** validated (WENO, TENO, MUSCL); partially validated for IGR. **Examples:** `examples/1D_sod_convergence`, `examples/1D_sodshocktube`, `examples/1D_laxshocktube`, `examples/1D_shuosher_wenoz5`. The Sod, Lax and 123 Riemann problems against the exact solution (L1 density error 2.2e-4, 9.2e-4 and 6.8e-4 at 2048 cells with WENO5-M, order about 0.9 for Sod and Lax and 0.6 for 123), every reconstruction, HLL, HLLC and Lax-Friedrichs, and IGR on a 2D strip (IGR has no 1D path, [#2463](https://github.com/MFlowCode/MFC/issues/2463)); the five Shu-Osher examples against a converged reference. Results and limits: @ref validation_shock_tubes.
+
+## Smooth-flow order of accuracy {#sec-validation-vortex-order}
+
+**Status:** open discrepancy (isentropic vortex); validated (Taylor-Green decay). **Examples:** `examples/2D_isentropicvortex` (`--convect`), `examples/2D_TaylorGreenVortex`. The translating vortex converges at second order for every WENO and TENO order ([#2464](https://github.com/MFlowCode/MFC/issues/2464)); the viscous decay rate of the 2D Taylor-Green vortex is exact to 7e-7 at 32 cells. Results and limits: @ref validation_vortex_order.
+
+## Circular blast wave {#sec-validation-blast}
+
+**Status:** validated on the CPU (the AMR run aborts on an NVIDIA GPU, [#2467](https://github.com/MFlowCode/MFC/issues/2467)). **Example:** `examples/2D_amr_blast_multilevel`. The 2D Sod explosion on uniform grids and with two AMR levels against a fine radial reference: L1 density order 0.87, shock radius within a tenth of a cell, AMR as accurate as the uniform grid of its finest level. Results and limits: @ref validation_blast.
 
 ## Other families
 

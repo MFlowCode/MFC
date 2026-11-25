@@ -490,6 +490,10 @@ if (MFC_DOCUMENTATION)
     install(FILES       "${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html"
                         "${CMAKE_CURRENT_SOURCE_DIR}/docs/404.html"
             DESTINATION "docs/mfc")
+
+    # > The dashboard (status, performance, CI and test health): its own pages under /dashboard/
+    install(DIRECTORY   "${CMAKE_CURRENT_SOURCE_DIR}/docs/dashboard"
+            DESTINATION "docs/mfc")
 endif()
 
 site_name(SITE_NAME)

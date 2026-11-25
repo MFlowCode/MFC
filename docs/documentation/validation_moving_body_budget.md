@@ -3,7 +3,7 @@
 # Moving immersed boundary: gas mass created at the surface, and the heat and force of a body against its Galilean twin
 
 **Status:** partially validated. **Code:** `master` at 0cdfdf02a. **Example:** `examples/2D_ibm_moving_mass_budget`.
-**Last run:** 2026-11-22.
+**Last run:** 2026-11-22 (mass runs); 2026-11-24 (twin runs, with `weno_avg = T`, which `weno_Re_flux` now requires).
 
 ## Purpose
 
@@ -22,7 +22,7 @@ particle-resolved runs, where a particle's drag and heating are read from these 
 | Flow | moving twin: the circle moves at Mach 0.3 through gas at rest (`moving_ibm = 1`); fixed twin: the circle is held and the gas moves at Mach -0.3 |
 | Mass runs | inviscid, box 5 D, 16, 24 and 32 cells/D, 6 D travelled, 24 saves, no-slip wall |
 | Twin runs | Re = U D/\f$\nu\f$ = 40, Pr 0.7, isothermal wall (`thermal_bc = 1`), wall/gas temperature 0.9 and 0.2, box 8 D, 16 and 32 cells/D, 6 D travelled, `ib_ip_interp = 2` |
-| Numerics | WENO5-M, HLLC, SSP-RK3, fixed step from an acoustic CFL of 0.4, `fd_order` 4 and `weno_Re_flux` when viscous |
+| Numerics | WENO5-M, HLLC, SSP-RK3, fixed step from an acoustic CFL of 0.4, `fd_order` 4, `weno_Re_flux` and `weno_avg` when viscous |
 | Correction | `ib_mass_relax` = 0 (off) and 30 |
 | Hardware | GNU 13 on an x86 CPU, double precision |
 
@@ -64,30 +64,30 @@ Galilean twin, viscous, moving over fixed (ratio 1 is exact agreement):
 
 | wall T / gas T | cells/D | Q, relax 0 | Q, relax 30 | F_x, relax 0 | F_x, relax 30 | RMS of the F difference, relax 30 |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0.9 | 16 | 0.940 | 0.993 | 0.966 | 0.963 | 2.7 % |
-| 0.9 | 32 | 0.966 | 1.002 | 0.969 | 0.968 | 1.6 % |
-| 0.2 | 16 | 0.760 | 0.817 | 1.248 | 1.748 | 112 % |
-| 0.2 | 32 | 0.882 | 0.917 | 0.690 | 0.682 | 7.5 % |
+| 0.9 | 16 | 0.944 | 1.009 | 0.978 | 0.976 | 2.5 % |
+| 0.9 | 32 | 0.974 | 1.009 | 0.985 | 0.984 | 1.6 % |
+| 0.2 | 16 | 0.764 | 0.823 | 1.400 | 1.915 | 118 % |
+| 0.2 | 32 | 0.894 | 0.928 | 0.784 | 0.785 | 7.3 % |
 
 ## Assessment
 
 - A moving no-slip circle creates gas mass at 0.013-0.05 % of the gas per diameter travelled (inverse-distance image points), falling at about first order with refinement. Over the 6 D of the runs
   this is 0.13-0.36 %, and it would grow with the distance a particle travels.
 - `ib_mass_relax = 30` holds the total to 0.016 % or less over 6 D at every grid and the steady rate to 0.002 %/D, with the start-up offset bounded.
-- With the correction, the conducted heat of a wall at 0.9 of the gas temperature agrees with its twin to 0.7 % at 16 cells/D and 0.2 % at 32; the correction moves the ratio from
-  0.94 and 0.97 and does not change the force (3 % low at both grids).
-- A cold wall (0.2 of the gas temperature) is not reproduced: the heat is 18 % low at 16 cells/D and 8 % low at 32 with the correction,
+- With the correction, the conducted heat of a wall at 0.9 of the gas temperature agrees with its twin to 0.9 % at 16 and 32 cells/D; the correction moves the ratio from
+  0.94 and 0.97 and does not change the force (2 % low at 16 cells/D, 1.6 % at 32).
+- A cold wall (0.2 of the gas temperature) is not reproduced: the heat is 18 % low at 16 cells/D and 7 % low at 32 with the correction,
   and the force of the moving body is not close to its twin's.
 - Status is partially validated: the mass budget and the warm-wall twin close; the cold-wall twin and the force do not.
 
 ## Known limitations
 
-- **Cold moving wall.** The conducted heat is low by 8-18 % at 16-32 cells/D even with the correction, converging about first order. The
+- **Cold moving wall.** The conducted heat is low by 7-18 % at 16-32 cells/D even with the correction, converging about first order. The
   cause is a ghost-state error at the advancing nose that the correction does not remove (found in a separate Python prototype; not
   re-verified in MFC). The solver documentation lists measured twin ratios for the same case.
 - **Force of a moving body.** `ib_forces.dat` is the lab-frame face momentum flux (`ib_face_ft`); it has no \f$-V f_m\f$ term and the cells a
-  body covers or uncovers book no momentum. The twin ratio is 0.96-0.97 for a wall near the gas temperature and not meaningful for the cold wall
-  (1.25 and 1.75 at 16 cells/D, 0.69 and 0.68 at 32, RMS difference 7-112 % of the fixed force). The force noise of a moving body (the cell-crossing frequency) is
+  body covers or uncovers book no momentum. The twin ratio is 0.98 for a wall near the gas temperature and not meaningful for the cold wall
+  (1.40 and 1.92 at 16 cells/D, 0.78 at 32, RMS difference 7-118 % of the fixed force). The force noise of a moving body (the cell-crossing frequency) is
   visible in the RMS column and was not separated here. Not changed in this example.
 - Drift with the box: 2D, one body, Mach 0.3, inviscid; 3D bodies cross cells in three directions and a particle array was not run here
   (the fixed-body array is covered by `ib_flux_wall`, see the `2D_ibm_wall_mass_budget` example).

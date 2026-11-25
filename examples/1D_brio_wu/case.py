@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
+import argparse
 import json
 
 # An upwind differencing scheme for the equations of ideal magnetohydrodynamics
 # M. Brio and C. C. Wu
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--mfc", type=json.loads, default={})
+parser.add_argument("-N", type=int, default=801, help="Cells (dt scales with 801 / N; end time 0.2)")
+parser.add_argument("--gamma", type=float, default=2.0, help="Ratio of specific heats (2 in Brio and Wu; 5/3 in Ryu and Jones)")
+args = parser.parse_args()
+r = args.N / 801
 
 # Configuring case dictionary
 print(
@@ -13,13 +21,13 @@ print(
             # Computational Domain Parameters
             "x_domain%beg": 0.0,
             "x_domain%end": 1.0,
-            "m": 800,
+            "m": args.N - 1,
             "n": 0,
             "p": 0,
-            "dt": 0.0002,
+            "dt": 0.0002 / r,
             "t_step_start": 0,
-            "t_step_stop": 1000,
-            "t_step_save": 100,
+            "t_step_stop": round(1000 * r),
+            "t_step_save": round(1000 * r) // 10,
             # Simulation Algorithm Parameters
             "num_patches": 2,
             "model_eqns": "5eq",
@@ -72,7 +80,7 @@ print(
             "patch_icpp(2)%alpha_rho(1)": 0.125,
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluids Physical Parameters
-            "fluid_pp(1)%gamma": 1.0e00 / (2.0e00 - 1.0e00),
+            "fluid_pp(1)%gamma": 1.0e00 / (args.gamma - 1.0e00),
             "fluid_pp(1)%eos": "ideal_gas",
         }
     )

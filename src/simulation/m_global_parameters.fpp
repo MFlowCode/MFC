@@ -237,7 +237,7 @@ module m_global_parameters
     !> @name Immersed Boundaries
     !> patch_ib, ib_airfoil, stl_models, particle_cloud: auto-generated in generated_decls.fpp
     !> @{
-    integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
+    integer, allocatable, dimension(:) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
 
@@ -657,6 +657,7 @@ contains
 
         ! Immersed Boundaries (sim-specific extras)
         ib_neighborhood_radius = 0
+        num_local_ibs_max = 30000
         collision_model = 0
         collision_temporal_resolution = 0
         coefficient_of_restitution = dflt_real
@@ -1103,6 +1104,7 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
+        if (ib) allocate (local_ib_patch_ids(num_local_ibs_max))
 
         ! Configure WENO averaging flag (arithmetic mean vs. unaltered values)
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
@@ -1418,6 +1420,7 @@ contains
         deallocate (MPI_IO_DATA%var, MPI_IO_DATA%view)
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
+        if (allocated(local_ib_patch_ids)) deallocate (local_ib_patch_ids)
 
         if (allocated(neighbor_ranks)) then
             @:DEALLOCATE(neighbor_ranks)

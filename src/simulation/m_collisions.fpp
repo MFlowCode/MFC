@@ -42,6 +42,37 @@ module m_collisions
 
 contains
 
+    !> @brief the point that decides which rank owns a body pair: the contact point built from the lower global id's own centroid
+    !! and the minimum-image offset to the other, so every rank holding the pair computes the same bits whichever periodic images it
+    !! found the pair through
+    subroutine s_pair_owner_point(pa, pb, point)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        type(ib_patch_parameters), intent(in) :: pa, pb
+        real(wp), intent(out)                 :: point(3)
+        real(wp)                              :: base(3), rel(3), rb, span
+
+        if (pa%gbl_patch_id < pb%gbl_patch_id) then
+            base = [pa%x_centroid, pa%y_centroid, 0._wp]; rel = [pb%x_centroid, pb%y_centroid, 0._wp] - base; rb = pa%radius
+            if (num_dims == 3) then
+                base(3) = pa%z_centroid; rel(3) = pb%z_centroid - base(3)
+            end if
+        else
+            base = [pb%x_centroid, pb%y_centroid, 0._wp]; rel = [pa%x_centroid, pa%y_centroid, 0._wp] - base; rb = pb%radius
+            if (num_dims == 3) then
+                base(3) = pb%z_centroid; rel(3) = pa%z_centroid - base(3)
+            end if
+        end if
+        #:for X, D in [('x', 1), ('y', 2), ('z', 3)]
+            if (num_dims >= ${D}$ .and. ib_bc_${X}$%beg == BC_PERIODIC) then
+                span = glb_bounds(${D}$)%end - glb_bounds(${D}$)%beg
+                rel(${D}$) = rel(${D}$) - span*anint(rel(${D}$)/span)
+            end if
+        #:endfor
+        point = base + rel/norm2(rel)*(rb - 0.5_wp*(pa%radius + pb%radius - norm2(rel)))
+
+    end subroutine s_pair_owner_point
+
     !> @brief inverse effective tangential mass of a sphere or circle at its contact point: 1/m + r^2/I
     function f_inv_tangential_mass(patch) result(inv_mass)
 
@@ -188,8 +219,8 @@ contains
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(normal_vector)
             if (overlap_distance > 0._wp) then  ! if the two patches are close enough to collide
                 normal_vector = normal_vector/norm2(normal_vector)
-                ! pid1 is a rank-local index, so owning the pair by its centroid drops or doubles pairs split across ranks
-                contact_point = centroid_1 + normal_vector*(patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
+                ! owned where its contact point lies, computed the same way on every rank (pid1 and the images are rank-local)
+                call s_pair_owner_point(patch_ib(pid1), patch_ib(pid2), contact_point)
                 if (f_local_rank_owns_location(contact_point, glb_bounds)) then
                     ! compute constants of the collision
                     effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))

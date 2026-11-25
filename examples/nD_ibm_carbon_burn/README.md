@@ -8,17 +8,17 @@ A fixed carbon body (D = 100 um) held at 2000 K gasifies in quiescent moist air 
 
 `compare_burn_rate.py` prints the burn rate (`D/ib_heat.dat` column 4, the face mass the flux wall passes to the gas, and column 3, the surface-solve rate) against the reference at 10, 20, 30 and 60 us, and the flame peak at the last save. `case.py` takes `--ndim`, `--D`, `--p_atm`, `--T`, `--H_over_R`, `--cells_per_D`, `--tend`, `--frames`, `--cfl` and `--set KEY=VAL`.
 
-Measured on `master` at 0cdfdf02a, NVIDIA A100 (NVHPC 25.11), error = (MFC - reference)/reference of the burn rate (`ib_heat.dat` column 4). The recommended setting is `--set ib_ip_interp=2` (triangular-shaped-cloud image points, the default of the earlier study's build); the suite test keeps the default.
+NVIDIA A100 (NVHPC 25.11), error = (MFC - reference)/reference of the burn rate (`ib_heat.dat` column 4) at 10 and 20 us. "Shared" is `master` at 0cdfdf02a, which gave all species one ghost mirror weight; "per species" is the current rule (each species its own weight, the most abundant closing the sum). The recommended setting is `--set ib_ip_interp=2` (triangular-shaped-cloud image points); the suite test keeps the default.
 
-| Body | cells per D | image points | 10 us | 20 us |
+| Body | cells per D | image points | shared | per species |
 | :--- | ---: | :--- | ---: | ---: |
-| cylinder | 12 | default | +1.87 % | +1.36 % |
-| cylinder | 12 | `ib_ip_interp=2` | +1.39 % | +0.80 % |
-| cylinder | 24 | default | +0.86 % | +0.64 % |
-| cylinder | 24 | `ib_ip_interp=2` | +0.32 % | +0.16 % |
-| sphere | 12 | default | +7.35 % | +6.22 % |
-| sphere | 12 | `ib_ip_interp=2` | +3.17 % | +2.49 % |
+| cylinder | 12 | default | +1.87 %, +1.36 % | +1.87 %, +1.35 % |
+| cylinder | 12 | `ib_ip_interp=2` | +1.39 %, +0.80 % | +0.90 %, +0.07 % |
+| cylinder | 24 | default | +0.86 %, +0.64 % | not run |
+| cylinder | 24 | `ib_ip_interp=2` | +0.32 %, +0.16 % | +0.15 %, -0.11 % |
+| sphere | 12 | default | +7.35 %, +6.22 % | +7.34 %, +6.20 % |
+| sphere | 12 | `ib_ip_interp=2` | +3.17 %, +2.49 % | +2.07 %, +1.15 % |
 
-The earlier pre-merge study measured the 12 and 24-cell cylinders at +0.92 and +0.16 % (10 us) and the 12-cell sphere at +2.07 %. Compare at times at least 0.5 us before the end of the run: the burn rate falls steeply and the averaging window of `compare_burn_rate.py` is cut off at the last row. See the page below for the settings tried and what remains.
+With the per-species weight and `ib_ip_interp=2` the runs reproduce the earlier pre-merge study (+0.92 and +0.08 % for the 12-cell cylinder, +0.16 and -0.11 % at 24, +2.07 and +1.14 % for the sphere). Compare at times at least 0.5 us before the end of the run: the burn rate falls steeply and the averaging window of `compare_burn_rate.py` is cut off at the last row. See the page below for the settings tried.
 
 The suite registers `2D -> Chemistry -> IBM Carbon Cylinder -> Burn Rate` (12 cells per diameter, 5e-7 s). Results and limits: @ref validation_burning_body.

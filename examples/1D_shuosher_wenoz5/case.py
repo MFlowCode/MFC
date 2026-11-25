@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
+"""Shu-Osher shock-entropy wave interaction with WENO-Z5; -N sets the cell count (check_shuosher.py compares with a fine run)."""
+
+import argparse
 import json
 import math
 
-# Numerical setup
-Nx = 1000
-dx = 1.0 / (1.0 * (Nx + 1))
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
+parser.add_argument("-N", type=int, default=1001, help="Cells (default: 1001); the step count scales with N")
+args = parser.parse_args()
 
-Tend, Nt = 1.8, 2000
+# Numerical setup
+Nx = args.N - 1
+
+Tend, Nt = 1.8, round(2000 * args.N / 1001)
 mydt = Tend / (1.0 * Nt)
 
 # Configuring case dictionary

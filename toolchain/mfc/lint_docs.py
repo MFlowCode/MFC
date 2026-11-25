@@ -40,6 +40,13 @@ DOCS = [
     "docs/documentation/validation_bubbles.md",
     "docs/documentation/validation_surface_tension.md",
     "docs/documentation/validation_interface_instabilities.md",
+    "docs/documentation/validation_acoustics.md",
+    "docs/documentation/validation_mhd.md",
+    "docs/documentation/validation_elastic_waves.md",
+    "docs/documentation/validation_coordinates.md",
+    "docs/documentation/validation_shock_tubes.md",
+    "docs/documentation/validation_vortex_order.md",
+    "docs/documentation/validation_blast.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]
