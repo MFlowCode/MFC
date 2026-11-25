@@ -76,6 +76,7 @@ print(
             "bc_y%end": -1,
             "format": 2,
             "precision": 2,
+            "prim_vars_wrt": "T",
             "parallel_io": "F",
             "hypoelasticity": "T",
             # Required with hypoelasticity: the stress sources are finite-differenced

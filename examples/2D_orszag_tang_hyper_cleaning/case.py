@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
+"""Orszag-Tang vortex with hyperbolic divergence cleaning; check_divb.py measures div B and mass conservation."""
+
+import argparse
 import json
 import math
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--mfc", type=json.loads, default={})
+parser.add_argument("--no-clean", action="store_true", help="Turn hyper_cleaning off (the control run)")
+parser.add_argument("--steps", type=int, default=2500, help="Time steps (dt = 4e-4; 2500 reach t = 1)")
+args = parser.parse_args()
+clean = {} if args.no_clean else {"hyper_cleaning": "T", "hyper_cleaning_speed": 2.5, "hyper_cleaning_tau": 0.004}
 
 # Configuring case dictionary
 print(
@@ -18,7 +28,7 @@ print(
             "p": 0,
             "dt": 0.0004,
             "t_step_start": 0,
-            "t_step_stop": 2500,
+            "t_step_stop": args.steps,
             "t_step_save": 100,
             # Simulation Algorithm Parameters
             "num_patches": 1,
@@ -48,9 +58,7 @@ print(
             "parallel_io": "T",
             # MHD
             "mhd": "T",
-            "hyper_cleaning": "T",
-            "hyper_cleaning_speed": 2.5,
-            "hyper_cleaning_tau": 0.004,
+            **clean,
             # Patch 1 - Analytical for v and B
             # gamma = 5/3
             #   rho = 25/(36*pi)

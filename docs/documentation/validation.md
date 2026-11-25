@@ -164,6 +164,22 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 **Status:** open discrepancy (resolution-limited). **Example:** `examples/2D_ibm_cylinder_standoff`. The detached-shock distance of a cylinder and a sphere at Mach 1.5-3 against Billig's correlation and a body-fitted Euler solution. Results and limits: @ref validation_standoff.
 
+## Acoustic sources {#sec-validation-acoustics}
+
+**Status:** partially validated. **Examples:** `examples/1D_acoustic_gauss_sigmatime` (with `_gauss_sigmadist`, `_sine_frequency`, `_dipole`). The pulses of 1D planar sources against linear acoustics from the discrete source weights: the amplitude and shape converge, but every pulse arrives \f$\Delta t/2\f$ late because the source sees the step-start time in all Runge-Kutta stages ([#2462](https://github.com/MFlowCode/MFC/issues/2462)). Results and limits: @ref validation_acoustics.
+
+## Ideal MHD {#sec-validation-mhd}
+
+**Status:** Alfven wave validated; Brio-Wu and Orszag-Tang partially validated. **Examples:** `examples/1D_mhd_smooth_alfven_wave`, `examples/1D_brio_wu_hlld`, `examples/2D_orszag_tang_hyper_cleaning`. The circularly polarized Alfven wave against its exact solution (third order with WENO5), the Brio-Wu shock tube by grid convergence and against the compound-wave states of Ryu and Jones, and the divergence error of the Orszag-Tang vortex with and without hyperbolic cleaning. Results and limits: @ref validation_mhd.
+
+## Elastic waves {#sec-validation-elastic-waves}
+
+**Status:** validated. **Examples:** `examples/1D_sodHypo`, `examples/2D_hypo_shear_contact`. Hypoelastic longitudinal and shear Riemann problems against linear elastodynamics: wave speeds \f$\sqrt{(K + 4G/3)/\rho}\f$ and \f$\sqrt{G/\rho}\f$, plateau velocities and stresses. Results and limits: @ref validation_elastic_waves.
+
+## Axisymmetric coordinates and stretched grids {#sec-validation-coordinates}
+
+**Status:** partially validated. **Examples:** `examples/2D_acoustic_support6_axisym`, `examples/1D_acoustic_gauss_sigmatime` (`--stretch`). The focal pressure of an axisymmetric focused transducer against the on-axis solution of a spherical cap, and the 1D acoustic pulse on a stretched grid against the same linear solution as on the uniform grid. Results and limits: @ref validation_coordinates.
+
 ## Other families
 
 - @ref validation_tsc_annulus "Isothermal conduction annulus": image-point interpolation (inverse distance and TSC) against the exact radial conduction solution.

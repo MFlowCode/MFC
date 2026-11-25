@@ -36,6 +36,10 @@ DOCS = [
     "docs/documentation/validation_moving_body_budget.md",
     "docs/documentation/validation_sphere_drag_nu.md",
     "docs/documentation/validation_standoff.md",
+    "docs/documentation/validation_acoustics.md",
+    "docs/documentation/validation_mhd.md",
+    "docs/documentation/validation_elastic_waves.md",
+    "docs/documentation/validation_coordinates.md",
     ".github/copilot-instructions.md",
     ".claude/CLAUDE.md",
 ]
