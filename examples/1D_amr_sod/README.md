@@ -15,6 +15,6 @@ Measured on `master` at 5838b641c, GNU CPU, double precision. L1(rho):
 | 200 | 1.89e-3 | 9.38e-4 | 9.39e-4 | 9.37e-4 | 5.01e-4 | 4.99e-4 | 4.50e-4 |
 | 400 | 9.37e-4 | 4.45e-4 | 4.45e-4 | 4.50e-4 | 2.75e-4 | 2.73e-4 | 2.62e-4 |
 
-With one level the error is the uniform 2N error within 1.1 %; with two levels it is within 11 % of the uniform 4N error, on 40 to 48 % of its cells. With two levels and `--buf 4` the run keeps the toolchain's `amr_snap = 2`, and the shock runs ahead by 3.3e-3 at every N (see the validation page).
+With one level the error is the uniform 2N error within 1.6 %; with two levels it is within 11 % of the uniform 4N error, on 40 to 48 % of its cells. With two levels and `--buf 4`, a derived `amr_snap = 2` let the shock run ahead by 3.3e-3 at every N; #2474 derives it only for one-level runs (see the validation page).
 
 The suite registers `AMR -> 1D -> Example -> Sod two levels` (`-N 32`, two levels, lock-step). Results and limits: @ref validation.
