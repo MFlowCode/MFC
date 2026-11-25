@@ -1195,6 +1195,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-10, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
+        # Swirl with an off-centre theta wedge: covers the (1/r) theta divergence and the hoop stresses (#1910)
+        swirl = {f"patch_icpp({i})%vel(3)": 0.1 for i in range(1, 4)}
+        wedge = {**theta_wedge, **swirl, "patch_icpp(4)%z_centroid": 0.13, "patch_icpp(4)%vel(2)": 0.05}
+        cases.append(define_case_d(stack, "Azimuthal", {**wedge, "weno_Re_flux": "F"}))
         for weno_Re_flux in ["T"]:
             stack.push("weno_Re_flux" if weno_Re_flux == "T" else "", {"weno_Re_flux": "T"})
             cases.append(define_case_d(stack, "weno_avg", {"weno_avg": "T"}))
@@ -4052,6 +4056,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_axisym_conduction_convergence",
                 "2D_jet_in_crossflow",  # analytic tanh inflow profile
                 "3D_cyl_azimuthal_conduction_convergence",
+                # Its initial state is written by run_mms.py between pre_process and simulation; covered by 3D -> Cylindrical -> Viscous -> Azimuthal
+                "3D_cyl_viscous_mms",
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",

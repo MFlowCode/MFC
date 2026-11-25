@@ -283,7 +283,7 @@ contains
         integer, intent(in)                                 :: norm_dir
         type(int_bounds_info), intent(in)                   :: ix, iy, iz
 
-        if (grid_geometry == 3) then
+        if (cyl_coord) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
                 & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
         else

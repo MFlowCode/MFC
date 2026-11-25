@@ -201,9 +201,9 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 **Status:** validated. **Examples:** `examples/1D_sodHypo`, `examples/2D_hypo_shear_contact`. Hypoelastic longitudinal and shear Riemann problems against linear elastodynamics: wave speeds \f$\sqrt{(K + 4G/3)/\rho}\f$ and \f$\sqrt{G/\rho}\f$, plateau velocities and stresses. Results and limits: @ref validation_elastic_waves.
 
-## Axisymmetric coordinates and stretched grids {#sec-validation-coordinates}
+## Cylindrical coordinates and stretched grids {#sec-validation-coordinates}
 
-**Status:** partially validated. **Examples:** `examples/2D_acoustic_support6_axisym`, `examples/1D_acoustic_gauss_sigmatime` (`--stretch`). The focal pressure of an axisymmetric focused transducer against the on-axis solution of a spherical cap, and the 1D acoustic pulse on a stretched grid against the same linear solution as on the uniform grid. Results and limits: @ref validation_coordinates.
+**Status:** partially validated. **Examples:** `examples/2D_acoustic_support6_axisym`, `examples/3D_cyl_viscous_mms`, `examples/1D_acoustic_gauss_sigmatime` (`--stretch`). The focal pressure of an axisymmetric focused transducer against the on-axis solution of a spherical cap, the 3D cylindrical and 2D axisymmetric viscous operator against manufactured solutions (second order), and the 1D acoustic pulse on a stretched grid against the same linear solution as on the uniform grid. Results and limits: @ref validation_coordinates.
 
 ## Shock tubes {#sec-validation-shock-tubes}
 
