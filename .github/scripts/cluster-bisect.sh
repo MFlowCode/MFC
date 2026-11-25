@@ -56,7 +56,7 @@ report() {  # report <exit code> <text>: print it, hand it to the workflow, stop
 
 # git bisect never tests the bad end itself, and names it when every candidate passes. Test it
 # first: a flaky test or an infrastructure failure does not reproduce, and has no culprit.
-git checkout -q "$BAD" || exit 1
+git checkout -q "$BAD" || report 1 "Could not check out ${BAD:0:9}."
 rc=0
 bash "$self" step || rc=$?
 case "$rc" in
@@ -64,7 +64,7 @@ case "$rc" in
     125) report 1 "${BAD:0:9} could not be judged (the cluster was down, or the job failed without a failed test), so nothing was bisected." ;;
 esac
 
-git bisect start --first-parent "$BAD" "$GOOD" || exit 1
+git bisect start --first-parent "$BAD" "$GOOD" || report 1 "git bisect could not start between ${GOOD:0:9} and ${BAD:0:9}."
 git bisect run bash "$self" step | tee "$log"
 culprit=$(sed -n 's/^\([0-9a-f]\{40\}\) is the first bad commit$/\1/p' "$log" | head -1)
 if [ -n "$culprit" ]; then

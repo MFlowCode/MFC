@@ -76,13 +76,14 @@ jobs:
   report:
     name: Report
     needs: bisect
-    if: always() && inputs.issue != '' && needs.bisect.outputs.message != ''
+    if: always() && inputs.issue != ''
     runs-on: ubuntu-latest
     steps:
       - name: Comment on the issue
         env:
           GH_TOKEN: ${{ github.token }}
-          MESSAGE:  ${{ needs.bisect.outputs.message }}
+          # No message: the job was cancelled, timed out or died before it could say anything.
+          MESSAGE:  ${{ needs.bisect.outputs.message || format('The bisect of {0} gpu-{1} did not finish ({2}).', inputs.cluster, inputs.interface, needs.bisect.result) }}
           RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ISSUE:    ${{ inputs.issue }}
           REPO:     ${{ github.repository }}

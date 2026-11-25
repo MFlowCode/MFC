@@ -413,8 +413,9 @@ jobs:
     # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
     # fail without blocking PR merges.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
-    # Queue wait (capped by SLURM_MAX_QUEUE_SECONDS) plus the SLURM time limit.
-    timeout-minutes: 480
+    # Up to three SLURM submissions one after another (the build, on AMD a second short build, the
+    # tests): each can wait SLURM_MAX_QUEUE_SECONDS (3 h) and run to its 2 h limit, which is rare.
+    timeout-minutes: 720
     strategy:
       fail-fast: false
       matrix:
