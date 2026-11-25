@@ -149,7 +149,7 @@ Full descriptions: @ref case.
 ```
 
 Complete cases: `examples/2D_amr_droplet` (a tracked interface), `examples/2D_amr_blast_multilevel` (two refined
-levels), `examples/2D_amr_ibm_cylinder` (an immersed body), `examples/3D_amr_blast` (3D, subcycled) and
+levels), `examples/2D_amr_ibm_cylinder` (an immersed body), `examples/2D_amr_cylinder_wake` (a viscous wake, drag and St), `examples/3D_amr_blast` (3D, subcycled) and
 `examples/1D_amr_reactive_shocktube` (chemistry: the blocks follow a reacting front tagged on temperature).
 
 ## When AMR pays {#amr-payoff}
@@ -180,15 +180,29 @@ cases on 8 MPI ranks of one Frontier node (amdflang, CPU), relative to the unifo
 | 512^2 | 1024^2 | 0.41 | 0.27 |
 | 2048^2 | 4096^2 | 0.36 | 0.22 |
 
+A 2D viscous cylinder wake (`examples/2D_amr_cylinder_wake`: Re 100, Mach 0.2, 16 cells per diameter, a static block
+over the body and near wake; the variants are edits at the top of `case.py`), run to 130 D/U on one MI250X GCD (whole-run wall time):
+
+| Domain | Uniform fine grid | Fine cells held by AMR | Lock-step / uniform fine | Subcycled / uniform fine | Uniform coarse / uniform fine |
+| :--- | :--- | ---: | ---: | ---: | ---: |
+| 24 D x 16 D | 768 x 512 (0.39 M cells) | 9.8% | 1.94 | 1.37 | 0.38 |
+| 36 D x 32 D | 1152 x 1024 (1.18 M cells) | 3.3% | 1.40 | 0.98 | 0.29 |
+
+On the larger domain the lock-step run matches the uniform fine grid's mean drag coefficient and Strouhal number to
+0.03%; the uniform coarse grid is off by -0.1% and -1.6%. The subcycled run's St matches as well; its drag is not
+comparable (forces on coarse faces only).
+
 - **Size.** On a GPU, AMR breaks even near a million cells on the grid it replaces (the subcycled droplet at 1.0 M
   cells, 1.04) and pays well above that (0.32 at 16.8 M). Below that, run the uniform grid: a GPU advances those cells
   at little extra cost. On CPUs AMR paid off from the smallest case above.
-- **Coverage.** The smaller the part of the fine grid the blocks hold, the sooner AMR pays: the blast's blocks hold
-  54% of a 2.1 M-cell grid and only its subcycled run is faster than the uniform one.
+- **Coverage.** The smaller the part of the fine grid the blocks hold, the sooner AMR pays: the wake's blocks hold
+  3.3% of a 1.2 M-cell grid and its subcycled run breaks even (0.98); the blast's hold 54% of a 2.1 M-cell grid and
+  only its subcycled run is faster than the uniform one.
 - **Subcycling.** `amr_subcycle = T` took 26% to 39% less time than lock-step in every case above.
 - **Accuracy.** In the droplet runs the AMR solution reproduces the uniform fine one: the L1 density difference from
   it is 6.1e-8 at the 512^2 base, against 5.0e-4 for the uniform 512^2 grid. The blocks cover the interface from the
-  first step and start from the patches evaluated at the fine resolution.
+  first step and start from the patches evaluated at the fine resolution. For an integral quantity check the coarse grid
+  first: in the wake it already has the drag to 0.1%; refinement buys the 1.6% in St.
 
 ## Limitations {#amr-limitations}
 
