@@ -156,18 +156,17 @@ regrids. On a GPU it pays only when the grid it replaces is large enough that th
 sets the time per step.
 
 Measured on one MI250X GCD (amdflang, OpenMP offload): `examples/2D_amr_droplet` with one refined level, against the
-same case on a uniform grid at the fine resolution. Time is the solver's time to the same physical time; below 1 the
-AMR run is faster.
+same case on a uniform grid at the fine resolution. Time is the wall time of the step loop to the same physical time;
+below 1 the AMR run is faster.
 
 | Base grid | Uniform fine grid | Fine cells held by AMR | Lock-step / uniform fine | Subcycled / uniform fine |
 | :--- | :--- | ---: | ---: | ---: |
-| 128^2 | 256^2 (0.07 M cells) | 11% | 2.98 | 2.19 |
-| 512^2 | 1024^2 (1.0 M cells) | 7% | 2.05 | 1.54 |
-| 2048^2 | 4096^2 (16.8 M cells) | 6% | 1.05 | 0.70 |
+| 128^2 | 256^2 (0.07 M cells) | 11% | 2.49 | 1.77 |
+| 512^2 | 1024^2 (1.0 M cells) | 7% | 1.49 | 1.04 |
+| 2048^2 | 4096^2 (16.8 M cells) | 6% | 0.51 | 0.32 |
 
-The last row is from the time per step over 400 steps. A 3D spherical blast (`examples/3D_amr_blast`, 64^3 base
-against a uniform 128^3 to t = 0.1875, the blocks holding 54% of the fine cells) took 1.44 (lock-step) and 1.10
-(subcycled) times the uniform run.
+The last row runs 400 fine steps. A 3D spherical blast (`examples/3D_amr_blast`, 64^3 base against a uniform 128^3 to
+t = 0.1875, the blocks holding 54% of the fine cells) took 1.17 (lock-step) and 0.87 (subcycled) times the uniform run.
 
 On CPUs the cost per cell is higher and the fixed cost matters less, so AMR pays at every size measured. Same droplet
 cases on 8 MPI ranks of one Frontier node (amdflang, CPU), relative to the uniform fine grid:
