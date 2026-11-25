@@ -11,7 +11,7 @@ module m_pressure_relaxation
 
     use m_derived_types
     use m_global_parameters
-    use m_mpi_proxy, only: s_mpi_abort
+    use m_mpi_proxy, only: s_mpi_abort, s_mpi_reduce_int_sum, s_mpi_allreduce_max
     use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel
     use m_eos, only: f_pressure, s_phase_internal_energy, s_phase_coefficients, s_phase_density_on_isentrope, f_is_state_dependent
 
@@ -91,9 +91,14 @@ contains
     !! tolerance.
     impure subroutine s_report_pressure_relaxation
 
-        if (n_hit_cap > 0 .and. proc_rank == 0) then
-            print '(A,I0,A,ES10.3,A)', ' Pressure relaxation reached its iteration cap in ', n_hit_cap, &
-                & ' cell updates; worst residual left behind ', worst_residual, ' against a 1e-10 tolerance.'
+        integer  :: n_hit_glb
+        real(wp) :: resid_glb
+
+        call s_mpi_reduce_int_sum(n_hit_cap, n_hit_glb)
+        call s_mpi_allreduce_max(worst_residual, resid_glb)
+        if (n_hit_glb > 0 .and. proc_rank == 0) then
+            print '(A,I0,A,ES10.3,A)', ' Pressure relaxation reached its iteration cap in ', n_hit_glb, &
+                & ' cell updates; worst residual left behind ', resid_glb, ' against a 1e-10 tolerance.'
         end if
 
     end subroutine s_report_pressure_relaxation
