@@ -26,6 +26,7 @@ module m_data_output
     use m_particles_EL, only: q_particles, lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, &
         & particle_mass, particle_seed, f_p, fqs_fluct, fluid_vel_at_particle, density_at_particle
     use m_constants, only: model_eqns_5eq, precision_single, ib_state_nfields
+    use m_amr_state, only: f_amr_mg_mu_frac_max
 
     implicit none
 
@@ -273,6 +274,7 @@ contains
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
+        if (amr .and. nvhpc_omp_state_dependent_eos) mu_frac_max_loc = max(mu_frac_max_loc, f_amr_mg_mu_frac_max())
         mu_frac_max_glb = mu_frac_max_loc
         if (num_procs > 1) call s_mpi_allreduce_max(mu_frac_max_loc, mu_frac_max_glb)
 
