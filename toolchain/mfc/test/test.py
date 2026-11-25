@@ -475,15 +475,15 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
     if ARG("max_tests") > 0:
         # --no-chemistry drops chemistry cases later; keep them out of the cap's pool.
         runs = (lambda c: c.to_case().params.get("chemistry", "F") != "T") if ARG("no_chemistry") else (lambda c: True)
-        # A change to a test's own files (its golden data) must be answered by that test, cap or not,
-        # and whether or not the coverage map could be loaded.
+        # Kept whatever the cap: a test whose own files (its golden data) changed, whether or not the coverage
+        # map could be loaded, and the canaries, which selection never skips either.
         if changed is None and (ARG("only_changes") or ARG("select_enforce")):
             from .. import common
             from .coverage import get_changed_files
 
             changed = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"), explicit=ARG("changed_files"))
         touched = {m.group(1) for f in changed or () if (m := re.match(r"tests/([0-9A-F]{8})/", f))}
-        cases, capped = cap_evenly(cases, ARG("max_tests"), runs, lambda c: c.get_uuid() in touched)
+        cases, capped = cap_evenly(cases, ARG("max_tests"), runs, lambda c: c.get_uuid() in touched or getattr(c, "canary", False))
         skipped_cases += capped
 
     if ARG("percent") == 100:

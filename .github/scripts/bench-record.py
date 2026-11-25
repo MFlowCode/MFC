@@ -11,7 +11,7 @@ the same `env`: a hash of the cluster's own lines of toolchain/modules at that c
 With compare.json (the API's `compare/<previously benchmarked commit>...<sha>`), the line also
 lists `covers`: every commit since the previous benchmark, as [sha, subject, pull request]. Any
 of them can be behind a change in the numbers.
-The history (one such line per lane per scheduled run) feeds docs/benchmarks.html.
+The history (one such line per lane per scheduled run) feeds docs/dashboard/benchmarks.html.
 """
 
 import hashlib

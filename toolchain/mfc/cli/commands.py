@@ -417,7 +417,7 @@ TEST_COMMAND = Command(
         ),
         Argument(
             name="max-tests",
-            help="Run at most this many tests, evenly spaced through the selected ones (0: no limit).",
+            help="Cap the run at this many tests, evenly spaced through the selected ones (0: no limit). The canary tests and any test whose own files changed run beyond the cap.",
             type=int,
             default=0,
             dest="max_tests",

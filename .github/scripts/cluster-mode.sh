@@ -7,6 +7,8 @@
 #   base   scheduled runs: the commit of the last scheduled run that counts as passed
 #
 # Env: EVENT, REPO, RUN_ID, HEAD_SHA, PR_NUMBER, PR_DRAFT, CHECKALL, GH_TOKEN;
+#      ACTION and PR_HEAD_SHA (bench.yml: a run started by a label does nothing when the pull
+#      request's commit has a benchmark already, running or done);
 #      WORKFLOW (default test.yml) is the workflow whose scheduled runs are compared;
 #      PARTIAL=1 counts a run as passed once any cluster job passed in it (bench.yml: each lane
 #      records its own result, and one broken lane must not hold the base back or repeat the rest).
@@ -58,7 +60,9 @@ case "$EVENT" in
             gpu=$(jq '[.[] | select(.filename | test("^src/.*\\.fpp$")) | select(.status != "removed")
                 | select(.patch == null or (.patch | split("\n") | any(test("^[+-].*GPU_[A-Z_]+"))))] | length' <<<"$changes")
             labels=$(gh api "repos/$REPO/issues/$PR_NUMBER/labels" --jq '.[].name')
-            if grep -qxF "$LABEL" <<<"$labels" || grep -qE "$RISKY" <<<"$files" || [ "$gpu" -gt 0 ]; then
+            # Tests whose own files changed all run, beyond the smoke cap: past this many, one unsharded job cannot hold them.
+            goldens=$({ grep -oE '^tests/[0-9A-F]{8}/' <<<"$files" || true; } | sort -u | wc -l)
+            if grep -qxF "$LABEL" <<<"$labels" || grep -qE "$RISKY" <<<"$files" || [ "$gpu" -gt 0 ] || [ "$goldens" -gt 100 ]; then
                 mode=full
             elif [ -n "$files" ] && [ -z "$(grep -vE "$IRRELEVANT" <<<"$files" || true)" ]; then
                 mode=none
@@ -68,6 +72,15 @@ case "$EVENT" in
         fi
         ;;
 esac
+
+if [ "$mode" = full ] && [ "${ACTION:-}" = labeled ] && [ -n "${PR_HEAD_SHA:-}" ]; then
+    for id in $(gh api "repos/$REPO/actions/workflows/$WORKFLOW/runs?event=pull_request&head_sha=$PR_HEAD_SHA&per_page=20" \
+        --jq ".workflow_runs[] | select(.id != $RUN_ID) | .id"); do
+        ran=$(gh api --paginate "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.labels | any(. == "frontier" or . == "gt")) | select(.conclusion != "skipped" and .conclusion != "cancelled")] | length' | jq -s add)
+        if [ "${ran:-0}" -gt 0 ]; then echo "Run $id already benchmarks $PR_HEAD_SHA."; mode=none; break; fi
+    done
+fi
 
 echo "Cluster mode: $mode (base=${base:-none})"
 if [ -n "${GITHUB_OUTPUT:-}" ]; then

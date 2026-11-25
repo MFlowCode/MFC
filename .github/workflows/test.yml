@@ -14,8 +14,8 @@ concurrency:
   # PRs: a new push cancels the PR's previous run. Master: one group with no
   # cancel-in-progress, so a started master run always finishes, and a newer push
   # replaces only a run that is still waiting (the newer commit contains it).
-  # Scheduled cluster runs take hours; they get their own group so they do not hold up a push run.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'schedule' && '-clusters' || '' }}
+  # Scheduled and manual runs use the clusters and take hours; they get their own group so they do not hold up a push run.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '-clusters' || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least-privilege default: no job in this workflow writes to the repo.
@@ -91,7 +91,7 @@ jobs:
   #                              cluster job reads what it changed
   #   ready PR labelled ci:clusters, touching GPU macros, MPI, the build system or cluster CI, or
   #   adding or changing a line with a GPU_* macro,
-  #   manual run, or the 6-hourly schedule when master has moved
+  #   manual run, or the 6-hourly schedule until master's commit has passed once or failed twice
   #                              full: every lane, whole suite, case-optimization
   # Its own job so that re-running it (cluster-label.yml does, when the label is added) re-runs
   # only the cluster jobs.

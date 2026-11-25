@@ -14,6 +14,12 @@ step=$1 device=$2 interface=$3 cluster=$4
 shift 4
 submit=(bash .github/scripts/submit-slurm-job.sh)
 
+# Phoenix tests run on the partition their build ran on (see below).
+if [ "$step" = test ] && [ "$cluster" = phoenix ]; then
+    MFC_GPU_PARTITION="$(cat .ci-build-partition)"
+    export MFC_GPU_PARTITION
+fi
+
 # A closed partition is the machine's failure, not the change's: say so before queueing.
 case "$cluster" in
     phoenix) partitions="${MFC_GPU_PARTITION:-gpu-h200,gpu-h100,gpu-a100,gpu-v100}" ;;
@@ -52,10 +58,6 @@ case "$step" in
         fi
         ;;
     test)
-        if [ "$cluster" = "phoenix" ]; then
-            MFC_GPU_PARTITION="$(cat .ci-build-partition)"
-            export MFC_GPU_PARTITION
-        fi
         rm -f tests/failed_uuids*.txt
         [ $# -gt 0 ] || set -- ""
         pids=()

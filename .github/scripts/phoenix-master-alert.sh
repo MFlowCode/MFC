@@ -94,6 +94,21 @@ lane_jobs() { awk -F'\t' -v c="$compiler" -v i="gpu-$interface" 'index($2, c) &&
 # curl, not `gh api`: gh 2.97 and later refuses to print a log, which always holds colour codes.
 job_log() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$REPO/actions/jobs/$1/logs"; }
 
+# What the lane's failed jobs among <job rows> give a bisect to reproduce: sets tests (the ones
+# cluster-lane.sh printed in the job log) and build_failed (the Build step failed).
+reproducible() {
+    local u
+    tests="" build_failed=""
+    while read -r u; do
+        [ -n "$u" ] || continue
+        tests="$tests $(job_log "${u##*/}" | sed -n 's/.*FAILED_TESTS: //p' | tr '\n' ' ' || true)"
+        if [ -n "$(api "repos/$REPO/actions/jobs/${u##*/}" --jq '.steps[] | select(.conclusion == "failure" and .name == "Build") | .name')" ]; then build_failed=1; fi
+    done < <(awk -F'\t' -v c="$compiler" -v i="gpu-$interface" '$1 == "failure" && index($2, c) && index($2, i) && $2 !~ /^Case Opt/ {print $3}' <<<"$1")
+    # At most 15: from 20 tests on, the runner aborts a run in which 30% fail and names none of
+    # them, and a bisect step that fails without a named test cannot judge its commit.
+    tests=$(tr ' ' '\n' <<<"$tests" | { grep -E '^[0-9A-Fa-f]{8}$' || true; } | sort -u | head -15 | xargs)
+}
+
 earlier_attempt=""
 if [ "$RUN_ATTEMPT" -gt 1 ]; then earlier_attempt=$(phoenix_jobs "$RUN_ID" "$((RUN_ATTEMPT - 1))"); fi
 done_lanes=" "
@@ -111,8 +126,10 @@ while IFS=$'\t' read -r conclusion name job_url; do
     case "$done_lanes" in *" $lane-$interface "*) continue ;; esac     # one bisect per lane, not per shard
     done_lanes="$done_lanes$lane-$interface "
 
-    # A re-run in which the lane fails again: the first attempt already dealt with it.
-    if [ -n "$(lane_jobs <<<"$earlier_attempt" | awk -F'\t' '$1 != "success"')" ]; then continue; fi
+    # A re-run in which the lane fails again is bisected once: not if the attempt before had a
+    # failure a bisect could reproduce, which that attempt's alert then dispatched.
+    reproducible "$earlier_attempt"
+    if [ -n "$tests" ] || [ -n "$build_failed" ]; then continue; fi
 
     # The last earlier run that ran this lane: a run that found master unchanged skipped it.
     good=""
@@ -127,16 +144,7 @@ while IFS=$'\t' read -r conclusion name job_url; do
     if [ -z "$good" ] || [ "$good" = "$HEAD_SHA" ]; then continue; fi     # already red, or never seen green
     if [ "$(api "repos/$REPO/compare/$good...$HEAD_SHA" --jq '.commits | length')" -le 1 ]; then continue; fi   # one merge: named above
 
-    # What failed: the tests cluster-lane.sh printed in the job log, or the build step.
-    tests="" build_failed=""
-    while read -r u; do
-        [ -n "$u" ] || continue
-        tests="$tests $(job_log "${u##*/}" | sed -n 's/.*FAILED_TESTS: //p' | tr '\n' ' ' || true)"
-        if [ -n "$(api "repos/$REPO/actions/jobs/${u##*/}" --jq '.steps[] | select(.conclusion == "failure" and .name == "Build") | .name')" ]; then build_failed=1; fi
-    done < <(awk -F'\t' -v c="$compiler" -v i="gpu-$interface" '$1 == "failure" && index($2, c) && index($2, i) && $2 !~ /^Case Opt/ {print $3}' <<<"$failed")
-    # At most 15: from 20 tests on, the runner aborts a run in which 30% fail and names none of
-    # them, and a bisect step that fails without a named test cannot judge its commit.
-    tests=$(tr ' ' '\n' <<<"$tests" | { grep -E '^[0-9A-Fa-f]{8}$' || true; } | sort -u | head -15 | xargs)
+    reproducible "$failed"
     # Neither a failed test nor a failed build: nothing a bisect could reproduce.
     if [ -z "$tests" ] && [ -z "$build_failed" ]; then
         echo "$lane gpu-$interface failed without a failed test or a failed build; not bisecting."

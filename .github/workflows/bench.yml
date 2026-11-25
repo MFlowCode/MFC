@@ -2,7 +2,7 @@ name: 'Benchmark'
 
 # Benchmarks run with the full cluster pass (cluster-mode in test.yml): a ready PR labelled
 # ci:clusters or touching cluster-critical paths, a manual run, and the 6-hourly schedule when
-# master has moved. A scheduled run compares master with the commit the previous one benchmarked.
+# master has a commit not yet benchmarked. A scheduled run compares master with the commit the previous one benchmarked.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled]
@@ -11,9 +11,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Adding an unrelated label starts a run that does nothing; give it its own group so it does
-  # not cancel a benchmark in progress.
-  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'ci:clusters' && format('-label-{0}', github.run_id) || '' }}
+  # A run started by a label does nothing unless the label is ci:clusters and the commit has no
+  # benchmark yet (cluster-mode.sh); its own group, so it does not cancel a benchmark in progress.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event.action == 'labeled' && format('-label-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least-privilege default: no job in this workflow writes to the repo.
@@ -59,6 +59,8 @@ jobs:
           CHECKALL:  ${{ steps.changes.outputs.checkall }}
           WORKFLOW:  bench.yml
           PARTIAL:   1
+          ACTION:      ${{ github.event.action }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash .github/scripts/cluster-mode.sh
 
   self:
@@ -235,7 +237,7 @@ jobs:
 
   record:
     # Appends each lane's result for this master commit to benchmarks.jsonl in MFlowCode/MFC-ci-data,
-    # which docs/benchmarks.html reads. CI_DATA_DEPLOY_KEY is a deploy key with write access there.
+    # which docs/dashboard/benchmarks.html reads. CI_DATA_DEPLOY_KEY is a deploy key with write access there.
     name: Record Benchmark History
     if: always() && github.repository == 'MFlowCode/MFC' && github.event_name == 'schedule' && needs.file-changes.outputs.mode == 'full'
     needs: [file-changes, self]
@@ -284,11 +286,12 @@ jobs:
           for attempt in 1 2 3 4 5; do
             rm -rf ../history
             git clone --depth=1 git@github.com:MFlowCode/MFC-ci-data.git ../history
-            cat new.jsonl >> ../history/benchmarks.jsonl
+            # Not the lines already there: a re-run of this run records its other lanes again.
+            grep -vxFf ../history/benchmarks.jsonl new.jsonl >> ../history/benchmarks.jsonl || true
             git -C ../history config user.name  'MFC Action'
             git -C ../history config user.email '<>'
             git -C ../history add benchmarks.jsonl
-            git -C ../history commit -m "Benchmarks @ ${GITHUB_SHA::7}"
+            git -C ../history commit -m "Benchmarks @ ${GITHUB_SHA::7}" || { echo "Already recorded."; echo "recorded=true" >> "$GITHUB_OUTPUT"; exit 0; }
             if git -C ../history push; then echo "recorded=true" >> "$GITHUB_OUTPUT"; exit 0; fi
             sleep $((attempt * 7))
           done

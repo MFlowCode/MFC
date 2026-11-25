@@ -19,6 +19,7 @@ jobs:
     if: >-
       github.repository == 'MFlowCode/MFC' &&
       github.event.label.name == 'ci:clusters' &&
+      github.event.pull_request.state == 'open' &&
       github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     # A run cannot be re-run until it has finished; wait for it, for up to 5.5 h.
@@ -46,7 +47,10 @@ jobs:
               sleep 120
           done
 
-          if [ "$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.sha)" != "$HEAD_SHA" ]; then
+          # The wait can be hours: the PR may have moved on, or been merged or closed.
+          read -r sha state < <(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '[.head.sha, .state] | @tsv')
+          if [ "$state" != open ]; then echo "The PR is $state; nothing to re-run."; exit 0; fi
+          if [ "$sha" != "$HEAD_SHA" ]; then
               echo "The PR has a newer commit; its run reads the label."; exit 0
           fi
           jobs=$(gh api --paginate "repos/$REPO/actions/runs/$run/jobs?filter=latest&per_page=100" \
