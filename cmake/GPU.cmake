@@ -186,13 +186,11 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
         )
     endif()
 
-    # On CPU, a checked build also stops at a null or unassociated pointer and at an invalid
-    # operation, a division by zero or an overflow. Offloaded code supports neither.
+    # On CPU, a checked build also stops at an invalid operation, a division by zero or an
+    # overflow; offloaded code cannot. Not -Mchkptr: it rejects a disassociated pointer passed
+    # to an optional dummy, which Fortran 2008 reads as an absent argument and MFC relies on.
     if ((CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug") AND NOT (MFC_OpenACC OR MFC_OpenMP))
-        add_compile_options(
-            $<$<COMPILE_LANGUAGE:Fortran>:-Mchkptr>
-            $<$<COMPILE_LANGUAGE:Fortran>:-Ktrap=fp>
-        )
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-Ktrap=fp>)
     endif()
 
     if (DEFINED ENV{MFC_CUDA_CC})

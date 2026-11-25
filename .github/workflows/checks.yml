@@ -3,7 +3,7 @@ name: 'Runtime Checks'
 # Once a week, a fifth of the tests on CPU with the compilers' runtime checks on (cmake/GPU.cmake).
 # AMD flang, one Frontier node for about half an hour: stops at an invalid operation, a division by
 # zero or an overflow, and fills uninitialised locals with NaN. NVHPC, a hosted runner for about
-# three hours: bounds, null pointers and the same floating-point traps. A failure opens an issue
+# three hours: bounds and the same floating-point traps. A failure opens an issue
 # listing the tests; it closes when they pass.
 on:
   schedule:
