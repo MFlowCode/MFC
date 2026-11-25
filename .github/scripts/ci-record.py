@@ -18,7 +18,7 @@ cluster job, a compact entry:
 and, for a test job whose log is in DIR as <job id>.txt:
 
     n    tests that passed
-    f    tests that failed: [uuid, name, error class]
+    f    tests that failed: [uuid, name, error class, the error's first line]
     r    tests that failed and then passed on a retry: [uuid, name, error class]
     tt   seconds the test phase took (the runner's own "Time:"), or absent if it did not finish
     slow the six slowest tests that passed: [uuid, name, seconds]
@@ -28,6 +28,7 @@ and, for any failed job whose log is there:
     why  what failed: tests, build, cluster (down), queue (never started), timeout (SLURM), node, checkout (git),
          upload (artifact), runner, or other. All but tests, build and other are the machine
          or the plumbing, not the change: ci-record.yml re-runs a run whose failures are all those.
+    e    the line of the log that says how: the compiler's error, SLURM's verdict, git's complaint
 
 --usage: lines "<GitHub job id> <slurm-usage notice>", the notices run_monitored_slurm_job.sh
 leaves on each job. --compare: the API's `compare/<previous run's commit>...<this run's commit>`;
@@ -95,6 +96,30 @@ def error_class(text: str) -> str:
     return "other"
 
 
+# For each cause, what the line that says how it happened looks like; the first match is kept.
+HOW = {
+    "build": r"(?i)(\berror\b.*|ftn-\d+.*|undefined reference.*|cannot open module file.*)",
+    "cluster": r"( unavailable::.*|Batch job submission failed.*)",
+    "queue": r"(SLURM job \d+ did not start within.*)",
+    "timeout": r"(.*DUE TO TIME LIMIT.*|.*state=TIMEOUT.*)",
+    "node": r"(.*(?:Preflight failed|failed preflight).*)",
+    "checkout": r"((?:fatal|error): .*)",
+}
+NOISE = re.compile(r"(?i)\b0 errors?\b|errors? *= *0|-Werror|error_|continue-on-error|##\[error\]Process completed|if .*error|\$\{|echo ")
+
+
+def how(lines: list, why: str) -> str:
+    """The log's own words for a failure of this kind, one line, or "" when it has none."""
+    pattern = HOW.get(why)
+    if pattern:
+        for line in lines:
+            m = re.search(pattern, line)
+            if m and not NOISE.search(line):
+                return re.sub(r"^##\[error\]", "", m.group(1)).strip(" :")[:160]
+    errors = [line for line in lines if line.startswith("##[error]") and "Process completed with exit code" not in line]
+    return errors[-1][len("##[error]") :].strip()[:160] if errors and why != "tests" else ""
+
+
 def tests(log: str, failed_job: bool) -> dict:
     """What a test job's log says about its tests, and for a failed job what failed."""
     lines = [ANSI.sub("", STAMP.sub("", line)) for line in log.splitlines()]
@@ -117,7 +142,9 @@ def tests(log: str, failed_job: bool) -> dict:
             name, block = line.split("FAILED:", 1)[1].strip(), "\n".join(lines[i + 1 : i + 5])
             uuid, err = re.search(r"UUID: ([0-9A-F]{8})", block), re.search(r"Error: (.*)", block)
             if uuid:
-                failed[uuid.group(1)] = [uuid.group(1), name, error_class(err.group(1) if err else "")]
+                said = err.group(1).strip() if err else ""
+                said = re.sub(r"^Test tests/[0-9A-F]{8}: .*?: (?=Variable|Failed|\w+ )", "", said)  # the test is already named
+                failed[uuid.group(1)] = [uuid.group(1), name, error_class(err.group(1) if err else ""), said[:160]]
     # A retry line names the test in full; the pass line that follows has its id and a name cut to fit.
     retried = []
     for name, cls in recovered.items():
@@ -130,18 +157,19 @@ def tests(log: str, failed_job: bool) -> dict:
         out["tt"] = took
     if failed_job:
         text = "\n".join(lines)
-        out["why"] = (
+        out["why"] = why = (
             "tests" if failed or "CRITICAL:" in text
-            else "cluster" if " unavailable::" in text
+            else "cluster" if " unavailable::" in text or "Batch job submission failed" in text
             else "queue" if "QUEUE STARVATION" in text
             else "build" if "Build failed after" in text
             else "timeout" if "state=TIMEOUT" in text
             else "node" if "Preflight failed" in text or "failed preflight" in text
             else "checkout" if "The process '/usr/bin/git' failed" in text
             else "upload" if "Failed to CreateArtifact" in text or "Failed to FinalizeArtifact" in text
-            else "runner" if re.search(r"runner has received a shutdown signal|operation was canceled|has timed out after|transport endpoint", text)
+            else "runner" if re.search(r"runner has received a shutdown signal|operation was canceled|has timed out after|transport endpoint|Missing file at path|EBUSY: resource busy", text)
             else "other"
         )
+        out["e"] = how(lines, why)
     return out
 
 
@@ -158,7 +186,7 @@ def record(run: dict, jobs: list, slurm: dict = None, compare: dict = None, logs
             with open(log, errors="replace") as f:
                 entry = tests(f.read(), job["conclusion"] == "failure")
             if name.startswith(("Bench", "Case Opt")):  # not a test job: only why it failed
-                entry = {k: v for k, v in entry.items() if k == "why"}
+                entry = {k: v for k, v in entry.items() if k in ("why", "e")}
         entries.append(
             {
                 "l": f"{CLUSTERS[(m.group(1), m.group(2))]}-{m.group(3)}-{m.group(4)}",

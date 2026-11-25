@@ -15,10 +15,10 @@ const MFCCI = (() => {
 
     // ---- lanes: a machine, a compiler and an offload model (and on Phoenix, for benchmarks, a GPU model) ----
     const CI_LANES = [["frontier-gpu-acc", "Frontier", "CCE", "OpenACC"], ["frontier-gpu-omp", "Frontier", "CCE", "OpenMP"], ["frontier_amd-gpu-omp", "Frontier", "AMD", "OpenMP"],
-                      ["phoenix-gpu-acc", "Phoenix", "NVHPC", "OpenACC"], ["phoenix-gpu-omp", "Phoenix", "NVHPC", "OpenMP"]]
-        .map(([key, machine, compiler, offload]) => ({ key, machine, compiler, offload, label: `${machine} · ${compiler} · ${offload}` }));
+                      ["phoenix-gpu-acc", "Phoenix", "NVIDIA", "OpenACC"], ["phoenix-gpu-omp", "Phoenix", "NVIDIA", "OpenMP"]]
+        .map(([key, machine, compiler, offload]) => ({ key, machine, compiler, offload, label: machine === "Phoenix" ? `${compiler} · ${offload}` : `${machine} · ${compiler} · ${offload}` }));
     const LANE_KEY = `<details class="key"><summary>Lane names</summary><p><strong>Frontier</strong>: OLCF, AMD GPUs. <strong>Phoenix</strong>: Georgia Tech, NVIDIA GPUs.
-        <strong>CCE</strong>: Cray compiler. <strong>AMD</strong>: AMD flang. <strong>NVHPC</strong>: NVIDIA compiler. <strong>OpenACC</strong>, <strong>OpenMP</strong>: GPU offload models.</p></details>`;
+        <strong>CCE</strong>: Cray compiler. <strong>AMD</strong>: AMD flang. <strong>NVIDIA</strong>: NVHPC compiler, on Phoenix. <strong>OpenACC</strong>, <strong>OpenMP</strong>: GPU offload models.</p></details>`;
     const FRONTIER = { "frontier-gpu-acc": "CCE · OpenACC", "frontier-gpu-omp": "CCE · OpenMP", "frontier_amd-gpu-omp": "AMD · OpenMP" };
     const GPUS = ["h200", "h100", "a100", "l40s", "v100"];
     const laneKey = r => `${r.cluster}-${r.device}-${r.interface}${r.hardware ? `-${r.hardware}` : ""}`;
@@ -26,7 +26,7 @@ const MFCCI = (() => {
         const key = laneKey(r);
         if (r.cluster.startsWith("frontier")) return { key, view: "Frontier", label: FRONTIER[key] || key, order: Object.keys(FRONTIER).indexOf(key) };
         const gpu = r.hardware || "unknown GPU", at = GPUS.indexOf(gpu);
-        return { key, view: `Phoenix · ${r.interface === "acc" ? "OpenACC" : "OpenMP"}`, label: gpu.toUpperCase().replace("UNKNOWN GPU", "GPU not recorded"), order: at < 0 ? GPUS.length : at };
+        return { key, view: `NVIDIA · ${r.interface === "acc" ? "OpenACC" : "OpenMP"}`, label: gpu.toUpperCase().replace("UNKNOWN GPU", "GPU not recorded"), order: at < 0 ? GPUS.length : at };
     }
     const benchLanes = records => { const seen = new Map(); for (const r of records) if (!seen.has(r.lane)) seen.set(r.lane, laneOf(r)); return [...seen.values()]; };
 
@@ -39,6 +39,53 @@ const MFCCI = (() => {
         usage: () => cache.usage ??= get("usage.jsonl").then(lines),
         builds: () => cache.builds ??= get("builds.jsonl").then(lines),
     };
+
+    // ---- what is running now: asked of GitHub when the page loads (the history holds finished runs only) ----
+    // Three unauthenticated requests, kept for two minutes; GitHub allows a visitor 60 an hour. If it
+    // cannot be reached, a snapshot beside the data (live.json) is used when there is one.
+    const API = "https://api.github.com/repos/MFlowCode/MFC";
+    const JOB = /(Frontier|Phoenix) \((CCE|AMD|NVHPC)\) \((gpu|cpu)-(acc|omp|none)(?: \[(\d+\/\d+)\])?\)/;
+    const CLUSTER = { "Frontier CCE": "frontier", "Frontier AMD": "frontier_amd", "Phoenix NVHPC": "phoenix" };
+    const liveRun = r => ({ id: r.id, workflow: (r.path || "").endsWith("bench.yml") ? "bench" : "test", name: r.name, event: r.event, branch: r.head_branch, sha: r.head_sha,
+                            title: r.display_title, status: r.status, t: Date.parse(r.run_started_at || r.created_at) });
+    const liveJob = j => { const m = JOB.exec(j.name || ""); if (!m) return null;
+        return { l: `${CLUSTER[`${m[1]} ${m[2]}`]}-${m[3]}-${m[4]}`, k: j.name.startsWith("Bench") ? "bench" : j.name.startsWith("Case Opt") ? "case-opt" : "test", s: m[5] || null,
+                 status: j.status, c: j.conclusion, created: Date.parse(j.created_at), started: j.started_at ? Date.parse(j.started_at) : null, id: j.id }; };
+    const isMasterTest = r => r.workflow === "test" && r.branch === "master" && ["push", "schedule", "workflow_dispatch"].includes(r.event);
+    function live() {
+        if (cache.live) return cache.live;
+        try { const kept = JSON.parse(sessionStorage.getItem("mfcci-live") || "null"); if (kept && Date.now() - kept.at < 120e3) return cache.live = Promise.resolve(kept); } catch (e) { /* no storage */ }
+        const ask = url => fetch(url, { headers: { Accept: "application/vnd.github+json" } }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+        return cache.live = (async () => {
+            try {
+                const runs = [...(await ask(`${API}/actions/runs?status=in_progress&per_page=50`)).workflow_runs, ...(await ask(`${API}/actions/runs?status=queued&per_page=50`)).workflow_runs].map(liveRun);
+                const m = runs.filter(isMasterTest).sort((a, b) => b.t - a.t)[0];
+                const jobs = m ? (await ask(`${API}/actions/runs/${m.id}/jobs?per_page=100`)).jobs.map(liveJob).filter(Boolean) : [];
+                const out = { at: Date.now(), runs, master: m ? { run: m, jobs } : null };
+                try { sessionStorage.setItem("mfcci-live", JSON.stringify(out)); } catch (e) { /* no storage */ }
+                return out;
+            } catch (e) {
+                const snap = await get("live.json");
+                try { return snap ? JSON.parse(snap) : null; } catch (e2) { return null; }
+            }
+        })();
+    }
+    // A lane's state in the master run now in progress: null when there is none or the lane is not in it.
+    function liveLane(now, lane, kind) {
+        const js = now?.master ? now.master.jobs.filter(j => j.l === lane && j.k === kind) : []; if (!js.length) return null;
+        const state = js.some(j => j.status === "in_progress") ? "running" : js.some(j => j.status !== "completed") ? "queued"
+                    : js.some(j => j.c === "failure") ? "failed" : js.every(j => j.c === "success") ? "passed" : "no result";
+        return { state, run: now.master.run, jobs: js };
+    }
+    const clock = t => new Date(t).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    const ago = t => { const m = Math.max(0, Math.round((Date.now() - t) / 60e3)); return m < 90 ? `${m} min` : `${(m / 60).toFixed(1)} h`; };
+    // "12 runs in progress, 3 queued, oldest queued 2.1 h" for a status line; "" when nothing is known.
+    function liveSummary(now) {
+        if (!now) return null;
+        // A run queued for days is waiting on a person (a fork's first run needs approval), not on a runner.
+        const fresh = now.runs.filter(r => now.at - r.t < 3 * 864e5), running = fresh.filter(r => r.status === "in_progress"), queued = fresh.filter(r => r.status !== "in_progress");
+        return { text: `${running.length} running, ${queued.length} queued` + (queued.length ? ` (oldest ${ago(Math.min(...queued.map(r => r.t)))})` : ""), at: now.at };
+    }
 
     // ---- state that follows you between pages and into a link: ?range=30&view=... ----
     const param = (name, value) => {
@@ -81,6 +128,15 @@ const MFCCI = (() => {
             for (const r of rows) table.tBodies[0].appendChild(r);
         });
     }
+
+    // How a job failed, in a few words, by the cause the recorder gave it.
+    const CAUSE = { tests: "tests failed", build: "build failed", cluster: "cluster down", queue: "never left the queue", timeout: "SLURM time limit", node: "bad node",
+                    checkout: "git checkout failed", upload: "artifact upload failed", runner: "runner stopped", other: "cause not recognized", "not read": "log not read" };
+    // One line per failed job of a cell: the cause, then the log's own line or the failed tests.
+    const howFailed = jobs => jobs.filter(j => j.c === "failure").map(j => {
+        const cause = CAUSE[j.why || "not read"] || j.why, f = j.f || [];
+        return { j, cause, detail: f.length ? f.slice(0, 3).map(t => `${t[1]} (${t[2]}${t[3] ? `: ${t[3]}` : ""})`).join("; ") + (f.length > 3 ? `; and ${f.length - 3} more` : "") : j.e || "" };
+    });
 
     // ---- master: each run's result per lane, and each lane's standing now ----
     const WORST = ["success", "cancelled", "timed_out", "failure"];
@@ -198,6 +254,6 @@ const MFCCI = (() => {
         const first = new Map(); for (const r of records) if (!first.has(r.sha)) first.set(r.sha, r);
         return events.map(e => ({ ...e, suspects: order.slice(e.lo, e.hi + 1), r: first.get(order[e.hi][0]) || e.spans[0].hits[0].r })).sort((a, b) => b.hi - a.hi);
     }
-    return { BASE, REPO, CI_LANES, LANE_KEY, lines, get, med, esc, day, PR_OF, commitLink, laneKey, laneOf, benchLanes, load, param, withParams, chrome, updated, sortable,
+    return { BASE, REPO, CI_LANES, LANE_KEY, lines, get, med, esc, day, PR_OF, commitLink, laneKey, laneOf, benchLanes, load, param, withParams, chrome, updated, sortable, CAUSE, howFailed, live, liveLane, liveSummary, clock, ago,
              masterRuns, laneStatus, testStats, frontierHours, shifts, CAP: 2688 };
 })();

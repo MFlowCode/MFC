@@ -41,7 +41,9 @@
         .legend li { display: inline-flex; align-items: center; gap: 6px; }
         .sw { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
         .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 6px 8px; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.15); z-index: 2; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
-        .tip .when { color: var(--ink-2); } .tip .row { display: flex; gap: 6px; align-items: center; } .tip .row b { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
+        .tip .when { color: var(--ink-2); }
+        .tip { white-space: normal; max-width: 460px; } .tip .row { white-space: nowrap; }
+        .tip .how { color: var(--ink-2); font-size: 11px; margin: 0 0 3px 12px; overflow-wrap: anywhere; } .tip .row { display: flex; gap: 6px; align-items: center; } .tip .row b { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; }
         .pin { font-size: 12px; color: var(--ink-2); padding-top: 8px; overflow-wrap: anywhere; }
         .scrollx { overflow-x: auto; }
         table { border-collapse: collapse; font-size: 13px; width: 100%; }
@@ -73,12 +75,15 @@
     <div class="panel scrollx"><table id="now" class="sortable"></table></div>
 
     <h2 id="strip-h">Master runs</h2>
-    <p class="note">One column per <code>master</code> Test Suite run, oldest left. Grey: cancelled.</p>
+    <p class="note">One column per <code>master</code> Test Suite run, oldest left. Hover for the test counts; click for the failed tests.</p>
     <ul class="legend">
         <li><span class="sw" style="background:var(--good)"></span>Passed</li>
-        <li><span class="sw" style="background:var(--critical)"></span>Failed &#10005;</li>
+        <li><span class="sw" style="background:var(--critical)"></span>Failed (number: tests failed; &#10005;: not a test)</li>
+        <li><span class="sw" style="background:var(--good);position:relative"><span style="position:absolute;right:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:#fbbf24"></span></span>A test passed on retry</li>
         <li><span class="sw" style="background:var(--serious)"></span>Timed out</li>
         <li><span class="sw" style="background:var(--idle)"></span>Cancelled</li>
+        <li><span class="sw" style="border:1px dashed var(--ink-2)"></span>Queued now</li>
+        <li><span class="sw" style="border:1px solid var(--ink-2)"></span>Running now</li>
     </ul>
     <div class="panel"><div class="strip"><div class="labels" id="rows"></div><div class="scroll" id="strip"></div></div><div class="pin" id="pin" hidden></div></div>
 
@@ -119,8 +124,7 @@ MFCCI.chrome("ci.html");
 // accounting from before that recorder existed, usage.jsonl (one line per day, cluster and kind).
 const RUN_URL = (run, job) => `https://github.com/MFlowCode/MFC/actions/runs/${run}${job ? `/job/${job}` : ""}`;
 const CAP = 2688;                                                    // Frontier: 16 nodes x 168 h
-const LANES = { "frontier-gpu-acc": "Frontier · CCE · OpenACC", "frontier-gpu-omp": "Frontier · CCE · OpenMP", "frontier_amd-gpu-omp": "Frontier · AMD · OpenMP",
-                "phoenix-gpu-acc": "Phoenix · NVHPC · OpenACC", "phoenix-gpu-omp": "Phoenix · NVHPC · OpenMP" };
+const LANES = Object.fromEntries(MFCCI.CI_LANES.map(l => [l.key, l.label]));
 const KINDS = [["build", "Build"], ["test", "Test"], ["case-opt", "Case optimization"], ["bench", "Benchmark"]].map(([key, label], i) => ({ key, label, color: `var(--s${i + 1})` }));
 // What a job was run for. "past" is SLURM accounting from before runs were recorded one by one.
 const TIERS = [["sched", "Scheduled master", "var(--s1)"], ["full", "Pull request, full", "var(--s2)"], ["smoke", "Pull request, smoke", "var(--s3)"],
@@ -129,7 +133,7 @@ const tierOf = (r, j) => r.master ? (r.event === "schedule" ? "sched" : "merge")
 const WORST = ["success", "cancelled", "timed_out", "failure"], COLOR = { success: "var(--good)", failure: "var(--critical)", timed_out: "var(--serious)", cancelled: "var(--idle)" };
 
 const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 30, cluster: MFCCI.param("cluster") === "phoenix" ? "phoenix" : "frontier",
-                split: MFCCI.param("split") === "tier" ? "tier" : "kind", runs: [], usage: [], builds: [] };
+                split: MFCCI.param("split") === "tier" ? "tier" : "kind", runs: [], usage: [], builds: [], live: null };
 const $ = id => document.getElementById(id);
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
@@ -180,7 +184,8 @@ function headline(rows) {
     const smoke = prs.filter(r => r.jobs.every(j => j.m === "smoke")).length;
     const part = (href, label, dot, text) => `<a href="${href}"><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
     $("statusline").innerHTML =
-        part("#now-h", "Master now", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
+        (MFCCI.liveSummary(state.live) ? part("https://github.com/MFlowCode/MFC/actions", `Workflow runs at ${MFCCI.clock(state.live.at)}`, "", MFCCI.liveSummary(state.live).text) : "")
+        + part("#now-h", "Master", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
         + part("#strip-h", `Master runs fully green, ${state.days} days`, "", master.length ? `${green} of ${master.length}` : "–")
         + part("#cost-h", "Frontier node-hours, 7 days", share >= 0.9 ? "bad" : share >= 0.7 ? "warn" : "good", `${Math.round(nh).toLocaleString()} of ${CAP.toLocaleString()} (${Math.round(100 * share)}%)`)
         + part("#lanes-h", "Wait for a runner, 7 days", "", dur(med(waits)))
@@ -197,44 +202,76 @@ function now() {
     $("now").innerHTML = `<tr><th>Lane</th><th>Latest result</th><th>Since</th><th>Last passed</th></tr>` + rows.map(r => {
         const c = r.last?.cells[r.key].c, failed = !r.ok && r.last ? r.last.cells[r.key].jobs.flatMap(j => j.f || []) : [];
         const status = !r.last ? `<span class="none">No result on record</span>` : r.ok ? `<span class="ok">&#10003; Passing</span>`
-            : `<a class="bad" href="${RUN_URL(r.last.run)}" target="_blank" rel="noopener">&#10005; ${c === "timed_out" ? "Timed out" : "Failing"}</a>`
+            : `<a class="bad" href="${RUN_URL(r.last.run)}" target="_blank" rel="noopener" title="${esc(MFCCI.howFailed(r.last.cells[r.key].jobs).map(h => `${h.cause}${h.detail ? `: ${h.detail}` : ""}`).join(" | "))}">&#10005; ${c === "timed_out" ? "Timed out" : [...new Set(MFCCI.howFailed(r.last.cells[r.key].jobs).map(h => h.cause))].join(", ") || "Failing"}</a>`
               + (failed.length ? ` · <a href="${MFCCI.withParams(`tests.html?scope=master&find=${failed[0][0]}`)}">${failed.length} ${failed.length === 1 ? "test" : "tests"}</a>` : "");
-        return `<tr><td>${r.lane.label} · ${r.kind === "test" ? "tests" : "case opt."}</td><td>${status}</td>`
+        const l = MFCCI.liveLane(state.live, r.lane.key, r.kind);
+        const live = l && !(r.last && r.last.run === l.run.id) ? ` <span class="none">· ${l.state} now at <a href="${RUN_URL(l.run.id)}" target="_blank" rel="noopener">${l.run.sha.slice(0, 7)}</a></span>` : "";
+        return `<tr><td>${r.lane.label} · ${r.kind === "test" ? "tests" : "case opt."}</td><td>${status}${live}</td>`
             + `<td>${r.firstBad ? `${day(r.firstBad.t)} (${r.badRuns} ${r.badRuns === 1 ? "run" : "runs"})` : r.last ? day(r.last.t) : "–"}</td><td>${r.passed ? commit(r.passed) : "Not in the record"}</td></tr>`;
     }).join("");
 }
 
+// What a cell's test jobs say about the tests: how many passed, which failed, which passed only on a retry.
+function cellTests(c) {
+    const failed = new Map(), retried = new Map(); let passed = 0, read = false;
+    for (const j of c.jobs) { if (j.n !== undefined) { read = true; passed += j.n; } for (const t of j.f || []) failed.set(t[0], t); for (const t of j.r || []) retried.set(t[0] || t[1], t); }
+    return { read, passed, failed: [...failed.values()], retried: [...retried.values()], why: [...new Set(c.jobs.filter(j => j.c === "failure").map(j => j.why || "not read"))] };
+}
+
 function strip() {
-    const runs = masterRuns().filter(r => r.t >= since()), keys = [];
-    for (const l in LANES) for (const k of ["test", "case-opt"]) if (runs.some(r => r.cells[`${l}|${k}`])) keys.push(`${l}|${k}`);
-    $("rows").innerHTML = keys.map(k => { const [l, kind] = k.split("|"); return `<div>${LANES[l]} · ${kind === "test" ? "tests" : "case opt."}</div>`; }).join("") + `<div>&nbsp;</div>`;
-    const cw = 11, ch = 16, W = Math.max(runs.length * cw, 10), H = (keys.length + 1) * ch;
-    const svg = el("svg", { width: W, height: H, role: "img", "aria-label": "Result of each master run per lane" });
+    const runs = masterRuns().filter(r => r.t >= since()), keys = [], now = state.live?.master && !runs.some(r => r.run === state.live.master.run.id) ? state.live : null;
+    for (const l in LANES) for (const k of ["test", "case-opt"]) if (runs.some(r => r.cells[`${l}|${k}`]) || MFCCI.liveLane(now, l, k)) keys.push(`${l}|${k}`);
+    const label = k => { const [l, kind] = k.split("|"); return `${LANES[l]} · ${kind === "test" ? "tests" : "case opt."}`; };
+    $("rows").innerHTML = keys.map(k => `<div>${label(k)}</div>`).join("") + `<div>&nbsp;</div>`;
+    const cw = 18, ch = 16, GAP = now ? 10 : 0, W = Math.max(runs.length * cw + (now ? GAP + cw + 22 : 0), 10), H = (keys.length + 1) * ch;
+    const svg = el("svg", { width: W, height: H, role: "img", "aria-label": "Result of each master run per lane, with failed tests" });
     const show = tipOn($("strip").closest(".panel"));
+    const testLink = t => `<a href="${MFCCI.withParams(`tests.html?scope=master&find=${t[0] || encodeURIComponent(t[1])}`)}">${esc(t[1])}</a>`;
     runs.forEach((r, i) => {
+        const info = new Map(keys.filter(k => r.cells[k]).map(k => [k, cellTests(r.cells[k])]));
         keys.forEach((k, row) => {
             const c = r.cells[k]; if (!c) return;
-            el("rect", { x: i * cw, y: row * ch + 1, width: cw - 2, height: ch - 3, rx: 2, fill: COLOR[c.c] || "var(--idle)" }, svg);
-            if (c.c === "failure") el("path", { d: `M${i * cw + 2},${row * ch + 4}l5,7m0,-7l-5,7`, stroke: "var(--surface)", "stroke-width": 1.5, fill: "none" }, svg);
+            const t = info.get(k), x = i * cw, y = row * ch + 1;
+            el("rect", { x, y, width: cw - 2, height: ch - 3, rx: 2, fill: COLOR[c.c] || "var(--idle)" }, svg);
+            if (c.c === "failure" && t.failed.length) el("text", { x: x + (cw - 2) / 2, y: y + 10, "text-anchor": "middle", style: "fill:#fff;font-size:10px;font-weight:700" }, svg).textContent = t.failed.length > 9 ? "9+" : t.failed.length;
+            else if (c.c === "failure") el("path", { d: `M${x + 5},${y + 3}l6,7m0,-7l-6,7`, stroke: "#fff", "stroke-width": 1.5, fill: "none" }, svg);
+            else if (c.c === "success" && t.retried.length) el("circle", { cx: x + cw - 6, cy: y + 4, r: 2.5, fill: "#fbbf24", stroke: "#fff", "stroke-width": 1 }, svg);
         });
-        if (i === 0 || day(r.t) !== day(runs[i - 1].t) && i % 6 === 0) el("text", { x: i * cw, y: H - 3 }, svg).textContent = day(r.t);
+        if (i === 0 || day(r.t) !== day(runs[i - 1].t) && i % 4 === 0) el("text", { x: i * cw, y: H - 3 }, svg).textContent = day(r.t);
         const hit = el("rect", { x: i * cw - 1, y: 0, width: cw, height: keys.length * ch, fill: "transparent", style: "cursor:pointer" }, svg);
-        const failed = keys.filter(k => r.cells[k] && r.cells[k].c !== "success");
         // A scheduled run is the first to test every merge since the scheduled run before it.
         const merged = r.merges?.length ? r.merges : [[r.sha, r.title, r.pr]];
-        const prLink = ([sha, title, pr]) => pr ? `<a href="https://github.com/MFlowCode/MFC/pull/${pr}" target="_blank" rel="noopener">#${pr}</a>` : `<a href="https://github.com/MFlowCode/MFC/commit/${sha}" target="_blank" rel="noopener"><code>${sha.slice(0, 7)}</code></a>`;
+        const line = k => { const c = r.cells[k], t = info.get(k), hows = MFCCI.howFailed(c.jobs);
+            return `<div class="row">${label(k)}<b>${c.c === "success" ? "" : c.c === "failure" ? [...new Set(hows.map(h => h.cause))].join(", ") : c.c.replace("_", " ")}`
+                + (t.read ? `${c.c === "success" ? "" : " · "}${t.passed} passed${t.failed.length ? `, ${t.failed.length} failed` : ""}${t.retried.length ? `, ${t.retried.length} on retry` : ""}` : c.c === "success" ? "passed" : "") + `</b></div>`
+                + hows.filter(h => h.detail).map(h => `<div class="how">${esc(h.detail)}</div>`).join(""); };
         hit.addEventListener("pointermove", e => show(`<div class="when">${new Date(r.t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · ${r.sha.slice(0, 7)}</div>`
             + (merged.length > 1 ? `<div>First run to test ${merged.length} merges: ${merged.map(m => m[2] ? `#${m[2]}` : m[0].slice(0, 7)).join(", ")}</div>` : `<div>${esc(r.title)}</div>`)
-            + (failed.length ? failed.map(k => `<div class="row">${LANES[k.split("|")[0]]} · ${k.split("|")[1]}<b>${r.cells[k].c.replace("_", " ")}</b></div>`).join("") : `<div class="when">All cluster jobs passed</div>`), e));
+            + keys.filter(k => r.cells[k]).map(line).join(""), e));
         hit.addEventListener("pointerleave", () => show(""));
         hit.addEventListener("click", () => {
             $("pin").hidden = false;
-            $("pin").innerHTML = `<a href="${RUN_URL(r.run)}" target="_blank" rel="noopener">Run ${r.run}</a> · <a href="https://github.com/MFlowCode/MFC/commit/${r.sha}" target="_blank" rel="noopener"><code>${r.sha.slice(0, 7)}</code></a>`
-                + (merged.length > 1 ? `<br>First run to test ${merged.length} merges: ` + merged.map(m => `${prLink(m)} ${esc(m[1])}`).join("; ")
-                                      : ` · ${prLink(merged[0])} · ${esc(r.title)}`)
-                + failed.flatMap(k => r.cells[k].jobs.filter(j => j.c !== "success").map(j => `<br><a href="${RUN_URL(r.run, j.id)}" target="_blank" rel="noopener">${LANES[j.l]} · ${j.k}${j.s ? ` [${j.s}]` : ""}</a>: ${j.c.replace("_", " ")}`)).join("");
+            $("pin").innerHTML = `<a href="${RUN_URL(r.run)}" target="_blank" rel="noopener">Run ${r.run}</a> · ` + merged.map(m => `${MFCCI.commitLink(m[0], m[2])} ${esc(m[1])}`).join("; ")
+                + keys.filter(k => r.cells[k]).map(k => { const c = r.cells[k], t = info.get(k); if (c.c === "success" && !t.retried.length) return "";
+                    return `<br><b>${label(k)}</b>: ` + (c.c === "success" ? "passed" : c.c === "failure" ? MFCCI.howFailed(c.jobs).map(h => `${h.cause}${h.j.e ? ` — ${esc(h.j.e)}` : ""}`).join("; ") : c.c.replace("_", " "))
+                        + c.jobs.filter(j => j.c === "failure").map(j => ` <a href="${RUN_URL(r.run, j.id)}" target="_blank" rel="noopener">job${j.s ? ` ${j.s}` : ""}</a>`).join("")
+                        + (t.failed.length ? `<br>&nbsp;&nbsp;failed: ${t.failed.slice(0, 12).map(testLink).join(", ")}${t.failed.length > 12 ? `, and ${t.failed.length - 12} more` : ""}` : "")
+                        + (t.retried.length ? `<br>&nbsp;&nbsp;passed on retry: ${t.retried.slice(0, 12).map(testLink).join(", ")}` : ""); }).join("");
         });
     });
+    if (now) {                                                  // the master run in progress: outlines, filled in as its lanes finish
+        const x = runs.length * cw + GAP, run = now.master.run, states = new Map(keys.map(k => [k, MFCCI.liveLane(now, ...k.split("|"))]));
+        keys.forEach((k, row) => { const l = states.get(k); if (!l) return; const y = row * ch + 1;
+            if (l.state === "passed" || l.state === "failed") el("rect", { x, y, width: cw - 2, height: ch - 3, rx: 2, fill: COLOR[l.state === "passed" ? "success" : "failure"], opacity: .55 }, svg);
+            else { el("rect", { x: x + .5, y: y + .5, width: cw - 3, height: ch - 4, rx: 2, fill: "none", stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": l.state === "queued" ? "2 2" : "none" }, svg);
+                   if (l.state === "running") el("circle", { cx: x + (cw - 2) / 2, cy: y + (ch - 3) / 2, r: 2.5, fill: "var(--ink-2)" }, svg); } });
+        el("text", { x: x + cw + 2, y: H - 3, "text-anchor": "end" }, svg).textContent = "now";
+        const hit = el("rect", { x: x - 1, y: 0, width: cw, height: keys.length * ch, fill: "transparent", style: "cursor:pointer" }, svg);
+        hit.addEventListener("pointermove", e => show(`<div class="when">In progress since ${MFCCI.clock(run.t)} · ${run.sha.slice(0, 7)}</div><div>${esc(run.title)}</div>`
+            + keys.filter(k => states.get(k)).map(k => `<div class="row">${label(k)}<b>${states.get(k).state}</b></div>`).join(""), e));
+        hit.addEventListener("pointerleave", () => show(""));
+        hit.addEventListener("click", () => { $("pin").hidden = false; $("pin").innerHTML = `<a href="${RUN_URL(run.id)}" target="_blank" rel="noopener">Run ${run.id}</a>, in progress · ${MFCCI.commitLink(run.sha)} ${esc(run.title)}`; });
+    }
     $("strip").replaceChildren(svg); $("strip").scrollLeft = W;
 }
 
@@ -367,10 +404,15 @@ function pull() {
     const q = $("prfind").value.trim().toLowerCase();
     if (!q) { $("prruns").innerHTML = `<tr><td class="none">No pull request selected.</td></tr>`; return; }
     const runs = state.runs.filter(r => !r.master && (String(r.pr) === q.replace(/^#/, "") || (!/^#?\d+$/.test(q) && (r.title || "").toLowerCase().includes(q)))).sort((a, b) => b.t - a.t).slice(0, 40);
-    if (!runs.length) { $("prruns").innerHTML = `<tr><td class="none">No matching runs.</td></tr>`; return; }
-    $("prruns").innerHTML = `<tr><th>Run</th><th>Pull request</th><th>Tier</th><th>Result on the clusters</th><th>What failed</th><th>Attempts</th></tr>` + runs.map(r => {
+    const known = new Set(runs.map(r => (r.title || "").toLowerCase()));
+    const pending = (state.live?.runs || []).filter(r => r.branch !== "master" && (known.has((r.title || "").toLowerCase()) || (!/^#?\d+$/.test(q) && (r.title || "").toLowerCase().includes(q))));
+    if (!runs.length && !pending.length) { $("prruns").innerHTML = `<tr><td class="none">No matching runs.</td></tr>`; return; }
+    $("prruns").innerHTML = `<tr><th>Run</th><th>Pull request</th><th>Tier</th><th>Result on the clusters</th><th>What failed</th><th>Attempts</th></tr>`
+        + pending.map(r => `<tr><td><a href="${RUN_URL(r.id)}" target="_blank" rel="noopener">${MFCCI.clock(r.t)}</a> · ${r.workflow === "bench" ? "benchmark" : "tests"}</td><td style="white-space:normal;text-align:left">${esc(r.title)}</td>`
+            + `<td>–</td><td><span class="none">${r.status === "in_progress" ? "running" : "queued"} for ${MFCCI.ago(r.t)}</span></td><td>–</td><td>–</td></tr>`).join("")
+        + runs.map(r => {
         const last = Math.max(...r.jobs.map(j => j.a)), js = r.jobs.filter(j => j.a === last), bad = js.filter(j => j.c === "failure"), cancelled = js.filter(j => j.c === "cancelled").length;
-        const why = bad.map(j => `<a href="${RUN_URL(r.run, j.id)}" target="_blank" rel="noopener">${LANES[j.l] || j.l} ${j.k}${j.s ? ` [${j.s}]` : ""}</a>: ${j.why || "not read"}`
+        const why = bad.map(j => `<a href="${RUN_URL(r.run, j.id)}" target="_blank" rel="noopener">${LANES[j.l] || j.l} ${j.k}${j.s ? ` [${j.s}]` : ""}</a>: <span title="${esc(j.e || "")}">${MFCCI.CAUSE[j.why || "not read"] || j.why}</span>${j.e ? ` <span class="none">${esc(j.e.slice(0, 90))}</span>` : ""}`
             + ((j.f || []).length ? ` (<a href="${MFCCI.withParams(`tests.html?scope=all&find=${j.f[0][0]}`)}">${j.f.length} ${j.f.length === 1 ? "test" : "tests"}</a>)` : "")).join("<br>");
         return `<tr><td><a href="${RUN_URL(r.run)}" target="_blank" rel="noopener">${day(r.t)}</a> · ${r.workflow === "bench" ? "benchmark" : "tests"}</td>`
             + `<td style="white-space:normal;text-align:left">${r.pr ? `<a href="https://github.com/MFlowCode/MFC/pull/${r.pr}" target="_blank" rel="noopener">#${r.pr}</a> ` : ""}${esc(r.title)}</td>`
@@ -402,6 +444,7 @@ Promise.all([MFCCI.load.usage(), MFCCI.load.builds(), MFCCI.load.runs()]).then((
     MFCCI.sortable($("lanes")); MFCCI.sortable($("now"));
     $("key").innerHTML = MFCCI.LANE_KEY;
     render();
+    MFCCI.live().then(now => { if (now) { state.live = now; render(); } });
 });
 </script>
 </body>

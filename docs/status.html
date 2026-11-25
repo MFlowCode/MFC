@@ -42,7 +42,7 @@ MFCCI.chrome("status.html");
 const $ = id => document.getElementById(id), { esc, day, commitLink } = MFCCI;
 const part = (href, label, dot, text) => `<a href="${MFCCI.withParams(href)}"><span class="label">${label}</span><span class="dot ${dot}"></span><b>${text}</b></a>`;
 
-Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench()]).then(([runs, usage, bench]) => {
+Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench(), MFCCI.live()]).then(([runs, usage, bench, now]) => {
     if (!runs.length && !bench.length) { $("statusline").innerHTML = `<span class="note">No history is available yet.</span>`; return; }
     MFCCI.updated($("updated"), Math.max(runs.at(-1)?.t || 0, bench.at(-1)?.t || 0), 3);
     const DAYS = 14, from = Date.now() - DAYS * 864e5;
@@ -52,8 +52,10 @@ Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench()]).then(([
     const slower = shifts.filter(e => e.spans.some(s => s.hits.some(h => h.pct > 0))).length;
     const tests = MFCCI.testStats(runs, 30, "master").tests, failing = tests.filter(t => t.f).length, retried = tests.filter(t => !t.f && t.r).length;
 
+    const going = MFCCI.liveSummary(now);
     $("statusline").innerHTML =
-        part("ci.html", "Master", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
+        (going ? part("ci.html", `Workflow runs at ${MFCCI.clock(now.at)}`, "idle", going.text) : "")
+        + part("ci.html", "Master", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
         + part("ci.html", "Frontier node-hours, 7 days", share >= 0.9 ? "bad" : share >= 0.7 ? "warn" : "good", `${Math.round(hours).toLocaleString()} of ${MFCCI.CAP.toLocaleString()} (${Math.round(100 * share)}%)`)
         + part("benchmarks.html", `Performance, ${DAYS} days`, slower ? "bad" : "good", shifts.length ? `${shifts.length} lasting ${shifts.length === 1 ? "change" : "changes"}, ${slower} slower` : "no lasting change")
         + part("tests.html", "Tests on master, 30 days", failing ? "bad" : retried ? "warn" : "good", `${failing} failing, ${retried} passed only on a retry`);
@@ -87,7 +89,7 @@ Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench()]).then(([
                                           : `<li><time></time><span class="what">No changes.</span></li>`;
 
     $("lanes").innerHTML = `<tr><th>Lane</th><th>Latest result</th><th>Since</th><th>Last passed</th></tr>` + status.rows.map(r =>
-        `<tr><td>${r.lane.label} · ${r.kind === "test" ? "tests" : "case opt."}</td><td><span class="dot ${!r.last ? "idle" : r.ok ? "good" : "bad"}"></span>${!r.last ? "No result" : r.ok ? "Passing" : "Failing"}</td>`
+        `<tr><td>${r.lane.label} · ${r.kind === "test" ? "tests" : "case opt."}</td><td><span class="dot ${!r.last ? "idle" : r.ok ? "good" : "bad"}"></span>${!r.last ? "No result" : r.ok ? "Passing" : "Failing"}${(l => l && !(r.last && r.last.run === l.run.id) ? ` · ${l.state} now at ${l.run.sha.slice(0, 7)}` : "")(MFCCI.liveLane(now, r.lane.key, r.kind))}</td>`
         + `<td>${r.firstBad ? `${day(r.firstBad.t)} (${r.badRuns} ${r.badRuns === 1 ? "run" : "runs"})` : r.last ? day(r.last.t) : "–"}</td><td>${r.passed ? `${commitLink(r.passed.sha, r.passed.pr)} · ${day(r.passed.t)}` : "Not in the record"}</td></tr>`).join("");
     MFCCI.sortable($("lanes"));
     $("key").innerHTML = MFCCI.LANE_KEY;

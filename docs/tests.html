@@ -131,8 +131,7 @@ MFCCI.chrome("tests.html");
 // One line per run, a file per month, written by .github/workflows/ci-record.yml. A test job carries
 // n (tests passed), f (failed: [uuid, name, error class]), r (passed on a retry) and, if it failed, why.
 const JOB_URL = (run, job) => `https://github.com/MFlowCode/MFC/actions/runs/${run}/job/${job}`;
-const LANES = [["frontier-gpu-acc", "Frontier", "CCE", "OpenACC"], ["frontier-gpu-omp", "Frontier", "CCE", "OpenMP"], ["frontier_amd-gpu-omp", "Frontier", "AMD", "OpenMP"],
-               ["phoenix-gpu-acc", "Phoenix", "NVHPC", "OpenACC"], ["phoenix-gpu-omp", "Phoenix", "NVHPC", "OpenMP"]].map(([key, machine, compiler, offload]) => ({ key, machine, compiler, offload }));
+const LANES = MFCCI.CI_LANES;
 const WHY = [["tests", "Tests"], ["build", "Build"], ["cluster", "Cluster down"], ["queue", "Never started"], ["timeout", "SLURM time limit"], ["node", "Bad node"], ["checkout", "Git checkout"], ["upload", "Artifact upload"], ["runner", "Runner"], ["other", "Other"]];
 
 const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 30, scope: MFCCI.param("scope") === "all" ? "all" : "master",
@@ -164,7 +163,7 @@ function render() {
     const failed = js.filter(x => x.j.c === "failure");
     $("why").innerHTML = `<tr><th>Lane</th><th>Test jobs</th><th>Failed</th>${WHY.map(w => `<th>${w[1]}</th>`).join("")}</tr>`
         + LANES.map(l => { const all = per.get(l.key), bad = all.filter(x => x.j.c === "failure");
-            return `<tr><td>${l.machine} · ${l.compiler} · ${l.offload}</td><td>${all.length.toLocaleString()}</td><td>${bad.length.toLocaleString()}</td>`
+            return `<tr><td>${l.label}</td><td>${all.length.toLocaleString()}</td><td>${bad.length.toLocaleString()}</td>`
                 + WHY.map(w => { const n = bad.filter(x => (x.j.why || "other") === w[0]).length; return `<td${n ? "" : ' class="zero"'}>${n || "–"}</td>`; }).join("") + `</tr>`; }).join("");
 
     // Per test: failures and retries by lane.
@@ -193,11 +192,11 @@ function render() {
         return `<td style="background:color-mix(in srgb, var(--critical) ${Math.round(45 * Math.min(1, share * 2))}%, transparent)">`
             + (c.f ? `${c.f}${state.scope === "master" ? `/${n}` : ""} &#10005;` : "") + (c.r ? ` <span class="retry">${c.r} &#8635;</span>` : "") + `</td>`;
     };
-    $("tests").innerHTML = `<tr><th>Test case</th><th class="tag">Pattern</th><th class="tag">Usual error</th>${LANES.map(l => `<th>${l.machine}<br>${l.compiler}<br>${l.offload}</th>`).join("")}</tr>`
+    $("tests").innerHTML = `<tr><th>Test case</th><th class="tag">Pattern</th><th class="tag">Usual error</th>${LANES.map(l => `<th>${l.label.split(" · ").join("<br>")}</th>`).join("")}</tr>`
         + (rows.length ? "" : `<tr><td colspan="${3 + LANES.length}" class="zero">No test case matches.</td></tr>`)
         + rows.slice(0, 200).map(t => `<tr class="test" data-k="${esc(t.key)}"><td class="name">${esc(t.name)} ${t.uuid ? `<code>${t.uuid}</code>` : ""}</td><td class="tag">${t.pat.label}</td><td class="tag">${esc(t.top)}</td>${LANES.map(l => cell(t, l)).join("")}</tr>`
-            + (state.open === t.key ? `<tr class="detail"><td colspan="${3 + LANES.length}">` + t.where.sort((a, b) => b.r.t - a.r.t).slice(0, 12).map(w => { const l = LANES.find(x => x.key === w.j.l), lane = l ? `${l.machine} ${l.compiler} ${l.offload}` : esc(w.j.l);
-                return `${day(w.r.t)} · <a href="${JOB_URL(w.r.run, w.j.id)}" target="_blank" rel="noopener">${lane}${w.j.s ? ` [${w.j.s}]` : ""}</a> · ${w.kind === "f" ? "failed" : "passed on a retry"} · ${w.r.master ? "master" : "pull request"}: ${esc(w.r.title)}`; }).join("<br>")
+            + (state.open === t.key ? `<tr class="detail"><td colspan="${3 + LANES.length}">` + t.where.sort((a, b) => b.r.t - a.r.t).slice(0, 12).map(w => { const l = LANES.find(x => x.key === w.j.l), lane = l ? l.label : esc(w.j.l);
+                return `${day(w.r.t)} · <a href="${JOB_URL(w.r.run, w.j.id)}" target="_blank" rel="noopener">${lane}${w.j.s ? ` [${w.j.s}]` : ""}</a> · ${w.kind === "f" ? "failed" : "passed on a retry"}${(e => e ? ` — ${esc(e)}` : "")(((w.j[w.kind] || []).find(x => (x[0] || x[1]) === (t.uuid || t.name)) || [])[3])} · ${w.r.master ? "master" : "pull request"}: ${esc(w.r.title)}`; }).join("<br>")
                 + (t.where.length > 12 ? `<br>and ${t.where.length - 12} more` : "") + `</td></tr>` : "")).join("")
         + (rows.length > 200 ? `<tr><td colspan="${3 + LANES.length}" class="zero">Showing the 200 worst of ${rows.length}.</td></tr>` : "");
     durations();
@@ -209,7 +208,7 @@ const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS,
 const { med } = MFCCI;
 function durations() {
     const js = jobs(), W = 900, H = 240, L = 46, B = 24, T = 14, svg = $("took"), LIMIT = 119;
-    const color = l => `var(--s${LANES.indexOf(l) + 1})`, name = l => `${l.machine} · ${l.compiler} · ${l.offload}`;
+    const color = l => `var(--s${LANES.indexOf(l) + 1})`, name = l => l.label;
     $("lanekeys").innerHTML = LANES.map(l => `<li><span class="sw" style="background:${color(l)}"></span>${name(l)}</li>`).join("");
     // A whole shard of the suite: a run that selected a few tests says nothing about how long the suite takes.
     const ss = LANES.map(l => { const d = new Map();
@@ -234,7 +233,7 @@ function durations() {
     for (let i = 1; i < ends.length; i++) ends[i].at = Math.max(ends[i].at, ends[i - 1].at + 13);
     for (const e of ends) { const end = e.s.pts.at(-1);
         el("line", { x1: x(end.t) + 5, x2: W - RM + 22, y1: y(end.v), y2: e.at, stroke: color(e.s.l), "stroke-width": 1, opacity: .5 }, svg);
-        el("text", { x: W - RM + 26, y: e.at + 4, style: "fill:var(--ink);font-size:12px" }, svg).textContent = `${e.s.l.compiler} ${e.s.l.offload} (${e.s.l.machine}) · ${Math.round(end.v)} min`; }
+        el("text", { x: W - RM + 26, y: e.at + 4, style: "fill:var(--ink);font-size:12px" }, svg).textContent = `${e.s.l.label} · ${Math.round(end.v)} min`; }
 
     const cases = new Map();
     for (const { j } of js) for (const [uuid, nm, secs] of j.slow || []) {
@@ -245,7 +244,7 @@ function durations() {
     // Three or more sightings on a lane, so that one hung run does not make a case look slow.
     for (const c of cases.values()) for (const [l, v] of c.by) if (v.length < 3) c.by.delete(l);
     const rows = [...cases.values()].filter(c => c.by.size).map(c => ({ ...c, top: Math.max(...[...c.by.values()].map(med)) })).sort((a, b) => b.top - a.top).slice(0, 25);
-    $("slow").innerHTML = `<tr><th>Test case</th>${LANES.map(l => `<th>${l.machine}<br>${l.compiler}<br>${l.offload}</th>`).join("")}</tr>`
+    $("slow").innerHTML = `<tr><th>Test case</th>${LANES.map(l => `<th>${l.label.split(" · ").join("<br>")}</th>`).join("")}</tr>`
         + rows.map(c => `<tr><td class="name">${esc(c.name)} <code>${c.uuid}</code></td>${LANES.map(l => c.by.has(l.key) ? `<td>${Math.round(med(c.by.get(l.key)))} s</td>` : `<td class="zero">–</td>`).join("")}</tr>`).join("");
 }
 
