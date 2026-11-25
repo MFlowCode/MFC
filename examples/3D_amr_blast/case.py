@@ -7,7 +7,8 @@
 # refined level takes two steps per coarse step, so dt is set by the coarse cells.
 #
 # The run stops at t = 0.1875, before the inward secondary shock collapses on the near-vacuum
-# center (t ~ 0.21): at the fine 128^3 spacing WENO5 then drives the pressure negative.
+# center (t ~ 0.21): at the fine 128^3 spacing WENO5 then drives the face pressure negative.
+# To run past it, add "face_bound": 2 (200 steps then complete; see validation_positivity.md).
 import json
 
 N = 64

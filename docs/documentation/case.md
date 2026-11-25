@@ -641,7 +641,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `muscl_lim`                | Integer | MUSCL Slope Limiter: [1] minmod; [2] monotonized central; [3] Van Albada; [4] Van Leer; [5] SUPERBEE |
 | `muscl_eps`                | Real    | MUSCL limiter slope-product threshold (default: hard-coded thresholds; set to 0 for textbook behavior) |
 | `int_comp`                 | Integer | Interface Compression [0] Off [1] THINC [2] MTHINC (default 0) |
-| `face_bound`               | Integer | Positivity bound on reconstructed face states, `model_eqns = 2` only: [0] Off [1] On (default 0) |
+| `face_bound`               | Integer | Positivity bound on reconstructed face states: [0] Off [1] Primitive bound, `model_eqns = 2` [2] Zhang-Shu bound, `model_eqns = 2` or `3` (default 0) |
 | `flux_lim`                 | Integer | Flux limiter for post-process: [1] minmod; [2] MUSCL; [3] OSPRE; [4] SUPERBEE |
 | `ic_eps`                   | Real    | Interface compression threshold (default: 1e-4) |
 | `ic_beta`                  | Real    | Interface compression sharpness parameter (default: 1.6) |
@@ -753,6 +753,11 @@ When not set (default), the threshold is 1e-9 for minmod/MC, and 1e-6 for others
 Setting `muscl_eps = 0` gives textbook limiter behavior where limiters activate whenever both slopes have the same sign.
 
 - `int_comp` activates interface compression using [1] THINC or [2] MTHINC (default off) used in variable reconstruction, with control parameters (`ic_eps`, and `ic_beta`).
+
+- `face_bound` scales each cell's reconstructed face states toward the cell state, by one factor per cell and direction and only as far as a bound requires (\cite Zhang10). The limiter is inactive wherever the face states already satisfy every bound, so on resolved smooth flow it leaves the reconstruction, and its order, unchanged.
+`face_bound = 1` keeps face density and \f$p + p_\infty\f$ positive; with chemistry it also bounds the face gas constant and temperature (`model_eqns = 2`).
+`face_bound = 2` is the Zhang-Shu bound for stiffened-gas fluids in the 5- and 6-equation models, single- or multi-fluid. It keeps face density and \f$p + p_\infty\f$ positive. It caps the face \f$(p + p_\infty)/\rho\f$ at 1000 times its largest value over the cell and its two neighbours, so a face scaled down to a near-zero density cannot set an unbounded wave speed. It keeps volume fractions in \f$[0, 1]\f$. It also keeps the conservative interior point \f$(\bar U - w(U_L + U_R))/(1 - 2w)\f$ admissible, with \f$w\f$ the Gauss-Lobatto end weight: 1/12 for WENO5, 1/6 for WENO3. With these bounds the cell averages provably stay positive when \f$\Delta t \sum_d \max(|u_d| + c)/\Delta x_d \le w\f$ (forward Euler, hence each SSP-RK stage). The runs in @ref validation_positivity use larger steps and stay positive.
+Use it when a shock collapses onto a near-vacuum region (blast and implosion centres, cavitation), where unlimited WENO faces go negative and the sound speed becomes NaN.
 
 - `riemann_solver` specifies the choice of the Riemann solver that is used in simulation by an integer from 1 through 4.
 `riemann_solver = 1`, `2`, and `3` correspond to HLL, HLLC, and Exact Riemann solver, respectively (\cite Toro09).
