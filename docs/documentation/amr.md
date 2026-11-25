@@ -54,9 +54,11 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
   cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
-  replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. The
-  volume fractions are not refluxed: they are not conserved, and their flux pairs with an \f$\alpha\,\nabla\cdot u\f$
-  source on the same faces. Each covered coarse cell is then set to the average of its fine children.
+  replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. A
+  volume fraction's flux pairs with an \f$\alpha\,\nabla\cdot u\f$ source on the same faces, so the registers also hold
+  the face velocity and the volume fractions' reflux corrects both: uniform \f$\alpha\f$ stays uniform, and a material
+  interface on a block face keeps pressure and velocity equilibrium (HLLC, HLL with `hll_u_interface`, exact and LF; HLL
+  Method 1 refluxes the flux alone). Each covered coarse cell is then set to the average of its fine children.
 
 ## Conservation and accuracy {#amr-conservation}
 

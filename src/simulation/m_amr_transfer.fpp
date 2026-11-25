@@ -159,7 +159,7 @@ contains
             type(t_amr_wave_side), intent(in) :: w
             logical, intent(in)               :: pack
             integer                           :: tsl(w%nx), toff(w%nx), tsd(w%nx)
-            integer                           :: t, nt, n1, n2, eq, a, b, j
+            integer                           :: t, nt, n0, n1, n2, eq, a, b, j
 
             nt = 0
             do t = 1, w%nx
@@ -167,13 +167,13 @@ contains
                 nt = nt + 1; tsl(nt) = w%bl(3, t); toff(nt) = w%off(t); tsd(nt) = w%bl(2, t)
             end do
             if (nt == 0) return
-            n1 = size(freg(${D}$)%lo, 2); n2 = size(freg(${D}$)%lo, 3)
+            n0 = size(freg(${D}$)%lo, 1); n1 = size(freg(${D}$)%lo, 2); n2 = size(freg(${D}$)%lo, 3)
             $:GPU_PARALLEL_LOOP(collapse=4, copyin='[tsl, toff, tsd]', private='[j]')
             do t = 1, nt
                 do b = 0, n2 - 1
                     do a = 0, n1 - 1
-                        do eq = 1, sys_size
-                            j = toff(t) + eq + sys_size*(a + n1*b)
+                        do eq = 1, n0
+                            j = toff(t) + eq + n0*(a + n1*b)
                             if (pack) then
                                 if (tsd(t) == 1) then
                                     amr_rf_sq(j) = freg(${D}$)%lo(eq, a, b, tsl(t))
