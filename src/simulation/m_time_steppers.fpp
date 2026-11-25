@@ -469,13 +469,13 @@ contains
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
-        real(wp)                :: start, finish
+        integer(kind=8)         :: step_t0, step_t1
         real(wp)                :: a_w               !< weight of this stage's state in the step's result (swept-cell booking)
         integer(kind=8)         :: stage_t0, stage_t1, clock_rate, clock_max
         real(wp)                :: stage_time
         integer, parameter      :: n_warmup = 2      !< time steps excluded before the timing floor (warmup/JIT/first-touch)
 
-        call cpu_time(start)
+        call system_clock(step_t0)
         call nvtxStartRange("TIMESTEP")
 
         ! Adaptive dt: initial stage
@@ -630,12 +630,7 @@ contains
             ! (not cpu_time, which counts MPI spin-wait) and the minimum (jitter only adds
             ! time) make it reproducible; the min over stages drops the I/O-bearing s==1 stage.
             call system_clock(stage_t1, clock_rate, clock_max)
-            ! Correct the delta for the rare case of the clock counter wrapping past clock_max.
-            if (stage_t1 >= stage_t0) then
-                stage_time = real(stage_t1 - stage_t0, wp)/real(clock_rate, wp)
-            else
-                stage_time = real(stage_t1 - stage_t0 + clock_max + 1_8, wp)/real(clock_rate, wp)
-            end if
+            stage_time = f_clock_seconds(stage_t0, stage_t1, clock_rate, clock_max)
             if (t_step - t_step_start < n_warmup) then
                 time_avg = 0._wp
             else if (time_avg <= 0._wp) then
@@ -685,9 +680,9 @@ contains
         if (adap_dt) call s_adaptive_dt_bubble(3)
 
         call nvtxEndRange
-        call cpu_time(finish)
-
-        wall_time = abs(finish - start)
+        ! wall clock: cpu_time also counts host-thread and MPI spin time
+        call system_clock(step_t1, clock_rate, clock_max)
+        wall_time = f_clock_seconds(step_t0, step_t1, clock_rate, clock_max)
 
         if (t_step - t_step_start >= 2) then
             wall_time_avg = (wall_time + (t_step - t_step_start - 2)*wall_time_avg)/(t_step - t_step_start - 1)
@@ -696,6 +691,16 @@ contains
         end if
 
     end subroutine s_tvd_rk
+
+    !> Seconds between two system_clock counts, correcting for the counter wrapping past cmax.
+    pure function f_clock_seconds(t0, t1, rate, cmax) result(sec)
+
+        integer(kind=8), intent(in) :: t0, t1, rate, cmax
+        real(wp)                    :: sec
+
+        sec = real(merge(t1 - t0, t1 - t0 + cmax + 1_8, t1 >= t0), wp)/real(rate, wp)
+
+    end function f_clock_seconds
 
     !> Bubble source part in Strang operator splitting scheme
     impure subroutine s_adaptive_dt_bubble(stage)
