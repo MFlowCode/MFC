@@ -60,8 +60,8 @@
     <div class="controls">
         <div class="seg" id="range" role="group" aria-label="Time range">
             <button data-v="14" aria-pressed="false">14 days</button>
-            <button data-v="30" aria-pressed="true">30 days</button>
-            <button data-v="90" aria-pressed="false">90 days</button>
+            <button data-v="30" aria-pressed="false">30 days</button>
+            <button data-v="90" aria-pressed="true">90 days</button>
         </div>
         <div class="seg" id="scope" role="group" aria-label="Runs">
             <button data-v="master" aria-pressed="true">Master only</button>
@@ -134,7 +134,7 @@ const JOB_URL = (run, job) => `https://github.com/MFlowCode/MFC/actions/runs/${r
 const LANES = MFCCI.CI_LANES;
 const WHY = [["tests", "Tests"], ["build", "Build"], ["cluster", "Cluster down"], ["queue", "Never started"], ["timeout", "SLURM time limit"], ["node", "Bad node"], ["checkout", "Git checkout"], ["upload", "Artifact upload"], ["runner", "Runner"], ["other", "Other"]];
 
-const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 30, scope: MFCCI.param("scope") === "all" ? "all" : "master",
+const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 90, scope: MFCCI.param("scope") === "all" ? "all" : "master",
                 pattern: ["compiler", "offload", "every"].includes(MFCCI.param("pattern")) ? MFCCI.param("pattern") : "", find: MFCCI.param("find") || "", runs: [], open: null };
 const $ = id => document.getElementById(id);
 const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);

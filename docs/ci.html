@@ -65,8 +65,8 @@
     <div class="controls">
         <div class="seg" id="range" role="group" aria-label="Time range">
             <button data-v="14" aria-pressed="false">14 days</button>
-            <button data-v="30" aria-pressed="true">30 days</button>
-            <button data-v="90" aria-pressed="false">90 days</button>
+            <button data-v="30" aria-pressed="false">30 days</button>
+            <button data-v="90" aria-pressed="true">90 days</button>
         </div>
     </div>
 
@@ -132,7 +132,7 @@ const TIERS = [["sched", "Scheduled master", "var(--s1)"], ["full", "Pull reques
 const tierOf = (r, j) => r.master ? (r.event === "schedule" ? "sched" : "merge") : j.m === "smoke" ? "smoke" : "full";
 const WORST = ["success", "cancelled", "timed_out", "failure"], COLOR = { success: "var(--good)", failure: "var(--critical)", timed_out: "var(--serious)", cancelled: "var(--idle)" };
 
-const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 30, cluster: MFCCI.param("cluster") === "phoenix" ? "phoenix" : "frontier",
+const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 90, cluster: MFCCI.param("cluster") === "phoenix" ? "phoenix" : "frontier",
                 split: MFCCI.param("split") === "tier" ? "tier" : "kind", runs: [], usage: [], builds: [], live: null };
 const $ = id => document.getElementById(id);
 const NS = "http://www.w3.org/2000/svg";

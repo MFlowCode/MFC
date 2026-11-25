@@ -45,3 +45,8 @@ ul.events { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(-
 ul.events li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 14px; }
 ul.events time { color: var(--muted); font-variant-numeric: tabular-nums; }
 ul.events .what { min-width: 0; overflow-wrap: anywhere; }
+
+/* Each group of choices says what it chooses, and a rule parts it from the next. */
+.controls .seg { align-items: baseline; }
+.controls .seg::before { content: attr(aria-label); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.controls .seg + .seg { border-left: 1px solid #cbd5e1; padding-left: 20px; }
