@@ -166,10 +166,20 @@ AMR run is faster.
 | 2048^2 | 4096^2 (16.8 M cells) | 6% | 1.05 | 0.70 |
 
 The last row is from the time per step over 400 steps. A 3D spherical blast (`examples/3D_amr_blast`, 64^3 base
-against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lock-step) and 1.40 (subcycled) times the uniform run.
+against a uniform 128^3 to t = 0.1875, the blocks holding 54% of the fine cells) took 1.44 (lock-step) and 1.10
+(subcycled) times the uniform run.
 
-- **Size.** Below a few million cells on the grid AMR would replace, run the uniform grid: a GPU advances those
-  cells at nearly no extra cost.
+On CPUs the cost per cell is higher and the fixed cost matters less, so AMR pays at every size measured. Same droplet
+cases on 8 MPI ranks of one Frontier node (amdflang, CPU), relative to the uniform fine grid:
+
+| Base grid | Uniform fine grid | Lock-step / uniform fine | Subcycled / uniform fine |
+| :--- | :--- | ---: | ---: |
+| 128^2 | 256^2 | 0.54 | 0.37 |
+| 512^2 | 1024^2 | 0.41 | 0.27 |
+| 2048^2 | 4096^2 | 0.36 | 0.22 |
+
+- **Size.** On a GPU, below a few million cells on the grid AMR would replace, run the uniform grid: a GPU advances
+  those cells at nearly no extra cost. On CPUs AMR paid off from the smallest case above.
 - **Coverage.** The blocks should hold a small part of the fine grid. The droplet's 6% breaks even at 16.8 M cells; the
   blast's 54% would need a far larger grid.
 - **Subcycling.** `amr_subcycle = T` took a quarter to a third less time than lock-step in every case above.
@@ -199,3 +209,6 @@ against a uniform 128^3, the blocks holding 54% of the fine cells) took 1.86 (lo
 - **Output.** Field output is at level-0 resolution with the fine solution restricted into it; post_process with
   `amr = T` overlays the blocks as separate SILO domains. Each save also writes `D/amr_levels.<step>.dat`: one line per
   refined level with its fine cell count and the mean of `|q|` over its cells for each conserved variable.
+  Step 0 is pre_process's output: level 0 only, with no blocks and no `amr_levels` file, since simulation regrids at
+  step 0 but first saves at step `t_step_save`. A run started at step 0 is therefore always a fresh start: it redoes
+  the initial regrid and fills the blocks from the patches.
