@@ -8,6 +8,15 @@
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
+#! Tangential interface velocity of the viscous work: the central average. The contact-upwinded state switches on sign(s_S), which
+#! is round-off at a no-slip wall face, where the two sides differ by order one across the ghost mirror (#2453).
+#:def VISC_TAN_VEL_SRC()
+    $:GPU_LOOP(parallelism='[seq]')
+    do i = 2, num_dims
+        vel_src_rsx_vf(${SF('')}$, dir_idx(i)) = 5.e-1_wp*(vel_L(dir_idx(i)) + vel_R(dir_idx(i)))
+    end do
+#:enddef
+
 module m_riemann_solver_hllc
 
     use m_derived_types
@@ -85,7 +94,7 @@ contains
             real(wp)                             :: s_L, s_R, s_M, s_P, s_S
             real(wp)                             :: xi_L, xi_R        !< Left and right wave speeds functions
             real(wp)                             :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
-            real(wp)                             :: xi_M, xi_P, xi_tan
+            real(wp)                             :: xi_M, xi_P
             real(wp)                             :: xi_MP, xi_PP
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
                 real(wp), dimension(3) :: R0_L, R0_R
@@ -399,13 +408,11 @@ contains
                                     end do
 
                                     ! Advection velocity source: interface velocity for volume fraction transport
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, &
-                                                       & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) &
-                                                       & *(s_S*(xi_MP*xi_L_m1 + 1) - vel_L(dir_idx(i)))) + xi_P*(vel_R(dir_idx(i)) &
-                                                       & + dir_flg(dir_idx(i))*(s_S*(xi_PP*xi_R_m1 + 1) - vel_R(dir_idx(i))))
-                                    end do
+                                    vel_src_rsx_vf(${SF('')}$, &
+                                                   & dir_idx(1)) = xi_M*(vel_L(dir_idx(1)) + (s_S*(xi_MP*xi_L_m1 + 1) &
+                                                   & - vel_L(dir_idx(1)))) + xi_P*(vel_R(dir_idx(1)) + (s_S*(xi_PP*xi_R_m1 + 1) &
+                                                   & - vel_R(dir_idx(1))))
+                                    $:VISC_TAN_VEL_SRC()
 
                                     ! INTERNAL ENERGIES ADVECTION FLUX. K-th pressure and velocity in preparation for the internal
                                     ! energy flux
@@ -787,12 +794,10 @@ contains
                                     end do
 
                                     ! Advection velocity source: interface velocity for volume fraction transport
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        vel_src_rsx_vf(${SF('')}$, &
-                                                       & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*s_M*xi_L_m1) &
-                                                       & + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i))*s_P*xi_R_m1)
-                                    end do
+                                    vel_src_rsx_vf(${SF('')}$, &
+                                                   & dir_idx(1)) = xi_M*(vel_L(dir_idx(1)) + s_M*xi_L_m1) + xi_P*(vel_R(dir_idx(1) &
+                                                   & ) + s_P*xi_R_m1)
+                                    $:VISC_TAN_VEL_SRC()
 
                                     flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_src_rsx_vf(${SF('')}$, dir_idx(1))
 
@@ -875,7 +880,7 @@ contains
                             #:set _hllc_s2 = ['pi_inf_R', 'qv_R', 'alpha_L_sum', 'alpha_R_sum', 'E_L', 'E_R', 'MW_L', 'MW_R', &
                                 & 'R_gas_L', 'R_gas_R', 'Cp_L', 'Cp_R', 'Cv_L', 'Cv_R', 'c_sum_Yi_Phi']
                             #:set _hllc_s3 = ['Gamm_L', 'Gamm_R', 'Y_L', 'Y_R', 'H_L', 'H_R', 'qv_avg', 'rho_avg', 'gamma_avg', &
-                                & 'H_avg', 'c_L', 'c_R', 'c_avg', 's_P', 's_M', 'xi_P', 'xi_M', 'xi_tan', 'xi_L']
+                                & 'H_avg', 'c_L', 'c_R', 'c_avg', 's_P', 's_M', 'xi_P', 'xi_M', 'xi_L']
                             #:set _hllc_s4 = ['xi_R', 'xi_L_m1', 'xi_R_m1', 'Ms_L', 'Ms_R', 'pres_SL', 'pres_SR', 's_L', 's_R', &
                                 & 's_S', 'vel_avg_rms', 'pcorr']
                             #:set _hllc_s5 = ['ib_fw', 'fw_o', 'fw_a', 'fw_m']
@@ -1400,22 +1405,10 @@ contains
                                         end do
 
                                         ! VOLUME FRACTION SOURCE FLUX.
-                                        $:GPU_LOOP(parallelism='[seq]')
-                                        do i = 1, num_dims
-                                            vel_src_rsx_vf(${SF('')}$, &
-                                                           & dir_idx(i)) = xi_M*(vel_L(dir_idx(i)) + dir_flg(dir_idx(i)) &
-                                                           & *s_M*xi_L_m1) + xi_P*(vel_R(dir_idx(i)) + dir_flg(dir_idx(i)) &
-                                                           & *s_P*xi_R_m1)
-                                        end do
-                                        if (ib_smooth_contact) then
-                                            xi_tan = f_contact_weight(s_S, max(c_L, c_R))
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 2, num_dims
-                                                vel_src_rsx_vf(${SF('')}$, &
-                                                               & dir_idx(i)) = xi_tan*vel_L(dir_idx(i)) + (1._wp - xi_tan) &
-                                                               & *vel_R(dir_idx(i))
-                                            end do
-                                        end if
+                                        vel_src_rsx_vf(${SF('')}$, &
+                                                       & dir_idx(1)) = xi_M*(vel_L(dir_idx(1)) + s_M*xi_L_m1) &
+                                                       & + xi_P*(vel_R(dir_idx(1)) + s_P*xi_R_m1)
+                                        $:VISC_TAN_VEL_SRC()
 
                                         ! COLOR FUNCTION FLUX
                                         if (surface_tension) then
