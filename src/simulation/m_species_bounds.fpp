@@ -25,6 +25,9 @@ module m_species_bounds
     !> face_bound = 2 caps a face's (p + p_inf)/rho at this multiple of the largest over the cell and its neighbours (sound speed at
     !! ~32x): high enough never to act on a resolved smooth field, low enough to rule out a floor-density face at finite pressure
     real(wp), parameter :: face_T_cap = 1000._wp
+    !> Relative positivity floor of the face bounds: verysmall, raised to 100 ulp where wp cannot resolve it (single precision);
+    !! a floor below roundoff lets the bounded face land on the wrong side of zero
+    real(wp), parameter :: pos_floor = max(verysmall, 100._wp*epsilon(1._wp))
     !> Violations below this fraction of rho are roundoff: cleaned but not counted
     real(wp), parameter :: clean_report_tol = 1.e-12_wp
     !> Fluid-cell cleanings, and sum of |rho_new - rho_old|, since the last report, per AMR level (0 = the coarse grid)
@@ -261,8 +264,8 @@ contains
                                 rx = rx + ${C}$*r; ex = ex + ${C}$*e; gx = gx + ${C}$*gam; pix = pix + ${C}$*pim; qvx = qvx &
                                     & + ${C}$*qv
                             #:endfor
-                            if (rx >= verysmall*(1._wp - 2._wp*w)*rb) then
-                                ok = ex - 0.5_wp*(mx(1)**2 + mx(2)**2 + mx(3)**2)/rx - pix - qvx + gx*pinf >= verysmall*(1._wp &
+                            if (rx >= pos_floor*(1._wp - 2._wp*w)*rb) then
+                                ok = ex - 0.5_wp*(mx(1)**2 + mx(2)**2 + mx(3)**2)/rx - pix - qvx + gx*pinf >= pos_floor*(1._wp &
                                                   & - 2._wp*w)*gb
                             end if
                             if (ok) exit
@@ -287,7 +290,7 @@ contains
 
     end subroutine s_bound_face_states_zs
 
-    !> Largest theta in [0, 1] keeping vbar + theta*(v - vbar) >= verysmall*vbar (0 if vbar <= 0).
+    !> Largest theta in [0, 1] keeping vbar + theta*(v - vbar) >= pos_floor*vbar (0 if vbar <= 0).
     pure function f_theta_floor(vbar, v) result(theta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -295,7 +298,7 @@ contains
         real(wp)             :: theta
 
         theta = 1._wp
-        if (v < verysmall*vbar) theta = max(0._wp, (1._wp - verysmall)*vbar)/max(vbar - v, sgm_eps)
+        if (v < pos_floor*vbar) theta = max(0._wp, (1._wp - pos_floor)*vbar)/max(vbar - v, sgm_eps)
 
     end function f_theta_floor
 
