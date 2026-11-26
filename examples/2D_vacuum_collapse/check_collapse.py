@@ -26,12 +26,14 @@ gammas = [1 / 0.4, 1 / (2 / 3)][:nf]  # 1/(gamma - 1)
 files = sorted(glob.glob(os.path.join(a.case_dir, "restart_data", "lustre_[0-9]*.dat")), key=lambda f: int(re.findall(r"(\d+)\.dat", f)[0]))
 if not files:
     sys.exit("no restart_data/lustre_<step>.dat files")
-N = int(round(np.sqrt(os.path.getsize(files[0]) / 8 / nvar)))
+size = os.path.getsize(files[0])
+dtype = np.float64 if np.sqrt(size / 8 / nvar) % 1 == 0 else np.float32  # double- or single-precision build
+N = int(round(np.sqrt(size / np.dtype(dtype).itemsize / nvar)))
 dA = (1.0 / N) ** 2
 ok, base = True, None
 print(f"{'step':>6} {'min rho':>11} {'min p':>11} {'mass drift':>11} {'energy drift':>12}")
 for f in files:
-    q = np.fromfile(f, dtype=np.float64).reshape(nvar, N, N)
+    q = np.fromfile(f, dtype=dtype).astype(np.float64).reshape(nvar, N, N)
     rho = q[:nf].sum(0)
     E = q[nf + 2]
     alpha = q[nf + 3 : 2 * nf + 3]
