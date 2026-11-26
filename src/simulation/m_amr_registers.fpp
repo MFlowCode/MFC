@@ -18,6 +18,7 @@ module m_amr_registers
     use m_global_parameters
     use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf
     use m_phase_timing, only: s_mem_note, MEM_REG
+    use m_eos, only: s_compute_mixture_coefficients, f_pressure, s_phase_bulk_modulus
 
     implicit none
 
@@ -595,9 +596,15 @@ contains
             type(scalar_field), dimension(sys_size), intent(in)    :: q_src
             integer                                                :: eq, c1, c2, c1w, c2w, k, gmax1, gmax2
             integer                                                :: f10, f20, dd1, dd2, nch, rr, dd1_hi, dd2_hi, side
-            integer                                                :: i2, i3, iu, ab, ae
-            logical                                                :: dta, dtb
-            real(wp)                                               :: fb, du
+            integer                                                :: i2, i3, iu, ab, ae, ib, ie, f, oo(3)
+            logical                                                :: dta, dtb, ext, usrc, altss
+            real(wp)                                               :: fb, du, cu, sc, ke, en, rh
+
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(3) :: arho, alf
+            #:else
+                real(wp), dimension(num_fluids) :: arho, alf
+            #:endif
 
             call s_amr_coarse_tables()
             if (a_n(${D}$) == 0) return
@@ -606,10 +613,11 @@ contains
             nch = rr**count([dta, dtb])
             dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
             gmax1 = a_m(1, ${D}$); gmax2 = a_m(2, ${D}$)
-            iu = amr_reg_u; ab = eqn_idx%adv%beg; ae = merge(eqn_idx%adv%end, ab - 1, iu > 0)
+            call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext); altss = alt_soundspeed
             ! separate launches: one block's high outside cell can be another's low outside cell
             do side = 0, 1
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fb, du, i2, i3]', firstprivate='[iu, ab, ae]')
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fb, du, cu, sc, ke, en, rh, f, oo, usrc, &
+                                    & arho, alf, i2, i3]', firstprivate='[iu, ab, ae, ib, ie, ext, altss]')
                 do k = 1, amr_reg_n
                     do c2w = 0, gmax2
                         do c1w = 0, gmax1
@@ -620,32 +628,52 @@ contains
                                 i2 = aint(3, k, ${D}$) + c1; i3 = aint(4, k, ${D}$) + c2
                                 f10 = 0; if (dta) f10 = rr*c1
                                 f20 = 0; if (dtb) f20 = rr*c2
+                                usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie)
                                 fb = 0._wp; du = 0._wp
                                 do dd2 = 0, dd2_hi
                                     do dd1 = 0, dd1_hi
                                         if (side == 0) then
                                             fb = fb + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, k)
-                                            if (eq >= ab .and. eq <= ae) du = du + freg(${D}$)%lo(iu, f10 + dd1, f20 + dd2, k)
+                                            if (usrc) du = du + freg(${D}$)%lo(iu, f10 + dd1, f20 + dd2, k)
                                         else
                                             fb = fb + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, k)
-                                            if (eq >= ab .and. eq <= ae) du = du + freg(${D}$)%hi(iu, f10 + dd1, f20 + dd2, k)
+                                            if (usrc) du = du + freg(${D}$)%hi(iu, f10 + dd1, f20 + dd2, k)
                                         end if
                                     end do
                                 end do
                                 fb = fb/real(nch, wp)
                                 if (side == 0) then
-                                    ! du sums the nch fine face velocities; fb absorbs alpha*(du/nch - u_coarse) so one update
-                                    ! carries both corrections
-                                    if (eq >= ab .and. eq <= ae) fb = fb - q_src(eq)%sf(${IDX}$)*(du/real(nch, &
-                                        & wp) - creg(${D}$)%lo(iu, c1, c2, k))
-                                    rhs_vf(eq)%sf(${IDX}$) = rhs_vf(eq)%sf(${IDX}$) + (creg(${D}$)%lo(eq, c1, c2, &
-                                           & k) - fb)/areal(1, k, ${D}$)
+                                    oo = [${IDX}$]
                                 else
-                                    if (eq >= ab .and. eq <= ae) fb = fb - q_src(eq)%sf(${IDX.replace('aint(1,', 'aint(2,')}$) &
-                                        & *(du/real(nch, wp) - creg(${D}$)%hi(iu, c1, c2, k))
-                                    rhs_vf(eq)%sf(${IDX.replace('aint(1,', 'aint(2,')}$) &
-                                           & = rhs_vf(eq)%sf(${IDX.replace('aint(1,', 'aint(2,')}$) + (fb - creg(${D}$)%hi(eq, &
-                                           & c1, c2, k))/areal(2, k, ${D}$)
+                                    oo = [${IDX.replace('aint(1,', 'aint(2,')}$]
+                                end if
+                                if (usrc) then
+                                    ! du sums the nch fine face velocities; fb absorbs s*(du/nch - u_coarse), s the coefficient
+                                    ! of the face velocity in eq's rhs at the outside cell, so one update carries both
+                                    cu = merge(creg(${D}$)%lo(iu, c1, c2, k), creg(${D}$)%hi(iu, c1, c2, k), side == 0)
+                                    if (ext) then
+                                        rh = 0._wp; ke = 0._wp
+                                        do f = 1, num_fluids
+                                            arho(f) = q_src(eqn_idx%cont%beg + f - 1)%sf(oo(1), oo(2), oo(3))
+                                            alf(f) = q_src(eqn_idx%adv%beg + f - 1)%sf(oo(1), oo(2), oo(3))
+                                            rh = rh + arho(f)
+                                        end do
+                                        do f = eqn_idx%mom%beg, eqn_idx%mom%end
+                                            ke = ke + 0.5_wp*q_src(f)%sf(oo(1), oo(2), oo(3))**2/max(rh, sgm_eps)
+                                        end do
+                                        en = q_src(eqn_idx%E)%sf(oo(1), oo(2), oo(3))
+                                        sc = f_amr_usrc_coef(arho, alf, ke, en, eq, altss)
+                                    else
+                                        sc = q_src(eq)%sf(oo(1), oo(2), oo(3))
+                                    end if
+                                    fb = fb - sc*(du/real(nch, wp) - cu)
+                                end if
+                                if (side == 0) then
+                                    rhs_vf(eq)%sf(oo(1), oo(2), oo(3)) = rhs_vf(eq)%sf(oo(1), oo(2), oo(3)) + (creg(${D}$)%lo(eq, &
+                                           & c1, c2, k) - fb)/areal(1, k, ${D}$)
+                                else
+                                    rhs_vf(eq)%sf(oo(1), oo(2), oo(3)) = rhs_vf(eq)%sf(oo(1), oo(2), &
+                                           & oo(3)) + (fb - creg(${D}$)%hi(eq, c1, c2, k))/areal(2, k, ${D}$)
                                 end if
                             end do
                         end do
@@ -701,13 +729,24 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q
         integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
         real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
-        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb, iu, ab, ae
-        logical :: dta, dtb
-        real(wp) :: fblo, fbhi, wl, wh, ml, mh, dulo, duhi
+        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb, iu, ab, ae, ib, ie, &
+            & f, side
+        integer  :: oo(3)
+        logical  :: dta, dtb, ext, usrc, altss
+        real(wp) :: fb, wl, wh, ml, mh, du, cu, sc, wt, mm, kes, ens
+        real(wp) :: ke(2), en(2)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 2) :: arho, alf
+        #:else
+            real(wp), dimension(num_fluids, 2) :: arho, alf
+        #:endif
 
         ! Loop bounds are hoisted to scalars: array-element bounds would force the host arrays present on the device (ACC present
-        ! error).
+        ! error). One thread per transverse cell walks the equations in turn: the outside cells' state the source coefficients
+        ! need is read before this thread writes them.
 
+        call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext); altss = alt_soundspeed
         #:for D, TA, TB, IDX in [(1, 2, 3, 'ol, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, ol, wb + g2'), (3, 1, 2, &
                                   & 'wa + g1, wb + g2, ol')]
             if (amr_dim(${D}$) .and. (w_lo(${D}$) /= 0._wp .or. w_hi(${D}$) /= 0._wp)) then
@@ -715,35 +754,73 @@ contains
                 nch = rr**count([dta, dtb]); dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
                 gla = glo(${TA}$); gha = ghi(${TA}$); glb = glo(${TB}$); ghb = ghi(${TB}$); wa = woff(${TA}$); wb = woff(${TB}$)
                 ol = olo(${D}$); oh = ohi(${D}$); wl = w_lo(${D}$); wh = w_hi(${D}$); ml = mlo(${D}$); mh = mhi(${D}$)
-                iu = amr_reg_u; ab = eqn_idx%adv%beg; ae = merge(eqn_idx%adv%end, ab - 1, iu > 0)
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi, dulo, duhi]', firstprivate='[iu, ab, ae]')
-                do eq = 1, sys_size
-                    do g2 = glb, ghb
-                        do g1 = gla, gha
-                            f10 = 0; if (dta) f10 = rr*g1
-                            f20 = 0; if (dtb) f20 = rr*g2
-                            fblo = 0._wp; fbhi = 0._wp; dulo = 0._wp; duhi = 0._wp
-                            do dd2 = 0, dd2_hi
-                                do dd1 = 0, dd1_hi
-                                    fblo = fblo + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                    fbhi = fbhi + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                                    if (eq >= ab .and. eq <= ae) then
-                                        dulo = dulo + freg(${D}$)%lo(iu, f10 + dd1, f20 + dd2, islot)
-                                        duhi = duhi + freg(${D}$)%hi(iu, f10 + dd1, f20 + dd2, islot)
-                                    end if
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[eq, f10, f20, dd1, dd2, fb, du, cu, sc, wt, mm, kes, ens, usrc, f, &
+                                    & side, oo, ke, en, arho, alf]', firstprivate='[iu, ab, ae, ib, ie, ext, altss]')
+                do g2 = glb, ghb
+                    do g1 = gla, gha
+                        f10 = 0; if (dta) f10 = rr*g1
+                        f20 = 0; if (dtb) f20 = rr*g2
+                        if (ext) then
+                            do side = 1, 2
+                                if (side == 1) then
+                                    oo = [${IDX}$]
+                                else
+                                    oo = [${IDX.replace('ol', 'oh')}$]
+                                end if
+                                if (merge(wl, wh, side == 1) == 0._wp) cycle
+                                ke(side) = 0._wp; mm = 0._wp
+                                do f = 1, num_fluids
+                                    arho(f, side) = q(eqn_idx%cont%beg + f - 1)%sf(oo(1), oo(2), oo(3))
+                                    alf(f, side) = q(eqn_idx%adv%beg + f - 1)%sf(oo(1), oo(2), oo(3))
+                                    mm = mm + arho(f, side)
                                 end do
+                                do f = eqn_idx%mom%beg, eqn_idx%mom%end
+                                    ke(side) = ke(side) + 0.5_wp*q(f)%sf(oo(1), oo(2), oo(3))**2/max(mm, sgm_eps)
+                                end do
+                                en(side) = q(eqn_idx%E)%sf(oo(1), oo(2), oo(3))
                             end do
-                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                            if (eq >= ab .and. eq <= ae) then
-                                if (wl /= 0._wp) fblo = fblo - q(eq)%sf(${IDX}$)*(dulo/real(nch, wp) - creg(${D}$)%lo(iu, g1, g2, &
-                                    & islot))
-                                if (wh /= 0._wp) fbhi = fbhi - q(eq)%sf(${IDX.replace('ol', 'oh')}$)*(duhi/real(nch, &
-                                    & wp) - creg(${D}$)%hi(iu, g1, g2, islot))
-                            end if
-                            if (wl /= 0._wp) q(eq)%sf(${IDX}$) = q(eq)%sf(${IDX}$) + wl*dtl*(creg(${D}$)%lo(eq, g1, g2, &
-                                & islot) - fblo)/ml
-                            if (wh /= 0._wp) q(eq)%sf(${IDX.replace('ol', 'oh')}$) = q(eq)%sf(${IDX.replace('ol', 'oh')}$) &
-                                & + wh*dtl*(fbhi - creg(${D}$)%hi(eq, g1, g2, islot))/mh
+                        end if
+                        do eq = 1, sys_size
+                            usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie)
+                            do side = 1, 2
+                                wt = merge(wl, wh, side == 1)
+                                if (wt == 0._wp) cycle
+                                if (side == 1) then
+                                    oo = [${IDX}$]
+                                else
+                                    oo = [${IDX.replace('ol', 'oh')}$]
+                                end if
+                                fb = 0._wp; du = 0._wp
+                                do dd2 = 0, dd2_hi
+                                    do dd1 = 0, dd1_hi
+                                        if (side == 1) then
+                                            fb = fb + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                            if (usrc) du = du + freg(${D}$)%lo(iu, f10 + dd1, f20 + dd2, islot)
+                                        else
+                                            fb = fb + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                                            if (usrc) du = du + freg(${D}$)%hi(iu, f10 + dd1, f20 + dd2, islot)
+                                        end if
+                                    end do
+                                end do
+                                fb = fb/real(nch, wp)
+                                if (usrc) then
+                                    cu = merge(creg(${D}$)%lo(iu, g1, g2, islot), creg(${D}$)%hi(iu, g1, g2, islot), side == 1)
+                                    if (ext) then
+                                        kes = ke(side); ens = en(side)  ! scalars into the device routine (Cray OpenACC)
+                                        sc = f_amr_usrc_coef(arho(:,side), alf(:,side), kes, ens, eq, altss)
+                                    else
+                                        sc = q(eq)%sf(oo(1), oo(2), oo(3))
+                                    end if
+                                    fb = fb - sc*(du/real(nch, wp) - cu)
+                                end if
+                                if (side == 1) then
+                                    q(eq)%sf(oo(1), oo(2), oo(3)) = q(eq)%sf(oo(1), oo(2), oo(3)) + wl*dtl*(creg(${D}$)%lo(eq, &
+                                      & g1, g2, islot) - fb)/ml
+                                else
+                                    q(eq)%sf(oo(1), oo(2), oo(3)) = q(eq)%sf(oo(1), oo(2), &
+                                      & oo(3)) + wh*dtl*(fb - creg(${D}$)%hi(eq, g1, g2, islot))/mh
+                                end if
+                            end do
                         end do
                     end do
                 end do
@@ -752,6 +829,60 @@ contains
         #:endfor
 
     end subroutine s_amr_reflux_apply_faces
+
+    !> Equations whose rhs carries a face-velocity term the reflux corrects (s_amr_capture_total's amr_reg_u channel): the volume
+    !! fractions [ab:ae], and with the 6-equation model the internal energies [ib:ie] (empty ranges otherwise). ext: some of those
+    !! coefficients need the cell's pressure (alt_soundspeed's K, the internal energies' alpha_k*p), not alpha alone.
+    impure subroutine s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext)
+
+        integer, intent(out) :: iu, ab, ae, ib, ie
+        logical, intent(out) :: ext
+
+        iu = amr_reg_u; ab = eqn_idx%adv%beg; ae = merge(eqn_idx%adv%end, ab - 1, iu > 0); ib = 1; ie = 0
+        if (iu > 0 .and. model_eqns == model_eqns_6eq) then
+            ib = eqn_idx%int_en%beg; ie = eqn_idx%int_en%end
+        end if
+        ext = iu > 0 .and. (alt_soundspeed .or. model_eqns == model_eqns_6eq)
+
+    end subroutine s_amr_usrc_ranges
+
+    !> Coefficient s of the face velocity in equation eq's rhs at one cell, which carries s*(u_r - u_l)/dx (m_rhs), from the cell's
+    !! partial densities arho, volume fractions alf, kinetic energy ke and total energy en: alpha_j for a volume fraction, plus K on
+    !! the first and minus K on the last with alt_soundspeed (K = a1 a2 (B2 - B1)/(a1 B2 + a2 B1)), and -alpha_k*p for a 6-equation
+    !! internal energy. p is the mixture pressure of the cell, as the conversion computes it (no chemistry).
+    function f_amr_usrc_coef(arho, alf, ke, en, eq, altss) result(sc)
+
+        $:GPU_ROUTINE(function_name='f_amr_usrc_coef', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: arho, alf
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: arho, alf
+        #:endif
+        real(wp), intent(in) :: ke, en
+        integer, intent(in)  :: eq
+        logical, intent(in)  :: altss
+        real(wp)             :: sc, rho, gam, pinf, qv, pres, b1, b2, kk, a1, a2, r1, r2
+        logical              :: adv
+
+        adv = eq >= eqn_idx%adv%beg .and. eq <= eqn_idx%adv%end
+        sc = 0._wp
+        if (adv) sc = alf(eq - eqn_idx%adv%beg + 1)
+        if (adv .and. .not. altss) return
+        call s_compute_mixture_coefficients(arho, alf, rho, gam, pinf, qv)
+        pres = f_pressure(en - ke, gam, pinf, qv)
+        if (adv) then
+            a1 = alf(1); a2 = alf(2); r1 = arho(1); r2 = arho(2)  ! scalars into the device routine (Cray OpenACC)
+            call s_phase_bulk_modulus(pres, a1, r1, 1, b1)
+            call s_phase_bulk_modulus(pres, a2, r2, 2, b2)
+            kk = a1*a2*(b2 - b1)/(a1*b2 + a2*b1)
+            if (eq == eqn_idx%adv%beg) sc = sc + kk
+            if (eq == eqn_idx%adv%end) sc = sc - kk
+        else
+            sc = -alf(eq - eqn_idx%int_en%beg + 1)*pres
+        end if
+
+    end function f_amr_usrc_coef
 
     !> amr_rk_w from the rows (c1, c2, c3, c4) of q <- (c1*q + c2*q^n + c3*dt*L(q))/c4, one per stage; amr_rk_c are the stage times
     !! c(1:ns) of the stepper.

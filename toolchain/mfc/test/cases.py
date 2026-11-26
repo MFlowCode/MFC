@@ -6701,6 +6701,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(2)": 8,
             "amr_block_end(2)": 23,
         }
+        # a two-fluid shear layer (u = +0.5 below y = 0.5, -0.5 above; uniform alpha and p) across the static block's x-faces, so
+        # the face velocity varies along them: the reflux corrects the alt_soundspeed K*div(u) term and the 6-equation internal
+        # energies' alpha_k*p*div(u) with the volume fractions' alpha*div(u)
+        shear = {k: v for k, v in amr_2d_base.items() if not k.startswith("patch_icpp(3)")}
+        shear.update({"num_patches": 2, "num_fluids": 2, "mpp_lim": "T", "amr_regrid_int": 0})
+        shear.update({"fluid_pp(2)%gamma": 1.0 / 3.4, "fluid_pp(2)%pi_inf": 4.4 * 2.0 / 3.4, "fluid_pp(2)%cv": 0.0, "fluid_pp(2)%qv": 0.0, "fluid_pp(2)%qvp": 0.0})
+        # the jump at y = 0.51 sits inside coarse cell 16, whose center takes the upper value while its two fine cells take one
+        # each, so the fine faces' velocity average differs from the coarse face's from the first step (an aligned jump stays
+        # steady with no difference at all)
+        for i, (yc, ly, u) in enumerate(((0.255, 0.51, 0.5), (0.755, 0.49, -0.5)), start=1):
+            shear.update({f"patch_icpp({i})%x_centroid": 0.5, f"patch_icpp({i})%length_x": 1.0, f"patch_icpp({i})%y_centroid": yc, f"patch_icpp({i})%length_y": ly})
+            shear.update({f"patch_icpp({i})%vel(1)": u, f"patch_icpp({i})%vel(2)": 0.0, f"patch_icpp({i})%pres": 1.0})
+            shear.update({f"patch_icpp({i})%alpha_rho(1)": 0.5, f"patch_icpp({i})%alpha_rho(2)": 0.25, f"patch_icpp({i})%alpha(1)": 0.5, f"patch_icpp({i})%alpha(2)": 0.5})
+        stack.push("AMR -> 2D -> two-fluid shear layer", shear)
+        cases.append(define_case_d(stack, "alt_soundspeed", {"alt_soundspeed": "T"}))
+        cases.append(define_case_d(stack, "6eq", {"model_eqns": 3}))
+        stack.pop()
+
         stack.push(
             "AMR -> 2D -> multi-level static np=2",
             {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16},
