@@ -734,8 +734,7 @@ contains
                                                        & qR_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                        & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                        & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                       & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_vf, norm_dir, &
-                                                       & ix, iy, iz)
+                                                       & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_vf, norm_dir)
                 else
                     call s_compute_viscous_source_flux(q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                        & dqL_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
@@ -744,8 +743,7 @@ contains
                                                        & q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                        & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                        & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                                       & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_vf, norm_dir, &
-                                                       & ix, iy, iz)
+                                                       & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_vf, norm_dir)
                 end if
             end if
         #:endif
