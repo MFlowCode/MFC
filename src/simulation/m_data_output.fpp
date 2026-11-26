@@ -276,7 +276,7 @@ contains
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
-        if (amr .and. nvhpc_omp_state_dependent_eos) mu_frac_max_loc = max(mu_frac_max_loc, f_amr_mg_mu_frac_max())
+        if (amr .and. any_state_dependent_eos) mu_frac_max_loc = max(mu_frac_max_loc, f_amr_mg_mu_frac_max())
         mu_frac_max_glb = mu_frac_max_loc
         if (num_procs > 1) call s_mpi_allreduce_max(mu_frac_max_loc, mu_frac_max_glb)
 

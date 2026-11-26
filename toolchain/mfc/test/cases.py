@@ -6499,11 +6499,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True))
         stack.pop()
 
-        # derived block cap at np=2 with amr_maxc_fit = 32 > the 16-cell floor (m = 127): f_amr_rank_tile searches tile sizes, so
-        # a refined region wider than 16 coarse cells splits over both ranks (#2496)
+        # derived block cap at np=2 with amr_maxc_fit = 32 > the 16-cell floor (m = 127): one Riemann problem at x = 0.8 (patch 1
+        # takes patch 2's state) spreads into a single tagged region of about 25 coarse cells by step 120, so at the starting size
+        # there is one tile for two ranks and f_amr_rank_tile shrinks it until the region splits over both (#2496)
+        one_jump = {"patch_icpp(1)%pres": 0.5, "patch_icpp(1)%alpha_rho(1)": 0.5, "t_step_stop": 120, "t_step_save": 120}
         stack.push(
             "AMR -> 1D -> dynamic regrid np=2 -> derived tiles",
-            {**amr_1d_base, "m": 127, "amr_block_beg(1)": 32, "amr_block_end(1)": 95, "amr_regrid_int": 2, "amr_tag_eps": 0.05, "amr_buf": 2},
+            {**amr_1d_base, **one_jump, "m": 127, "amr_block_beg(1)": 92, "amr_block_end(1)": 111, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2},
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()

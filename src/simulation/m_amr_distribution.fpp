@@ -786,6 +786,7 @@ contains
                     if (.not. amr_dim(dd)) cycle
                     ! s_amr_tile_box: ntl tiles of s cells, the remainder in the last
                     ntl = (boxes(k)%hi(dd) - boxes(k)%lo(dd) + cur(dd))/cur(dd)
+                    if (ntl == 1) cycle  ! an unsplit dimension keeps the box's own width, whatever cur is
                     s = (boxes(k)%hi(dd) - boxes(k)%lo(dd) + ntl)/ntl
                     minw = min(minw, boxes(k)%hi(dd) - boxes(k)%lo(dd) + 1 - (ntl - 1)*s)
                 end do
