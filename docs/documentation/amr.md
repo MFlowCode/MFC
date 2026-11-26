@@ -233,5 +233,5 @@ comparable (forces on coarse faces only).
   step 0 but first saves at step `t_step_save`. A run started at step 0 is therefore always a fresh start: it redoes
   the initial regrid and fills the blocks from the patches.
   The overlay carries density, pressure, velocity and volume fractions only; probes and derived post_process fields read
-  level 0, `run_time_info` reads the level-0 state but scales its CFL numbers to the finest level covering each cell,
-  and `sim_data` is rejected.
+  level 0, `run_time_info` reads the level-0 state but scales its CFL numbers to the finest level covering each cell
+  (its Mie-Gruneisen compression check also reads the fine blocks), and `sim_data` is rejected.

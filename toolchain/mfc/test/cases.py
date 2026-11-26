@@ -6508,6 +6508,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {**amr_1d_base, **one_jump, "m": 127, "amr_block_beg(1)": 92, "amr_block_end(1)": 111, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2},
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
+        # a one-slot block pool: the unguarded rule splits into two tiles and the tiler drops the second, leaving half the region
+        # coarse; the pool guard keeps one 28-cell tile
+        cases.append(define_case_d(stack, "pool of one", {"amr_max_blocks": 1}, ppn=2))
         stack.pop()
 
         # multi-level + dynamic regrid at np=2: children are placed by distributed sensor-on-fine nesting (tags OR-reduced

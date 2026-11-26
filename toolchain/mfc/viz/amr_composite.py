@@ -42,8 +42,6 @@ def leaves(run_dir, step, var=0):
     """Cells of the finest level at each point: a list of (centers, cell width, values) per patch, with patch 0 the uncovered
     level-0 cells (centers is a tuple of flat coordinate arrays). var is the 0-based conservative variable index."""
     inp = read_inp(run_dir)
-    if inp.get("precision", "2") != "2":
-        raise SystemExit(f"{run_dir}: precision = {inp['precision']}; amr_composite reads double-precision output only")
     cells, lo, dx = grid(inp)
     ncell = int(np.prod(cells))
     raw = np.fromfile(os.path.join(run_dir, "restart_data", f"lustre_{step}.dat"))  # double precision only (checked below)
