@@ -923,15 +923,15 @@ contains
     impure subroutine s_finalize_amr_registers()
 
         integer    :: d
-        integer(8) :: slot_bytes
+        integer(8) :: slot_bytes, reg_bytes
 
         if (.not. amr) return
         slot_bytes = 0_8
         do d = 1, num_dims
-            call s_mem_note(MEM_REG, storage_size(creg(d)%lo, kind=8)/8_8*(size(creg(d)%lo, kind=8) + size(creg(d)%hi, &
-                            & kind=8) + size(freg(d)%lo, kind=8) + size(freg(d)%hi, kind=8)))
-            slot_bytes = slot_bytes + storage_size(creg(d)%lo, kind=8)/8_8*(size(creg(d)%lo, kind=8) + size(creg(d)%hi, &
-                            & kind=8) + size(freg(d)%lo, kind=8) + size(freg(d)%hi, kind=8))/int(max(amr_reg_cap, 1), 8)
+            reg_bytes = storage_size(creg(d)%lo, kind=8)/8_8*(size(creg(d)%lo, kind=8) + size(creg(d)%hi, &
+                                     & kind=8) + size(freg(d)%lo, kind=8) + size(freg(d)%hi, kind=8))
+            call s_mem_note(MEM_REG, reg_bytes)
+            slot_bytes = slot_bytes + reg_bytes/int(max(amr_reg_cap, 1), 8)
             @:DEALLOCATE(creg(d)%lo, creg(d)%hi, freg(d)%lo, freg(d)%hi)
         end do
         call s_mem_note_reg_slot(slot_bytes)
