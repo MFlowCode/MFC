@@ -851,7 +851,7 @@ See @ref troubleshooting for detailed debugging workflows.
 
 1. **PRs come from your fork.** Do not create branches on `MFlowCode/MFC` directly. Push to your fork and open a PR from there against `MFlowCode/MFC:master`.
 2. **One PR = one logical change.** Split large changes into focused PRs.
-3. **Fill out the PR template.** Run its commands yourself before opening the PR. The `PR Description` check (`pr-description.yml`) fails while a section your change requires is missing, blank or N/A, or when `src/` or build files changed after the commit you benchmarked. With no GPU access, write `No GPU access` in the speed section.
+3. **Fill out the PR template.**
 4. **Link issues** with `Fixes #<id>` or `Part of #<id>`.
 5. **Ensure CI passes** before requesting review. Run `./mfc.sh test` locally first. Run `./mfc.sh format`; the pre-commit hook runs `./mfc.sh precheck` and blocks the commit if a check fails.
 6. **Describe your testing**: what you ran, which compilers/platforms you used.
