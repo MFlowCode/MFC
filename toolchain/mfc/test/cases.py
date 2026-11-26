@@ -1499,6 +1499,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_ib(1)%mass": 1.0e6,  # heavy: the body keeps its speed
                         "patch_ib(1)%vel(1)": 0.1,
                     },
+                    # Double keeps the IBM default; single and double differ by 1e-2 after these 5 steps (measured, #2514)
+                    override_tol=1e-10,
+                    override_tol_single=1e-1,
                 )
             )
             # A CFL-mode restart of a two-way-coupled body must continue the straight run: it resumes at the saved time (from the IB
