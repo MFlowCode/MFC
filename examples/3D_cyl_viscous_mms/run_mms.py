@@ -63,7 +63,6 @@ def species_state(RR, TH, d3):
     """Cantera state of the species case per (theta, r) cell: rho, E, Y; rho D = k/cp(f) as a function of the H2 shift
     f; the index of H2; the base-state energy."""
     import cantera as ct
-
     from case import SPECIES
 
     gas = ct.Solution(SPECIES["mech"])
