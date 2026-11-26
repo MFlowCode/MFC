@@ -601,9 +601,8 @@ contains
                                     & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
-                        ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
-                        ! computed on the host and copied every Runge-Kutta stage. Unity unless a ramp is set.
-                        ramp = f_vel_ramp(bc_${XYZ}$%vel_in_ramp, bc_${XYZ}$%vel_in_t0, bc_${XYZ}$%vel_in_frac0, mytime)
+                        ! Ramp factor for a smoothly starting inflow at this RK stage's time. Unity unless a ramp is set.
+                        ramp = f_vel_ramp(bc_${XYZ}$%vel_in_ramp, bc_${XYZ}$%vel_in_t0, bc_${XYZ}$%vel_in_frac0, t_rhs)
 
                         ! Transferring the Primitive Variables
                         $:GPU_LOOP(parallelism='[seq]')

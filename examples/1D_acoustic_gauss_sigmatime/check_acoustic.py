@@ -19,7 +19,9 @@ with f_j the discrete Gaussian weights of the support (standard deviation 1.25 d
 this at the saved step (default: the last one with the whole signal inside the domain), and prints the
 relative L2 and max errors of p' outside +-5 support widths, the ratio of the max |p'|, and the amplitude A and
 time shift tau of a least-squares fit p'_MFC = A p'_lin(t + tau) (tau < 0: MFC lags). With several runs (a resolution sweep) it also prints the observed order of the L2 error.
-Exit 1 if the relative L2 error of the finest run exceeds --tol.
+Exit 1 if the relative L2 error of the finest run exceeds --tol. With --dt-sweep the runs are one grid at dt, dt/2, dt/4, ...
+(case.py --dt-div): the script then prints the relative L2 difference of p' at the last save between successive runs and
+its order.
 """
 
 import argparse
@@ -112,7 +114,16 @@ def main():
     ap.add_argument("--case-args", default="", help="case.py arguments of the runs; ';' separates one entry per run")
     ap.add_argument("--step", type=int, default=None, help="Saved step to compare (default: last with the signal inside)")
     ap.add_argument("--tol", type=float, default=0.05, help="Max relative L2 error of the finest run")
+    ap.add_argument("--dt-sweep", action="store_true", help="Runs differ only in dt: print the differences between them")
     args = ap.parse_args()
+    if args.dt_sweep:
+        pm = [load(d, discover_timesteps(d, discover_format(d))[-1])[1] for d in args.runs]
+        pm = [p - p[0] for p in pm]  # p' (the ends stay at p0)
+        diffs = [math.sqrt(np.mean((a - b) ** 2) / np.mean(pm[-1] ** 2)) for a, b in zip(pm, pm[1:])]
+        for k, e in enumerate(diffs):
+            order = f"  order {math.log2(diffs[k - 1] / e):.2f}" if k else ""
+            print(f"rel. L2 |p'(run {k + 1}) - p'(run {k + 2})| = {e:.3e}{order}")
+        return
     cargs = args.case_args.split(";")
     if len(cargs) == 1:
         cargs *= len(args.runs)

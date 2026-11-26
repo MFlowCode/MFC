@@ -129,6 +129,9 @@ contains
             dt = dtl
             $:GPU_UPDATE(device='[dt]')
             do s = 1, size(amr_rk_c)
+                ! this substage's time: fraction th0 + dth*(k + c_s)/2 of the coarse step dtl*2/dth
+                t_rhs = f_step_time(th0 + 0.5_wp*dth*(real(k, wp) + amr_rk_c(s)), t_step, 2._wp*dtl/dth)
+                $:GPU_UPDATE(device='[t_rhs]')
                 call s_amr_fill_sub(lev, q_new, 0.5_wp*(real(k, wp) + amr_rk_c(s)), th0, dth)
                 call s_amr_fine_stage_advance_batched(s, coefs(s,:), bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             end do

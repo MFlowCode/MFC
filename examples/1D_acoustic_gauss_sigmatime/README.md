@@ -27,6 +27,7 @@ clustered on 0.3-0.6 mm). For a sweep, run copies of the directory and pass the 
 
 ## Result
 
-The amplitude converges to the linear value and the shape after the shift converges at about third order, but the pulse lags
-by $\Delta t/2$ at every resolution: the source is evaluated at the step-start time in all Runge-Kutta stages
+The pulse arrives on time ($|\tau| \le 0.002\,\Delta t$) and the L2 error falls at third order to a floor of about 2e-4
+(round-off of the 1 Pa signal on the stiffened-gas energy). The source is evaluated at each Runge-Kutta stage's own time; with
+the step-start time in every stage the pulse lagged by $\Delta t/2$ and the error was first order
 ([#2462](https://github.com/MFlowCode/MFC/issues/2462)). The full tables are on @ref validation_acoustics.

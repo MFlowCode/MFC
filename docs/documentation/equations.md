@@ -875,7 +875,7 @@ The parameter \f$q\f$ controls the convergence rate at critical points (typicall
 
 If \f$\xi_r < C_T\f$, set \f$\alpha_r = 0\f$ (stencil excluded).
 
-Primitive variable reconstruction is used to avoid spurious oscillations at interfaces.
+Primitive variables are reconstructed, which keeps material interfaces in pressure and velocity equilibrium (no spurious oscillations). The cell values are converted from the conserved averages cell by cell and treated as averages of the primitives; that conversion is exact only where the primitives are linear in the conserved variables (uniform u and p), so on nonlinear smooth flows the spatial order is two for every `weno_order`. In multiple dimensions the single-point (midpoint) face flux of the dimension-by-dimension scheme is a second such limit \cite ZhangZhangShu2011. The reconstruction order still sets the error at moderate resolution and the shock capturing; see @ref validation_vortex_order.
 
 #### MUSCL (`muscl_order = 2`)
 

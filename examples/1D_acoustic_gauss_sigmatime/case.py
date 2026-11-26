@@ -8,9 +8,14 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--mfc", type=json.loads, default={})
 parser.add_argument("-N", type=int, default=200, help="Cells (dt and steps scale with it to keep the CFL number and end time)")
 parser.add_argument("--stretch", type=float, default=0.0, help="a_x of a stretched grid clustered on 0.3-0.6 mm (0: uniform)")
+parser.add_argument("--mag", type=float, default=1.0, help="Source amplitude [Pa] (default 1)")
+parser.add_argument("--dt-div", type=int, default=1, help="Divide dt by this factor at fixed end time and save times (time refinement)")
+parser.add_argument("--wenom", action="store_true", help="WENO5-M instead of WENO5 with TENO")
 args = parser.parse_args()
 
 r = args.N / 200
+q = args.dt_div
+scheme = {"teno": "F", "mapped_weno": "T"} if args.wenom else {"teno": "T", "teno_CT": 1e-8}
 # The stretched grid ends past x = 1 mm (about 1.7 mm at a_x = 4), so the patch then covers 0-10 mm
 stretch = {"stretch_x": "T", "a_x": args.stretch, "x_a": 0.0003, "x_b": 0.0006, "loops_x": 1, "patch_icpp(1)%x_centroid": 0.005, "patch_icpp(1)%length_x": 0.01} if args.stretch > 0 else {}
 
@@ -25,10 +30,10 @@ print(
             "m": args.N - 1,
             "n": 0,
             "p": 0,
-            "dt": 2e-9 / r,
+            "dt": 2e-9 / r / q,
             "t_step_start": 0,
-            "t_step_stop": round(250 * r),
-            "t_step_save": round(r),
+            "t_step_stop": round(250 * r) * q,
+            "t_step_save": round(r) * q,
             # Simulation Algorithm Parameters
             "num_patches": 1,
             "model_eqns": "5eq",
@@ -39,8 +44,7 @@ print(
             "time_stepper": "rk3",
             "weno_order": 5,
             "weno_eps": 1.0e-16,
-            "teno": "T",
-            "teno_CT": 1e-8,
+            **scheme,
             "null_weights": "F",
             "mp_weno": "F",
             "riemann_solver": "hllc",
@@ -70,7 +74,7 @@ print(
             "acoustic(1)%pulse": 2,
             "acoustic(1)%npulse": 1,
             "acoustic(1)%dir": 1.0,
-            "acoustic(1)%mag": 1.0,
+            "acoustic(1)%mag": args.mag,
             "acoustic(1)%gauss_sigma_time": 2e-8,
             "acoustic(1)%delay": 1e-7,
             # Fluids Physical Parameters

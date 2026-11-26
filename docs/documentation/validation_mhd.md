@@ -25,7 +25,19 @@ All tables were measured with GNU 13 (CPU, one rank, double precision) on `maste
 | 512 | 1.16e-6 | 4.14 | 1.56e-9 | 3.03 | 1.9e-12 |
 
 The example deck itself (1024 cells, WENO3, \f$\Delta t\f$ = 1e-5, CFL 0.011) gives L1(\f$B_y\f$) = 6.3e-8 and \f$|\rho - 1| \le 2.5\f$e-8.
-WENO5 at fixed CFL approaches third order, the order of SSP-RK3; WENO3 is second order on coarse grids, where its weights are
+WENO5 at fixed CFL approaches third order, the order of SSP-RK3: at CFL 0.4 the time error dominates from 128 cells on. With the
+CFL number reduced, WENO5 reaches its design order (CPU, NVHPC 25.11; L1(\f$B_y\f$) at 32, 64, 128 and 256 cells):
+
+| fast-wave CFL | 32 | 64 | 128 | 256 | orders |
+| ---: | ---: | ---: | ---: | ---: | :--- |
+| 0.4 | 1.99e-5 | 1.21e-6 | 1.11e-7 | 1.27e-8 | 4.04, 3.44, 3.13 |
+| 0.1 | 1.37e-5 | 4.38e-7 | 1.48e-8 | 6.03e-10 | 4.97, 4.89, 4.62 |
+| 0.025 | 1.36e-5 | 4.26e-7 | 1.33e-8 | 4.13e-10 | 5.00, 5.00, 5.01 |
+
+The primitive-variable reconstruction that limits nonlinear smooth flows to second order (@ref validation_vortex_order) does not
+act here: \f$\rho\f$ is uniform, so the velocity is linear in the momentum, and the pressure recovered from the cell averages
+differs from p by a constant (\f$|v_\perp|\f$ and \f$|B_\perp|\f$ are uniform), which has no gradient.
+WENO3 is second order on coarse grids, where its weights are
 far from optimal at the extrema of the sine, and steepens toward its optimal-weight order as the grid is refined (the 4.1 between
 256 and 512 cells is pre-asymptotic). The wave amplitude 0.1 is not small, so this checks the nonlinear HLLD fluxes as well as the
 linear Alfven speed.

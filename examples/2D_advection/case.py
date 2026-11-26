@@ -50,7 +50,7 @@ case = {
     "model_eqns": "6eq",
     "alt_soundspeed": "F",
     "num_fluids": 2,
-    "mpp_lim": "T",
+    "mpp_lim": "F",  # its alpha clip shifts p by about delta * gamma * pi_inf where alpha undershoots by delta (#2476)
     "mixture_err": "T",
     "time_stepper": "rk3",
     "weno_order": 5,

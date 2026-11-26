@@ -160,7 +160,7 @@ contains
         logical                             :: freq_conv_flag, gauss_conv_flag
         integer, parameter                  :: mass_label = 1, mom_label = 2
 
-        sim_time = mytime  ! Accumulated time, correct under adaptive dt
+        sim_time = t_rhs  ! this RK stage's time
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
         do l = 0, p

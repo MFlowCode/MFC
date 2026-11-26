@@ -709,7 +709,7 @@ The effect and use of the source term are assessed by \cite Schmidmayer20.
 
 - `adv_n` activates the direct computation of number density by the Riemann solver instead of computing number density from the void fraction in the method of classes.
 
-- `mpp_lim` activates correction of solutions to avoid a negative void fraction of each component in each grid cell, such that \f$\alpha_i>\varepsilon\f$ is satisfied at each time step.
+- `mpp_lim` clips each partial density at zero and each volume fraction to [0, 1], renormalized to sum to one, wherever the mixture rules are evaluated: the conservative-to-primitive conversion and the Riemann-solver face states (with `model_eqns = 3` also the stored volume fractions in the pressure relaxation). It keeps the mixture density, \f$\Gamma\f$ and \f$\Pi_\infty\f$ physical when a volume fraction undershoots, for example near strong shocks or cavitation. The energy is not adjusted to the clipped fractions, so the clip breaks the pressure equilibrium of a material interface: an undershoot of \f$\delta\f$ next to a stiff fluid moves the pressure by about \f$\delta\,\gamma\pi_\infty\f$ (250 Pa for \f$\delta\f$ = 1e-7 in water, \f$\gamma\pi_\infty\f$ = 2.35e9 Pa). Leave it off for interface advection and other flows without strong waves; see @ref validation_multiphase_riemann. AMR with `num_fluids > 1` requires it, so such runs keep this error.
 
 - `mixture_err` activates correction of solutions to avoid imaginary speed of sound at each grid cell.
 

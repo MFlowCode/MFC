@@ -6,7 +6,7 @@ spherical cap.
     check_focus.py RUN_DIR [RUN_DIR ...] [--case-args ARGS] [--tol TOL]
 
 Each RUN_DIR is a finished simulation run with --probe (D/probe1_prim.dat holds the pressure in the probe cell every
-step, row k at t = (k + 1) dt); --case-args are its case.py arguments (';' separates one entry per run).
+step, row k at t = k dt: it is written from the state at the start of step k); --case-args are its case.py arguments (';' separates one entry per run).
 
 The source emits a converging spherical wave from a cap of radius of curvature F (acoustic(1)%foc_length) and
 aperture 2a, with pressure p0(t) = mag g(t - delay) at the cap. On the axis, at distance z from the cap apex, the
@@ -55,7 +55,7 @@ def check(d, case_args):
     xp = case["x_domain%beg"] + (math.floor((case["probe(1)%x"] - case["x_domain%beg"]) / dx) + 0.5) * dx
     z = xp - case["acoustic(1)%loc(1)"]
     data = np.loadtxt(os.path.join(d, "D", "probe1_prim.dat"))
-    t = (np.arange(data.shape[0]) + 1) * case["dt"]
+    t = np.arange(data.shape[0]) * case["dt"]
     pm = data[:, 4] - p_amb
     if abs(F - z) > 1e-9 * F:
         re = math.sqrt(a * a + (z - h) ** 2)

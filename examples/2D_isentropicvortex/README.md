@@ -20,5 +20,7 @@ and `--time-stepper`. `check_vortex.py` prints the density error against the exa
     ./mfc.sh run examples/2D_isentropicvortex/case.py -t pre_process simulation -n 1 -- --convect -N 128 --order 5
     python3 examples/2D_isentropicvortex/check_vortex.py <run N=64> <run N=128> <run N=256>
 
-Every WENO and TENO order converges at second order on this flow (L1 1.37e-5 at N = 256 for WENO5 and WENO7 alike, #2464).
+Every WENO and TENO order converges at second order on this flow (L1 1.37e-5 at N = 256 for WENO5 and WENO7 alike). That is the
+expected order: MFC reconstructs primitive variables from cell averages, and its dimension-by-dimension fluxes use one point per
+face; both limit nonlinear smooth flows to second order (#2464).
 Results and limits: @ref validation_vortex_order.

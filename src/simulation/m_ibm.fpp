@@ -3,6 +3,7 @@
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
 !> @brief Per-block fine-grid immersed-boundary state for AMR. A separate module from m_ibm: declaring these derived-type
 !! allocatables inside m_ibm corrupts CCE's OpenMP declare-target descriptor table for m_ibm's ghost_points (lib-4425 on its
@@ -273,9 +274,9 @@ contains
     !> Initializes the values of various IBM variables, such as ghost points and image points.
     impure subroutine s_ibm_setup()
 
-        integer                        :: i, j, k, gid
+        integer                        :: i, j, k, gid, gbl_id
         integer(kind=8)                :: n_need
-        real(wp)                       :: t_init  !< initial time for prescribed kinematics
+        real(wp)                       :: t_stage  !< initial time for prescribed kinematics and analytic velocities
         real(wp)                       :: max_num_gps_rank
         integer(kind=8)                :: max_num_gps, fine_gps_est, total_gps, n_pool
         integer(kind=8)                :: n_lumped
@@ -290,13 +291,16 @@ contains
         end if
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs), glb_bounds]')
 
-        ! do all set up for moving immersed boundaries; prescribed kinematics are evaluated at the initial time so the
-        ! first stage already sees the correct body state, velocity and angular velocity
-        t_init = mytime
-        $:GPU_PARALLEL_LOOP(private='[i]', copyin='[t_init]')
+        ! do all set up for moving immersed boundaries; prescribed kinematics and analytic velocities are evaluated at the
+        ! initial time so the first stage already sees the correct body state, velocity and angular velocity
+        t_stage = mytime
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[t_stage]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
-                if (patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_init)
+                if (patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_stage)
+                if (patch_ib(i)%moving_ibm == 1 .and. patch_ib(i)%kin_model <= 0) then
+                    @:mib_analytical()
+                end if
                 call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, patch_ib(i)%moment)
             end if
             call s_update_ib_rotation_matrix(i)
@@ -331,7 +335,7 @@ contains
                 call s_get_neighborhood_idx(gid, i)
                 call s_compute_centroid_offset(gid, i)
             end do
-            call s_restore_centroid_offsets(t_init)
+            call s_restore_centroid_offsets(t_stage)
         end if
         do i = 1, num_ibs
             $:GPU_UPDATE(device='[patch_ib(i)]')

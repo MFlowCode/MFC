@@ -30,8 +30,8 @@ module m_boundary_primitives
 contains
 
     !> Velocity scaling for a GRCBC inflow that is ramping up: unity unless `bc_[x,y,z]%vel_in_ramp` is set, so an unramped case is
-    !! untouched. Takes the time as an argument so the caller can evaluate it on the device from `mytime`, which the time stepper
-    !! already places there, rather than computing it on the host and copying the result every Runge-Kutta stage.
+    !! untouched. Takes the time as an argument: the callers pass the stage time `t_rhs`, on the device (GRCBC) or on the host
+    !! (Dirichlet ghost velocities).
     pure function f_vel_ramp(tau, t0, frac0, t) result(f)
 
         $:GPU_ROUTINE(parallelism='[seq]')

@@ -2,9 +2,9 @@
 
 # Two-fluid flows: shock tube, interface advection, phase-change equilibrium
 
-**Status:** water-air shock tube: validated. Interface advection: partially validated (open: a localized pressure error on coarse grids). Phase-change equilibrium: partially validated (equilibrium of the relaxed state only). **Code:** `master` at 5838b641c. **Examples:** `examples/1D_kapilashocktube`, `examples/2D_advection`, `examples/1D_exp_tube_phasechange`. **Last run:** 2026-11-24. See also @ref validation.
+**Status:** water-air shock tube: validated. Interface advection: validated (pressure equilibrium to round-off at every grid). Phase-change equilibrium: partially validated (equilibrium of the relaxed state only). **Code:** `master` at 5838b641c (interface advection: 3e4c53258). **Examples:** `examples/1D_kapilashocktube`, `examples/2D_advection`, `examples/1D_exp_tube_phasechange`. **Last run:** 2026-11-24. See also @ref validation.
 
-All tables were measured with GNU 13.3 (CPU, one rank, double precision); the A100 rows used NVHPC 25.11 (OpenACC, one GPU).
+Except for the interface-advection table, all tables were measured with GNU 13.3 (CPU, one rank, double precision) and the A100 rows with NVHPC 25.11 (OpenACC, one GPU); the interface-advection table states its own compilers.
 
 ## Water-air shock tube {#sec-validation-mp-riemann}
 
@@ -39,33 +39,40 @@ Exact star state: p* = 1.4190e7 Pa, u* = 482.61 m/s, rho* = 804.44 kg/m^3 (water
 | Geometry | 2D periodic unit box, N x N cells; water disk of radius 0.2 centred at (0.4627, 0.5381), off the cell faces and the box centre |
 | Fluids | water (stiffened gas, gamma 2.35, pi_inf 1e9 Pa, 1000 kg/m^3) in air (gamma 1.4, 1 kg/m^3); 1e-8 of the other fluid in each pure region; initial interface smoothed (`smooth_coeff` 0.5, about 9 cells wide at every N) |
 | State | p = 1e5 Pa, u = v = 100 m/s everywhere |
-| Numerics | 6-equation model with `mpp_lim`, WENO5-M, HLLC, SSP-RK3, acoustic CFL 0.4; one flow-through along the diagonal (t = 0.01 s, the disk returns to its initial position) |
+| Numerics | 6-equation model, `mpp_lim = F`, WENO5-M, HLLC, SSP-RK3, acoustic CFL 0.4; one flow-through along the diagonal (t = 0.01 s, the disk returns to its initial position) |
 | Reference | exact: p and u stay uniform, the volume fraction translates; after one flow-through it equals the initial field |
 | Measured | max abs(p/p0 - 1) and max abs(u - U)/U over all saves and cells; L1 of alpha_water against the initial field per unit interface length, in cells; the width of the mixed zone (0.01 < alpha < 0.99) per unit interface length, in cells; `check_advection.py` |
 
 | N | max dp/p0 | max du/U | L1 [cells] | L1 [m] | width, initial [cells] | width, final [cells] |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 50 | 2.5e-3 | 1.7e-4 | 0.066 | 1.3e-3 | 9.17 | 9.25 |
-| 64 | 2.5e-3 | 7.2e-7 | 0.075 | 1.2e-3 | 9.21 | 9.26 |
-| 80 | 1.2e-4 | 5.0e-8 | 0.084 | 1.0e-3 | 9.26 | 9.24 |
-| 100 | 3.1e-6 | 1.9e-9 | 0.095 | 9.5e-4 | 9.18 | 9.26 |
-| 200 | 3.2e-6 | 2.2e-9 | 0.142 | 7.1e-4 | 9.16 | 9.54 |
-| 50, A100 | 2.5e-3 | 1.7e-4 | 0.066 | 1.3e-3 | 9.17 | 9.25 |
-| 100, A100 | 2.9e-6 | 1.8e-9 | 0.095 | 9.5e-4 | 9.18 | 9.26 |
+| 50 | 3.7e-11 | 1.1e-11 | 0.066 | 1.3e-3 | 9.17 | 9.25 |
+| 64 | 2.5e-11 | 1.4e-12 | 0.075 | 1.2e-3 | 9.21 | 9.26 |
+| 80 | 2.4e-11 | 2.1e-12 | 0.084 | 1.0e-3 | 9.26 | 9.24 |
+| 100 | 2.5e-11 | 5.6e-12 | 0.095 | 9.5e-4 | 9.18 | 9.26 |
+| 200 | 1.5e-10 | 1.9e-10 | 0.142 | 7.1e-4 | 9.16 | 9.54 |
+| 50, `model_eqns = 2` | 1.9e-11 | 9.4e-14 | 0.066 | 1.3e-3 | 9.17 | 9.25 |
+| 100, `model_eqns = 2` | 2.9e-11 | 3.9e-13 | 0.095 | 9.5e-4 | 9.18 | 9.26 |
+| 50, A100 | 3.8e-11 | 1.1e-11 | 0.066 | 1.3e-3 | 9.17 | 9.25 |
+| 100, A100 | 3.4e-11 | 2.1e-12 | 0.095 | 9.5e-4 | 9.18 | 9.26 |
 
-- At 100 and 200 cells the uniform pressure and velocity hold to 3e-6 and 2e-9 across a density ratio of 1000 and a pi_inf
-  contrast of 1e4 p0 over the whole flow-through: the scheme keeps the interface equilibrium.
+This table was measured at 3e4c53258 on the CPU with NVHPC 25.11 (four ranks) and on the A100 with NVHPC 25.5 (OpenACC, one GPU).
+
+- The uniform pressure and velocity hold to round-off (1e-11 to 1e-10) at every grid, across a density ratio of 1000 and a
+  pi_inf contrast of 1e4 p0, over the whole flow-through and with either model: the scheme keeps the interface equilibrium.
 - The interface is not diffused beyond its initial smoothing: the mixed zone widens by 0.1 cells or less per flow-through up to
   100 cells (0.4 cells at 200, where the disk travels 200 cells in each direction). The L1 error per unit interface length is
   about a tenth of a cell and falls as N^-0.4 in physical units; the initial profile is a fixed number of cells wide, so this is
   not the convergence of one solution.
-- **Open: localized pressure error on coarse grids.** At 50 and 64 cells the pressure error stays below 3e-6 for 0.4
-  flow-throughs and then jumps to 2.5e-3 p0 (250 Pa) in a patch of about 30 water cells that hold 1e-6 to 1e-4 of air, and
-  travels with the disk. The onset coincides with a cell where a volume fraction undershoots to zero (6-equation) or below zero
-  (the same case with the 5-equation model, where the error reaches 2.5e-2 p0 at 50 cells and stays at 2e-11 at 100). It does not
-  change with the CFL number (0.2), the trace fraction (1e-6 to 1e-10), `mp_weno` (1.7e-3) or a disk path that avoids the box
-  corner, and the A100 reproduces it to the digits shown. Relative to the water stiffness p0 + pi_inf the error is 2.5e-7. Cause
-  not identified.
+- **`mpp_lim` must stay off here** ([#2476](https://github.com/MFlowCode/MFC/issues/2476)). With `mpp_lim = T`, which the deck
+  used before, the pressure error is 3e-6 at 100 and 200 cells. At 50 and 64 cells it jumps after 0.4 flow-throughs to 2.5e-3 p0
+  (250 Pa; 2.7e-2 p0 with `model_eqns = 2`) in a patch of water cells that hold traces of air. `mpp_lim` clips each volume
+  fraction to [0, 1] and renormalizes the set before it forms the mixture \f$\Gamma\f$ and \f$\Pi_\infty\f$, in the
+  conversion to primitives and on the Riemann-solver face states. The energy is not changed with them, so where alpha_air
+  undershoots by \f$\delta\f$ the clip moves the water pressure by about \f$\delta\,\gamma\pi_\infty\f$ = 2.35e9
+  \f$\delta\f$ Pa: \f$\delta\f$ = 1e-7 gives the 250 Pa. Without the clip the volume fractions do undershoot at 50 cells
+  (min alpha_air = −2.7e-5, min alpha_water = −3.4e-7, partial densities down to −3.4e-4 kg/m³; none at 100 and 200 cells),
+  but the equation of state stays consistent with the advected alpha and energy, and the run is stable. `face_bound = 1` (bounds
+  on the face density and p + pi_inf, `model_eqns = 2`) does not change the result with or without `mpp_lim`.
 
 ## Phase-change equilibrium {#sec-validation-mp-phase-change}
 

@@ -3987,6 +3987,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_laplace_pressure_jump",
                 "2D_bubbly_steady_shock",
                 "2D_advection",
+                # Order-of-accuracy study run by hand (check_smooth.py); its file IC (hcid = 170) is written per grid
+                "1D_smooth_wave_order",
                 "2D_hardcoded_ic",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
@@ -5737,7 +5739,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2, honor_io_keys=True))
         stack.pop()
 
-        # body forces: accel is evaluated at the coarse-step-frozen time on the fine blocks, as in the coarse RK3 stages
+        # body forces: accel is evaluated at the coarse stage time t_rhs on the fine blocks, as in the coarse RK3 stages
         stack.push(
             "AMR -> 1D -> bodyforces",
             {**amr_1d_base, "amr_regrid_int": 0, "bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10},
