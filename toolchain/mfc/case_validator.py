@@ -663,8 +663,10 @@ class CaseValidator:
         self.prohibit(self.get("face_bound", 0) == 1 and model_eqns != 2, "face_bound = 1 requires model_eqns = 2")
         if self.get("face_bound", 0) == 2:
             self.prohibit(model_eqns not in [2, 3], "face_bound = 2 requires model_eqns = 2 or 3")
-            for flag in ["bubbles_euler", "chemistry", "mhd", "hypoelasticity", "relativity", "igr", "cont_damage"]:
-                self.prohibit(self.get(flag, "F") == "T", f"face_bound = 2 does not support {flag} (use face_bound = 1 with chemistry)")
+            self.prohibit(self.get("chemistry", "F") == "T", "face_bound = 2 does not support chemistry (use face_bound = 1 with chemistry)")
+            for flag in ["bubbles_euler", "mhd", "hypoelasticity", "relativity", "igr", "cont_damage"]:
+                self.prohibit(self.get(flag, "F") == "T", f"face_bound = 2 does not support {flag}")
+            self.prohibit(self._get_recon_type() == 1 and self.get("weno_order", 0) == 1, "face_bound = 2 has no effect with weno_order = 1: first-order faces equal the cell state")
             state_dependent = {f.value for f in EOS_FAMILIES if f.state_dependent}
             for i in range(1, (num_fluids or 0) + 1):
                 self.prohibit(self.get(f"fluid_pp({i})%eos") in state_dependent, "face_bound = 2 requires stiffened-gas fluids: its bounds are linear in the volume fractions")

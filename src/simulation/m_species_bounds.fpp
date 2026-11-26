@@ -170,11 +170,11 @@ contains
         integer :: i, j, k, l, o, it, dj, dk, dl, polyn
         logical :: ok
 
-        ! Same range as s_reconstruct_cell_boundary_values (m_rhs.fpp); it leaves room for the +-1 neighbours along id
+        ! Range of s_reconstruct_cell_boundary_values (m_rhs.fpp), narrowed by at least 1 for the +-1 neighbours along id
 
         polyn = merge(weno_polyn, muscl_polyn, recon_type == recon_type_weno)
         b = idwbuff
-        b(id)%beg = b(id)%beg + polyn; b(id)%end = b(id)%end - polyn
+        b(id)%beg = b(id)%beg + max(polyn, 1); b(id)%end = b(id)%end - max(polyn, 1)
         w = merge(f_lobatto_weight(polyn), 0.5_wp, recon_type == recon_type_weno)  ! MUSCL is linear: no interior point
         pinf = maxval(pi_infs(1:num_fluids)/(gammas(1:num_fluids) + 1._wp))  ! stiffest fluid: liquid tension is not limited
         dj = merge(1, 0, id == 1); dk = merge(1, 0, id == 2); dl = merge(1, 0, id == 3)
@@ -239,7 +239,7 @@ contains
                             ! homogeneous of degree one, so the positive factor 1 - 2w is kept on the bounds instead
                             rx = 0._wp; ex = 0._wp; gx = 0._wp; pix = 0._wp; qvx = 0._wp; mx = 0._wp
                             #:for V in ['', 'vL', 'vR']
-                                #:set C = '1._wp' if V == '' else '-w'
+                                #:set C = '1._wp' if V == '' else '(-w)'
                                 #:if V == ''
                                     #:set P = 'q_prim_vf({0})%sf(j, k, l)'
                                 #:else
