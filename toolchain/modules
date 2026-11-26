@@ -22,12 +22,6 @@ r     Richardson
 r-all python/3.7
 r-cpu gcc/9.3.0 openmpi-2.0/gcc-9.3.0
 
-w     OLCF Wombat
-w-all cmake/3.25.1 python/3.10.8
-w-cpu gcc/11.1.0 openmpi/4.0.5_gcc
-w-gpu nvhpc/22.11
-w-gpu CC=nvc CXX=nvc++ FC=nvfortran
-
 e     SDSC Expanse
 e-all python/3.8.5
 e-cpu cpu/0.15.4 gcc/9.2.0 openmpi/4.1.1 cmake/3.18.2
@@ -97,14 +91,6 @@ o-cpu hpcx-mpi python/3.13.5
 o-gpu nvhpc cuda/12.3.0 cmake/3.26.3
 o-gpu CC=nvc CXX=nvc++ FC=nvfortran
 
-pa     Purdue Anvil
-pa-cpu gcc/11.2.0 
-pa-cpu openmpi/4.1.6 
-pa-cpu python/3.9.5 
-pa-cpu fftw/3.3.8 
-pa-cpu cmake/3.20.0
-pa-all PYTHONPATH=""
-
 dai     NCSA DeltaAI
 dai-all python cmake nvidia/25.5
 dai-all CC=nvc CXX=nvc++ FC=nvfortran
@@ -139,10 +125,6 @@ h-gpu CC=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpicc
 h-gpu CXX=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpicxx
 h-gpu FC=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/mpi/bin/mpifort
 h-gpu NVCOMPILER_COMM_LIBS_HOME=/apps/compilers/nvhpc/25.9/Linux_x86_64/25.9/comm_libs/12.9
-
-i     Tennessee Isaac
-i-all gcc/13.4.0 openmpi/4.1.8-gcc13 Python/3.9.10-gcc
-i-all CC=mpicc CXX=mpicxx FC=mpif90
 
 t     WPI Turing
 t-all slurm
