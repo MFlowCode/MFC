@@ -5909,6 +5909,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # with a body force: the fine hooks must apply it before relaxing, in the coarse stage's order
         cases.append(define_case_d(stack, "body force", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10}))
         stack.pop()
+        # a stiffened-gas / ideal-gas interface crossing a static block's low face at uniform p and u (#2503): the volume fractions'
+        # reflux must correct their alpha*div(u) source with the flux, or the interface loses p/u equilibrium at the face
+        stiff = {"amr_regrid_int": 0, "fluid_pp(1)%eos": "stiffened_gas", "fluid_pp(1)%gamma": 1.0 / 3.4, "fluid_pp(1)%pi_inf": 4.4 * 10.0 / 3.4}
+        # the interface starts one coarse cell upstream of the face (x = 15/64), so it crosses the outside cell and the face
+        stiff.update({"patch_icpp(2)%x_centroid": 0.1671875, "patch_icpp(2)%length_x": 0.134375, "patch_icpp(3)%x_centroid": 0.6171875, "patch_icpp(3)%length_x": 0.765625})
+        cases.append(define_case_d(stack, "stiffened gas at a static block face", stiff))
+        # the subcycled state reflux takes alpha from the step-start state
+        cases.append(define_case_d(stack, "stiffened gas at a static block face -> subcycle", {**stiff, "amr_subcycle": "T"}))
         stack.pop()
 
         # hypoelasticity: 1D hypoelastic shock config on a static 2:1 block; the fine swap recomputes the
