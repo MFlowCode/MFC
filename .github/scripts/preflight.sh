@@ -10,9 +10,8 @@
 # Why at the top of the *test* allocation: over 2026-08-18..31, 48 of 58
 # measurable jobs built on one node and tested on another, and in every ECC
 # failure the build node was healthy while the tests landed on a bad one. A
-# probe placed after the build checks the wrong machine. (Phoenix's combined
-# build-and-test allocation avoids the split; Frontier still submits the two
-# separately and lands elsewhere ~90% of the time.)
+# probe placed after the build checks the wrong machine. (The build and the tests
+# are separate submissions and land on different nodes ~90% of the time.)
 #
 # Usage: preflight.sh <cluster> <device>
 #

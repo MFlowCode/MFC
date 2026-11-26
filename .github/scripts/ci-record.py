@@ -110,7 +110,7 @@ def error_class(text: str) -> str:
 # For each cause, what the line that says how it happened looks like; the first match is kept.
 HOW = {
     "build": r"(?i)(\berror\b.*|ftn-\d+.*|undefined reference.*|cannot open module file.*)",
-    "cluster": r"( unavailable::.*|Batch job submission failed.*)",
+    "cluster": r"(cluster unavailable.*|Batch job submission failed.*)",
     "queue": r"(SLURM job \d+ did not start within.*)",
     "timeout": r"(.*DUE TO TIME LIMIT.*|.*state=TIMEOUT.*)",
     "node": r"(.*(?:Preflight failed|failed preflight).*)",
@@ -127,8 +127,17 @@ def how(lines: list, why: str) -> str:
             m = re.search(pattern, line)
             if m and not NOISE.search(line):
                 return re.sub(r"^##\[error\]", "", m.group(1)).strip(" :")[:160]
+    if why == "tests":
+        return ""
     errors = [line for line in lines if line.startswith("##[error]") and "Process completed with exit code" not in line]
-    return errors[-1][len("##[error]") :].strip()[:160] if errors and why != "tests" else ""
+    if errors:
+        return errors[-1][len("##[error]") :].strip()[:160]
+    # No annotation: what the scripts themselves printed, the most specific first.
+    for pattern in (r"^(Failed cases: .*)", r"^mfc: ERROR > (?::\( )?(.*failed with exit code.*)", r"^(ERROR: .*)"):
+        found = [m.group(1) for m in (re.search(pattern, line) for line in lines) if m]
+        if found:
+            return found[-1].strip()[:160]
+    return ""
 
 
 def tests(log: str, failed_job: bool) -> dict:
@@ -174,7 +183,7 @@ def tests(log: str, failed_job: bool) -> dict:
         text = "\n".join(lines)
         out["why"] = why = (
             "tests" if failed or "CRITICAL:" in text
-            else "cluster" if " unavailable::" in text or "Batch job submission failed" in text
+            else "cluster" if "cluster unavailable" in text or "Batch job submission failed" in text
             else "queue" if "QUEUE STARVATION" in text
             else "build" if "Build failed after" in text
             else "timeout" if "state=TIMEOUT" in text

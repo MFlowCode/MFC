@@ -20,10 +20,9 @@ if [ "$job_cluster" = "phoenix" ]; then
 fi
 
 # --- Probe this node before running the suite ---
-# The build already probed a node, but not necessarily this one: outside
-# Phoenix's combined allocation the Build and Test steps are separate SLURM
-# submissions with no node affinity, and they landed on different nodes in 26 of
-# 29 measurable Frontier jobs. In the Aug 2026 ECC failures the build node was
+# The build already probed a node, but not necessarily this one: the Build and
+# Test steps are separate SLURM submissions with no node affinity, and they
+# landed on different nodes in 26 of 29 measurable Frontier jobs. In the Aug 2026 ECC failures the build node was
 # healthy every time and the tests were what landed on the bad one.
 preflight_rc=0
 bash .github/scripts/preflight.sh "$job_cluster" "$job_device" || preflight_rc=$?
@@ -66,19 +65,12 @@ else
     device_opts="--no-gpu"
 fi
 
-# --- Sharding (Frontier only) ---
+# --- Sharding ---
 if [ -n "${job_shard:-}" ]; then
     shard_opts="--shard $job_shard"
 fi
 
-# Coverage-based test selection ENFORCED on PRs: runs only tests whose recorded coverage
-# overlaps the PR's changed files (conservative ladder; non-.fpp and uncovered-.fpp changes
-# fall back to run-all). Pushes to master run the full suite as a backstop. Changed files
-# come from git detection (self-healing deepen) since the SLURM job doesn't receive the
-# paths-filter list.
-select_opts=""
-if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
-    select_opts="--select-enforce"
-fi
-
-./mfc.sh test -v --max-attempts 3 --no-build $select_opts -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
+# The whole suite, unless the caller narrows it: a smoke run passes --select-enforce (only the
+# tests whose recorded coverage overlaps the changed files, found by git since the SLURM job
+# does not get the paths-filter list) and --max-tests through MFC_TEST_EXTRA_OPTS.
+./mfc.sh test -v --max-attempts 3 --no-build -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts ${MFC_TEST_EXTRA_OPTS:-} -- -c $job_cluster

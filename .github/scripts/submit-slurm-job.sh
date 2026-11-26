@@ -42,7 +42,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 script_basename="$(basename "$script_path" .sh)"
 case "$script_basename" in
     bench*)                 job_type="bench" ;;
-    build-and-test*)        job_type="buildtest" ;;
     run_case_optimization*) job_type="caseopt" ;;
     *)                      job_type="test"  ;;
 esac
@@ -60,9 +59,6 @@ case "$cluster" in
         qos="inferno"
         extra_sbatch="#SBATCH --requeue"
         test_time="03:00:00"
-        # Combined build+test: on a V100 node the build takes 1 h 30 min and the
-        # suite about 2 h 30 min.
-        buildtest_time="05:00:00"
         bench_time="04:00:00"
         gpu_partition_dynamic=true
         ;;
@@ -106,7 +102,6 @@ esac
 # --- Time limit ---
 case "$job_type" in
     bench)     sbatch_time="#SBATCH -t $bench_time" ;;
-    buildtest) sbatch_time="#SBATCH -t ${buildtest_time:-$test_time}" ;;
     *)         sbatch_time="#SBATCH -t $test_time" ;;
 esac
 
@@ -139,7 +134,9 @@ elif [ "$device" = "gpu" ]; then
         # idle nodes in the SAME partition at once -- the main bench queue-starver).
         # gpu-l40s (bad hardware) and gpu-rtx6000 (too slow for the time limit) are
         # intentionally omitted.
-        gpu_partition="gpu-h200,gpu-h100,gpu-a100,gpu-v100"
+        # MFC_GPU_PARTITION pins the list to one partition: test jobs that reuse a
+        # build made by an earlier job must run on the node type it was built on.
+        gpu_partition="${MFC_GPU_PARTITION:-gpu-h200,gpu-h100,gpu-a100,gpu-v100}"
         echo "Using GPU partition list: $gpu_partition"
     fi
 
@@ -250,7 +247,7 @@ set -x
 cd "\$SLURM_SUBMIT_DIR"
 echo "Running in \$(pwd):"
 
-# Exported so wrapper scripts (build-and-test.sh) run child scripts that inherit these.
+# Exported so scripts the payload runs inherit these.
 export job_slug="$job_slug"
 export job_device="$device"
 export job_interface="$interface"
@@ -258,6 +255,7 @@ export job_shard="$shard"
 export job_variant="$variant"
 export job_cluster="$cluster"
 export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
+export MFC_TEST_EXTRA_OPTS="${MFC_TEST_EXTRA_OPTS:-}"
 
 . ./mfc.sh load -c $compiler_flag -m $module_mode
 

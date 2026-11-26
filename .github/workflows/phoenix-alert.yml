@@ -1,7 +1,7 @@
-name: 'Phoenix Master Alert'
+name: 'Cluster Master Alert'
 
-# Keep one issue open while Phoenix fails on master, listing the merges since the last
-# green run.
+# Keep one issue open per cluster while it fails in the scheduled master run of the Test
+# Suite, listing the merges since the last green run.
 on:
   workflow_run:
     workflows: ['Test Suite']
@@ -9,18 +9,23 @@ on:
     branches: [master]
 
 concurrency:
-  group: phoenix-alert
+  group: cluster-alert
   cancel-in-progress: false
 
 permissions:
   contents: read
-  actions: read
+  # write: dispatches the Cluster Bisect workflow.
+  actions: write
   issues: write
 
 jobs:
   alert:
-    if: github.repository == 'MFlowCode/MFC' && github.event.workflow_run.event == 'push'
+    if: github.repository == 'MFlowCode/MFC' && github.event.workflow_run.event == 'schedule'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cluster: [Phoenix, Frontier]
     steps:
       - name: Clone
         uses: actions/checkout@v5
@@ -32,4 +37,5 @@ jobs:
           RUN_ID:      ${{ github.event.workflow_run.id }}
           RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
           HEAD_SHA:    ${{ github.event.workflow_run.head_sha }}
+          CLUSTER:     ${{ matrix.cluster }}
         run: bash .github/scripts/phoenix-master-alert.sh

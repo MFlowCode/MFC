@@ -297,6 +297,23 @@ def gpu_fc_version(fc_version: str, probe=lambda: _compiler_version("nvfortran")
     return fc_version if re.search(r"\b(nvfortran|gnu|cray|ifx|ifort|flang|clang)", fc_version, re.I) else probe()
 
 
+def cap_evenly(cases: list, cap: int, runs=lambda case: True, keep=lambda case: False) -> typing.Tuple[list, list]:
+    """Keep at most `cap` of the cases that will run, spread evenly over the list; return (kept, dropped).
+
+    The list is ordered by feature, so an even spread samples every area where the
+    first `cap` cases would sample one. Cases for which `runs` is false are left in
+    place and do not count: something later skips them anyway. Cases for which
+    `keep` is true are always kept, and the spread fills what is left of the cap.
+    """
+    pool = [c for c in cases if runs(c)]
+    if cap <= 0 or len(pool) <= cap:
+        return cases, []
+    rest = [c for c in pool if not keep(c)]
+    room = max(cap - (len(pool) - len(rest)), 0)
+    kept = {id(c) for c in pool if keep(c)} | {id(rest[i * len(rest) // room]) for i in range(min(room, len(rest)))}
+    return [c for c in cases if id(c) in kept or not runs(c)], [c for c in pool if id(c) not in kept]
+
+
 def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
     cases = cases_[:]
     selected_cases = []
@@ -435,6 +452,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
+    changed = None
     if ARG("only_changes") or ARG("select_enforce"):
         import datetime
 
@@ -453,6 +471,20 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 cases = to_run
             else:
                 cons.print("[dim](shadow mode: running full suite; pass --select-enforce to actually skip)[/dim]")
+
+    if ARG("max_tests") > 0:
+        # --no-chemistry drops chemistry cases later; keep them out of the cap's pool.
+        runs = (lambda c: c.to_case().params.get("chemistry", "F") != "T") if ARG("no_chemistry") else (lambda c: True)
+        # Kept whatever the cap: a test whose own files (its golden data) changed, whether or not the coverage
+        # map could be loaded, and the canaries, which selection never skips either.
+        if changed is None and (ARG("only_changes") or ARG("select_enforce")):
+            from .. import common
+            from .coverage import get_changed_files
+
+            changed = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"), explicit=ARG("changed_files"))
+        touched = {m.group(1) for f in changed or () if (m := re.match(r"tests/([0-9A-F]{8})/", f))}
+        cases, capped = cap_evenly(cases, ARG("max_tests"), runs, lambda c: c.get_uuid() in touched or getattr(c, "canary", False))
+        skipped_cases += capped
 
     if ARG("percent") == 100:
         return cases, skipped_cases
@@ -520,7 +552,9 @@ def test():
     global errors, failed_tests, test_start_time  # noqa: PLW0603
 
     test_start_time = time.time()  # Start timing
-    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
+    # One file per shard: concurrent shards share a checkout in CI.
+    shard_tag = f"-{ARG('shard').replace('/', '-of-')}" if ARG("shard") else ""
+    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, f"failed_uuids{shard_tag}.txt")
     cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/

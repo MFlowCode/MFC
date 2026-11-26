@@ -11,8 +11,9 @@ whose slug was never pre-built is handed a binary that does not exist:
 
 What gets pre-built is lane-dependent. Most lanes run `./mfc.sh test --dry-run -a`,
 which builds every case-specific variant. The Frontier AMD gpu-omp lane cannot: each
-amdflang device link is ~1 h, so `.github/workflows/test.yml` splits its build into two
-concurrent jobs, and only these two slugs exist afterwards:
+amdflang device link is ~1 h, so `.github/scripts/cluster-lane.sh` splits its build into
+concurrent jobs (base, chem-h2o2, chem-carbon, eos) and then runs the chem sweep below, and only
+these slugs exist afterwards:
 
     base -> ./mfc.sh build                                  (the default build)
     chem -> ./mfc.sh test --dry-run -a -o Chemistry         (cases the Chemistry label

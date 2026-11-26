@@ -1,0 +1,66 @@
+name: 'Cluster Label'
+
+# Adding the ci:clusters label to a ready PR gives it the full cluster run (see cluster-mode in
+# test.yml). A run that starts after the label is added reads it by itself; this re-runs the
+# cluster part of a Test Suite run that had already decided on a smoke run. The label stays, so
+# later pushes to the PR get the full run too until it is removed.
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  actions: write
+  # write: says so on the PR when the re-run could not be made.
+  pull-requests: write
+
+jobs:
+  rerun:
+    name: Re-run cluster jobs
+    if: >-
+      github.repository == 'MFlowCode/MFC' &&
+      github.event.label.name == 'ci:clusters' &&
+      github.event.pull_request.state == 'open' &&
+      github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    # A run cannot be re-run until it has finished; wait for it, for up to 5.5 h.
+    timeout-minutes: 350
+    steps:
+      - name: Re-run
+        env:
+          GH_TOKEN:  ${{ github.token }}
+          REPO:      ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA:  ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          run=$(gh api "repos/$REPO/actions/workflows/test.yml/runs?event=pull_request&head_sha=$HEAD_SHA&per_page=1" \
+              --jq '.workflow_runs[0].id // ""')
+          if [ -z "$run" ]; then echo "No Test Suite run for $HEAD_SHA yet; it will read the label."; exit 0; fi
+
+          give_up() {
+              gh pr comment "$PR_NUMBER" -R "$REPO" --body "\`ci:clusters\` was added, but $1 The full cluster run was not started for this commit: re-run the Test Suite, or push a commit, and it will read the label."
+              exit 0
+          }
+          deadline=$((SECONDS + 330 * 60))
+          while [ "$(gh api "repos/$REPO/actions/runs/$run" --jq .status)" != "completed" ]; do
+              if [ "$SECONDS" -ge "$deadline" ]; then give_up "the Test Suite run in progress did not finish within 5.5 hours."; fi
+              sleep 120
+          done
+
+          # The wait can be hours: the PR may have moved on, or been merged or closed.
+          read -r sha state < <(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '[.head.sha, .state] | @tsv')
+          if [ "$state" != open ]; then echo "The PR is $state; nothing to re-run."; exit 0; fi
+          if [ "$sha" != "$HEAD_SHA" ]; then
+              echo "The PR has a newer commit; its run reads the label."; exit 0
+          fi
+          jobs=$(gh api --paginate "repos/$REPO/actions/runs/$run/jobs?filter=latest&per_page=100" \
+              --jq '.jobs[] | [.id, (.conclusion // "none"), .name] | @tsv')
+          # A smoke run has a Phoenix job too, named "... [smoke]"; only a full run has one without.
+          if [ -n "$(awk -F'\t' '$3 ~ /Phoenix/ && $3 !~ /\[smoke\]/ && $2 != "skipped"' <<<"$jobs")" ]; then
+              echo "Run $run already ran the full cluster set."; exit 0
+          fi
+          mode_job=$(awk -F'\t' '$3 == "Cluster Mode" {print $1}' <<<"$jobs" | head -1)
+          if [ -z "$mode_job" ]; then echo "Run $run has no Cluster Mode job."; exit 0; fi
+          # Re-running a job re-runs the jobs that need it: the cluster lanes, not the hosted ones.
+          gh api -X POST "repos/$REPO/actions/jobs/$mode_job/rerun"
+          echo "Re-ran the cluster jobs of run $run."

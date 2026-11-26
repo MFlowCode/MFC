@@ -17,6 +17,7 @@ A test is considered passing when our error tolerances are met in order to maint
 - `--test-all` (`a`) test post process and ensure the Silo database files are correct
 - `--percent` (`%`) to specify a percentage of the test suite to select at random and test
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
+- `--max-tests` caps the run at that many tests, evenly spaced through the selected ones; the canary tests and any test whose own files changed run beyond the cap
 - `--no-examples` skips the testing of cases in the examples folder
 - `--no-chemistry` skips every case that uses chemistry (``chemistry = 'T'``), including reacting example cases
 - Cases with a known GPU-only difference on NVHPC < 25.11 (`NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS` in `toolchain/mfc/test/test.py`, tracked in #2181) are skipped on GPU builds with an old `nvfortran`, with a visible reason line; tolerances are not widened. CPU builds and other compilers run them.
