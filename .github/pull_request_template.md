@@ -21,11 +21,19 @@ If more than one row applies, do everything each of them requires. Write N/A wit
 
 ## 1. Does it solve the problem?
 
+Show before and after with numbers, figures, or both. Delete what you don't use.
+
 Command that shows it:
 
 | Quantity | master | this PR | expected |
 |---|---|---|---|
 |  |  |  |  |
+
+| Figure: master | Figure: this PR |
+|---|---|
+|  |  |
+
+Why the new result is right (analytic solution, reference data, convergence, ...):
 
 ## 2. Does it create another one?
 
