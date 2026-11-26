@@ -49,7 +49,7 @@ Note: Ordering is not guaranteed or stable, so use key-value pairing when using 
 In order to parallelize a loop, simply place two macro calls on either end of the loop:
 
 ```C
-$:$GPU_PARALLEL_LOOP(...)
+$:GPU_PARALLEL_LOOP(...)
    {code}
 $:END_GPU_PARALLEL_LOOP()
 ```

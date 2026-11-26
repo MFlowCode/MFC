@@ -53,9 +53,9 @@ COMMON_JOBS = CommonArgumentSet(
         Argument(
             name="jobs",
             short="j",
-            help="Allows for JOBS concurrent jobs.",
+            help="Concurrent jobs. Builds default to min(cores, 16); test cases run one at a time unless -j is given.",
             type=int,
-            default=1,
+            default=None,
             metavar="JOBS",
         ),
     ],
@@ -1377,7 +1377,7 @@ VIZ_COMMAND = Command(
 PARAMS_COMMAND = Command(
     name="params",
     help="Search and explore MFC case parameters.",
-    description="Search, list, and get information about MFC's ~3,300 case parameters.",
+    description="Search, list, and get information about MFC's case parameters.",
     positionals=[
         Positional(
             name="query",

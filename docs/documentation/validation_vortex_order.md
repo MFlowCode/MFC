@@ -159,8 +159,8 @@ run agrees with the CPU to 1e-12 in density and to all printed digits in the tab
 
 - The Taylor-Green check is at a Reynolds number of 1.2e-5 and a Mach number of 3e-4, where the flow is a single decaying mode. The
   3D Re = 1600 transition (`examples/3D_TaylorGreenVortex`) and the IGR Taylor-Green examples are not checked here.
-- The initial pressure of the 2D Taylor-Green patch is a quarter of the exact one ([#2465](https://github.com/MFlowCode/MFC/issues/2465)).
-  At this Mach number the start-up acoustic transient does not affect the decay rate measurably.
+- The 2D Taylor-Green patch sets the exact initial pressure since [#2465](https://github.com/MFlowCode/MFC/issues/2465) (it was a
+  quarter of it); the table above, measured before the fix, is unchanged at the printed digits (32 cells, rerun after the fix).
 - The time-step order is not measured here: the spatial error dominates the vortex, and the suite covers the RK1-3 orders on 1D
   advection (`Convergence -> Temporal`).
 - WENO7 needs at least 36 cells per direction (`num_stcls_min * weno_order`).

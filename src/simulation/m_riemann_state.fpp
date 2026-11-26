@@ -822,11 +822,12 @@ contains
         real(wp) :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
         real(wp), dimension(2) :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
+        real(wp) :: alpha_sum
         integer :: fl
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
                             & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const, &
-                            & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
+                            & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, alpha_sum, fl]')
         do l = iz%beg, iz%end
             do k = iy%beg, iy%end
                 do j = ix%beg, ix%end
@@ -877,11 +878,16 @@ contains
                             end if
                         #:endif
                         gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                        alpha_sum = 0._wp
                         do fl = 1, num_fluids
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, &
                                       & l) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
+                            ! Alphas over/undershoot near interfaces: clamp to [0, 1]; rescale a sum above 1 (3+ fluids)
                             alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
+                            alpha_sum = alpha_sum + alpha_avg(fl)
+                        end do
+                        do fl = 1, num_fluids
+                            alpha_avg(fl) = alpha_avg(fl)/max(alpha_sum, 1._wp)
                         end do
                         call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if
@@ -1035,11 +1041,12 @@ contains
         real(wp)                        :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
         real(wp), dimension(2)          :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
+        real(wp)                        :: alpha_sum
         integer                         :: fl
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
                             & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx, gamma_dot, D_xx, D_yy, &
-                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
+                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, alpha_sum, fl]')
         do l_loop = isz%beg, isz%end
             do k_loop = isy%beg, isy%end
                 do j_loop = isx%beg, isx%end
@@ -1086,12 +1093,17 @@ contains
                             end if
                         #:endif
                         gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                        alpha_sum = 0._wp
                         do fl = 1, num_fluids
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, &
                                       & l_loop) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_right_phys(1), idx_right_phys(2), &
                                       & idx_right_phys(3)))
-                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
+                            ! Alphas over/undershoot near interfaces: clamp to [0, 1]; rescale a sum above 1 (3+ fluids)
                             alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
+                            alpha_sum = alpha_sum + alpha_avg(fl)
+                        end do
+                        do fl = 1, num_fluids
+                            alpha_avg(fl) = alpha_avg(fl)/max(alpha_sum, 1._wp)
                         end do
                         call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if

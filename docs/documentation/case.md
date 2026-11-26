@@ -356,6 +356,7 @@ These physical parameters must be consistent with fluid material's parameters de
 
 Initial conditions in which not all patches support the `patch_icpp(j)%%smoothen` parameter can still be smoothed by applying iterations of the heat equation to the initial condition.
 This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothing_iters': N,`` to the case dictionary, where `N` is the number of smoothing iterations to apply.
+With `igr`, an initial condition with a sharp jump (a shock tube) needs it: a Sod tube without smoothing gives NaN within 10 steps.
 
 ### 4. Immersed Boundary Patches {#sec-immersed-boundary-patches}
 
@@ -672,7 +673,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD (default F) |
 | `ADC_kappa`                | Real    | ADC sensor scaling parameter (default 1.0) |
 | `hypo_hll_interface_rhs`   | Logical | HLL uses interface-consistent hypo RHS (default F) |
-| `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 |
+| `igr`                      | Logical | Enable solution via information geometric regularization (IGR) \cite Cao24 (2D and 3D only) |
 | `igr_order`                | Integer | Order of reconstruction for IGR [3,5] |
 | `alf_factor`               | Real    | Alpha factor for IGR entropic pressure (default 10) |
 | `igr_pres_lim`             | Logical | Limit IGR pressure to avoid negative values (default F) |
@@ -1701,7 +1702,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 
 This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on \cite Pirozzoli13. This enables to provide inflow and outflow conditions outside the computational domain.
 
-`bc_[x,y,z]%%vel_in_ramp` starts the inflow smoothly instead of holding it constant, which is what a jet or a tunnel accelerating from rest requires: the start-up is the event of interest, not a transient to be discarded. The inflow velocity is scaled by \f$f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2\f$, with \f$\tau\f$ = `vel_in_ramp`, \f$t_0\f$ = `vel_in_t0` and \f$f_0\f$ = `vel_in_frac0`, so it leaves \f$f_0\f$ of the final velocity at \f$t_0\f$ and is within half a percent of it at \f$t_0 + \tau\f$. A boundary with `vel_in_ramp = 0` is held constant, as before. The ramp acts on a GRCBC inflow (`grcbc_in`) or on the ghost-cell velocity of a Dirichlet (-17) boundary or boundary patch normal to that direction, such as a nozzle set into a wall.
+`bc_[x,y,z]%%vel_in_ramp` starts the inflow smoothly instead of holding it constant, which is what a jet or a tunnel accelerating from rest requires: the start-up is the event of interest, not a transient to be discarded. The inflow velocity is scaled by \f$f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2\f$, with \f$\tau\f$ = `vel_in_ramp`, \f$t_0\f$ = `vel_in_t0` and \f$f_0\f$ = `vel_in_frac0`, so it leaves \f$\approx f_0\f$ of the final velocity at \f$t_0\f$ and is within half a percent of it at \f$t_0 + \tau\f$. A boundary with `vel_in_ramp = 0` is held constant, as before. The ramp acts on a GRCBC inflow (`grcbc_in`) or on the ghost-cell velocity of a Dirichlet (-17) boundary or boundary patch normal to that direction, such as a nozzle set into a wall.
 
 ### Patch types {#patch-types}
 

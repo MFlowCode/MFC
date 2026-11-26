@@ -497,7 +497,7 @@ contains
         if (file_exist) call s_delete_directory(trim(t_step_dir))
         call s_create_directory(trim(t_step_dir))
         ! Serial readers (post_process, restart) need bc_type.dat and bc_buffers.dat in every step directory, not just step 0.
-        if (bc_io) call s_write_serial_boundary_condition_files(bc_type, t_step_dir, .false.)
+        if (bc_io) call s_write_serial_boundary_condition_files(bc_type, t_step_dir)
 
         file_path = trim(t_step_dir) // '/x_cb.dat'
 

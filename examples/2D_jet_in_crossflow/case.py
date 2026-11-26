@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import json
 import math
 
@@ -62,7 +63,7 @@ print(
             "elliptic_smoothing": "T",
             "elliptic_smoothing_iters": 10,  # 50,
             "bc_x%beg": -17,
-            "bc_x%end": -12,
+            "bc_x%end": -3,
             "bc_y%beg": -17,
             "bc_y%end": -3,
             "num_bc_patches": 0,

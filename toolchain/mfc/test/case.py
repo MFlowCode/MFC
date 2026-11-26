@@ -11,7 +11,7 @@ import sys
 from typing import Callable, List, Optional, Set, Union
 
 from .. import case, common
-from ..build import SIMULATION, MFCTarget, get_target
+from ..build import PRE_PROCESS, SIMULATION, MFCTarget, get_target
 from ..run import input
 from ..state import ARG, CFG
 
@@ -168,11 +168,12 @@ class TestCase(case.Case):
     ppn: int
     trace: str
     override_tol: Optional[float] = None
-    restart_check: bool = False
+    restart_check: Union[bool, str] = False  # "old_ic": the restart goes through pre_process
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
     honor_io_keys: bool = False
+    override_tol_single: Optional[float] = None
 
     def __init__(
         self,
@@ -180,15 +181,17 @@ class TestCase(case.Case):
         mods: dict,
         ppn: int = None,
         override_tol: float = None,
-        restart_check: bool = False,
+        restart_check: Union[bool, str] = False,
         kind: str = "golden",
         convergence_spec: Optional[dict] = None,
         canary: bool = False,
         honor_io_keys: bool = False,
+        override_tol_single: float = None,
     ) -> None:
         self.trace = trace
         self.ppn = ppn or 1
         self.override_tol = override_tol
+        self.override_tol_single = override_tol_single
         self.honor_io_keys = honor_io_keys
         self.restart_check = restart_check
         self.kind = kind
@@ -206,7 +209,7 @@ class TestCase(case.Case):
 
         filepath = f"{self.get_dirpath()}/case.py"
         tasks = ["-n", str(self.ppn)]
-        jobs = ["-j", str(ARG("jobs"))] if ARG("case_optimization") else []
+        jobs = ["-j", str(ARG("jobs"))] if ARG("case_optimization") and ARG("jobs") else []
         case_optimization = ["--case-optimization"] if ARG("case_optimization") else []
 
         if self.params.get("bubbles_lagrange", "F") == "T":
@@ -257,6 +260,9 @@ class TestCase(case.Case):
             dirpath = self.get_dirpath()
             common.delete_directory(os.path.join(dirpath, "silo_hdf5"))
 
+            if self.restart_check == "old_ic":
+                return self._restart_through_pre_process(orig, mid_step, gpus, env)
+
             # Phase 2: Restart simulation from midpoint.  Only the simulation
             # is run — it reads grid + IC directly from p_all/p0/<mid_step>/.
             self.params = {**orig, "t_step_start": mid_step, "t_step_save": orig["t_step_stop"] - mid_step}
@@ -289,6 +295,32 @@ class TestCase(case.Case):
                 self.create_directory()
             except Exception as exc:
                 print(f"Warning: failed to restore test directory: {exc}")
+
+    def _restart_through_pre_process(self, orig, mid_step, gpus, env):
+        """Phase 2 of a serial-I/O restart through pre_process (old_ic): pre_process reads p_all/p0/<mid_step>/ and writes it
+        back as step 0, and simulation runs the remaining steps from 0. Its last save is renamed to t_step_stop, so D/ holds the
+        straight run's steps 0 and t_step_stop. Needs a constant dt and no explicit time dependence (the clock restarts at 0)."""
+        dirpath = self.get_dirpath()
+        d_dir, keep = os.path.join(dirpath, "D"), os.path.join(dirpath, "D_straight")
+        rest = orig["t_step_stop"] - mid_step
+        common.delete_directory(keep)  # left by an interrupted run
+        os.rename(d_dir, keep)
+        no_patches = {k: v for k, v in orig.items() if not k.startswith("patch_icpp")}
+        self.params = {**no_patches, "old_grid": "T", "old_ic": "T", "num_patches": 0, "t_step_start": mid_step, "t_step_old": mid_step}
+        self.create_directory()
+        result = self.run([PRE_PROCESS], gpus, env=env)
+        if result.returncode == 0:
+            self.params = {**orig, "t_step_start": 0, "t_step_stop": rest, "t_step_save": rest}
+            self.create_directory()
+            result = self.run([SIMULATION], gpus, env=env)
+        if result.returncode == 0:
+            for f in glob.glob(os.path.join(keep, f"*.{mid_step:06d}.dat")):
+                common.delete_file(f)
+            for f in glob.glob(os.path.join(d_dir, f"*.{rest:06d}.dat")):
+                os.replace(f, os.path.join(keep, os.path.basename(f).replace(f".{rest:06d}.", f".{orig['t_step_stop']:06d}.")))
+        common.delete_directory(d_dir)
+        os.rename(keep, d_dir)
+        return result
 
     def run_cfl_restarts(self, targets, gpus, env: dict = None):
         """CFL mode: restart from each interior save index and check that the
@@ -440,8 +472,9 @@ print(json.dumps({{**case, **mods}}))
     def compute_tolerance(self) -> float:
         single = ARG("single")
         if self.override_tol:
-            # an override tightens the double comparison; single precision cannot honor one below its default floor
-            return max(self.override_tol, 1e8 * 1e-12) if single else self.override_tol
+            # an override tightens the double comparison; single precision cannot honor one below its default floor, and
+            # override_tol_single sets the single comparison where single round-off is measured to exceed that floor
+            return max(self.override_tol_single or self.override_tol, 1e8 * 1e-12) if single else self.override_tol
 
         tolerance = 1e-12  # Default
 
@@ -486,11 +519,12 @@ class TestCaseBuilder:
     ppn: int
     functor: Optional[Callable]
     override_tol: Optional[float] = None
-    restart_check: bool = False
+    restart_check: Union[bool, str] = False
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
     honor_io_keys: bool = False
+    override_tol_single: Optional[float] = None
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -523,7 +557,17 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, kind=self.kind, canary=self.canary, honor_io_keys=self.honor_io_keys)
+        return TestCase(
+            self.trace,
+            dictionary,
+            self.ppn,
+            self.override_tol,
+            self.restart_check,
+            kind=self.kind,
+            canary=self.canary,
+            honor_io_keys=self.honor_io_keys,
+            override_tol_single=self.override_tol_single,
+        )
 
 
 @dataclasses.dataclass
@@ -546,9 +590,17 @@ class CaseGeneratorStack:
 
 
 def define_case_f(
-    trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False
+    trace: str,
+    path: str,
+    args: List[str] = None,
+    ppn: int = None,
+    mods: dict = None,
+    functor: Callable = None,
+    override_tol: float = None,
+    restart_check: Union[bool, str] = False,
+    override_tol_single: float = None,
 ) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol, restart_check)
+    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol, restart_check, override_tol_single=override_tol_single)
 
 
 def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCaseBuilder:
@@ -567,9 +619,10 @@ def define_case_d(
     ppn: int = None,
     functor: Callable = None,
     override_tol: float = None,
-    restart_check: bool = False,
+    restart_check: Union[bool, str] = False,
     honor_io_keys: bool = False,
     kind: str = "golden",
+    override_tol_single: float = None,
 ) -> TestCaseBuilder:
     mods: dict = {}
 
@@ -586,7 +639,7 @@ def define_case_d(
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, kind=kind, honor_io_keys=honor_io_keys)
+    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, kind=kind, honor_io_keys=honor_io_keys, override_tol_single=override_tol_single)
 
 
 def input_bubbles_lagrange(self):

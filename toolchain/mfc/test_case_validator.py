@@ -325,7 +325,10 @@ class TestChemistrySubstepping(ConstraintTestCase):
         self.assertAccepts(params)
 
     def test_accepts_igr_without_substepping(self):
-        self.assertAccepts({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0})
+        self.assertAccepts({**CHEMISTRY, **BASE_2D, "igr": "T", "chem_params%reaction_substeps": 0})
+
+    def test_rejects_igr_in_1d(self):
+        self.assertRejects({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0}, "igr requires a 2D or 3D case")
 
 
 class TestChemistryTransportDt(ConstraintTestCase):

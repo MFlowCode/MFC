@@ -61,23 +61,15 @@ contains
     end subroutine s_create_mpi_types
 
     !> Write bc type and bc_buffers to serial restart files (pre_process packs them first; simulation writes the startup values).
-    subroutine s_write_serial_boundary_condition_files(bc_type, step_dirpath, old_grid_in)
+    subroutine s_write_serial_boundary_condition_files(bc_type, step_dirpath)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        logical, intent(in)                                        :: old_grid_in
         character(LEN=*), intent(in)                               :: step_dirpath
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_path
-        character(len=10)                                          :: status
-
-        if (old_grid_in) then
-            status = 'old'
-        else
-            status = 'new'
-        end if
 
         file_path = trim(step_dirpath) // '/bc_type.dat'
-        open (1, FILE=trim(file_path), form='unformatted', STATUS=status)
+        open (1, FILE=trim(file_path), form='unformatted', STATUS='replace')
         do dir = 1, num_dims
             do loc = 1, 2
                 write (1) bc_type(dir, loc)%sf
@@ -86,7 +78,7 @@ contains
         close (1)
 
         file_path = trim(step_dirpath) // '/bc_buffers.dat'
-        open (1, FILE=trim(file_path), form='unformatted', STATUS=status)
+        open (1, FILE=trim(file_path), form='unformatted', STATUS='replace')
         do dir = 1, num_dims
             do loc = 1, 2
                 write (1) bc_buffers(dir, loc)%sf

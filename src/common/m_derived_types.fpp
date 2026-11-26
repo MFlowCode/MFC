@@ -113,8 +113,8 @@ module m_derived_types
         real(wp), dimension(num_fluids_max) :: alpha_rho_in, alpha_in
         logical                             :: grcbc_in, grcbc_out, grcbc_vel_out
         !> Smooth start-up of a GRCBC inflow: the inflow velocity is scaled by f(t) = vel_in_frac0 + (1 - vel_in_frac0) (1 + tanh(6
-        !! (t - t0)/tau - 3))/2, so it leaves vel_in_frac0 of its final value at t0 and reaches it after vel_in_ramp. Inactive when
-        !! the ramp duration is zero.
+        !! (t - t0)/tau - 3))/2, so f(t0) ~ vel_in_frac0 and f(t0 + tau) ~ 1 (within 0.25%). Inactive when the ramp duration is
+        !! zero.
         real(wp) :: vel_in_ramp, vel_in_t0, vel_in_frac0
         logical  :: isothermal_in, isothermal_out
         real(wp) :: Twall_in, Twall_out

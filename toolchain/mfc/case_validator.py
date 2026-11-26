@@ -288,7 +288,7 @@ PHYSICS_DOCS = {
     "check_igr": {
         "title": "Iterative Generalized Riemann (IGR)",
         "category": "Feature Compatibility",
-        "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
+        "explanation": ("Requires model_eqns = 2 and a 2D or 3D case. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
     "check_non_newtonian": {
         "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
@@ -603,6 +603,8 @@ class CaseValidator:
 
         if not igr:
             return
+
+        self.prohibit(self.get("n", 0) == 0, "igr requires a 2D or 3D case (n > 0); m_igr has no 1D path")
 
         # m_igr.fpp discards qv (qv_igr), so a nonzero value would be silently dropped from
         # the pressure rather than applied.
@@ -1386,7 +1388,7 @@ class CaseValidator:
         args = []
         for suffix in family.coefficients_args:
             value = self.get(f"fluid_pp({i})%{family.prefix}_{suffix}")
-            args.append((value or 0.0) if suffix in optional else value)
+            args.append(0.0 if value is None and suffix in optional else value)
         return args
 
     def _check_initial_states_inside_eos(self, num_fluids):
@@ -1972,10 +1974,8 @@ class CaseValidator:
         # m_time_steppers.fpp but deallocated unconditionally, so heat_conduction + igr would
         # deallocate an unallocated field.
         self.prohibit(heat_conduction and igr, "heat conduction is not supported with igr")
-        # Load-bearing, not cosmetic: with chemistry, m_rhs.fpp allocates the energy flux_src slot
-        # under chemistry and chem_params%diffusion and not viscous, which conduction also allocates
-        # when heat_conduction is on -- the combination double-allocates and aborts in the allocator.
-        # Chemistry also carries its own mixture-averaged conduction, so the physics would double-count.
+        # Chemistry carries its own mixture-averaged conduction (chem_params%diffusion), so adding
+        # Fourier conduction would double-count the heat flux.
         self.prohibit(
             heat_conduction and chemistry,
             "heat conduction is not supported with chemistry: the reacting path already carries mixture-averaged conduction through chem_params%diffusion",
@@ -2703,10 +2703,10 @@ class CaseValidator:
                 # dir_idx, which is (2,1,3) for a y inflow and (3,1,2) for z -- so requiring only
                 # component 1 would leave the normal velocity of a y or z inflow unchecked.
                 num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
-                missing = [n for n in (f"bc_{dir}%pres_in",) if self.get(n) is None]
-                missing += [f"bc_{dir}%vel_in({d})" for d in range(1, num_dims + 1) if self.get(f"bc_{dir}%vel_in({d})") is None]
-                missing += [f"bc_{dir}%alpha_rho_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_rho_in({i})") is None]
-                missing += [f"bc_{dir}%alpha_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_in({i})") is None]
+                required = [f"bc_{dir}%pres_in"]
+                required += [f"bc_{dir}%vel_in({d})" for d in range(1, num_dims + 1)]
+                required += [f"bc_{dir}%{name}({i})" for name in ("alpha_rho_in", "alpha_in") for i in range(1, num_fluids + 1)]
+                missing = [name for name in required if self.get(name) is None]
                 self.prohibit(len(missing) > 0, f"Subsonic Inflow (grcbc_in) needs the full inflow state; missing {', '.join(missing)}")
             if grcbc_out:
                 # Check if EITHER beg OR end is set to -8

@@ -10,5 +10,4 @@ energy, against the exact solution:
     ./mfc.sh run examples/2D_TaylorGreenVortex/case.py -t pre_process simulation -n 1 -- -N 64
     python3 examples/2D_TaylorGreenVortex/check_tgv.py <run N=32> <run N=64> [--tol 1e-4]
 
-The rate error is 7e-7 at 32 cells and 1e-10 at 128. Results and limits (the initial pressure of the patch is a quarter of the
-exact one, #2465): @ref validation_vortex_order.
+The rate error is 7e-7 at 32 cells and 1e-10 at 128. Results and limits: @ref validation_vortex_order.

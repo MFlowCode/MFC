@@ -21,6 +21,12 @@ from .run import input
 from .state import ARG, CFG, gpuConfigOptions
 from .thermochem.fingerprint import generator_fingerprint, mechanism_fingerprint, surface_fingerprint
 
+
+def build_jobs() -> int:
+    """Parallel build jobs: -j if given, else min(core count, 16) so an unset -j does not compile serially."""
+    return ARG("jobs") or min(os.cpu_count() or 1, 16)
+
+
 # Regex to parse build progress
 # Ninja format: [42/156] Building Fortran object ...
 _NINJA_PROGRESS_RE = re.compile(r"^\[(\d+)/(\d+)\]\s+(.*)$")
@@ -473,6 +479,7 @@ class MFCTarget:
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
             f"-DMFC_SINGLE_PRECISION={'ON' if (ARG('single') or ARG('mixed')) else 'OFF'}",
             f"-DMFC_MIXED_PRECISION={'ON' if ARG('mixed') else 'OFF'}",
+            # -flto-partitions of the amdflang offload link (cmake/MFCTargets.cmake) follows -j as given, not the default job count
             f"-DMFC_BUILD_JOBS={ARG('jobs')}",
         ]
 
@@ -533,7 +540,7 @@ class MFCTarget:
             "--target",
             self.name,
             "--parallel",
-            ARG("jobs"),
+            build_jobs(),
             "--config",
             "Debug" if ARG("debug") else "RelDebug" if ARG("reldebug") else "Release",
         ]
@@ -543,7 +550,7 @@ class MFCTarget:
         if verbosity >= 2:
             command.append("--verbose")
 
-        debug(f"Building {self.name} with {ARG('jobs')} parallel jobs")
+        cons.print(f"  [dim]Building {self.name} with -j {build_jobs()}[/dim]")
         debug(f"Build command: {' '.join(str(c) for c in command)}")
 
         if verbosity >= 2:
