@@ -101,9 +101,9 @@ module m_ibm
     !> Quadratic wall-normal fill of one ghost point (ib_wall_order = 2): TSC stencils of two probes along the surface normal and
     !! the Lagrange weights that carry the profile through them back to the ghost (see s_wall_fill).
     type :: wall_fill
-        integer                   :: tier  !< 1 quadratic, 2 linear mirror (the outer probe lacks fluid), 3 the wall value (no quadratic fill)
-        real(wp), dimension(3)    :: lw  !< Lagrange weights on (phi_w, phi_1, phi_2)
-        real(wp), dimension(2)    :: llin  !< Linear mirror on (phi_w, phi_1), which bounds the quadratic
+        integer                   :: tier      !< 1 quadratic, 2 linear mirror (the outer probe lacks fluid), 3 the wall value
+        real(wp), dimension(3)    :: lw        !< Lagrange weights on (phi_w, phi_1, phi_2)
+        real(wp), dimension(2)    :: llin      !< Linear mirror on (phi_w, phi_1), which bounds the quadratic
         integer, dimension(3)     :: ic1, ic2  !< TSC stencil centres of the probes
         real(wp), dimension(3, 3) :: wd1, wd2  !< TSC weights of the probes
     end type wall_fill
