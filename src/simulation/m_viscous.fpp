@@ -27,9 +27,9 @@ module m_viscous
     use m_constants, only: model_eqns_5eq, recon_type_weno, recon_type_muscl
     use m_hb_function
 
-    private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
-        & s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, s_compact_normal_viscous_gradients, &
-        & s_finalize_viscous_module, Res_viscous
+    private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_compute_axisym_viscous_hoop, &
+        & s_initialize_viscous_module, s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, &
+        & s_compact_normal_viscous_gradients, s_finalize_viscous_module, Res_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -343,6 +343,59 @@ contains
         #:endif
 
     end subroutine s_compute_viscous_stress_cylindrical_boundary
+
+    !> 2D axisymmetric hoop stress: adds -tau_theta_theta/r to the radial momentum at every cell, with tau_theta_theta = 2 mu u_r/r
+    !! + (mu_b - 2 mu/3) div(u) from cell-centred gradients (3D takes it from theta faces)
+    subroutine s_compute_axisym_viscous_hoop(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(num_dims), intent(in)    :: grad_x_vf, grad_y_vf, grad_z_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        real(wp)                                               :: alpha_visc_sum, ur_r, div_v, tau_tt
+        real(wp), dimension(2)                                 :: Re_visc
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_visc
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_visc
+        #:endif
+        integer :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_visc_sum, alpha_visc, Re_visc, ur_r, div_v, tau_tt]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        if (bubbles_euler .and. num_fluids == 1) then
+                            alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
+                        else
+                            alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
+                        end if
+                    end do
+                    if (mpp_lim) then
+                        alpha_visc_sum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                            alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
+                        end do
+                        alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
+                    end if
+                    call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
+
+                    ur_r = q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y_cc(k)
+                    div_v = grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, l) + ur_r
+                    tau_tt = 0._wp
+                    if (shear_stress) tau_tt = (2._wp*ur_r - (2._wp/3._wp)*div_v)/Re_visc(1)
+                    if (bulk_stress) tau_tt = tau_tt + div_v/Re_visc(2)
+                    rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - tau_tt/y_cc(k)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_axisym_viscous_hoop
 
     !> Computes viscous terms
     subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, &

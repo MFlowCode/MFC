@@ -1064,6 +1064,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
+        # Axial and radial flow: u_r/r in div u and the hoop stress -tau_thth/r (#1910)
+        radial = {f"patch_icpp({i})%vel({d})": v for i, uv in enumerate([(0.03, 0.05), (-0.02, 0.1), (0.04, 0.08)], 1) for d, v in enumerate(uv, 1)}
+        cases.append(define_case_d(stack, "Radial", {**radial, "weno_Re_flux": "F"}))
         for weno_Re_flux in ["T"]:
             stack.push("weno_Re_flux" if weno_Re_flux == "T" else "", {"weno_Re_flux": "T"})
             cases.append(define_case_d(stack, "weno_avg", {"weno_avg": "T"}))
@@ -1195,6 +1198,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-10, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
+        # Swirl with an off-centre theta wedge: covers the (1/r) theta divergence and the hoop stresses (#1910)
+        swirl = {f"patch_icpp({i})%vel(3)": 0.1 for i in range(1, 4)}
+        wedge = {**theta_wedge, **swirl, "patch_icpp(4)%z_centroid": 0.13, "patch_icpp(4)%vel(2)": 0.05}
+        cases.append(define_case_d(stack, "Azimuthal", {**wedge, "weno_Re_flux": "F"}))
         for weno_Re_flux in ["T"]:
             stack.push("weno_Re_flux" if weno_Re_flux == "T" else "", {"weno_Re_flux": "T"})
             cases.append(define_case_d(stack, "weno_avg", {"weno_avg": "T"}))
@@ -4052,6 +4059,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_axisym_conduction_convergence",
                 "2D_jet_in_crossflow",  # analytic tanh inflow profile
                 "3D_cyl_azimuthal_conduction_convergence",
+                # Its initial state is written by run_mms.py between pre_process and simulation. Regression cover: 3D -> Cylindrical ->
+                # Viscous -> Azimuthal (3D), 2D -> Axisymmetric -> Viscous -> Radial (2D), and the Cylindrical Species Diffusion cases
+                "3D_cyl_viscous_mms",
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",
@@ -4635,6 +4645,91 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
 
+        stack.pop()
+
+        # Cylindrical species diffusion (#1910): the radial geometric term and the axis cell (2D axisymmetric), the theta face gradient
+        # and divergence (3D), both transport models. An H2-rich block off the axis, at rest; in 3D the cuboid (Cartesian test
+        # coordinates) covers an off-centre (r, theta) wedge.
+        cyl_chem = {
+            "num_patches": 2,
+            "num_fluids": 1,
+            "dt": 2.0e-9,
+            "t_step_start": 0,
+            "t_step_stop": 20,
+            "t_step_save": 20,
+            "cyl_coord": "T",
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0e-3,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0e-3,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%end": -3,
+            "weno_order": 5,
+            "weno_eps": 1e-16,
+            "mapped_weno": "T",
+            "riemann_solver": 2,
+            "wave_speeds": 1,
+            "avg_state": 2,
+            "time_stepper": 3,
+            "chemistry": "T",
+            "chem_params%diffusion": "T",
+            "chem_params%reactions": "F",
+            "cantera_file": "h2o2.yaml",
+            "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+            "fluid_pp(1)%eos": "ideal_gas",
+            **{f"patch_icpp({i})%{q}": v for i in (1, 2) for q, v in (("pres", 101325.0), ("alpha(1)", 1.0), ("vel(1)", 0.0), ("vel(2)", 0.0))},
+            "patch_icpp(1)%alpha_rho(1)": 1.0,
+            "patch_icpp(1)%Y(1)": 0.02,
+            "patch_icpp(1)%Y(4)": 0.22,
+            "patch_icpp(1)%Y(10)": 0.76,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%alpha_rho(1)": 0.9,
+            "patch_icpp(2)%Y(1)": 0.05,
+            "patch_icpp(2)%Y(4)": 0.22,
+            "patch_icpp(2)%Y(10)": 0.73,
+            "patch_icpp(2)%x_centroid": 0.47e-3,
+            "patch_icpp(2)%length_x": 0.5e-3,
+            "patch_icpp(2)%y_centroid": 0.37e-3,
+            "patch_icpp(2)%length_y": 0.4e-3,
+        }
+        cyl_2d = {
+            "m": 24,
+            "n": 24,
+            "p": 0,
+            "bc_y%beg": -2,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5e-3,
+            "patch_icpp(1)%y_centroid": 0.5e-3,
+            "patch_icpp(1)%length_x": 1.0e-3,
+            "patch_icpp(1)%length_y": 1.0e-3,
+            "patch_icpp(2)%geometry": 3,
+        }
+        cyl_3d = {
+            "m": 25,
+            "n": 25,
+            "p": 25,
+            "bc_y%beg": -14,
+            "bc_z%beg": -1,
+            "bc_z%end": -1,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 2.0 * 3.141592653589793,
+            "patch_icpp(1)%geometry": 10,
+            "patch_icpp(1)%x_centroid": 0.5e-3,
+            "patch_icpp(1)%y_centroid": 0.0,
+            "patch_icpp(1)%z_centroid": 0.0,
+            "patch_icpp(1)%length_x": 1.0e-3,
+            "patch_icpp(1)%radius": 2.0e-3,
+            "patch_icpp(1)%vel(3)": 0.0,
+            "patch_icpp(2)%vel(3)": 0.0,
+            "patch_icpp(2)%geometry": 9,
+            "patch_icpp(2)%z_centroid": 0.13e-3,
+            "patch_icpp(2)%length_z": 0.5e-3,
+        }
+        stack.push("Cylindrical Species Diffusion", cyl_chem)
+        cases.append(define_case_d(stack, "2D Axisymmetric", cyl_2d, override_tol=10 ** (-10)))
+        cases.append(define_case_d(stack, "3D Cylindrical", cyl_3d, override_tol=10 ** (-10)))
+        cases.append(define_case_d(stack, "3D Cylindrical -> Unity Lewis", {**cyl_3d, "chem_params%transport_model": 2}, override_tol=10 ** (-10)))
         stack.pop()
 
     foreach_dimension()

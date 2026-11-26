@@ -274,18 +274,17 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-        & dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dz_vf, q_prim_vf, norm_dir)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
              & dvelR_dy_vf, dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: norm_dir
-        type(int_bounds_info), intent(in)                   :: ix, iy, iz
 
-        if (grid_geometry == 3) then
+        if (cyl_coord) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-                & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
+                & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
                 & dvelR_dz_vf, q_prim_vf, norm_dir)
@@ -780,7 +779,7 @@ contains
 
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-        & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir)
 
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
@@ -788,7 +787,6 @@ contains
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: norm_dir
-        type(int_bounds_info), intent(in)                   :: ix, iy, iz
 
         ! Local variables
 
@@ -828,9 +826,11 @@ contains
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
                             & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const, &
                             & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, alpha_sum, fl]')
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
+        ! Bounds from isx/isy/isz (device-updated in s_populate_riemann_states_variables_buffers): the caller's bounds are
+        ! not current on the device
+        do l = isz%beg, isz%end
+            do k = isy%beg, isy%end
+                do j = isx%beg, isx%end
                     ! Determine indices for the 'right' state for averaging across the interface
                     idx_rp = [j, k, l]
                     idx_rp(norm_dir) = idx_rp(norm_dir) + 1
@@ -902,7 +902,7 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     case (2)  ! y-face (radial face in r_cyl direction)
                         if (any_non_newtonian) then
@@ -912,7 +912,7 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cb(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         if (any_non_newtonian) then
@@ -922,9 +922,12 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     end select
+                    ! The axis face (r = 0) flux is unused (the axis cell takes the cell-centred stress); a unit radius keeps its
+                    ! divisions finite under FP traps
+                    if (r_eff <= 0._wp) r_eff = 1._wp
 
                     ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 1

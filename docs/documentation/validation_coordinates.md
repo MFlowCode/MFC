@@ -1,8 +1,8 @@
-@page validation_coordinates Validation: Axisymmetric Focusing and Stretched Grids
+@page validation_coordinates Validation: Cylindrical Coordinates and Stretched Grids
 
-# Coordinates and grids: axisymmetric focusing and a stretched 1D grid
+# Coordinates and grids: axisymmetric focusing, the cylindrical viscous operator and a stretched 1D grid
 
-**Status:** partially validated. The focal pressure of an axisymmetric transducer converges to the exact on-axis solution (−0.4 % at the finest grid) and arrives on time (shift 0.01 \f$\Delta t\f$), but 4 % of the waveform differs in its tails. On a stretched grid the 1D pulse is as accurate as on the uniform grid. **Code:** `master` at 3e4c53258 with the stage-time fix of [#2462](https://github.com/MFlowCode/MFC/issues/2462). **Examples:** `examples/2D_acoustic_support6_axisym`, `examples/1D_acoustic_gauss_sigmatime`. See also @ref validation and @ref validation_acoustics.
+**Status:** partially validated. The focal pressure of an axisymmetric transducer converges to the exact on-axis solution (−0.4 % at the finest grid) and arrives on time (shift 0.01 \f$\Delta t\f$), but 4 % of the waveform differs in its tails. On a stretched grid the 1D pulse is as accurate as on the uniform grid. **Code:** `master` at 3e4c53258 with the stage-time fix of [#2462](https://github.com/MFlowCode/MFC/issues/2462). The viscous operator in 3D cylindrical and 2D axisymmetric coordinates converges at second order to manufactured solutions ([#1910](https://github.com/MFlowCode/MFC/issues/1910)). **Examples:** `examples/2D_acoustic_support6_axisym`, `examples/3D_cyl_viscous_mms`, `examples/1D_acoustic_gauss_sigmatime`. See also @ref validation and @ref validation_acoustics.
 
 ## Axisymmetric focused transducer {#sec-validation-coordinates-focus}
 
@@ -29,6 +29,33 @@ The focal signal arrives on time: the shift falls from −0.14 to −0.01 \f$\De
 
 Limits: one transducer geometry and one probe point on the axis; the off-axis field, the element arrays (`support = 9, 10`) and the 3D transducers are not compared.
 
+## Cylindrical viscous operator {#sec-validation-coordinates-viscous}
+
+| Item | Value |
+| :--- | :--- |
+| Equations | \f$\mathbf{f} = \nabla\cdot\boldsymbol{\tau}\f$ and \f$W = \nabla\cdot(\boldsymbol{\tau}\cdot\mathbf{u})\f$ with \f$\boldsymbol{\tau} = \mu(\nabla\mathbf{u} + \nabla\mathbf{u}^T) + (\mu_b - 2\mu/3)(\nabla\cdot\mathbf{u})\mathbf{I}\f$ in (x, r, \f$\theta\f$): \f$f_r\f$ carries \f$-\tau_{\theta\theta}/r\f$, \f$f_\theta\f$ carries \f$+\tau_{r\theta}/r\f$, every \f$\theta\f$ derivative carries \f$1/r\f$ |
+| Geometry | r in [0, 2] with the axis (`bc_y%%beg = -14` in 3D, `-2` in 2D), \f$\theta\f$ periodic, x periodic with 26 cells; fields independent of x |
+| Fields | (a) \f$u_x = A(r/R)^2\cos\theta\f$ (exact \f$f_x = 3\mu A\cos\theta/R^2\f$ at every r); (b) Taylor-Couette \f$u_\theta = A(r + 0.5/r)\f$ (exact \f$\mathbf{f} = 0\f$, rings with r \f$\ge\f$ 0.5); (c) \f$u_x = Ar^3\cos\theta\f$, \f$u_r = Ar^2\cos\theta\f$, \f$u_\theta = A(r^3 - r^2\sin\theta)\f$ with bulk viscosity; (d) 2D axisymmetric \f$u_x = A(r/R)^2\f$, \f$u_r = A(r/R)^3\f$ with bulk viscosity. \f$\mu\f$ = \f$\mu_b\f$ = 1, A = 0.1, \f$\rho\f$ = p = 1 |
+| Measured | `run_mms.py`: one RK3 step, \f$\Delta t\f$ = 1e-8, rate = (q with viscosity - q without)/\f$\Delta t\f$ (the inviscid terms cancel) against the exact rates of `derive_rates.py` (sympy) at the cell centres; max norm over the rings away from the axis and the outer boundary, relative to the largest exact momentum rate (energy: the largest exact \f$W\f$; (b): the largest error before the fix) |
+
+![Max-norm error of the viscous rate against N, before (dashed) and after (solid) the fix of #1910](../res/validation_cyl_viscous.png)
+
+| Case, component | N = 32 | 64 | 128 | 256 | order | before the fix (N = 128) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| (a) \f$\rho u_x\f$ | 1.07e-3 | 2.68e-4 | 6.70e-5 | | 2.0 | 0.289 |
+| (a) \f$\rho E\f$ | 1.20e-3 | 2.95e-4 | 7.41e-5 | | 2.0 | 0.124 |
+| (b) \f$\rho u_\theta\f$ | 1.50e-2 | 3.81e-3 | 9.63e-4 | | 2.0 | 1.00 |
+| (c) \f$\rho u_x\f$ | 8.84e-4 | 3.27e-4 | 8.63e-5 | | 1.9 | 0.075 |
+| (c) \f$\rho u_r\f$ | 1.32e-3 | 3.23e-4 | 8.05e-5 | | 2.0 | 0.107 |
+| (c) \f$\rho u_\theta\f$ | 2.79e-3 | 7.94e-4 | 2.03e-4 | | 2.0 | 0.257 |
+| (c) \f$\rho E\f$ | 1.24e-3 | 2.93e-4 | 7.30e-5 | | 2.0 | 0.078 |
+| (d) \f$\rho u_r\f$ | 1.49e-3 | 5.30e-4 | 1.31e-4 | 3.27e-5 | 2.0 | 0.125 |
+| (d) \f$\rho E\f$ | 8.19e-4 | 1.86e-4 | 4.60e-5 | 1.18e-5 | 2.0 | 0.038 |
+
+GNU 13.3 on the CPU, one rank; order from the last two grids. On an NVIDIA Quadro RTX 6000 (NVHPC 25.11, OpenACC, N = 32 and 64) every entry reproduces the CPU error to three digits. Before the fix, 3D lacked the \f$1/r\f$ of the \f$\theta\f$ divergence and of both hoop terms, and 2D used the Cartesian (x, r) stress (no \f$u_r/r\f$ in \f$\nabla\cdot\mathbf{u}\f$, no \f$-\tau_{\theta\theta}/r\f$). The errors then stay O(1) and the measured rates match those of the defective operator (`MASTER` in `exact_rates.py`) to within the errors in the table: the issue's case gives \f$(4 - r)\,\mu A\cos\theta/R^2\f$ instead of \f$3\,\mu A\cos\theta/R^2\f$. Species diffusion uses the same metric (`--case S2`, `S3`). With \f$Y_{H_2} = Y_0 + 10^{-3}(r/R)^2\f$ (times \f$\cos\theta\f$ in 3D, N\f$_2\f$ compensating) at rest in h2o2 at uniform T and p with unity Lewis number, the exact rate of \f$\rho Y_{H_2}\f$ over \f$\epsilon/R^2\f$ is \f$4\rho D + 2r\,d(\rho D)/dr\f$ in 2D (\f$\rho D = k/c_p\f$ follows the local composition) and \f$3\rho D\f$ for the \f$\cos\theta\f$ coefficient in 3D, with \f$k/c_p\f$ from Cantera. The max-norm error relative to the exact mean is 6.7e-6, 1.7e-6, 5.4e-7 in 2D (N = 32, 64, 128) and 1.07e-3, 2.67e-4 in 3D (N = 32, 64), second order; these runs are GNU 12.3 on Phoenix. Before the fix the radial species diffusion was skipped with the axis boundary. Heat conduction in \f$\theta\f$ was already correct and is unchanged to round-off.
+
+Limits: one step (the operator, not a time-accurate flow); smooth fields; the cells next to the axis and the outer boundary are excluded. Surface tension has no cylindrical metric terms in its gradients and is not covered; in 3D its theta divergence and the theta-face hoop terms (which share the momentum flux slots) now carry the \f$1/r\f$. With viscosity and species diffusion together, the axis cell's energy row misses the diffusive energy flux through its outer face ([#2513](https://github.com/MFlowCode/MFC/issues/2513)).
+
 ## Stretched grid {#sec-validation-coordinates-stretched}
 
 The 1D Gaussian pulse of @ref validation_acoustics run on a stretched grid (`stretch_x`, `a_x` = 4, clustered on 0.3 to 0.6 mm, one loop): the same number of cells cover 0 to 1.68 mm with \f$\Delta x\f$ from 0.81 to 3.6 times the uniform spacing of 1 mm/N, and the largest change between neighbouring cells 0.8 %. The reference is the same linear solution, evaluated with the run's own cell widths, and \f$\Delta t\f$ is that of the uniform grid (c \f$\Delta t/\Delta x_\text{min}\f$ = 0.73).
@@ -49,5 +76,6 @@ Limits: one stretching and one direction; a pulse that crosses the clustered reg
 ./mfc.sh run examples/2D_acoustic_support6_axisym/case.py -t pre_process simulation -n 1 -- --refine 4 --probe
 python3 examples/2D_acoustic_support6_axisym/check_focus.py examples/2D_acoustic_support6_axisym --case-args "--refine 4 --probe"
 ./mfc.sh run examples/1D_acoustic_gauss_sigmatime/case.py -t pre_process simulation post_process -n 1 -- -N 400 --stretch 4
+python3 examples/3D_cyl_viscous_mms/run_mms.py --case A3 -N 32 64 128   # also B3, C3, E2, and the species cases S2, S3
 python3 examples/1D_acoustic_gauss_sigmatime/check_acoustic.py examples/1D_acoustic_gauss_sigmatime --case-args "-N 400 --stretch 4"
 ```

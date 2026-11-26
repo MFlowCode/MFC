@@ -1954,6 +1954,7 @@ contains
         type(scalar_field), intent(in)                         :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: dq_prim_dx_vf, dq_prim_dy_vf, dq_prim_dz_vf
+        real(wp)                                               :: inv_ds
         integer                                                :: i, j, k, l
 
         if (idir == 1) then  ! x-direction
@@ -2056,6 +2057,31 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
+
+                ! Species diffusion uses the face form down to the axis cell: its r = 0 face flux cancels against the geometric
+                ! source below. Without viscosity the axis cell's energy row takes the same form; with viscosity it takes only the
+                ! cell-centred viscous stress, so the diffusive energy flux through face 0 is missing there (#2513).
+                if (chem_params%diffusion) then
+                    $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%species%beg, eqn_idx%species%end
+                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dy(k)*(flux_src_rsx_vf(j, k - 1, l, &
+                                           & i) - flux_src_rsx_vf(j, k, l, i))
+                                end do
+                                if (k == 0 .and. .not. (viscous .or. heat_conduction)) then
+                                    rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
+                                           & l) + 1._wp/dy(k)*(flux_src_rsx_vf(j, k - 1, l, eqn_idx%E) - flux_src_rsx_vf(j, k, l, &
+                                           & eqn_idx%E)) - 5.e-1_wp/y_cc(k)*(flux_src_rsx_vf(j, k - 1, l, &
+                                           & eqn_idx%E) + flux_src_rsx_vf(j, k, l, eqn_idx%E))
+                                end if
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
             else
                 if ((surface_tension .or. viscous) .or. chem_params%diffusion .or. heat_conduction) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
@@ -2091,6 +2117,11 @@ contains
 
             ! Applying the geometrical viscous Riemann source fluxes calculated as average of values at cell boundaries
             if (cyl_coord) then
+                if (viscous .and. grid_geometry == 2) then
+                    call s_compute_axisym_viscous_hoop(q_prim_vf, dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                       & dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                                       & dq_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), rhs_vf)
+                end if
                 if ((bc_y%beg == -2) .or. (bc_y%beg == -14)) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p
@@ -2133,16 +2164,34 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
                 end if
+
+                if (chem_params%diffusion) then
+                    $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%species%beg, eqn_idx%species%end
+                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) - 5.e-1_wp/y_cc(k)*(flux_src_rsx_vf(j, k - 1, &
+                                           & l, i) + flux_src_rsx_vf(j, k, l, i))
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
             end if
         else if (idir == 3) then  ! z-direction
+            ! In 3D cylindrical z is theta (dz in radians): the divergence is (1/r) dF/dtheta, as in the advection path
             if (surface_tension) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[j, k, l, inv_ds]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
-                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, &
-                                   & l) + 1._wp/dz(l)*q_prim_vf(eqn_idx%c)%sf(j, k, l)*(flux_src_rsx_vf(j, k, l, &
-                                   & eqn_idx%adv%beg) - flux_src_rsx_vf(j, k, l - 1, eqn_idx%adv%beg))
+                            inv_ds = 1._wp/dz(l)
+                            if (grid_geometry == 3) inv_ds = inv_ds/y_cc(k)
+                            rhs_vf(eqn_idx%c)%sf(j, k, l) = rhs_vf(eqn_idx%c)%sf(j, k, l) + inv_ds*q_prim_vf(eqn_idx%c)%sf(j, k, &
+                                   & l)*(flux_src_rsx_vf(j, k, l, eqn_idx%adv%beg) - flux_src_rsx_vf(j, k, l - 1, eqn_idx%adv%beg))
                         end do
                     end do
                 end do
@@ -2150,14 +2199,16 @@ contains
             end if
 
             if ((surface_tension .or. viscous) .or. chem_params%diffusion .or. heat_conduction) then
-                $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
+                $:GPU_PARALLEL_LOOP(private='[i, j, k, l, inv_ds]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
+                            inv_ds = 1._wp/dz(l)
+                            if (grid_geometry == 3) inv_ds = inv_ds/y_cc(k)
                             if (surface_tension .or. viscous .or. heat_conduction) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%mom%beg, eqn_idx%E
-                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)*(flux_src_rsx_vf(j, k, l - 1, &
+                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + inv_ds*(flux_src_rsx_vf(j, k, l - 1, &
                                            & i) - flux_src_rsx_vf(j, k, l, i))
                                 end do
                             end if
@@ -2165,13 +2216,12 @@ contains
                             if (chem_params%diffusion) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%species%beg, eqn_idx%species%end
-                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + 1._wp/dz(l)*(flux_src_rsx_vf(j, k, l - 1, &
+                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + inv_ds*(flux_src_rsx_vf(j, k, l - 1, &
                                            & i) - flux_src_rsx_vf(j, k, l, i))
                                 end do
                                 if (.not. (viscous .or. surface_tension .or. heat_conduction)) then
-                                    rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
-                                           & l) + 1._wp/dz(l)*(flux_src_rsx_vf(j, k, l - 1, eqn_idx%E) - flux_src_rsx_vf(j, k, l, &
-                                           & eqn_idx%E))
+                                    rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + inv_ds*(flux_src_rsx_vf(j, k, &
+                                           & l - 1, eqn_idx%E) - flux_src_rsx_vf(j, k, l, eqn_idx%E))
                                 end if
                             end if
                         end do
@@ -2180,18 +2230,19 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
+            ! Hoop stresses from the theta-face fluxes (-tau_theta_theta/r on u_r, +tau_r_theta/r on u_theta)
             if (grid_geometry == 3) then
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
                 do l = 0, p
                     do k = 0, n
                         do j = 0, m
                             rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                                   & l) + 5.e-1_wp*(flux_src_rsx_vf(j, k, l - 1, eqn_idx%mom%end) + flux_src_rsx_vf(j, k, l, &
-                                   & eqn_idx%mom%end))
+                                   & l) + 5.e-1_wp/y_cc(k)*(flux_src_rsx_vf(j, k, l - 1, eqn_idx%mom%end) + flux_src_rsx_vf(j, k, &
+                                   & l, eqn_idx%mom%end))
 
                             rhs_vf(eqn_idx%mom%end)%sf(j, k, l) = rhs_vf(eqn_idx%mom%end)%sf(j, k, &
-                                   & l) - 5.e-1_wp*(flux_src_rsx_vf(j, k, l - 1, eqn_idx%mom%beg + 1) + flux_src_rsx_vf(j, k, l, &
-                                   & eqn_idx%mom%beg + 1))
+                                   & l) - 5.e-1_wp/y_cc(k)*(flux_src_rsx_vf(j, k, l - 1, &
+                                   & eqn_idx%mom%beg + 1) + flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + 1))
                         end do
                     end do
                 end do

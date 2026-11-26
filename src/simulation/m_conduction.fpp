@@ -51,9 +51,9 @@ contains
                         grid_spacing = y_cc(y + 1) - y_cc(y)
                     case (3)
                         grid_spacing = z_cc(z + 1) - z_cc(z)
-                        ! 3D cylindrical z is the azimuth: dz is in radians. The r**2 carries both metric
-                        ! factors of (1/r**2) d2T/dtheta2, since m_rhs divides this flux by dz alone.
-                        if (grid_geometry == 3) grid_spacing = y_cc(y)**2*grid_spacing
+                        ! 3D cylindrical z is the azimuth (dz in radians): the face gradient is (1/r) dT/dtheta; m_rhs
+                        ! supplies the divergence-side 1/r
+                        if (grid_geometry == 3) grid_spacing = y_cc(y)*grid_spacing
                     end select
 
                     ! Volume-fraction-weighted face conductivity. Raw cell-centered alphas over- and

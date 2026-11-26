@@ -420,11 +420,12 @@ A thermal diffusion CFL limit (`TCFL`) is added to the adaptive time-step candid
 
 Additional geometric source terms appear with \f$1/r\f$ factors in the continuity, momentum, and energy equations. Key modifications:
 
-- **Radial momentum:** extra \f$p/r\f$ and \f$\tau_{\theta\theta}/r\f$ terms
-- **Viscous stress:** \f$\tau_{yy}\f$ includes \f$v/r\f$ corrections:
+- **Radial momentum:** extra \f$p/r\f$ and \f$-\tau_{\theta\theta}/r\f$ terms; in 3D the azimuthal momentum gets \f$+\tau_{r\theta}/r\f$
+- **Viscous stress:** the divergence includes \f$v/r\f$ (and \f$(1/r)\,\partial w/\partial\theta\f$ in 3D), e.g.
 
 \f[\tau_{yy} = \mu\left(\frac{4}{3}\frac{\partial v}{\partial r} - \frac{2}{3}\frac{\partial u}{\partial x} - \frac{2}{3}\frac{v}{r}\right)\f]
 
+- **Azimuthal direction (3D):** \f$z\f$ is \f$\theta\f$ in radians, so every \f$\theta\f$ derivative carries \f$1/r\f$: once in the face gradient of a diffusive flux and once in its divergence, \f$(1/r)\,\partial F_\theta/\partial\theta\f$ (verified in @ref validation_coordinates)
 - **Axis singularity:** axis placed at cell boundary with spectral filtering in the azimuthal direction
 
 ---

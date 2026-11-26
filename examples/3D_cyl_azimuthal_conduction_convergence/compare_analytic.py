@@ -11,7 +11,7 @@ cylindrical geometric source vanishes and the only RHS contribution is Fourier c
 a constant times cos(theta), the same at every radius. The radial half of that answer,
 4*k*A*T0*cos(theta)/R**2, is reproduced exactly by the discretization (T is quadratic in r on a
 uniform r-grid), so subtracting it isolates the azimuthal half, -k*A*T0*cos(theta)/R**2, which is
-what the (1/r**2) metric in m_conduction has to produce. Dropping either metric factor multiplies
+what the two 1/r factors (the face gradient in m_conduction, the divergence in m_rhs) have to produce. Dropping either metric factor multiplies
 that half by r**2 -- an r-dependent error that no refinement removes -- so the table reports the
 azimuthal half ring by ring as well as in aggregate.
 
