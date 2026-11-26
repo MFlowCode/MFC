@@ -12,6 +12,11 @@ retry_sbatch() {
     local max_attempts=3
     local attempt=1
     local submit_output job_id last_output=""
+    # A timed-out sbatch can still have queued the job; a second copy would then run in the same
+    # directory and delete the first one's test inputs. Find it by name, directory and submit time.
+    local name since
+    name=$(printf '%s\n' "$script_contents" | sed -n 's/^#SBATCH -J //p' | head -n 1)
+    since=$(date +%Y-%m-%dT%H:%M:%S)
 
     while [ $attempt -le $max_attempts ]; do
         echo "sbatch attempt $attempt of $max_attempts..." >&2
@@ -30,6 +35,14 @@ retry_sbatch() {
         if [ $attempt -lt $max_attempts ]; then
             echo "Transient error — retrying in 30s..." >&2
             sleep 30
+            # standard: Frontier's SLURM_TIME_FORMAT=relative prints only the time for today's jobs
+            job_id=$(SLURM_TIME_FORMAT=standard squeue -u "$USER" -h -n "$name" -t PD,R,CF,RQ -o '%i|%Z|%V' 2>/dev/null |
+                awk -F'|' -v d="$PWD" -v t="$since" '$2 == d && $3 >= t { print $1; exit }')
+            if [ -n "$name" ] && [ -n "$job_id" ]; then
+                echo "sbatch timed out but queued job $job_id — using it." >&2
+                echo "$job_id"
+                return 0
+            fi
         fi
         attempt=$((attempt + 1))
     done

@@ -47,11 +47,13 @@ export HSA_XNACK=0
     % if not mpi:
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
+        ## greedy:0: with fewer ranks than sockets, mpibind otherwise lets a rank run on a socket away from its GPU.
         (set -x; flux run \
             --nodes=${nodes} --ntasks=${tasks_per_node * nodes} \
             -o spindle.level=off --exclusive \
             % if gpu_enabled:
                 --gpus-per-task 1 \
+                -o mpibind=greedy:0 \
             % endif
             ${profiler} "${target.get_install_binpath(case)}")
     % endif
