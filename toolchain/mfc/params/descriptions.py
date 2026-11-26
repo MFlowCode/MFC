@@ -67,7 +67,7 @@ DESCRIPTIONS = {
     "teno_CT": "TENO cutoff parameter",
     "mp_weno": "Enable monotonicity-preserving WENO",
     "weno_Re_flux": "Enable WENO for viscous fluxes",
-    "weno_Re_flux_compact": "With weno_Re_flux, take the face-normal velocity gradient of the viscous flux as the compact difference across the face",
+    "weno_Re_flux_compact": "With weno_Re_flux, take the face-normal viscous velocity gradient as the difference across the face (default T in Cartesian coordinates)",
     "weno_avg": "Enable WENO averaging",
     "null_weights": "Allow null WENO weights",
     # MUSCL reconstruction
@@ -175,7 +175,7 @@ DESCRIPTIONS = {
     "ib_mass_relax": "Immersed-boundary mass conservation: N > 0 returns each body's spurious gas mass over about N steps; 0 off; -1 (default) auto: 30 for a moving body, else 0",
     "ib_slip_ccst": "Slip immersed boundaries: isentropic ghost density and total-enthalpy tangential speed (curvature-corrected symmetry technique)",
     "ib_wall_order": "Immersed-boundary wall treatment: 1 default ghost fill (default), 2 two-probe quadratic wall-normal ghost velocity at no-slip walls",
-    "ib_smooth_contact": "Blend the left and right HLLC tangential interface velocity across the contact wave in the viscous work next to an immersed body",
+    "ib_smooth_contact": "No effect (kept for older case files): HLLC always uses the central tangential velocity in the viscous work",
     "ib_visc_compact": "Compact velocity gradients on the viscous faces next to an immersed body when weno_Re_flux is on",
     "ib_uncover_fill": "A cell a moving immersed boundary uncovers takes the mean density, species and pressure of its fluid neighbours instead of its stale ghost state (off by default)",
     "wall_column_dt_frac": "Wall columns: largest fraction of a near-wall cell's heat span one step's column drain may take (time-step limit WCOL; default 0.1)",

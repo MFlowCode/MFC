@@ -50,7 +50,7 @@ Reading the table:
 | No-slip velocity at a flat or curved static wall | `ib_wall_order = 2` | measured gain and where it fails (4 to 6 cells across a gap): the `ib_wall_order` entry of @ref case "the case documentation" |
 | Force and heat of a cylinder or sphere | face-flux force `ib_force_wrt`, heat `ib_heat_wrt` | agree with references and with a momentum balance: @ref validation_cyl_drag_nu |
 | Gas mass of a closed box with a body | `ib_flux_wall = T` (reacting or inert fixed no-slip body); `ib_mass_relax` for slip or moving bodies | `examples/2D_ibm_wall_mass_budget` |
-| A body in contact with a no-slip or moving wall differing between CPU and GPU builds (about 1e-5) | no setting closes it: `ib_smooth_contact = T` (HLLC) removes one cause but the measured A100-against-CPU difference stays ([#2419](https://github.com/MFlowCode/MFC/issues/2419)); budget the tolerance | the `ib_smooth_contact` entry of the case documentation |
+| A body in contact with a no-slip or moving wall differing between CPU and GPU builds (about 1e-5) | no setting closes it: the central tangential velocity of the HLLC viscous work (always on) removed one cause, but the measured A100-against-CPU difference stays ([#2419](https://github.com/MFlowCode/MFC/issues/2419)); budget the tolerance | the `riemann_solver` entry of the case documentation |
 | Wall shear or local heat flux | read an integrated force or total wall heat instead | a local fit through the near-wall cells does not converge for any option above |
 
 The options are described in @ref ibm "the immersed-boundary overview". Resolution is the remaining lever: the gradient errors above fall by about a factor of 2 per grid doubling.

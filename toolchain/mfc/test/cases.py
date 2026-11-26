@@ -1402,7 +1402,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if viscous and not slip and len(dimInfo[0]) >= 2:
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
-                cases.append(define_case_d(stack, f"{shape} -> ib_smooth_contact", {**geom, "ib_smooth_contact": "T"}))
                 cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact", {**geom, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "T"}))
 
             stack.pop()
@@ -4967,17 +4966,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # GNU 13 on a CPU by 1e-4 (4e-4 with ib_mass_relax = 0) in the energy of this case, TSC agrees to 4e-12 (the cold-wall twin: 2e-11, the
     # stand-off case below: 2e-12; an NVHPC CPU build agrees with GNU to 3e-11). The checker script holds the physics; the goldens are
     # regression guards, so 1e-6 is several orders above the observed spread. Skipped in the single-precision lane (see test.py).
-    # The cold-wall twin is viscous: with weno_avg = T (required by weno_Re_flux) the wall shear is nonzero, and the HLLC viscous work
-    # switches between the two tangential velocities on the sign of a round-off s_S at the wall faces, so an A100 differed from GNU by
-    # 1e-5 after 10 steps; ib_smooth_contact = T blends them there and the two agree within 1e-6 again. A test-configuration choice
-    # that avoids the pre-existing sensitivity (#2453), not a fix of it.
+    # The cold-wall twin is viscous: the HLLC viscous work takes the central tangential velocity at its wall faces (#2453), so an A100
+    # and GNU 13 agree on it to 2e-11.
     cases.append(define_case_f("2D -> IBM -> Moving Circle -> Mass Budget", "examples/2D_ibm_moving_mass_budget/case.py", args=["--ip_interp", "2"], mods={"parallel_io": "F"}, override_tol=1e-6))
     cases.append(
         define_case_f(
             "2D -> IBM -> Moving Circle -> Mass Budget -> Cold Wall",
             "examples/2D_ibm_moving_mass_budget/case.py",
             args=["--Re", "40", "--Twall", "0.9", "--ip_interp", "2"],
-            mods={"parallel_io": "F", "ib_smooth_contact": "T"},
+            mods={"parallel_io": "F"},
             override_tol=1e-6,
         )
     )
@@ -5288,10 +5285,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # -O3 and debug builds within 20 steps. With these settings GNU 13 double -O3, reldebug and debug agree to 5e-8 (-O3 repeats
     # bitwise) and an AMD MI250X (Cray Fortran, OpenMP offload) run and an AMD CPU build (amdflang) differ from the GNU golden by 8e-8 and 6e-8, so 1e-6 leaves a factor 12.
     # Single precision differs from double by 4e-4: skipped there (label "Chemistry", test.py). Those spreads were measured with
-    # weno_avg = F, which saw no wall shear; with weno_avg = T the HLLC viscous work switches on the sign of a round-off s_S at the
-    # no-slip wall faces and an A100 (NVHPC 25.11) differed from GNU by 3e-5 after 10 steps, so the golden uses HLL (no such switch),
-    # with which A100 and GNU 13 agree within 1e-6: a test-configuration choice that avoids that pre-existing sensitivity (#2453).
-    channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "riemann_solver": 1, "t_step_stop": 100, "t_step_save": 100}
+    # weno_avg = F; with weno_avg = T (and HLLC, whose viscous work takes the central tangential velocity at the walls, #2453) GNU 13,
+    # an NVHPC CPU build and an A100 agree to 2e-12.
+    channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "t_step_stop": 100, "t_step_save": 100}
     cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=channel_mods, override_tol=1e-6))
 
     def direction_symmetry_tests():
@@ -6290,7 +6286,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "slip", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T"}))
         # ghost-state options of the slip and viscous walls, both checked with ./mfc.sh amr_check
         cases.append(define_case_d(stack, "slip -> ib_slip_ccst", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T", "ib_slip_ccst": "T"}))
-        cases.append(define_case_d(stack, "ib_smooth_contact", {"amr_max_grid_size": 32, "ib_smooth_contact": "T", "viscous": "T", "fluid_pp(1)%Re(1)": 1000.0}))
+        cases.append(define_case_d(stack, "viscous", {"amr_max_grid_size": 32, "viscous": "T", "fluid_pp(1)%Re(1)": 1000.0}))
         cases.append(define_case_d(stack, "ib_second_order_vel", {"amr_max_grid_size": 32, "ib_second_order_vel": "T", "ib_ip_min_dist": 1.5}))
         cases.append(define_case_d(stack, "many_ib_patch_parallelism", {"amr_max_grid_size": 32, "many_ib_patch_parallelism": "T"}))
         # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
