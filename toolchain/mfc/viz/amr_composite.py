@@ -20,7 +20,7 @@ def read_inp(run_dir):
     return out
 
 
-def _num(s):
+def parse_num(s):
     return float(s.replace("d", "e").replace("D", "e"))
 
 
@@ -31,7 +31,7 @@ def grid(inp):
         c = int(inp.get(k, "0")) + 1
         if c == 1:
             break
-        beg, end = _num(inp[f"{ax}_domain%beg"]), _num(inp[f"{ax}_domain%end"])
+        beg, end = parse_num(inp[f"{ax}_domain%beg"]), parse_num(inp[f"{ax}_domain%end"])
         cells.append(c)
         lo.append(beg)
         dx.append((end - beg) / c)
@@ -44,7 +44,9 @@ def leaves(run_dir, step, var=0):
     inp = read_inp(run_dir)
     cells, lo, dx = grid(inp)
     ncell = int(np.prod(cells))
-    raw = np.fromfile(os.path.join(run_dir, "restart_data", f"lustre_{step}.dat"))
+    raw = np.fromfile(os.path.join(run_dir, "restart_data", f"lustre_{step}.dat"))  # double precision only (checked below)
+    if raw.size % ncell:
+        raise SystemExit(f"{run_dir}: lustre_{step}.dat does not hold whole double-precision fields (single or mixed precision run?)")
     nvar = raw.size // ncell
     q0 = raw.reshape(nvar, ncell)[var].reshape(cells, order="F")
     centers0 = np.meshgrid(*[lo[d] + (np.arange(cells[d]) + 0.5) * dx[d] for d in range(len(cells))], indexing="ij")
@@ -70,11 +72,13 @@ def _blocks(path, ndim):
     with open(path, "rb") as f:
         hdr = np.fromfile(f, dtype=np.int32, count=6)
         nblk, nvar, wbytes = int(hdr[1]), int(hdr[2]), int(hdr[5])
+        if wbytes != 8:
+            raise SystemExit(f"{path}: word size {wbytes}; amr_composite reads double-precision runs only")
         for _ in range(nblk):
             rec = np.fromfile(f, dtype=np.int32, count=11)
             blo, bhi, lvl, own, ext = rec[0:3], rec[3:6], int(rec[6]), int(rec[7]), rec[8:11]
             if own <= 0:
                 raise SystemExit(f"{path}: block without an owner")
             shape = tuple(int(e) + 1 for e in ext[:ndim])
-            data = np.fromfile(f, dtype=np.float64 if wbytes == 8 else np.float32, count=nvar * int(np.prod(shape)))
+            data = np.fromfile(f, dtype=np.float64, count=nvar * int(np.prod(shape)))
             yield blo[:ndim], bhi[:ndim], lvl, ext[:ndim], data.reshape((nvar,) + shape[::-1]).transpose([0] + list(range(ndim, 0, -1)))

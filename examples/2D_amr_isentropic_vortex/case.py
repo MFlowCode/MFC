@@ -123,6 +123,7 @@ print(
             "patch_icpp(1)%length_y": L,
             **ic,
             "patch_icpp(1)%alpha(1)": 1.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%gamma": 1.0 / (gam - 1.0),
             **amr,
         }

@@ -10,13 +10,11 @@ largest error in the cells within 3 level-0 cells of a block edge, "away" in all
 """
 
 import math
-import os
 import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from amr_composite import _num, leaves, read_inp  # noqa: E402
+from mfc.viz.amr_composite import leaves, parse_num, read_inp
 
 GAM, EPS, X0, U0 = 1.4, 5.0, -3.0, 1.0
 
@@ -36,7 +34,7 @@ def kind(inp):
     """Run label and base N: a uniform run at 2N (--fine) takes the base-N step, twice the CFL number of one at N."""
     cells = int(inp["m"]) + 1
     if inp.get("amr", "F") != "T":
-        fine = _num(inp["dt"]) * cells / (_num(inp["x_domain%end"]) - _num(inp["x_domain%beg"])) > 0.1
+        fine = parse_num(inp["dt"]) * cells / (parse_num(inp["x_domain%end"]) - parse_num(inp["x_domain%beg"])) > 0.1
         return ("uniform 2N", cells // 2) if fine else ("uniform N", cells)
     mode = "regrid" if int(inp.get("amr_regrid_int", "0")) > 0 else "static"
     sub = "subcycle" if inp.get("amr_subcycle", "F") == "T" else "lock-step"
@@ -46,11 +44,11 @@ def kind(inp):
 def errors(run_dir):
     inp = read_inp(run_dir)
     step = int(inp["t_step_stop"])
-    t = _num(inp["dt"]) * step
+    t = parse_num(inp["dt"]) * step
     parts, _ = leaves(run_dir, step)
     edges = [p[3] for p in parts[1:]]
     dx0 = parts[0][1]
-    x0, y0 = _num(inp["x_domain%beg"]), _num(inp["y_domain%beg"])
+    x0, y0 = parse_num(inp["x_domain%beg"]), parse_num(inp["y_domain%beg"])
     l1 = area = 0.0
     seam = away = 0.0
     for (x, y), dx, q, _ in parts:

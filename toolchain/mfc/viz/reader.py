@@ -589,6 +589,8 @@ def read_amr_restart(case_dir: str, step: int, rank: int = 0) -> Tuple[np.ndarra
     d = os.path.join(case_dir, "p_all", f"p{rank}", str(step))
     with open(os.path.join(d, "amr_fine.dat"), "rb") as f:
         _, nblk, sys_size, _, _, word = struct.unpack("<6i", _read_record_endian(f, "<"))
+        if word not in (4, 8):
+            raise ValueError(f"{d}/amr_fine.dat: unsupported word size {word} (expected 4 or 8)")
         dt = np.float64 if word == 8 else np.float32
         blocks = []
         for _ in range(nblk):

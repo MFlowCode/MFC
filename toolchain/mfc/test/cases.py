@@ -6499,6 +6499,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True))
         stack.pop()
 
+        # derived block cap at np=2 with amr_maxc_fit = 32 > the 16-cell floor (m = 127): one Riemann problem at x = 0.8 (patch 1
+        # takes patch 2's state) spreads into a single tagged region of about 25 coarse cells by step 120, so at the starting size
+        # there is one tile for two ranks and f_amr_rank_tile shrinks it until the region splits over both (#2496)
+        one_jump = {"patch_icpp(1)%pres": 0.5, "patch_icpp(1)%alpha_rho(1)": 0.5, "t_step_stop": 120, "t_step_save": 120}
+        stack.push(
+            "AMR -> 1D -> dynamic regrid np=2 -> derived tiles",
+            {**amr_1d_base, **one_jump, "m": 127, "amr_block_beg(1)": 92, "amr_block_end(1)": 111, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        # a one-slot block pool: the unguarded rule splits into two tiles and the tiler drops the second, leaving half the region
+        # coarse; the pool guard keeps one 28-cell tile
+        cases.append(define_case_d(stack, "pool of one", {"amr_max_blocks": 1}, ppn=2))
+        stack.pop()
+
         # multi-level + dynamic regrid at np=2: children are placed by distributed sensor-on-fine nesting (tags OR-reduced
         # across ranks; each child stays co-located with its parent). Same eps=0.1/amr_buf=6 as the np=1 case.
         stack.push(
@@ -6564,6 +6578,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16},
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        # the per-level memory table (rank_time_wrt): a static multi-level layout is recorded without a regrid
+        cases.append(define_case_d(stack, "rank_time_wrt", {"amr_max_grid_size": 16, "rank_time_wrt": "T"}, ppn=2))
         stack.pop()
 
         # 2D dynamic regrid at np=2: a level-1 block whose owner holds none of its covered coarse cells, so the fold-back
@@ -6581,6 +6597,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ("subcycle -> quartic prolongation", {"amr_subcycle": "T", "amr_prolong": 2}),
             # viscous fluxes reflux across the seam too; the 1D viscous tests cannot split
             ("viscous", {"viscous": "T", "fluid_pp(1)%Re(1)": 100.0}),
+            # amr_buf = 4 derives amr_snap = 2 (one level): the regrid snap's only golden in 2D
+            ("derived snap", {"amr_buf": 4}),
         )
         for label, mods in np2_variants:
             cases.append(define_case_d(stack, label, {"amr_max_grid_size": 16, **mods}, ppn=2))

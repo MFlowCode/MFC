@@ -640,6 +640,10 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
     if target.isDependency and target.is_installed(case):
         return
 
+    if _interrupted_build(target, case):
+        cons.print(f"  [bold yellow]Reconfiguring[/bold yellow] [magenta]{target.name}[/magenta] from scratch: an earlier build stopped before installing it")
+        delete_directory(target.get_staging_dirpath(case))
+
     # CI's retry clears only the slugs its own build touched (.github/scripts/retry-build.sh).
     slug_log = os.environ.get("MFC_SLUG_LOG")
     if slug_log:
@@ -734,6 +738,17 @@ def cmake_cache_compilers(staging_dirpath: str) -> typing.Dict[str, str]:
 def compiler_mismatches(ours: typing.Dict[str, str], theirs: typing.Dict[str, str]) -> typing.List[str]:
     # Compare resolved paths: module systems often reach one compiler through several symlinks.
     return [lang for lang in ("Fortran", "C", "CXX") if lang in ours and lang in theirs and os.path.realpath(ours[lang]) != os.path.realpath(theirs[lang])]
+
+
+def _interrupted_build(target: MFCTarget, case: input.MFCInputFile) -> bool:
+    """A dependency whose staging directory holds a configure but no install manifest.
+
+    A build stopped before install leaves CMakeCache.txt behind, and CMake keeps the cached
+    compilers whatever FC/CC/CXX now say (or the module default when they are unset), so
+    reconfiguring over it can reuse the old toolchain (#2501). Such a dependency is rebuilt
+    from scratch. Installed dependencies are _stale_dependencies' concern.
+    """
+    return target.isDependency and not target.is_installed(case) and os.path.isfile(os.path.join(target.get_staging_dirpath(case), "CMakeCache.txt"))
 
 
 def _all_dependencies(target: MFCTarget) -> typing.List[MFCTarget]:

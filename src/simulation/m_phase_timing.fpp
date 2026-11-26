@@ -17,7 +17,7 @@ module m_phase_timing
     public :: s_phase_tic, s_phase_toc, s_phase_step_tic, s_phase_step_toc, s_phase_report, PH_HALO, PH_GATHER, PH_GFILL, &
         & PH_SEAM, PH_RHS, PH_RK, PH_REFLUX, PH_REGRID, PH_COARSE, PH_SWAP, PH_RESTR, PH_LERP, PH_RG_HALO, PH_RG_TAG, PH_RG_CLUS, &
         & PH_RG_OWN, PH_RG_MIG, PH_RG_BUILD, PH_RG_REC, s_mem_note, s_mem_note_fields, MEM_STORE, MEM_SCRATCH, MEM_PATCH, &
-        & MEM_REG, MEM_IB, MEM_IBHOST, s_mem_note_level
+        & MEM_REG, MEM_IB, MEM_IBHOST, s_mem_note_level, s_mem_reset_levels
 
     integer, parameter          :: PH_HALO = 1       !< coarse cons halo exchange (once per stage)
     integer, parameter          :: PH_GATHER = 2     !< fill waves: coarse-patch gather into every block
@@ -59,8 +59,9 @@ module m_phase_timing
     character(len=8), parameter :: MEM_NAME(MEM_N + 1) = [character(len=8)::'store','scratch', 'patch', 'register', 'ib park', &
               & 'ib marks', 'total']
     real(wp) :: mem_mib(MEM_N) = 0._wp
-    !> Per level over every regrid (rank 0, s_mem_note_level): high-water blocks on the busiest rank, and the share of its store
-    !! column each block's interior fills. Every column is sized to the largest block, so memory goes by block count, not size.
+    !> Per level over every layout (rank 0, s_mem_note_level): high-water blocks on the busiest rank, and the share of its store
+    !! column (ghost layers included) each block's interior fills. Every column is sized to the block size cap, so memory goes by
+    !! block count, not size.
     integer, allocatable  :: mem_lev_hw(:)
     real(wp), allocatable :: mem_fill_min(:), mem_fill_max(:), mem_fill_sum(:), mem_fill_n(:)
     real(wp)              :: mem_col_mib = 0._wp
@@ -150,7 +151,7 @@ contains
             & product(real(idwbuff_alloc%end - idwbuff_alloc%beg + 1, wp))/product(real(idwbuff%end - idwbuff%beg + 1, wp)), &
             & 'x the coarse extent (largest block or batch slab)'
         if (.not. allocated(mem_lev_hw)) return
-        print '(A,F10.2,A)', '[amr-mem] per block ', mem_col_mib, ' MiB of store (every block is sized to the largest)'
+        print '(A,F10.2,A)', '[amr-mem] per block ', mem_col_mib, ' MiB of store (every block is sized to the size cap)'
         print '(A)', '[amr-mem] level  blocks/rank  store MiB   fill min    mean     max  (busiest rank, high-water over regrids)'
         do i = 1, size(mem_lev_hw)
             if (mem_fill_n(i) <= 0._wp) cycle
@@ -180,6 +181,13 @@ contains
         mem_fill_sum(lev) = mem_fill_sum(lev) + sum(fill); mem_fill_n(lev) = mem_fill_n(lev) + real(size(fill), wp)
 
     end subroutine s_mem_note_level
+
+    !> Forget the per-level notes so far (a restart replaces the initial layout before the first step).
+    impure subroutine s_mem_reset_levels()
+
+        if (allocated(mem_lev_hw)) deallocate (mem_lev_hw, mem_fill_min, mem_fill_max, mem_fill_sum, mem_fill_n)
+
+    end subroutine s_mem_reset_levels
 
     !> Add bytes to group id of the end-of-run AMR memory table.
     impure subroutine s_mem_note(id, bytes)

@@ -84,8 +84,9 @@ last dimension, one solver call per batch; this is why AMR needs a uniform Carte
 `rank_time_wrt = T` prints a per-phase time budget of the AMR step, the block-balance report, and at the end of the run
 the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, advance scratch, coarse patches, flux
 registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies). Every block's store column is
-sized to the largest block, so it also prints that column's size and, per level, the most blocks any rank held over
-the run, their store, and how much of its column a block's interior fills (min, mean, max).
+sized to the block size cap (`amr_max_grid_size`, or the rank-derived cap) plus ghost layers, so it also prints that column's
+size and, per level, the most blocks any rank held over the run, their store, and how much of its column (ghost layers
+included, so below 1 even at the cap) a block's interior fills (min, mean, max).
 
 ## Supported physics {#amr-physics}
 
@@ -132,7 +133,7 @@ Full descriptions: @ref case.
 | `amr_subcycle` | F | Subcycle refined levels in time (ratio 2, up to two levels) |
 | `amr_prolong` | 1 | 1: limited linear, 2: quartic (ratio 2) |
 | `amr_place_owner` | F | Owner-aware block placement |
-| `amr_snap` | 0 | Regrid hysteresis, coarse cells (<= `amr_buf - 2`) |
+| `amr_snap` | 0 | Regrid hysteresis, coarse cells (<= `amr_buf - 2`; one refined level only under regrid) |
 | `amr_device_pack` | F | Fused device pack/unpack of the coarse-patch exchange |
 
 ## Example {#amr-example}
@@ -208,7 +209,9 @@ comparable (forces on coarse faces only).
 
 - **Block size.** A block spans at most about half a rank's subdomain per dimension unless `amr_max_grid_size` is set;
   larger features are covered by several blocks. On several ranks, regrid tiles the level-1 boxes smaller (not below 16
-  coarse cells) until there is at least one per rank, so a small refined region still spreads over the ranks.
+  coarse cells) until there is at least one per rank (or per block-pool slot, if `amr_max_blocks` is smaller), so a small
+  refined region still spreads over the ranks; a size that would leave a tile narrower than the ghost layer or overflow the
+  block pool is skipped.
 - **Restart.** `parallel_io` restarts work on any rank count when `amr_max_grid_size` is set; otherwise restart on no
   more ranks than wrote the checkpoint. The serial format needs the rank count that wrote it.
   The file header records `amr_ref_ratio`, `amr_max_level` and the storage precision, which must match (the level count may
@@ -229,5 +232,6 @@ comparable (forces on coarse faces only).
   Step 0 is pre_process's output: level 0 only, with no blocks and no `amr_levels` file, since simulation regrids at
   step 0 but first saves at step `t_step_save`. A run started at step 0 is therefore always a fresh start: it redoes
   the initial regrid and fills the blocks from the patches.
-  The overlay carries density, pressure, velocity and volume fractions only; probes, `run_time_info` and derived
-  post_process fields read level 0, and `sim_data` is rejected.
+  The overlay carries density, pressure, velocity and volume fractions only; probes and derived post_process fields read
+  level 0, `run_time_info` reads the level-0 state but scales its CFL numbers to the finest level covering each cell
+  (its Mie-Gruneisen compression check also reads the fine blocks), and `sim_data` is rejected.

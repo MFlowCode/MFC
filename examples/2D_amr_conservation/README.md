@@ -5,6 +5,8 @@ A square of dense, high-pressure gas (rho = p = 2 in a background of 1, uniform 
     ./mfc.sh run examples/2D_amr_conservation/case.py -t pre_process simulation -n 1 -- --subcycle
     python3 examples/2D_amr_conservation/check_conservation.py examples/2D_amr_conservation
 
+The checkers import `mfc.viz`, so run them in MFC's Python environment (`source build/venv/bin/activate` after any `./mfc.sh` command).
+
 `case.py` takes `-N` (base cells per side, default 64), `--levels` (default 2), `--subcycle`, `--steps` (default: to t = 0.4) and `--saves`. `check_conservation.py` reads the serial restart files of every save and prints the relative drift (S(t) - S(0))/S(0) of each total, summed exactly (`math.fsum`), and the gap between the level-0 totals and the totals over the composite grid (leaf cells of every level, from `amr_fine.dat`). It exits 1 if any drift exceeds `--tol` (1e-13).
 
 Measured on `master` after #2482, #2474 and #2461, AMD flang on a Frontier CPU node, double precision, 64^2 base, t = 0.4 (up to 52544 refined cells):

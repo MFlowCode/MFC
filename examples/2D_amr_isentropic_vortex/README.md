@@ -24,4 +24,6 @@ covers a point, level 0 elsewhere. It prints L1 (area mean) and Linf, the larges
 python3 examples/2D_amr_isentropic_vortex/check_vortex.py <run directories in increasing N>
 ```
 
+The checkers import `mfc.viz`, so run them in MFC's Python environment (`source build/venv/bin/activate` after any `./mfc.sh` command).
+
 Each run writes next to `case.py`: copy the directory per run. Results and limits: the AMR section of the validation page.

@@ -13,7 +13,7 @@ module m_amr_state
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
     use m_amr_restart_io, only: s_amr_subdivide_cb
-    use m_constants, only: mapCells
+    use m_constants, only: mapCells, eos_mie_gruneisen
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_array_max
     use m_amr_registers, only: s_amr_parent_foot
@@ -647,5 +647,48 @@ contains
         end if
 
     end subroutine s_amr_size_real
+
+    !> Bytes of one block's column of the flat store (one field family): the mbuf extents (interior plus ghost layers) x sys_size at
+    !! the store's precision.
+    pure function f_amr_col_bytes() result(b)
+
+        integer(8) :: b
+
+        b = product(int(mbuf_hi - mbuf_lo + 1, 8))*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
+
+    end function f_amr_col_bytes
+
+    !> Largest Mie-Gruneisen compression over this rank's fine blocks, as a fraction of each phase's mu_max. Level 0 holds only the
+    !! restricted average, so a fine cell past the limit would otherwise go unreported (m_eos clamps mu silently).
+    impure function f_amr_mg_mu_frac_max() result(frac_max)
+
+        real(wp) :: frac_max
+        real(wp) :: frac
+        integer  :: k, loc, i, j, l, fl, fm, fn, fp
+
+        frac_max = 0._wp
+        do k = 1, amr_num_blocks
+            if (.not. amr_owns_all(k)) cycle
+            loc = amr_loc_of(k); fm = amr_slots(k)%m; fn = amr_slots(k)%n; fp = amr_slots(k)%p
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, l, fl, frac]', reduction='[[frac_max]]', reductionOp='[max]')
+            do l = 0, fp
+                do j = 0, fn
+                    do i = 0, fm
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do fl = 1, num_fluids
+                            if (eoss(fl) == eos_mie_gruneisen) then
+                                frac = (real(amr_cons_st(i, j, l, eqn_idx%cont%beg + fl - 1, loc), wp)/max(real(amr_cons_st(i, j, &
+                                        & l, eqn_idx%adv%beg + fl - 1, loc), wp), &
+                                        & sgm_eps)/eos_coeffs(fl)%rho0 - 1._wp)/eos_coeffs(fl)%mu_max
+                                frac_max = max(frac_max, frac)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end do
+
+    end function f_amr_mg_mu_frac_max
 
 end module m_amr_state
