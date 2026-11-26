@@ -32,7 +32,7 @@ def run_one(case, N, visc, flags):
     for t in ("pre_process", "simulation"):
         if t == "simulation":
             write_ic(case, N, rd)
-        out = subprocess.run([MFC, "run", os.path.join(rd, "case.py"), "-t", t, "-n", "1", *flags], capture_output=True, text=True)
+        out = subprocess.run([MFC, "run", os.path.join(rd, "case.py"), "-t", t, "-n", "1", *flags], capture_output=True, text=True, check=False)
         if out.returncode:
             sys.exit(f"{t} failed in {rd}:\n{out.stdout[-4000:]}\n{out.stderr[-2000:]}")
 
