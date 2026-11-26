@@ -28,6 +28,7 @@ dependencies = [
     "ffmt==0.4.5",
     "ansi2txt",
     "pytest",
+    "pytest-xdist",
 
     # Profiling
     "numpy",
