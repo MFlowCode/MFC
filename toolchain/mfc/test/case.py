@@ -173,6 +173,7 @@ class TestCase(case.Case):
     convergence_spec: Optional[dict] = None
     canary: bool = False
     honor_io_keys: bool = False
+    override_tol_single: Optional[float] = None
 
     def __init__(
         self,
@@ -185,10 +186,12 @@ class TestCase(case.Case):
         convergence_spec: Optional[dict] = None,
         canary: bool = False,
         honor_io_keys: bool = False,
+        override_tol_single: float = None,
     ) -> None:
         self.trace = trace
         self.ppn = ppn or 1
         self.override_tol = override_tol
+        self.override_tol_single = override_tol_single
         self.honor_io_keys = honor_io_keys
         self.restart_check = restart_check
         self.kind = kind
@@ -469,8 +472,9 @@ print(json.dumps({{**case, **mods}}))
     def compute_tolerance(self) -> float:
         single = ARG("single")
         if self.override_tol:
-            # an override tightens the double comparison; single precision cannot honor one below its default floor
-            return max(self.override_tol, 1e8 * 1e-12) if single else self.override_tol
+            # an override tightens the double comparison; single precision cannot honor one below its default floor, and
+            # override_tol_single sets the single comparison where single round-off is measured to exceed that floor
+            return max(self.override_tol_single or self.override_tol, 1e8 * 1e-12) if single else self.override_tol
 
         tolerance = 1e-12  # Default
 
@@ -520,6 +524,7 @@ class TestCaseBuilder:
     convergence_spec: Optional[dict] = None
     canary: bool = False
     honor_io_keys: bool = False
+    override_tol_single: Optional[float] = None
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -552,7 +557,17 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, kind=self.kind, canary=self.canary, honor_io_keys=self.honor_io_keys)
+        return TestCase(
+            self.trace,
+            dictionary,
+            self.ppn,
+            self.override_tol,
+            self.restart_check,
+            kind=self.kind,
+            canary=self.canary,
+            honor_io_keys=self.honor_io_keys,
+            override_tol_single=self.override_tol_single,
+        )
 
 
 @dataclasses.dataclass
@@ -575,9 +590,17 @@ class CaseGeneratorStack:
 
 
 def define_case_f(
-    trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None, restart_check: Union[bool, str] = False
+    trace: str,
+    path: str,
+    args: List[str] = None,
+    ppn: int = None,
+    mods: dict = None,
+    functor: Callable = None,
+    override_tol: float = None,
+    restart_check: Union[bool, str] = False,
+    override_tol_single: float = None,
 ) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol, restart_check)
+    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol, restart_check, override_tol_single=override_tol_single)
 
 
 def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCaseBuilder:
@@ -599,6 +622,7 @@ def define_case_d(
     restart_check: Union[bool, str] = False,
     honor_io_keys: bool = False,
     kind: str = "golden",
+    override_tol_single: float = None,
 ) -> TestCaseBuilder:
     mods: dict = {}
 
@@ -615,7 +639,7 @@ def define_case_d(
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, kind=kind, honor_io_keys=honor_io_keys)
+    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, kind=kind, honor_io_keys=honor_io_keys, override_tol_single=override_tol_single)
 
 
 def input_bubbles_lagrange(self):
