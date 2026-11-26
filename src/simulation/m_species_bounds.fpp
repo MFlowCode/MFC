@@ -25,8 +25,8 @@ module m_species_bounds
     !> face_bound = 2 caps a face's (p + p_inf)/rho at this multiple of the largest over the cell and its neighbours (sound speed at
     !! ~32x): high enough never to act on a resolved smooth field, low enough to rule out a floor-density face at finite pressure
     real(wp), parameter :: face_T_cap = 1000._wp
-    !> Relative positivity floor of the face bounds: verysmall, raised to 100 ulp where wp cannot resolve it (single precision);
-    !! a floor below roundoff lets the bounded face land on the wrong side of zero
+    !> Relative positivity floor of the face bounds: verysmall, raised to 100 ulp where wp cannot resolve it (single precision); a
+    !! floor below roundoff lets the bounded face land on the wrong side of zero
     real(wp), parameter :: pos_floor = max(verysmall, 100._wp*epsilon(1._wp))
     !> Violations below this fraction of rho are roundoff: cleaned but not counted
     real(wp), parameter :: clean_report_tol = 1.e-12_wp
