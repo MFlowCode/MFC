@@ -1416,6 +1416,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if viscous and not slip and len(dimInfo[0]) >= 2:
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
                 cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact", {**geom, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "T"}))
+                # the opt-out: the WENO viscous gradient next to the body, the path every weno_Re_flux IB run took before the default
+                cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact=F", {**geom, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "F"}))
 
             stack.pop()
 
@@ -5039,11 +5041,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # an STL outer ring (Taylor-Couette, 100 steps: the reldebug lanes take minutes per 100 steps) and two flat rectangle walls (plane
     # Poiseuille, 300 steps). Both run at their CI size, far from steady state, and save only the last step, so the golden is a regression
     # guard on the cons fields and the ib_forces.dat history; the accuracy against the exact solutions is measured by check_couette.py and
-    # check_poiseuille.py (see the Validation page). The default order 1 is covered by the viscous IBM tests above. The annulus has a
+    # check_poiseuille.py (see the Validation page). Order 1 is covered by the ib_wall_order=1 variants above. The annulus has a
     # rotating inner wall: its golden changes with the wall-point velocity fix (#2383, merged: a rotating body's ghost-cell wall velocity
     # evaluated at the wall point, not the ghost point; this golden has it); the channel golden does not. Against double-precision
     # goldens (GNU, CPU), the GNU, Intel, NVHPC and macOS CI lanes differ by at most 1e-13 absolute and an A100 (NVHPC 25.11) by 1e-14,
-    # so override_tol = 1e-10. The earlier 1e-4 covered an annulus golden generated in single precision, not a CPU/GPU gap.
+    # so override_tol = 1e-10. The earlier 1e-4 covered an annulus golden generated in single precision, not a CPU/GPU gap. The annulus runs
+    # inverse-distance image points (--ip_interp 1) with the solver-default compact viscous gradient.
     cases.append(define_case_f("2D -> IBM -> Taylor-Couette -> ib_wall_order=2", "examples/2D_ibm_taylor_couette/case.py", args=["--steps", "100"], mods={"t_step_save": 100}, override_tol=1e-10))
     cases.append(define_case_f("2D -> IBM -> Plane Poiseuille -> ib_wall_order=2", "examples/2D_ibm_plane_poiseuille/case.py", mods={"t_step_save": 300}, override_tol=1e-10))
 

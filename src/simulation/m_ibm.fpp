@@ -101,7 +101,7 @@ module m_ibm
     !> Quadratic wall-normal fill of one ghost point (ib_wall_order = 2): TSC stencils of two probes along the surface normal and
     !! the Lagrange weights that carry the profile through them back to the ghost (see s_wall_fill).
     type :: wall_fill
-        integer                   :: tier  !< 1 quadratic, 2 linear mirror (the outer probe lacks fluid), 3 the default treatment
+        integer                   :: tier  !< 1 quadratic, 2 linear mirror (the outer probe lacks fluid), 3 the wall value (no quadratic fill)
         real(wp), dimension(3)    :: lw  !< Lagrange weights on (phi_w, phi_1, phi_2)
         real(wp), dimension(2)    :: llin  !< Linear mirror on (phi_w, phi_1), which bounds the quadratic
         integer, dimension(3)     :: ic1, ic2  !< TSC stencil centres of the probes
@@ -1873,7 +1873,7 @@ contains
             if (lvl > 0) write (tag, '(A,I0)') ', AMR level ', lvl
             if (proc_rank == 0 .and. sum(ft) > 0) print '(A,3(F6.1,A))', &
                 & ' [WALLFILL] ghost fill tiers' // trim(tag) // ': quadratic ', 1.e2_wp*ft(1)/sum(ft), '%, linear ', &
-                & 1.e2_wp*ft(2)/sum(ft), '%, default ', 1.e2_wp*ft(3)/sum(ft), '%'
+                & 1.e2_wp*ft(2)/sum(ft), '%, wall value ', 1.e2_wp*ft(3)/sum(ft), '%'
         end do
 
     end subroutine s_report_ibm_surface
@@ -3228,7 +3228,7 @@ contains
     !! (d = ghost_depth, s1 = probe1_dist, s2 = probe2_dist below.) L0 + L1 + L2 = 1 and at d = 0 they reduce to (1, 0, 0), so the
     !! wall value is exact on the wall. s1 = max(h, d) bounds the weights by (3, -3, 1) at any ghost depth. Tier 1 uses both probes;
     !! tier 2 is the linear mirror where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body)
-    !! or lies beyond the halo (a ghost several cells deep); tier 3 leaves the default treatment.
+    !! or lies beyond the halo (a ghost several cells deep); tier 3 leaves the wall value (no quadratic fill).
     subroutine s_wall_fill(gp, wf)
 
         $:GPU_ROUTINE(parallelism='[seq]')

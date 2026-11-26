@@ -20,25 +20,25 @@ with the options named, not repeated on `master`; the options exist on `master` 
 | :--- | :--- | :--- | :--- |
 | Wall temperature, inverse-distance image point (`ib_ip_interp = 1`, the default before TSC) | annulus, exact conduction solution | 0.6 then 1.2 (idw), error 5.0e-3 of \f$T_2-T_1\f$ at 40 cells/R | `master`, @ref validation_tsc_annulus |
 | Wall temperature, TSC (`ib_ip_interp = 2`) | same | 2.3 then 2.0 (inner wall), 1.1 then 1.0 (outer wall) | `master`, @ref validation_tsc_annulus |
-| Wall velocity, default | Taylor-Couette, 10-30 cells/R | about 1 to 2, not monotonic at the outer wall | pre-merge |
-| Wall shear, static curved wall, default | same | 0.7 to 1 or worse, 1.4 % error at 30 cells/R | pre-merge |
+| Wall velocity, `ib_wall_order = 1` | Taylor-Couette, 10-30 cells/R | about 1 to 2, not monotonic at the outer wall | pre-merge |
+| Wall shear, static curved wall, `ib_wall_order = 1` | same | 0.7 to 1 or worse, 1.4 % error at 30 cells/R | pre-merge |
 | Wall shear, static curved wall, `ib_wall_order = 2` | same | 2.8 then 2.4, 0.065 % at 30 cells/R | pre-merge |
 | Wall shear, rotating wall, any option | same | below 0.5, plateau near 2 % | pre-merge |
-| Thermal wall gradient (fit through the first cells), default | annulus, 10-40 cells/R | 0.4 to 1.4 | pre-merge |
+| Thermal wall gradient (fit through the first cells), inverse distance | annulus, 10-40 cells/R | 0.4 to 1.4 | pre-merge |
 | Thermal wall gradient, TSC | same | 1.4 to 1.6, error about 0.1 % at 40 cells/R | pre-merge |
-| Curved isothermal wall, temperature \f$L_\infty\f$, \f$L_1\f$, total heat, default weights | annulus, 600/300 K, 10-80 cells/R | 0.85, 1.1-1.4, 0.9-1.3 between 40 and 80 cells/R | pre-merge, before #2248 |
+| Curved isothermal wall, temperature \f$L_\infty\f$, \f$L_1\f$, total heat, inverse-distance weights | annulus, 600/300 K, 10-80 cells/R | 0.85, 1.1-1.4, 0.9-1.3 between 40 and 80 cells/R | pre-merge, before #2248 |
 | Flat isothermal wall at 0 degrees to the grid | slab, 10-80 cells per gap | 2.0 in all norms | pre-merge, before #2248 |
 | Flat isothermal wall at 26.6 and 45 degrees | same | 1.6 to 1.75 on average, scattered from grid to grid | pre-merge, before #2248 |
 
 Reading the table:
 
-- **The wall value is about second order** once the grid is fine enough with TSC or `ib_wall_order = 2`. With the default weights it is first order on the annulus.
+- **The wall value is about second order** once the grid is fine enough with TSC or `ib_wall_order = 2`. With inverse-distance weights (`ib_ip_interp = 1`) it is first order on the annulus.
 - **The wall-normal gradient is first order or worse** with every option tried. TSC lowers its error about fourfold in the thermal annulus
   (order 1.4 to 1.6); none of the options reaches second order at 40 cells/R.
 - **A rotating wall keeps a shear error of about 2 % for every option** (rms over angle, 10-30 cells/R, orders below 0.5). The wall value there is right to 0.1 %, and the
   azimuthal-mean velocity error is 0.05 % of the wall speed, so the cause is not an interpolation effect. Not explained.
 - **Curved isothermal walls**: the max-norm temperature error was first order and the total wall heat about order 1.3 (0.06 % of \f$T_1-T_2\f$ and 0.01 % of the exact heat at 80 cells/R).
-  These were measured before the unbounded mirror temperature of [#2248](https://github.com/MFlowCode/MFC/pull/2248) and with the default weights; they were not repeated on `master`.
+  These were measured before the unbounded mirror temperature of [#2248](https://github.com/MFlowCode/MFC/pull/2248) and with inverse-distance weights; they were not repeated on `master`.
 - Wall values that look converged do not imply a converged wall flux: the wall heat of a closed conduction problem is fixed by conservation and agrees between the two bodies to five digits,
   so it is a global integral, not a measure of the local gradient.
 
@@ -69,7 +69,7 @@ The options are described in @ref ibm "the immersed-boundary overview". Resoluti
 
 ## Known limitations of the measurements
 
-- The Taylor-Couette runs stop at 30 cells/R: at 40 cells/R every scheme, the default included, aborted with an image-point bounds error (cause not investigated). TSC has no 30 cells/R point for the same reason.
+- The Taylor-Couette runs stop at 30 cells/R: at 40 cells/R every scheme, order 1 with inverse distance included, aborted with an image-point bounds error (cause not investigated). TSC has no 30 cells/R point for the same reason.
 - Orders come from three grids; the measurement floor is not negligible on the coarsest (inner-wall gradient floor 1.4 % at 10 cells/R). Coarse-pair orders (10 to 20 cells/R) were flattered by being pre-asymptotic and fell on refinement, so only the finest pairs are quoted.
 - The wall gradient here is a cubic or quadratic fit through the fluid cells near the wall, not the ghost-cell gradient (ghost cells are never used); it measures what the solution holds at the wall.
 - Slab orders at 26.6 and 45 degrees scatter because the wall-to-cell-centre offsets change with each grid; no single order is claimed.

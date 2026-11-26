@@ -34,6 +34,8 @@ parser.add_argument("--nsave", type=int, default=1, help="Number of saves.")
 parser.add_argument("--cfl", type=float, default=0.4, help="Acoustic CFL number of the fixed step.")
 parser.add_argument("--relax", type=int, default=None, help="ib_mass_relax (omitted: the solver default).")
 parser.add_argument("--ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance, 2: TSC).")
+parser.add_argument("--wall_order", type=int, default=2, choices=(1, 2), help="ib_wall_order (1 wall value, 2 quadratic, the solver default).")
+parser.add_argument("--visc_compact", type=int, default=1, choices=(0, 1), help="ib_visc_compact (1 compact viscous gradient next to the body, the solver default; 0 the WENO gradient).")
 parser.add_argument("--slip", action="store_true", help="Slip wall.")
 parser.add_argument("--stride", type=int, default=10, help="ib_force_stride: steps between force rows.")
 parser.add_argument("--serial_io", action="store_true", help="parallel_io = F (a build without MPI); the checker then reads p_all/.")
@@ -105,6 +107,7 @@ case = {
     "patch_ib(1)%radius": 0.5 * D,
     "patch_ib(1)%slip": "T" if args.slip else "F",
     "ib_ip_interp": args.ip_interp,
+    "ib_wall_order": args.wall_order,
     "ib_state_wrt": "T",
     "ib_force_wrt": "T",
     "ib_force_stride": args.stride,
@@ -122,6 +125,7 @@ if moving:
 if args.Re > 0:
     mu = rho * U * D / args.Re
     case.update({"viscous": "T", "weno_Re_flux": "T", "weno_avg": "T", "fd_order": 4, "fluid_pp(1)%Re(1)": 1.0 / mu})
+    case["ib_visc_compact"] = "T" if args.visc_compact else "F"
     if args.Twall > 0:
         case.update(
             {
