@@ -414,6 +414,7 @@ AMR_INERT_FLAGS = (
     "down_sample",
     "nv_uvm_*",
     "rdma_mpi",
+    "ib_smooth_contact",  # no effect (HLLC always uses the central tangential velocity in the viscous work)
 )
 
 # Logical switches AMR accepts (fnmatch patterns over the case's keys). AMR fails closed: a switch set true and absent here is
