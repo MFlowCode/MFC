@@ -1,10 +1,12 @@
 import collections
+import errno
 import logging
 import os
 import shutil
 import signal
 import subprocess
 import sys
+import time
 import typing
 from os.path import abspath, dirname, join, normpath, realpath
 
@@ -194,15 +196,30 @@ def create_directory(dirpath: str) -> None:
 
 
 def delete_directory(dirpath: str) -> None:
-    if os.path.isdir(dirpath):
+    if not os.path.isdir(dirpath):
+        return
+    for attempt in range(4):
         try:
             shutil.rmtree(dirpath)
+            return
         except FileNotFoundError:
             # Under heavy parallel metadata load (Lustre) an rmdir/unlink can report ENOENT for an entry that is already gone.
             # Absence is the goal: finish the sweep and only fail if something is left behind.
             shutil.rmtree(dirpath, ignore_errors=True)
-            if os.path.isdir(dirpath):
+            if not os.path.isdir(dirpath):
+                return
+            raise
+        except OSError as e:
+            # On NFS a file deleted while a process still holds it open becomes a .nfs* file until that
+            # process exits, and its directory cannot be removed (EBUSY, ENOTEMPTY). Wait for it a little,
+            # then move the directory aside: the path is what the caller needs free.
+            if e.errno not in (errno.EBUSY, errno.ENOTEMPTY):
                 raise
+            if attempt < 3:
+                time.sleep(2**attempt)
+    aside = f"{dirpath}.stale-{os.getpid()}-{time.time_ns()}"
+    os.rename(dirpath, aside)
+    shutil.rmtree(aside, ignore_errors=True)
 
 
 def get_program_output(arguments: typing.List[str] = None, cwd=None, merge_stderr: bool = False):

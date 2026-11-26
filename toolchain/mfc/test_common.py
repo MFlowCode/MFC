@@ -69,6 +69,52 @@ def test_delete_directory_tolerates_enoent_from_a_concurrent_unlink():
         assert not target.exists()
 
 
+def _busy_rmtree(fail_times):
+    """An rmtree that raises EBUSY the first `fail_times` calls, as NFS does while a .nfs* file is held open."""
+    real_rmtree, calls = shutil.rmtree, []
+
+    def rmtree(path, *args, **kwargs):
+        calls.append(path)
+        if len(calls) <= fail_times and not kwargs.get("ignore_errors"):
+            raise OSError(16, "Device or resource busy", path)
+        return real_rmtree(path, *args, **kwargs)
+
+    return rmtree, calls
+
+
+def test_delete_directory_waits_out_a_busy_directory():
+    rmtree, calls = _busy_rmtree(2)
+    with tempfile.TemporaryDirectory() as d:
+        target = Path(d) / "restart_data"
+        (target / "lustre_0.dat").parent.mkdir(parents=True)
+        (target / "lustre_0.dat").write_text("x")
+        with patch("mfc.common.shutil.rmtree", rmtree), patch("mfc.common.time.sleep"):
+            delete_directory(str(target))
+        assert not target.exists()
+        assert len(calls) == 3
+
+
+def test_delete_directory_moves_a_directory_that_stays_busy_aside():
+    rmtree, _ = _busy_rmtree(99)
+    with tempfile.TemporaryDirectory() as d:
+        target = Path(d) / "restart_data"
+        target.mkdir()
+        with patch("mfc.common.shutil.rmtree", rmtree), patch("mfc.common.time.sleep"):
+            delete_directory(str(target))
+        assert not target.exists(), "the path must be free for the next run"
+
+
+def test_delete_directory_raises_other_errors():
+    def rmtree(path, *args, **kwargs):
+        raise PermissionError(13, "Permission denied", path)
+
+    with tempfile.TemporaryDirectory() as d:
+        target = Path(d) / "D"
+        target.mkdir()
+        with patch("mfc.common.shutil.rmtree", rmtree), pytest.raises(PermissionError):
+            delete_directory(str(target))
+
+
 def test_system_timeout_kills_a_hung_grandchild_that_holds_the_pipe():
     start = time.time()
     res = system(["sh", "-c", "sleep 60 & wait"], print_cmd=False, timeout=1, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
