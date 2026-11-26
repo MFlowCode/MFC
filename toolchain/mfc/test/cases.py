@@ -1472,7 +1472,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
             # IB-interior cells must not set the adaptive dt. A body moving through gas at rest carries its velocity into
             # its interior, so there |u| + c exceeds anywhere in the fluid and dt shrinks ~8% if those cells are counted.
-            # The edges sit on cell faces and the body moves 0.2 dx, so no cell crosses the surface.
+            # The edges sit 0.137 dx (x) and 0.213 dx (y) past cell faces, not on them (a face-aligned body made the result
+            # round-off sensitive), and the body moves 0.2 dx, so no cell centre crosses the surface.
             cases.append(
                 define_case_d(
                     stack,
@@ -1489,8 +1490,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "t_stop": 0.04,
                         **{f"patch_icpp({i})%{k}": v for i in range(1, 4) for k, v in [("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0)]},
                         "patch_ib(1)%geometry": 3,
-                        "patch_ib(1)%x_centroid": 0.5,
-                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%x_centroid": 0.50274,
+                        "patch_ib(1)%y_centroid": 0.50426,
                         "patch_ib(1)%length_x": 0.2,
                         "patch_ib(1)%length_y": 0.2,
                         "patch_ib(1)%slip": "F",
