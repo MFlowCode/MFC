@@ -2059,7 +2059,8 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
 
                 ! Species diffusion uses the face form down to the axis cell: its r = 0 face flux cancels against the geometric
-                ! source below. Without viscosity the axis cell's energy row takes the same form.
+                ! source below. Without viscosity the axis cell's energy row takes the same form; with viscosity it takes only the
+                ! cell-centred viscous stress, so the diffusive energy flux through face 0 is missing there (#2513).
                 if (chem_params%diffusion) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p

@@ -8,6 +8,11 @@ without viscosity. Rate = (q_visc - q_inviscid)/dt (the inviscid terms cancel), 
 exact_rates.RATES over the interior rings (the axis rings, the outer extrapolated rings and, for B3, r < 0.5
 where the Couette field is singular, are excluded). Errors are max norms relative to the largest exact momentum
 (energy) rate; B3, whose exact force is zero, is normalised by the pre-fix hoop error.
+
+S2 / S3 (species diffusion, h2o2, unity Lewis, at rest at uniform T and p): Y_H2 = Y0 + eps (r/R)^2 (times
+cos(theta) in 3D), with N2 compensating. Rate = (q with diffusion - q without)/dt of rho Y_H2. Exactly
+4 rho D eps/R^2 in 2D and 3 rho D eps cos(theta)/R^2 in 3D, the same at every r; c(r) is the rate (3D: its
+cos(theta) coefficient) over eps/R^2, compared with 4 (3) rho D = 4 (3) k/cp from Cantera at the base state.
 """
 
 import argparse
@@ -49,13 +54,51 @@ def grid(case, N, rd):
     rc = 0.5 * (yb[1:] + yb[:-1])
     thc = (np.arange(NP) + 0.5) * 2 * np.pi / NP if d3 else np.zeros(1)
     TH, RR = np.meshgrid(thc, rc, indexing="ij")
-    return d3, NP, (6 if d3 else 5), RR, TH
+    nv = os.path.getsize(os.path.join(rd, "restart_data", "lustre_0.dat")) // (8 * NP * N * NX)
+    return d3, NP, nv, RR, TH
+
+
+def species_state(RR, TH, d3):
+    """Cantera state of the species case: (gas, rho, E, Y) per (theta, r) cell, and rho D = k/cp of the base state."""
+    import cantera as ct
+
+    from case import SPECIES
+
+    gas = ct.Solution(SPECIES["mech"])
+    gas.TPY = SPECIES["T"], SPECIES["p"], SPECIES["Y0"]
+    rhoD = gas.thermal_conductivity / gas.cp_mass
+    ih2, in2 = gas.species_index("H2"), gas.species_index("N2")
+    f = SPECIES["eps"] * (RR / SPECIES["R"]) ** 2 * (np.cos(TH) if d3 else 1.0)
+    y0, E0 = gas.Y.copy(), gas.density * gas.int_energy_mass
+    rho, E, Y = np.empty(RR.shape), np.empty(RR.shape), np.empty(RR.shape + (gas.n_species,))
+    for idx in np.ndindex(RR.shape):
+        y = y0.copy()
+        y[ih2] += f[idx]
+        y[in2] -= f[idx]
+        gas.TPY = SPECIES["T"], SPECIES["p"], y
+        rho[idx], E[idx], Y[idx] = gas.density, gas.density * gas.int_energy_mass, gas.Y
+    return rho, E, Y, rhoD, ih2, E0
 
 
 def write_ic(case, N, rd):
     d3, NP, nv, RR, TH = grid(case, N, rd)
     f0 = os.path.join(rd, "restart_data", "lustre_0.dat")
     q = np.fromfile(f0).reshape(nv, NP, N, NX)
+    if case.startswith("S"):
+        nd = 3 if d3 else 2
+        rho, E, Y, _, _, E0 = species_state(RR, TH, d3)
+        assert nv == 3 + nd + Y.shape[-1], f"unexpected restart layout: {nv} variables"
+        # pre_process wrote the uniform base state: Cantera's energy must match MFC's for the state to be at uniform T
+        if abs(q[1 + nd].mean() / E0 - 1) > 1e-8:
+            sys.exit(f"MFC and Cantera energies differ: {q[1 + nd].mean():.12e} vs {E0:.12e}")
+        q[0] = rho[:, :, None]
+        q[1 : 1 + nd] = 0.0
+        q[1 + nd] = E[:, :, None]
+        q[2 + nd] = 1.0
+        for k in range(Y.shape[-1]):
+            q[3 + nd + k] = (rho * Y[..., k])[:, :, None]
+        q.tofile(f0)
+        return
     vel = FIELDS[case](RR, TH, A)[: 3 if d3 else 2]
     q[0] = 1.0
     for i, v in enumerate(vel):
@@ -89,9 +132,27 @@ def errors(case, N):
     return res
 
 
+def species_coefficient(case, N):
+    """c(r) over the interior rings, and 4 (2D) or 3 (3D) rho D from Cantera."""
+    rd = os.path.join(HERE, "runs", f"{case}_{N}_T")
+    d3, NP, nv, RR, TH = grid(case, N, rd)
+    from case import SPECIES
+
+    _, _, _, rhoD, ih2, _ = species_state(RR, TH, d3)
+    row = 3 + (3 if d3 else 2) + ih2
+
+    def ld(v):
+        return np.fromfile(os.path.join(HERE, "runs", f"{case}_{N}_{v}", "restart_data", "lustre_1.dat")).reshape(nv, NP, N, NX)[row].mean(axis=2)
+
+    rate = (ld("T") - ld("F")) / SPECIES["dt"]
+    c = (2.0 * (rate * np.cos(TH)).mean(axis=0) if d3 else rate[0]) / (SPECIES["eps"] / SPECIES["R"] ** 2)
+    kb = max(3, N // 16)
+    return c[kb : N - kb], (3.0 if d3 else 4.0) * rhoD
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--case", default="A3", choices=list(RATES))
+    p.add_argument("--case", default="A3", choices=[*RATES, "S2", "S3"])
     p.add_argument("-N", type=int, nargs="+", default=[32, 64, 128])
     p.add_argument("--no-run", action="store_true", help="only evaluate existing runs")
     a, flags = p.parse_known_args()
@@ -100,5 +161,9 @@ if __name__ == "__main__":
         if not a.no_run:
             for v in ("T", "F"):
                 run_one(a.case, N, v, flags)
+        if a.case.startswith("S"):
+            c, cex = species_coefficient(a.case, N)
+            print(f"{a.case} N={N}: c(r) mean {c.mean():.5e}, spread (max-min)/mean {np.ptp(c) / c.mean():.2e}, vs Cantera {cex:.5e}: {c.mean() / cex - 1:+.2e}")
+            continue
         res = errors(a.case, N)
         print(f"{a.case} N={N}: " + "; ".join(f"{c} err {e:.3e} (from pre-fix model {m:.3e})" for c, (e, m) in res.items()))

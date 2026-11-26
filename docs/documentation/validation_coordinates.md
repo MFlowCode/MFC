@@ -54,7 +54,7 @@ Limits: one transducer geometry and one probe point on the axis; the off-axis fi
 
 GNU 13.3 on the CPU, one rank; order from the last two grids. On an NVIDIA Quadro RTX 6000 (NVHPC 25.11, OpenACC, N = 32 and 64) every entry reproduces the CPU error to three digits. Before the fix, 3D lacked the \f$1/r\f$ of the \f$\theta\f$ divergence and of both hoop terms, and 2D used the Cartesian (x, r) stress (no \f$u_r/r\f$ in \f$\nabla\cdot\mathbf{u}\f$, no \f$-\tau_{\theta\theta}/r\f$). The errors then stay O(1) and the measured rates match those of the defective operator (`MASTER` in `exact_rates.py`) to within the errors in the table: the issue's case gives \f$(4 - r)\,\mu A\cos\theta/R^2\f$ instead of \f$3\,\mu A\cos\theta/R^2\f$. Species diffusion uses the same metric. With \f$Y_{H_2} = Y_0 + 10^{-3}(r/R)^2\f$ (times \f$\cos\theta\f$ in 3D) at rest in h2o2 with unity Lewis number, the exact rate of \f$\rho Y_{H_2}\f$ is the same at every r (\f$4\rho D\epsilon/R^2\f$ in 2D, \f$3\rho D\epsilon/R^2\f$ in 3D): the measured rate is flat in r to 4e-4 (3D, N = 64) and 5e-4 (2D, N = 128), and the 3D/2D ratio is 0.7503 against 3/4. Before the fix the radial species diffusion was skipped with the axis boundary. Heat conduction in \f$\theta\f$ was already correct and is unchanged to round-off.
 
-Limits: one step (the operator, not a time-accurate flow); smooth fields; the cells next to the axis and the outer boundary are excluded. Surface tension has no cylindrical metric terms and is not covered.
+Limits: one step (the operator, not a time-accurate flow); smooth fields; the cells next to the axis and the outer boundary are excluded. Surface tension has no cylindrical metric terms in its gradients and is not covered; in 3D its theta divergence and the theta-face hoop terms (which share the momentum flux slots) now carry the \f$1/r\f$. With viscosity and species diffusion together, the axis cell's energy row misses the diffusive energy flux through its outer face ([#2513](https://github.com/MFlowCode/MFC/issues/2513)).
 
 ## Stretched grid {#sec-validation-coordinates-stretched}
 
@@ -76,6 +76,6 @@ Limits: one stretching and one direction; a pulse that crosses the clustered reg
 ./mfc.sh run examples/2D_acoustic_support6_axisym/case.py -t pre_process simulation -n 1 -- --refine 4 --probe
 python3 examples/2D_acoustic_support6_axisym/check_focus.py examples/2D_acoustic_support6_axisym --case-args "--refine 4 --probe"
 ./mfc.sh run examples/1D_acoustic_gauss_sigmatime/case.py -t pre_process simulation post_process -n 1 -- -N 400 --stretch 4
-python3 examples/3D_cyl_viscous_mms/run_mms.py --case A3 -N 32 64 128   # also B3, C3, E2
+python3 examples/3D_cyl_viscous_mms/run_mms.py --case A3 -N 32 64 128   # also B3, C3, E2, and the species cases S2, S3
 python3 examples/1D_acoustic_gauss_sigmatime/check_acoustic.py examples/1D_acoustic_gauss_sigmatime --case-args "-N 400 --stretch 4"
 ```

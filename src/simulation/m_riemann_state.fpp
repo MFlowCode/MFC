@@ -902,7 +902,7 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     case (2)  ! y-face (radial face in r_cyl direction)
                         if (any_non_newtonian) then
@@ -912,7 +912,7 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cb(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         if (any_non_newtonian) then
@@ -922,9 +922,12 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     end select
+                    ! The axis face (r = 0) flux is unused (the axis cell takes the cell-centred stress); a unit radius keeps its
+                    ! divisions finite under FP traps
+                    if (r_eff <= 0._wp) r_eff = 1._wp
 
                     ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 1

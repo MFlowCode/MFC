@@ -10,6 +10,8 @@ MASTER gives the rates of the operator before #1910 was fixed: in 3D the theta d
 1/r; in 2D the stress is the Cartesian (x, r) one (div u without u_r/r) and there is no hoop term.
 """
 
+import os
+
 import sympy as sp
 
 x, r, th = sp.symbols("x r th", real=True)
@@ -64,4 +66,4 @@ if __name__ == "__main__":
         out.append(f"FIELDS['{k}'] = lambda r, th, A: ({f(ux)}, {f(ur)}, {f(ut)})")
         out.append(f"RATES['{k}'] = lambda r, th, A, mu, mub: ({', '.join(f(e) for e in rates(ux, ur, ut, d3))})")
         out.append(f"MASTER['{k}'] = lambda r, th, A, mu, mub: ({', '.join(f(e) for e in rates(ux, ur, ut, d3, master=True))})")
-    open("exact_rates.py", "w").write("\n".join(out) + "\n")
+    open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "exact_rates.py"), "w").write("\n".join(out) + "\n")
