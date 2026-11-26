@@ -3919,7 +3919,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for label, mods, tol in [
             ("2D -> Hypoelasticity -> HLLD -> IBM -> Fixed Circle -> Force", ib_cfg, 1e-5),
             ("2D -> Hypoelasticity -> HLLD -> IBM -> Two-way Circle", {**ib_cfg, "patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.1}, 1e-5),
-            ("3D -> Hypoelasticity -> HLLD -> IBM -> Fixed Sphere -> Force", ib_3d_cfg, None),
+            # with the default TSC and quadratic wall fill, Cray CCE (Frontier, OpenACC) differs from GNU by 1.1e-6 (abs) in a stress
+            ("3D -> Hypoelasticity -> HLLD -> IBM -> Fixed Sphere -> Force", ib_3d_cfg, 1e-5),
         ]:
             cases.append(define_case_f(label, "", mods=mods, override_tol=tol))
 
