@@ -19,13 +19,15 @@ account=${SCALING_ACCOUNT:-CFD154}
 # runner's checkout is shared with other workflows.
 config="--gpu mp --mpi --no-debug --no-reldebug"
 
+# First: the checkout is kept between runs, and a failed build must not leave the last run's logs to be recorded.
+rm -rf "$logs" scaling-run; mkdir -p "$logs" scaling-run
+
 . ./mfc.sh load -c famd -m g
 if [ -z "${SCALING_NO_BUILD:-}" ]; then
     ./mfc.sh build -j 8 $config -t pre_process simulation --case-optimization \
         -i examples/scaling/benchmark.py -- --scaling weak --memory "$weak_gb" || exit 1
 fi
 
-rm -rf "$logs" scaling-run; mkdir -p "$logs" scaling-run
 for N in "${nodes[@]}"; do
     sbatch --wait <<EOT > "$logs/submit-$N.out" 2>&1 &
 #!/bin/bash
