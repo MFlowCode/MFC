@@ -213,6 +213,17 @@ PHYSICS_DOCS = {
         "category": "Numerical Schemes",
         "explanation": ("weno_order must be 1, 3, 5, or 7. Grid must have enough cells. Only one of mapped_weno, wenoz, teno can be active."),
     },
+    "check_mpp_lim": {
+        "title": "Volume-Fraction Clipping (mpp_lim)",
+        "category": "Numerical Schemes",
+        "math": r"\alpha_i \leftarrow \min(\max(\alpha_i, 0), 1) \Big/ \textstyle\sum_j \min(\max(\alpha_j, 0), 1)",
+        "explanation": (
+            "mpp_lim clips the volume fractions (and partial densities) where the mixture equation of state is formed, "
+            "and in the 6-equation model also in the conserved state, without changing the energy, so it breaks the "
+            "pressure equilibrium of a moving material interface. A warning is issued when it is on, except with AMR "
+            "(which requires it for num_fluids > 1) and Euler-Euler bubbles (where it selects the multi-component closure)."
+        ),
+    },
     "check_muscl": {
         "title": "MUSCL Reconstruction",
         "category": "Numerical Schemes",
@@ -1705,6 +1716,17 @@ class CaseValidator:
         self.prohibit(muscl_lim is not None and (muscl_lim < 0 or muscl_lim > 5), "muscl_lim must be 0 (unlimited), 1, 2, 3, 4, or 5")
         if muscl_eps is not None:
             self.prohibit(muscl_eps < 0, "muscl_eps must be >= 0 (use 0 for textbook limiter behavior)")
+
+    def check_mpp_lim(self):
+        """Advisory (#2476): mpp_lim breaks interface pressure equilibrium. AMR requires it, and with Euler-Euler
+        bubbles it selects the multi-fluid closure, so neither warns."""
+        if self.get("mpp_lim", "F") != "T":
+            return
+        self.warn(
+            self.get("amr", "F") != "T" and self.get("bubbles_euler", "F") != "T",
+            "mpp_lim clips volume fractions to [0, 1] where the mixture equation of state is formed, which breaks pressure "
+            "equilibrium at material interfaces; use it only if the case fails without it (see mpp_lim in docs/documentation/case.md)",
+        )
 
     def check_model_eqns_simulation(self):
         """Checks model equation constraints specific to simulation"""
@@ -3803,6 +3825,7 @@ class CaseValidator:
         self.check_muscl_simulation()
         self.check_interface_compression()
         self.check_model_eqns_simulation()
+        self.check_mpp_lim()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
         self.check_mean_pressure_gradient()

@@ -17,3 +17,5 @@ step. `check_saturation.py` reads the relaxed state and prints, in every cell, t
 
 The initial state lies on the saturation curve to 2.5e-7 K. The fluid parameters give T_sat(1 atm) = 373.79 K (373.12 K
 measured). Only the equilibrium of the relaxed state is checked, not the wave structure. See @ref validation_multiphase_riemann.
+
+`mpp_lim` is off: this case runs without it, and it breaks pressure equilibrium at material interfaces (see `mpp_lim` in @ref case).

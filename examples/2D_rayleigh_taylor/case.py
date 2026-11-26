@@ -57,7 +57,7 @@ data = {
     "model_eqns": "6eq",
     "alt_soundspeed": "F",
     "mixture_err": "T",
-    "mpp_lim": "T",
+    "mpp_lim": "F",
     "time_stepper": "rk3",
     "avg_state": "arithmetic",
     "weno_order": 5,

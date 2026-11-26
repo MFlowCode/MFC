@@ -552,6 +552,34 @@ class TestWenoReFluxWithoutAvg(ConstraintTestCase):
         self.assertAccepts({**self.VISCOUS, "weno_Re_flux": "F"})
 
 
+class TestMppLimWarning(unittest.TestCase):
+    """mpp_lim breaks interface pressure equilibrium (#2476): a warning, except where AMR requires it or bubbles use it."""
+
+    MSG = "mpp_lim clips volume fractions"
+
+    def warned(self, params):
+        return any(self.MSG in w for w in CaseValidator(dict(params)).validate("simulation"))
+
+    def test_warns_when_on(self):
+        self.assertTrue(self.warned({**TWO_FLUID, "mpp_lim": "T"}))
+
+    def test_silent_when_off(self):
+        self.assertFalse(self.warned(TWO_FLUID))
+
+    def check_only(self, params):
+        """The rule alone: a full valid AMR or Euler-Euler bubble case needs many unrelated keys."""
+        validator = CaseValidator(dict(params))
+        validator.check_mpp_lim()
+        return any(self.MSG in w for w in validator.warnings)
+
+    def test_silent_with_two_fluid_amr(self):
+        self.assertTrue(self.check_only({**TWO_FLUID, "mpp_lim": "T"}))
+        self.assertFalse(self.check_only({**TWO_FLUID, "mpp_lim": "T", "amr": "T"}))
+
+    def test_silent_with_bubbles_euler(self):
+        self.assertFalse(self.check_only({**TWO_FLUID, "mpp_lim": "T", "bubbles_euler": "T"}))
+
+
 class TestNumLocalIbsMax(ConstraintTestCase):
     """num_local_ibs_max sizes the per-rank IB arrays and must be positive."""
 

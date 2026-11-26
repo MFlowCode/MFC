@@ -33,7 +33,7 @@ print(
             "model_eqns": "6eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
+            "mpp_lim": "F",
             # Correct errors when computing speed of sound
             "mixture_err": "T",
             # Use TVD RK3 for time marching

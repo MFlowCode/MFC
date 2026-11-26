@@ -24,3 +24,5 @@ against sqrt(A g k) = 12.41 1/s without viscosity).
 
 The 32-cell CPU run takes 66 minutes; the 100-cell GPU run about 1.5 hours. On NVIDIA GPUs use `--case-optimization`
 ([#2466](https://github.com/MFlowCode/MFC/issues/2466)). See @ref validation_interface_instabilities.
+
+`mpp_lim` is off: this case runs without it, and it breaks pressure equilibrium at material interfaces (see `mpp_lim` in @ref case).
