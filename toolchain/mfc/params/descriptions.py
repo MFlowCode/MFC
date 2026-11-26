@@ -54,7 +54,7 @@ DESCRIPTIONS = {
     "model_eqns": "Model equations",
     "num_fluids": "Number of fluid components",
     "num_patches": "Number of initial condition patches",
-    "mpp_lim": "Enable mixture pressure positivity limiter",
+    "mpp_lim": "Clip volume fractions to [0, 1] in the mixture EOS (breaks interface pressure equilibrium)",
     "mixture_err": "Enable mixture error checking",
     "alt_soundspeed": "Use alternative sound speed formulation",
     # WENO reconstruction

@@ -566,6 +566,19 @@ class TestMppLimWarning(unittest.TestCase):
     def test_silent_when_off(self):
         self.assertFalse(self.warned(TWO_FLUID))
 
+    def check_only(self, params):
+        """The rule alone: a full valid AMR or Euler-Euler bubble case needs many unrelated keys."""
+        validator = CaseValidator(dict(params))
+        validator.check_mpp_lim()
+        return any(self.MSG in w for w in validator.warnings)
+
+    def test_silent_with_two_fluid_amr(self):
+        self.assertTrue(self.check_only({**TWO_FLUID, "mpp_lim": "T"}))
+        self.assertFalse(self.check_only({**TWO_FLUID, "mpp_lim": "T", "amr": "T"}))
+
+    def test_silent_with_bubbles_euler(self):
+        self.assertFalse(self.check_only({**TWO_FLUID, "mpp_lim": "T", "bubbles_euler": "T"}))
+
 
 class TestNumLocalIbsMax(ConstraintTestCase):
     """num_local_ibs_max sizes the per-rank IB arrays and must be positive."""
