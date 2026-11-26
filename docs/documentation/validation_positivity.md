@@ -5,7 +5,7 @@
 **Status:** validated (runs complete, density and pressure positive, agreement with a 1D spherical reference, order of accuracy
 unchanged on smooth flow). **Code:** `master` at bb9cfe5e1 plus `face_bound = 2`. **Examples:** `examples/2D_vacuum_collapse`,
 `examples/3D_amr_blast` (run without AMR). **Issues:** [#2469](https://github.com/MFlowCode/MFC/issues/2469),
-[#2344](https://github.com/MFlowCode/MFC/issues/2344). **Last run:** 2026-11-25.
+[#2344](https://github.com/MFlowCode/MFC/issues/2344). **Last run:** 2026-11-26.
 
 ## Purpose
 
@@ -106,18 +106,26 @@ energy are unchanged to 4e-13 until the outer rarefaction reaches the boundary.
 
 ## Order of accuracy
 
-The advection convergence cases (`./mfc.sh test --only Convergence`) with `--face-bound 2`:
+The advection convergence cases (`./mfc.sh test --only Convergence`) with `--face-bound 2`. Fitted order, and the L2 error on
+the finest grid (Phoenix, GNU 12.3, double):
 
 | Case | WENO5 | WENO5, `face_bound = 2` |
 | :--- | :--- | :--- |
-| TBD | | |
+| 1D, N = 32, 64, 128 | 5.00, 3.298884e-11 | 5.00, 3.298884e-11 |
+| 2D, N = 32, 64, 96 | 5.00, 3.714029e-10 | 5.00, 3.714029e-10 |
+| 3D, N = 32, 64 | 5.00, 6.351377e-09 | 5.00, 6.351377e-09 |
+
+The errors agree to all printed digits: on these smooth fields every bound already holds, so the limiter does not act.
 
 ## Limits
 
 - The guarantee holds for \f$\Delta t \sum_d \max(|u_d| + c)/\Delta x_d \le w\f$ (1/12 for WENO5). The runs above use larger
   steps and stay positive, but a strong enough expansion at a large CFL, such as the 123 problem with \f$u = \pm 3\f$ at
   CFL 0.7, still produces a negative cell average.
-- Volume fractions and partial densities are bounded at the faces only; their cell averages also depend on the non-conservative
-  \f$\alpha\,\nabla\cdot u\f$ term.
+- Of the densities, only the mixture density is bounded. Each partial density is scaled by the shared theta without a floor of
+  its own, so the face partial density of a trace fluid can still be slightly negative where the sum is positive. The
+  partial-density equations are conservative, so their cell averages follow the faces.
+- Volume fractions get their own theta into [0, 1] at the faces, but their cell averages also depend on the non-conservative
+  \f$\alpha\,\nabla\cdot u\f$ term, which the bound does not control.
 - Values from `face_bound = 1` and `face_bound = 2` differ only where the extra bounds act. In the 1-fluid 2D collapse they gave
   the same minima to four digits.
