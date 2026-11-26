@@ -1,10 +1,10 @@
-This file was created on 2026-11-25 15:43:54.822704.
+This file was created on 2026-11-26 10:17:18.393433.
 
 mfc.sh:
 
-    Invocation: test --no-build --no-gpu --generate -o 22789119 3A474BEE 5EBC6418 EC935FC5 3D28F3B1 DF3FF10D ECFE38B1 6EBD0A89 -j 8 --max-attempts 1 -- -c frontier_amd
+    Invocation: test --no-build --no-gpu --generate -o EC935FC5 -j 1 --max-attempts 1 -- -c frontier_amd
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        bb9cfe5e134861e2cc39f1fd01d319c609710b53 on amr-alpha-reflux (dirty)
+    Git:        fb7ce6fc8797ffddee5ed2ec1b353f622ed2a14e on amr-alpha-reflux (dirty)
 
 simulation:
 
