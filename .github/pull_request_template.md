@@ -72,13 +72,13 @@ base=$(git merge-base FETCH_HEAD HEAD) || { echo "No commit shared with master. 
 base=$(git rev-parse --short $base)
 [ $base != $(git rev-parse --short HEAD) ] || { echo "Nothing to compare: your commit is already in master."; exit 1; }
 [ -d ../mfc-$base ] || git worktree add --detach ../mfc-$base $base
-source .github/scripts/detect-gpus.sh
+ngpus=1    # GPUs to use, one MPI rank each. To pick which ones, add -g <ids> to the bench line.
 
 # NVIDIA or Cray: --gpu acc. AMD flang: --gpu mp. On a cluster, add -c <computer> after "--".
 for tree in ../mfc-$base .; do
     (cd $tree &&
         ./mfc.sh build --gpu acc -j 8 &&
-        ./mfc.sh bench --mem 4 -o build/bench.yaml -- --gpu acc -g $gpu_ids -n $ngpus)
+        ./mfc.sh bench --mem 4 -o build/bench.yaml -- --gpu acc -n $ngpus)
 done
 
 GITHUB_STEP_SUMMARY=build/speed.md ./mfc.sh bench_diff ../mfc-$base/build/bench.yaml build/bench.yaml
