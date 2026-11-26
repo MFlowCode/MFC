@@ -114,6 +114,7 @@ def main():
 
     if args.case.startswith("S"):
         case.update(species_case(args, d3))
+        del case["fluid_pp(1)%pi_inf"]  # ideal gas
         if d3:
             case["patch_icpp(1)%radius"] = 2.0 * SPECIES["R"]
         else:

@@ -21,7 +21,8 @@ The trailing flags are passed to `./mfc.sh run` (use the build flags of your bui
 to `examples/3D_cyl_viscous_mms/runs/` and prints, per grid and component, the max-norm error relative to the
 largest exact rate and the distance to the rates of the operator before the fix (`MASTER` in `exact_rates.py`).
 For `S2`/`S3` the toggle is species diffusion (`chem_params%diffusion`), the state is set with Cantera, and the
-script prints `c(r)`, the rate (3D: its `cos(theta)` coefficient) over `eps/R^2`: its spread over the interior
-rings, and its mean against `4 rho D` (`3 rho D`) with `rho D = k/cp` from Cantera at the base state. The species
-cases need a chemistry build (`h2o2.yaml`).
+script prints the max-norm error of `c(r)`, the rate (3D: its `cos(theta)` coefficient) over `eps/R^2`, against its
+exact value with `rho D = k/cp` from Cantera (in 2D `4 rho D + 2 r d(rho D)/dr`, since `rho D` follows the local
+composition), relative to the exact mean. It includes the difference between Cantera's and MFC's transport fits.
+The species cases need a chemistry build (`h2o2.yaml`).
 Results: `docs/documentation/validation_coordinates.md`.

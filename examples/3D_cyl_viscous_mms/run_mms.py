@@ -10,9 +10,10 @@ where the Couette field is singular, are excluded). Errors are max norms relativ
 (energy) rate; B3, whose exact force is zero, is normalised by the pre-fix hoop error.
 
 S2 / S3 (species diffusion, h2o2, unity Lewis, at rest at uniform T and p): Y_H2 = Y0 + eps (r/R)^2 (times
-cos(theta) in 3D), with N2 compensating. Rate = (q with diffusion - q without)/dt of rho Y_H2. Exactly
-4 rho D eps/R^2 in 2D and 3 rho D eps cos(theta)/R^2 in 3D, the same at every r; c(r) is the rate (3D: its
-cos(theta) coefficient) over eps/R^2, compared with 4 (3) rho D = 4 (3) k/cp from Cantera at the base state.
+cos(theta) in 3D), with N2 compensating. Rate = (q with diffusion - q without)/dt of rho Y_H2; c(r) is the rate
+(3D: its cos(theta) coefficient) over eps/R^2, against its exact value with rho D = k/cp from Cantera (see
+species_coefficient). The error, relative to the exact mean, includes the difference between Cantera's and MFC's
+transport fits.
 """
 
 import argparse
@@ -59,25 +60,34 @@ def grid(case, N, rd):
 
 
 def species_state(RR, TH, d3):
-    """Cantera state of the species case: (gas, rho, E, Y) per (theta, r) cell, and rho D = k/cp of the base state."""
+    """Cantera state of the species case per (theta, r) cell: rho, E, Y; rho D = k/cp(f) as a function of the H2 shift
+    f; the index of H2; the base-state energy."""
     import cantera as ct
 
     from case import SPECIES
 
     gas = ct.Solution(SPECIES["mech"])
     gas.TPY = SPECIES["T"], SPECIES["p"], SPECIES["Y0"]
-    rhoD = gas.thermal_conductivity / gas.cp_mass
     ih2, in2 = gas.species_index("H2"), gas.species_index("N2")
-    f = SPECIES["eps"] * (RR / SPECIES["R"]) ** 2 * (np.cos(TH) if d3 else 1.0)
     y0, E0 = gas.Y.copy(), gas.density * gas.int_energy_mass
+
+    def at(f):
+        y = y0.copy()
+        y[ih2] += f
+        y[in2] -= f
+        gas.TPY = SPECIES["T"], SPECIES["p"], y
+        return gas
+
+    def rho_d(f):
+        g = at(f)
+        return g.thermal_conductivity / g.cp_mass
+
+    f = SPECIES["eps"] * (RR / SPECIES["R"]) ** 2 * (np.cos(TH) if d3 else 1.0)
     rho, E, Y = np.empty(RR.shape), np.empty(RR.shape), np.empty(RR.shape + (gas.n_species,))
     for idx in np.ndindex(RR.shape):
-        y = y0.copy()
-        y[ih2] += f[idx]
-        y[in2] -= f[idx]
-        gas.TPY = SPECIES["T"], SPECIES["p"], y
-        rho[idx], E[idx], Y[idx] = gas.density, gas.density * gas.int_energy_mass, gas.Y
-    return rho, E, Y, rhoD, ih2, E0
+        g = at(f[idx])
+        rho[idx], E[idx], Y[idx] = g.density, g.density * g.int_energy_mass, g.Y
+    return rho, E, Y, rho_d, ih2, E0
 
 
 def write_ic(case, N, rd):
@@ -133,21 +143,32 @@ def errors(case, N):
 
 
 def species_coefficient(case, N):
-    """c(r) over the interior rings, and 4 (2D) or 3 (3D) rho D from Cantera."""
+    """c(r) over the interior rings and its exact value: in 2D (1/r) d(r rho D dY/dr)/dr / (eps/R^2) = 4 rho D + 2 r d(rho D)/dr,
+    with rho D(r) = k/cp of the local composition; in 3D the cos(theta) coefficient is 3 rho D of the base state (the
+    variation of rho D contributes only to the 0 and 2 theta modes, at O(eps^2))."""
     rd = os.path.join(HERE, "runs", f"{case}_{N}_T")
     d3, NP, nv, RR, TH = grid(case, N, rd)
     from case import SPECIES
 
-    _, _, _, rhoD, ih2, _ = species_state(RR, TH, d3)
+    _, _, _, rho_d, ih2, _ = species_state(RR, TH, d3)
     row = 3 + (3 if d3 else 2) + ih2
 
     def ld(v):
         return np.fromfile(os.path.join(HERE, "runs", f"{case}_{N}_{v}", "restart_data", "lustre_1.dat")).reshape(nv, NP, N, NX)[row].mean(axis=2)
 
     rate = (ld("T") - ld("F")) / SPECIES["dt"]
-    c = (2.0 * (rate * np.cos(TH)).mean(axis=0) if d3 else rate[0]) / (SPECIES["eps"] / SPECIES["R"] ** 2)
+    eps, R = SPECIES["eps"], SPECIES["R"]
+    c = (2.0 * (rate * np.cos(TH)).mean(axis=0) if d3 else rate[0]) / (eps / R**2)
     kb = max(3, N // 16)
-    return c[kb : N - kb], (3.0 if d3 else 4.0) * rhoD
+    r = RR[0, kb : N - kb]
+    if d3:
+        cex = np.full_like(r, 3.0 * rho_d(0.0))
+    else:
+        h = 1.0e-3 * R
+        rd_r = np.array([rho_d(eps * (x / R) ** 2) for x in r])
+        drd = np.array([(rho_d(eps * ((x + h) / R) ** 2) - rho_d(eps * ((x - h) / R) ** 2)) / (2 * h) for x in r])
+        cex = 4.0 * rd_r + 2.0 * r * drd
+    return c[kb : N - kb], cex
 
 
 if __name__ == "__main__":
@@ -163,7 +184,7 @@ if __name__ == "__main__":
                 run_one(a.case, N, v, flags)
         if a.case.startswith("S"):
             c, cex = species_coefficient(a.case, N)
-            print(f"{a.case} N={N}: c(r) mean {c.mean():.5e}, spread (max-min)/mean {np.ptp(c) / c.mean():.2e}, vs Cantera {cex:.5e}: {c.mean() / cex - 1:+.2e}")
+            print(f"{a.case} N={N}: rho Y_H2 rate, max |c - c_exact| / mean c_exact = {np.abs(c - cex).max() / cex.mean():.3e} (c mean {c.mean():.5e}, exact {cex.mean():.5e})")
             continue
         res = errors(a.case, N)
         print(f"{a.case} N={N}: " + "; ".join(f"{c} err {e:.3e} (from pre-fix model {m:.3e})" for c, (e, m) in res.items()))
