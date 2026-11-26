@@ -37,52 +37,46 @@ Command that shows it:
 
 ## 3. Is it slower?
 
-When required, run the benchmarks on a GPU yourself. A pull request without these results is incomplete.
+Required for `src/` and build changes: benchmark your base commit and your PR on the same hardware.
+Any supported GPU will do. No GPU? Run on CPUs and say so.
 
-GPU and compiler:
+Hardware and compiler:
 
 Base commit:
 
 PR commit:
 
-<!-- Replace this line with the contents of build/speed.md -->
+<!-- Paste build/speed.md here -->
 
-If a case is below 0.95, run the commands again from the `for` loop, paste both tables, and explain it only if it stays below. If no benchmark case uses your change, add master and PR grind times for a case that does.
+Explain any grind speedup below 0.95 that shows up twice.
 
 <details>
-<summary>Commands (run from your PR checkout, inside a GPU allocation)</summary>
+<summary>Commands</summary>
 
 ```bash
-# Commit your changes first, so the PR commit id matches what you measure.
+# Run inside a GPU job with your compiler loaded (supported clusters: source ./mfc.sh load -c <slug> -m g).
+(
+set -e    # stop at the first failure
+rm -f build/speed.md
+git diff --quiet HEAD || { echo "Commit your changes first."; exit 1; }
 git fetch https://github.com/MFlowCode/MFC.git master
-base=$(git merge-base FETCH_HEAD HEAD)
-# Creates ../mfc-base, or moves one left from an earlier run to this base.
-if [ -d ../mfc-base ]; then
-    git -C ../mfc-base checkout --detach $base
-else
-    git worktree add --detach ../mfc-base $base
-fi
-
-# <slug> is from toolchain/modules; <computer> names a file in toolchain/templates. On Frontier they are f and frontier.
-# Elsewhere, load your own modules and drop both -c options.
-source ./mfc.sh load -c <slug> -m g
-
-# One rank on every GPU in the allocation, as CI does: sets $gpu_ids and $ngpus.
+base=$(git merge-base FETCH_HEAD HEAD) || { echo "No commit shared with master. Shallow clone? Run: git fetch --unshallow"; exit 1; }
+base=$(git rev-parse --short $base)
+[ $base != $(git rev-parse --short HEAD) ] || { echo "Nothing to compare: your commit is already in master."; exit 1; }
+[ -d ../mfc-$base ] || git worktree add --detach ../mfc-$base $base
 source .github/scripts/detect-gpus.sh
 
-# Use --gpu mp for OpenMP offload.
-for tree in ../mfc-base .; do
+# NVIDIA or Cray: --gpu acc. AMD flang: --gpu mp. On a cluster, add -c <computer> after "--".
+# CPU only: drop --gpu and -g, and use --mem 1 -n <cores>.
+for tree in ../mfc-$base .; do
     (cd $tree &&
-        rm -f build/bench.yaml &&
         ./mfc.sh build --gpu acc -j 8 &&
-        ./mfc.sh bench --mem 4 -o build/bench.yaml -- -c <computer> --gpu acc -g $gpu_ids -n $ngpus)
+        ./mfc.sh bench --mem 4 -o build/bench.yaml -- --gpu acc -g $gpu_ids -n $ngpus)
 done
 
-rm -f build/speed.md
-GITHUB_STEP_SUMMARY=build/speed.md ./mfc.sh bench_diff ../mfc-base/build/bench.yaml build/bench.yaml
-
-echo "Base commit: $(git -C ../mfc-base rev-parse --short HEAD)"
-echo "PR commit: $(git rev-parse --short HEAD)"
+GITHUB_STEP_SUMMARY=build/speed.md ./mfc.sh bench_diff ../mfc-$base/build/bench.yaml build/bench.yaml
+echo "Base commit: $base"; echo "PR commit: $(git rev-parse --short HEAD)"
+)
 ```
 
 </details>
