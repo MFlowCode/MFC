@@ -127,7 +127,19 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
             # against local symbol". Link a non-PIE executable to accept them.
             # Release links fine via LTO's link-time PIC codegen, so it is left alone.
             add_link_options(-no-pie)
+            # The checks this flang has (it has no -fcheck=bounds, and its -fsanitize=address does
+            # not instrument array accesses): trap on invalid, divide-by-zero and overflow, and fill
+            # uninitialised locals with 0xff bytes (reals NaN, integers -1) so their use shows.
+            # Older flangs (flang-new 20) know neither flag, so each is added only where accepted.
             add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
+            check_fortran_compiler_flag("-ffpe-trap=invalid,zero,overflow" MFC_FLANG_FPE_TRAP)
+            if (MFC_FLANG_FPE_TRAP)
+                add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-ffpe-trap=invalid,zero,overflow>)
+            endif()
+            check_fortran_compiler_flag("-finit-local=0xff" MFC_FLANG_INIT_LOCAL)
+            if (MFC_FLANG_INIT_LOCAL)
+                add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-finit-local=0xff>)
+            endif()
         endif()
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "Intel") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM"))
@@ -176,6 +188,13 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
             $<$<COMPILE_LANGUAGE:Fortran>:-traceback>
             $<$<COMPILE_LANGUAGE:Fortran>:-Mbounds>
         )
+    endif()
+
+    # On CPU, a checked build also stops at an invalid operation, a division by zero or an
+    # overflow; offloaded code cannot. Not -Mchkptr: it rejects a disassociated pointer passed
+    # to an optional dummy, which Fortran 2008 reads as an absent argument and MFC relies on.
+    if ((CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug") AND NOT (MFC_OpenACC OR MFC_OpenMP))
+        add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-Ktrap=fp>)
     endif()
 
     if (DEFINED ENV{MFC_CUDA_CC})

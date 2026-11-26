@@ -424,8 +424,8 @@ function scaling(records) {
     const status = MFCCI.scalingStatus(records), latest = status.latest, pct = v => `${v.toFixed(0)}%`;
     const eff = (r, kind) => status.measure(r).filter(x => x.kind === kind);
     $("scaleverdict").innerHTML = `<span class="dot ${status.bad.length ? "bad" : "good"}"></span>` + (status.bad.length
-        ? `<b>Regressed:</b> ${status.bad.map(x => `${x.kind} at ${x.nodes} ${x.nodes === 1 ? "node" : "nodes"}`).join(", ")}.` : `<b>Within tolerance.</b>`)
-        + ` A run fails, and opens an issue, when efficiency falls more than ${MFCCI.SCALING.points} points below the median of the last ${MFCCI.SCALING.runs} runs, grind time at the smallest size rises more than ${MFCCI.SCALING.grind}%, or weak efficiency is under ${MFCCI.SCALING.weakFloor}%.`;
+        ? `<b>Regressed:</b> ${status.bad.map(x => `${x.kind} at ${x.nodes} ${x.nodes === 1 ? "node" : "nodes"}${x.missing ? " (no result)" : ""}`).join(", ")}.` : `<b>Within tolerance.</b>`)
+        + ` A run fails, and opens an issue, when efficiency falls more than ${MFCCI.SCALING.points} points below the median of the last ${MFCCI.SCALING.runs} accepted runs, grind time at the smallest size rises more than ${MFCCI.SCALING.grind}%, a size has no result, or weak efficiency is under ${MFCCI.SCALING.weakFloor}%. A run that regressed does not count towards that median.`;
     $("scaletable").innerHTML = `<tr><th>${day(latest.t)} · ${links(latest)}</th><th>Nodes</th><th>GPUs</th><th>Grid points</th><th>Grind time</th><th>Efficiency</th><th>Usual</th><th></th></tr>`
         + status.rows.map(x => `<tr><td>${x.kind === "weak" ? "Weak" : "Strong"}</td><td>${x.nodes}</td><td>${x.ranks}</td><td>${(x.cells / 1e6).toFixed(0)} M</td><td>${x.grind.toPrecision(3)} ns</td>`
             + `<td>${x.base ? "–" : pct(x.eff)}</td><td>${x.usual === null ? "–" : x.base ? `${x.usual.toPrecision(3)} ns` : pct(x.usual)}</td>`

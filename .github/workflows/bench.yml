@@ -226,6 +226,18 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # A pull request's numbers and master's, for the comment bench-comment.yml posts.
+      - name: Archive Comparison
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v6
+        with:
+          name: bench-compare-${{ matrix.cluster }}-${{ matrix.device }}-${{ matrix.interface }}
+          path: |
+            pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml
+            master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml
+          if-no-files-found: ignore
+          retention-days: 7
+
       # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)
         if: always() && matrix.cluster != 'phoenix'
@@ -264,7 +276,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BASE: ${{ needs.file-changes.outputs.base }}
         run: |
-          if [ -z "$DEPLOY_KEY" ]; then echo "::error::The CI_DATA_DEPLOY_KEY secret is not set and the benchmark history cannot be recorded."; exit 1; fi
           pip3 install --quiet PyYAML
           date=$(git show -s --format=%cI "$GITHUB_SHA")
           subject=$(git show -s --format=%s "$GITHUB_SHA")
@@ -283,22 +294,8 @@ jobs:
           done
           if [ ! -s new.jsonl ]; then echo "No benchmark results to record."; exit 0; fi
 
-          install -m 600 /dev/null ~/deploy_key && printf '%s\n' "$DEPLOY_KEY" > ~/deploy_key
-          export GIT_SSH_COMMAND="ssh -i ~/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
-          # Other recorders push to the same repository: on a rejected push, start again from a fresh clone.
-          for attempt in 1 2 3 4 5; do
-            rm -rf ../history
-            git clone --depth=1 git@github.com:MFlowCode/MFC-ci-data.git ../history
-            # Not the lines already there: a re-run of this run records its other lanes again.
-            grep -vxFf ../history/benchmarks.jsonl new.jsonl >> ../history/benchmarks.jsonl || true
-            git -C ../history config user.name  'MFC Action'
-            git -C ../history config user.email '<>'
-            git -C ../history add benchmarks.jsonl
-            git -C ../history commit -m "Benchmarks @ ${GITHUB_SHA::7}" || { echo "Already recorded."; echo "recorded=true" >> "$GITHUB_OUTPUT"; exit 0; }
-            if git -C ../history push; then echo "recorded=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-            sleep $((attempt * 7))
-          done
-          echo "::error::Could not push the benchmark history after 5 attempts."; exit 1
+          .github/scripts/ci-data-append.sh benchmarks.jsonl new.jsonl "Benchmarks @ ${GITHUB_SHA::7}"
+          echo "recorded=true" >> "$GITHUB_OUTPUT"
 
       - name: Say so when the history cannot be recorded
         if: failure()
