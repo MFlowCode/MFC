@@ -5129,12 +5129,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     )
 
     # ib_flux_wall (with its surface records) on the same example and mechanism: the wall faces carry the surface solve's species,
-    # mass and energy fluxes.
+    # mass and energy fluxes. 1e-7: the GitHub ubuntu GNU lane differs from the Phoenix GNU 12.3 golden by 4e-9 relative.
     cases.append(
         define_case_f(
             "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
+            override_tol=1e-7,
         )
     )
 
