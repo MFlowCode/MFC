@@ -90,7 +90,7 @@ the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, ad
 registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies). Every block's store column is
 sized to the block size cap (`amr_max_grid_size`, or the rank-derived cap) plus ghost layers, so it also prints that column's
 size and, per level, the most blocks any rank held over the run, their store, and how much of its column (ghost layers
-included, so below 1 even at the cap) a block's interior fills (min, mean, max).
+included, so below 1 even at the cap) a block's interior fills (min, mean, max). Each level's row also splits its store into the ghost-layer part and gives its flux registers (one register slot per block), and GPU builds add one line with the device and host totals: every group but the IB marker copies is device-resident and keeps a host mirror.
 
 ## Supported physics {#amr-physics}
 
