@@ -4993,7 +4993,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "examples/2D_ibm_moving_mass_budget/case.py",
             args=["--Re", "40", "--Twall", "0.9", "--ip_interp", "2"],
             mods={"parallel_io": "F"},
-            override_tol=1e-6,  # W152-TBD: set from the measured spread with ib_wall_order = 2
+            # GNU 12.3 and NVHPC 25.11 (Quadro RTX 6000) agreed to 2e-11 with the default TSC and quadratic wall fill
+            override_tol=1e-9,
         )
     )
 
@@ -5123,8 +5124,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
-            # With TSC and the quadratic wall fill (the defaults) GNU 12.3 and NVHPC 25.11 (CPU and A100) differ by 1e-7 in one value
-            override_tol=1e-6,
         )
     )
 
