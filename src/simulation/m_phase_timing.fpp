@@ -66,7 +66,7 @@ module m_phase_timing
     real(wp), allocatable :: mem_fill_min(:), mem_fill_max(:), mem_fill_sum(:), mem_fill_n(:)
     real(wp)              :: mem_col_mib = 0._wp
     !> Ghost-layer share of one store column (s_mem_note_level) and one block's flux-register slot (s_mem_note_reg_slot).
-    real(wp)              :: mem_ghost_frac = 0._wp, mem_reg_slot_mib = 0._wp
+    real(wp) :: mem_ghost_frac = 0._wp, mem_reg_slot_mib = 0._wp
 
 contains
 
@@ -159,10 +159,11 @@ contains
             & 'x the coarse extent (largest block or batch slab)'
         if (.not. allocated(mem_lev_hw)) return
         print '(A,F10.2,A)', '[amr-mem] per block ', mem_col_mib, ' MiB of store (every block is sized to the size cap)'
-        print '(A)', '[amr-mem] level  blocks/rank  store MiB  ghost MiB  regs MiB   fill min    mean     max  (busiest rank, high-water over regrids)'
+        print '(A)', &
+            & '[amr-mem] level  blocks/rank  store MiB  ghost MiB  regs MiB   fill min    mean     max  (busiest rank, high-water over regrids)'
         do i = 1, size(mem_lev_hw)
             if (mem_fill_n(i) <= 0._wp) cycle
-            print '(A,I5,I13,3F11.1,3F9.3)', '[amr-mem] ', i, mem_lev_hw(i), mem_lev_hw(i)*mem_col_mib, &
+            print '(A,I5,I13,3F11.3,3F9.3)', '[amr-mem] ', i, mem_lev_hw(i), mem_lev_hw(i)*mem_col_mib, &
                 & mem_lev_hw(i)*mem_col_mib*mem_ghost_frac, mem_lev_hw(i)*mem_reg_slot_mib, mem_fill_min(i), &
                 & mem_fill_sum(i)/mem_fill_n(i), mem_fill_max(i)
         end do
