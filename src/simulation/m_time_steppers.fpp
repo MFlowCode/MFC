@@ -213,8 +213,10 @@ contains
 
             do i = 1, num_probe_ts
                 do j = 1, sys_size
+                    ! Zeroed: the acceleration probe reads all four levels from the first step, before they hold a state
                     @:ALLOCATE(q_prim_ts1(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
+                    q_prim_ts1(i)%vf(j)%sf = 0._wp
                 end do
                 @:ACC_SETUP_VFs(q_prim_ts1(i))
             end do
@@ -229,6 +231,7 @@ contains
                 do j = 1, sys_size
                     @:ALLOCATE(q_prim_ts2(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
+                    q_prim_ts2(i)%vf(j)%sf = 0._wp
                 end do
                 @:ACC_SETUP_VFs(q_prim_ts2(i))
             end do
@@ -714,13 +717,10 @@ contains
 
         integer, intent(in) :: stage
 
-        ! Before the first RHS the conservative ghosts are unset; Lagrange refills the primitive ones below
+        ! The interior only: before the first RHS the conservative ghosts are unset (a zero bubble number density
+        ! divides by zero there). The Euler source reads no ghost cell; Lagrange refills the primitive ones below.
 
-        if (bubbles_lagrange) then
-            call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
-        else
-            call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwbuff)
-        end if
+        call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
 
         if (bubbles_euler) then
             call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, divu)

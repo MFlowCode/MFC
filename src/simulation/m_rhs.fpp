@@ -338,6 +338,9 @@ contains
                                    & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         @:ALLOCATE(qR_prim(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
                                    & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                        ! Zeroed: the gradient's outer ghost cells read faces the reconstruction never writes
+                        qL_prim(i)%vf(l)%sf = 0._wp
+                        qR_prim(i)%vf(l)%sf = 0._wp
                     end do
                 end if
                 @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))
@@ -669,11 +672,14 @@ contains
                             do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
                                 alf_sum%sf(j, k, l) = alf_sum%sf(j, k, l) + q_cons_qp%vf(i)%sf(j, k, l)
                             end do
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                                q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, &
-                                             & l)*(1._wp - q_cons_qp%vf(eqn_idx%alf)%sf(j, k, l))/alf_sum%sf(j, k, l)
-                            end do
+                            ! Zero only in ghost cells not yet filled before the first step; they are refilled below
+                            if (alf_sum%sf(j, k, l) > 0._wp) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
+                                    q_cons_qp%vf(i)%sf(j, k, l) = q_cons_qp%vf(i)%sf(j, k, &
+                                                 & l)*(1._wp - q_cons_qp%vf(eqn_idx%alf)%sf(j, k, l))/alf_sum%sf(j, k, l)
+                                end do
+                            end if
                         end do
                     end do
                 end do

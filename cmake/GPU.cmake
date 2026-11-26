@@ -131,7 +131,9 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
             # not instrument array accesses): trap on invalid, divide-by-zero and overflow, and fill
             # uninitialised locals with 0xff bytes (reals NaN, integers -1) so their use shows.
             # Older flangs (flang-new 20) know neither flag, so each is added only where accepted.
-            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
+            # -O0: at -O1 this flang evaluates divisions guarded by an if before the test, and
+            # no flag forbids it, so the traps would fire on results the code never uses.
+            add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O0> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
             check_fortran_compiler_flag("-ffpe-trap=invalid,zero,overflow" MFC_FLANG_FPE_TRAP)
             if (MFC_FLANG_FPE_TRAP)
                 add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-ffpe-trap=invalid,zero,overflow>)

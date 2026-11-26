@@ -525,11 +525,11 @@ contains
                 do l = 1, num_fluids
                     cv_mix = cv_mix + alpha(l)*cvs(l)/gammas(l)  ! R = cv*(gamma - 1), with gammas = 1/(gamma - 1)
                 end do
-                fluid_temp = (fluid_pres + pi_inf_mix)/(fluid_rho*cv_mix)
                 do l = 1, num_fluids
-                    ! Constant viscosity unless a Sutherland constant is given
+                    ! Constant viscosity unless a Sutherland constant is given; only then is the temperature needed, and cv set
                     mu_f = particle_params%mu_ref(l)
                     if (particle_params%suth(l) > 0._wp) then
+                        fluid_temp = (fluid_pres + pi_inf_mix)/(fluid_rho*cv_mix)
                         mu_f = mu_f*sqrt(fluid_temp/tref)*(1._wp + particle_params%suth(l)/tref)/(1._wp + particle_params%suth(l) &
                                          & /fluid_temp)
                     end if

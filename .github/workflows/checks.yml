@@ -48,10 +48,17 @@ jobs:
 
       - name: Build and test
         run: |
-          rm -f checks.out
+          rm -f checks*.out
           # --stepmgr: the suite's srun steps otherwise congest the Frontier controller (see submit-slurm-job.sh).
-          sbatch --wait -J MFC-checks -A CFD154 -N 1 -t 01:30:00 -q normal --stepmgr -o checks.out \
-            --wrap '. ./mfc.sh load -c famd -m c && ./mfc.sh test -v -a -j 32 --no-gpu --reldebug -- -c frontier_amd'
+          job() { sbatch --wait -J MFC-checks -A CFD154 -N 1 -t 01:30:00 -q normal --stepmgr -o "$1" \
+            --wrap ". ./mfc.sh load -c famd -m c && ./mfc.sh test -v -a -j 32 --no-gpu --reldebug $2 -- -c frontier_amd"; }
+          # The -O0 build runs the suite in about 2 h: build every variant once, then two shards side by side.
+          job checks-build.out --dry-run || { cat checks-build.out > checks.out; exit 1; }
+          job checks-1.out '--no-build --shard 1/2' & p1=$!
+          job checks-2.out '--no-build --shard 2/2' & p2=$!
+          e=0; wait $p1 || e=1; wait $p2 || e=1
+          cat checks-1.out checks-2.out > checks.out
+          exit $e
 
       - name: Print Log
         if: always()
