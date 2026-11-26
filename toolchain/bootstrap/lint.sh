@@ -33,7 +33,7 @@ if [ "$RUN_TESTS" = true ]; then
     log "(venv) Running$MAGENTA unit tests$COLOR_RESET on$MAGENTA MFC$COLOR_RESET's $MAGENTA""toolchain$COLOR_RESET."
 
     cd toolchain
-    python3 -m pytest . -v
+    python3 -m pytest . -v -n auto --maxprocesses=16
     cd - > /dev/null
 fi
 

@@ -19,7 +19,7 @@ echo ""
 echo "mfc: Running precheck before commit (-j $JOBS)..."
 echo ""
 
-if ./mfc.sh precheck -j "$JOBS"; then
+if ./mfc.sh precheck --staged -j "$JOBS"; then
     echo ""
     exit 0
 else

@@ -158,7 +158,7 @@ while [ ! -f "$output_file" ]; do
     RUNNING|COMPLETING)
       unknown_count=0
       # Job is running but output file not yet visible (NFS delay)
-      sleep 2
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
     UNKNOWN)
       unknown_count=$((unknown_count + 1))
@@ -223,7 +223,7 @@ done
 # Give tail a moment to flush the final lines, then stop streaming. Whether it
 # was still alive decides how much needs reprinting below: if it streamed the
 # whole job, printing the file again just doubles every log.
-sleep 2
+sleep "$MFC_MONITOR_POLL_SECONDS"
 streamed_ok=0
 if kill -0 "${tail_pid}" 2>/dev/null; then
   streamed_ok=1

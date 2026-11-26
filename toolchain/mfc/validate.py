@@ -4,6 +4,7 @@ MFC Validate Command - Validate a case file without building or running.
 
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 from . import state
 from .case_validator import CaseConstraintError, CaseValidator
@@ -33,13 +34,18 @@ def _validate_batch_default_build(inputs):
     failed = []
     refused = []
     with_issues = []
-    for c in inputs:
-        if not os.path.isfile(c):
-            failed.append(c)
-            continue
+
+    def _load(c):
         try:
-            case = run_input.load(c, do_print=False)
+            return run_input.load(c, do_print=False) if os.path.isfile(c) else None
         except MFCException:
+            return None
+
+    # Each load runs the case file in its own interpreter (~0.5 s, most of the time), so run them side by side.
+    with ThreadPoolExecutor(max_workers=min(16, os.cpu_count() or 1)) as pool:
+        cases = list(pool.map(_load, inputs))
+    for c, case in zip(inputs, cases):
+        if case is None:
             failed.append(c)
             continue
         had_issue = False
