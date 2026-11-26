@@ -37,10 +37,10 @@ Command that shows it:
 
 ## 3. Is it slower?
 
-Required for `src/` and build changes: benchmark your base commit and your PR on the same hardware.
-Any supported GPU will do. No GPU? Run on CPUs and say so.
+Required for `src/` and build changes: benchmark your base commit and your PR on the same GPU.
+Any supported GPU will do.
 
-Hardware and compiler:
+GPU and compiler:
 
 Base commit:
 
@@ -67,7 +67,6 @@ base=$(git rev-parse --short $base)
 source .github/scripts/detect-gpus.sh
 
 # NVIDIA or Cray: --gpu acc. AMD flang: --gpu mp. On a cluster, add -c <computer> after "--".
-# CPU only: drop --gpu and -g, and use --mem 1 -n <cores>.
 for tree in ../mfc-$base .; do
     (cd $tree &&
         ./mfc.sh build --gpu acc -j 8 &&
