@@ -26,6 +26,7 @@ parser.add_argument("--cfl", type=float, default=0.4, help="CFL number (default:
 parser.add_argument("--no-mapped", action="store_true", help="Disable mapped WENO")
 parser.add_argument("--muscl-lim", type=int, default=0, help="MUSCL limiter: 0=unlimited 1=minmod ... (default: 0)")
 parser.add_argument("--time-stepper", type=int, default=3, help="Time stepper: 1=Euler 2=RK2 3=RK3 (default: 3)")
+parser.add_argument("--face-bound", type=int, default=0, help="Face-state positivity bound: 0=off, 1, 2 (default: 0)")
 parser.add_argument("--t-end", type=float, default=None, help="Override total simulation time (default: 1.0 = one period)")
 parser.add_argument("--amr", action="store_true", help="Refine the central half of the domain with one 2:1 AMR block")
 parser.add_argument("--amr-regrid", type=int, default=0, help="Steps between regrids (default: 0 = static block)")
@@ -122,6 +123,7 @@ print(
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
             "fluid_pp(1)%eos": "ideal_gas",
             **scheme_params,
+            **({"face_bound": args.face_bound} if args.face_bound else {}),
             **amr_params,
         }
     )

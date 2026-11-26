@@ -38,6 +38,7 @@ DOCS = [
     "docs/documentation/validation_standoff.md",
     "docs/documentation/validation_multiphase_riemann.md",
     "docs/documentation/validation_bubbles.md",
+    "docs/documentation/validation_positivity.md",
     "docs/documentation/validation_surface_tension.md",
     "docs/documentation/validation_interface_instabilities.md",
     "docs/documentation/validation_acoustics.md",

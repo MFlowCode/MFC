@@ -36,6 +36,7 @@ _CONVERGENCE_1D_SCHEMES = [
     ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [64, 128, 256]),
     ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [64, 128, 256]),
     ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64, 128]),
+    ("WENO5 -> face_bound 2", ["--order", "5", "--cfl", "0.02", "--face-bound", "2"], 5, 0.3, [32, 64, 128]),
 ]
 # WENO7/TENO7 in 1D: period mode (full period T=1.0, see 1D case.py).
 _CONVERGENCE_1D_PERIOD_SCHEMES = [
@@ -62,6 +63,7 @@ _CONVERGENCE_2D_SCHEMES = [
     ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64, 128]),
     ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [32, 64, 128]),
     ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64, 96]),
+    ("WENO5 -> face_bound 2", ["--order", "5", "--cfl", "0.02", "--face-bound", "2"], 5, 0.3, [32, 64, 96]),
 ]
 _CONVERGENCE_2D_PERIOD_SCHEMES = [
     ("WENO7", ["--order", "7", "--cfl", "0.005"], 7, 0.5, [80, 96]),
@@ -77,6 +79,7 @@ _CONVERGENCE_3D_SCHEMES = [
     ("WENO1", ["--order", "1", "--cfl", "0.02"], 1, 0.2, [32, 64]),
     ("MUSCL2", ["--muscl", "--muscl-lim", "0", "--cfl", "0.02"], 2, 0.3, [32, 64]),
     ("TENO5", ["--order", "5", "--teno", "--teno-ct", "1e-6", "--cfl", "0.02"], 5, 0.3, [32, 64]),
+    ("WENO5 -> face_bound 2", ["--order", "5", "--cfl", "0.02", "--face-bound", "2"], 5, 0.3, [32, 64]),
 ]
 
 # Sod L1 self-convergence: any conservative monotone scheme converges at L1
@@ -4078,6 +4081,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
                 # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
                 "2D_ibm_poiseuille_nn",
+                # Registered in the Face Bound cases at a size that reaches the collapse
+                "2D_vacuum_collapse",
                 # Synthetic turbulence now uses a deterministic (compiler-independent) PRNG,
                 # but the 50-step forced run with a moving airfoil IB is FP-sensitive enough
                 # that Intel's aggressive FP model (FMA/fast trig) diverges from the golden on
@@ -4804,6 +4809,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
     ibm_burn_rate_cases()
+
+    # Near-vacuum collapse (#2469): unlimited WENO5 goes NaN when the converging gas reaches the disc centre; face_bound = 2 carries
+    # it through. Each runs past the collapse on a 40^2 grid.
+    for fluids, model in [(1, "5eq"), (2, "5eq"), (2, "6eq")]:
+        cases.append(
+            define_case_f(
+                f"2D -> Face Bound -> Vacuum Collapse -> {fluids} fluid(s) -> {model}",
+                "examples/2D_vacuum_collapse/case.py",
+                args=["-N", "40", "--fluids", str(fluids), "--model", model, "--t-end", "0.09", "--saves", "1"],
+                mods={"parallel_io": "F"},
+            )
+        )
 
     # A hot-wall finite cylinder goes NaN near its caps from step ~245 without face_bound (WENO face temperature past T_surface_max).
     # Run only 6 steps of a 4500 K wall in a tilted stream: face_bound already limits faces there (the state differs from face_bound = 0

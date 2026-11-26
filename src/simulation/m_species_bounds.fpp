@@ -20,8 +20,14 @@ module m_species_bounds
     implicit none
 
     private
-    public :: s_bound_species_faces, s_bound_face_states, s_clean_species, s_report_species_cleanup
+    public :: s_bound_species_faces, s_bound_face_states, s_bound_face_states_zs, s_clean_species, s_report_species_cleanup
 
+    !> face_bound = 2 caps a face's (p + p_inf)/rho at this multiple of the largest over the cell and its neighbours (sound speed at
+    !! ~32x): high enough never to act on a resolved smooth field, low enough to rule out a floor-density face at finite pressure
+    real(wp), parameter :: face_T_cap = 1000._wp
+    !> Relative positivity floor of the face bounds: verysmall, raised to 100 ulp where wp cannot resolve it (single precision); a
+    !! floor below roundoff lets the bounded face land on the wrong side of zero
+    real(wp), parameter :: pos_floor = max(verysmall, 100._wp*epsilon(1._wp))
     !> Violations below this fraction of rho are roundoff: cleaned but not counted
     real(wp), parameter :: clean_report_tol = 1.e-12_wp
     !> Fluid-cell cleanings, and sum of |rho_new - rho_old|, since the last report, per AMR level (0 = the coarse grid)
@@ -145,7 +151,146 @@ contains
 
     end subroutine s_bound_face_states
 
-    !> Largest theta in [0, 1] keeping vbar + theta*(v - vbar) >= verysmall*vbar (0 if vbar <= 0).
+    !> face_bound = 2, for stiffened-gas 5- and 6-equation states with one or more fluids (Zhang & Shu, JCP 2010). Each cell's
+    !! primitive face states vL/vR of direction id are scaled toward its cell state by the largest theta that keeps, on both faces,
+    !! rho and p + p_inf positive and (p + p_inf)/rho at most face_T_cap times its largest value over the cell and its two
+    !! neighbours along id. The last bound limits the face sound speed: without it, a face scaled down to a density floor at finite
+    !! pressure sets an unbounded wave speed. theta is then halved until the conservative interior point (U_bar - w(U_L + U_R))/(1 -
+    !! 2w), with w the Gauss-Lobatto end weight, has positive density and pressure. Volume fractions get their own theta into [0,
+    !! 1]. The limiter is inactive wherever every bound already holds. Cell averages then stay positive for dt sum_d max(|u_d| +
+    !! c)/dx_d <= w.
+    subroutine s_bound_face_states_zs(q_prim_vf, vL, vR, id)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL, vR
+        integer, intent(in) :: id
+        type(int_bounds_info), dimension(3) :: b
+        real(wp), dimension(3) :: mx  !< interior-point momentum
+        real(wp) :: w, pinf, theta, theta_a, rb, pb, tc, rf, pf, ab, s, r, rx, ex, gx, pix, qvx, gam, pim, qv, e, u, a, gb
+        integer :: i, j, k, l, o, it, dj, dk, dl, polyn
+        logical :: ok
+
+        ! Range of s_reconstruct_cell_boundary_values (m_rhs.fpp), narrowed by at least 1 for the +-1 neighbours along id
+
+        polyn = merge(weno_polyn, muscl_polyn, recon_type == recon_type_weno)
+        b = idwbuff
+        b(id)%beg = b(id)%beg + max(polyn, 1); b(id)%end = b(id)%end - max(polyn, 1)
+        w = merge(f_lobatto_weight(polyn), 0.5_wp, recon_type == recon_type_weno)  ! MUSCL is linear: no interior point
+        pinf = maxval(pi_infs(1:num_fluids)/(gammas(1:num_fluids) + 1._wp))  ! stiffest fluid: liquid tension is not limited
+        dj = merge(1, 0, id == 1); dk = merge(1, 0, id == 2); dl = merge(1, 0, id == 3)
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, o, it, mx, theta, theta_a, rb, pb, tc, rf, pf, ab, s, r, rx, ex, &
+                            & gx, pix, qvx, gam, pim, qv, e, u, a, gb, ok]', copyin='[b, w, pinf, dj, dk, dl]')
+        do l = b(3)%beg, b(3)%end
+            do k = b(2)%beg, b(2)%end
+                do j = b(1)%beg, b(1)%end
+                    tc = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do o = -1, 1
+                        r = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                            r = r + q_prim_vf(i)%sf(j + o*dj, k + o*dk, l + o*dl)
+                        end do
+                        tc = max(tc, (q_prim_vf(eqn_idx%E)%sf(j + o*dj, k + o*dk, l + o*dl) + pinf)/max(r, sgm_eps))
+                    end do
+                    tc = face_T_cap*tc
+
+                    rb = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                        rb = rb + q_prim_vf(i)%sf(j, k, l)
+                    end do
+                    pb = q_prim_vf(eqn_idx%E)%sf(j, k, l) + pinf
+                    theta = 1._wp
+                    #:for V in ['vL', 'vR']
+                        rf = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                            rf = rf + ${V}$(j, k, l, i)
+                        end do
+                        pf = ${V}$(j, k, l, eqn_idx%E) + pinf
+                        theta = min(theta, f_theta_floor(rb, rf), f_theta_floor(pb, pf), f_theta_floor(tc*rb - pb, tc*rf - pf))
+                    #:endfor
+
+                    theta_a = 1._wp
+                    if (num_fluids > 1) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%adv%beg, eqn_idx%adv%beg + num_fluids - 1
+                            ab = q_prim_vf(i)%sf(j, k, l)
+                            theta_a = min(theta_a, f_theta_floor(ab, vL(j, k, l, i)), f_theta_floor(1._wp - ab, 1._wp - vL(j, k, &
+                                          & l, i)), f_theta_floor(ab, vR(j, k, l, i)), f_theta_floor(1._wp - ab, 1._wp - vR(j, k, &
+                                          & l, i)))
+                        end do
+                    end if
+
+                    if (w < 0.5_wp) then
+                        ! Interior point from the reduced conservative state (rho, m, E, Gamma, Pi_inf, q_v) of the cell and faces
+                        gb = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            gb = gb + q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l)*gammas(i)
+                        end do
+                        gb = gb*pb  ! Gamma (p + p_inf)
+                        ok = .false.
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do it = 1, 30
+                            ! xi*(1 - 2w) = U_bar - w(U_L + U_R); rho and g = E - |m|^2/(2 rho) - Pi_inf - q_v + Gamma p_inf are
+                            ! homogeneous of degree one, so the positive factor 1 - 2w is kept on the bounds instead
+                            rx = 0._wp; ex = 0._wp; gx = 0._wp; pix = 0._wp; qvx = 0._wp; mx = 0._wp
+                            #:for V in ['', 'vL', 'vR']
+                                #:set C = '1._wp' if V == '' else '(-w)'
+                                #:if V == ''
+                                    #:set P = 'q_prim_vf({0})%sf(j, k, l)'
+                                #:else
+                                    #:set P = '(q_prim_vf({0})%sf(j, k, l) + {1}*(' + V &
+                                        & + '(j, k, l, {0}) - q_prim_vf({0})%sf(j, k, l)))'
+                                #:endif
+                                r = 0._wp; qv = 0._wp; gam = 0._wp; pim = 0._wp; e = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    a = ${P.format('eqn_idx%cont%beg + i - 1', 'theta')}$
+                                    r = r + a; qv = qv + a*qvs(i)
+                                    a = ${P.format('eqn_idx%adv%beg + i - 1', 'theta*theta_a')}$
+                                    gam = gam + a*gammas(i); pim = pim + a*pi_infs(i)
+                                end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_vels
+                                    u = ${P.format('eqn_idx%mom%beg + i - 1', 'theta')}$
+                                    mx(i) = mx(i) + ${C}$*r*u
+                                    e = e + 0.5_wp*r*u*u
+                                end do
+                                e = e + gam*${P.format('eqn_idx%E', 'theta')}$ + pim + qv
+                                rx = rx + ${C}$*r; ex = ex + ${C}$*e; gx = gx + ${C}$*gam; pix = pix + ${C}$*pim; qvx = qvx &
+                                    & + ${C}$*qv
+                            #:endfor
+                            if (rx >= pos_floor*(1._wp - 2._wp*w)*rb) then
+                                ok = ex - 0.5_wp*(mx(1)**2 + mx(2)**2 + mx(3)**2)/rx - pix - qvx + gx*pinf >= pos_floor*(1._wp &
+                                                  & - 2._wp*w)*gb
+                            end if
+                            if (ok) exit
+                            theta = 0.5_wp*theta
+                        end do
+                        if (.not. ok) theta = 0._wp
+                    end if
+
+                    if (theta < 1._wp .or. theta_a < 1._wp) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, sys_size
+                            s = theta
+                            if (i >= eqn_idx%adv%beg .and. i < eqn_idx%adv%beg + num_fluids) s = theta*theta_a
+                            vL(j, k, l, i) = q_prim_vf(i)%sf(j, k, l) + s*(vL(j, k, l, i) - q_prim_vf(i)%sf(j, k, l))
+                            vR(j, k, l, i) = q_prim_vf(i)%sf(j, k, l) + s*(vR(j, k, l, i) - q_prim_vf(i)%sf(j, k, l))
+                        end do
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_bound_face_states_zs
+
+    !> Largest theta in [0, 1] keeping vbar + theta*(v - vbar) >= pos_floor*vbar (0 if vbar <= 0).
     pure function f_theta_floor(vbar, v) result(theta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -153,7 +298,7 @@ contains
         real(wp)             :: theta
 
         theta = 1._wp
-        if (v < verysmall*vbar) theta = max(0._wp, (1._wp - verysmall)*vbar)/max(vbar - v, sgm_eps)
+        if (v < pos_floor*vbar) theta = max(0._wp, (1._wp - pos_floor)*vbar)/max(vbar - v, sgm_eps)
 
     end function f_theta_floor
 

@@ -11,7 +11,7 @@ Errors are (MFC − reference)/reference.
 
 Separate pages: @ref validation_wall_order_couette "Wall-normal ghost velocity at viscous walls" (`ib_wall_order` against plane Poiseuille and Taylor-Couette flow).
 Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
-Gas-dynamics pages: @ref validation_shock_tubes "Shock tubes" (Sod, Lax, 123 and Shu-Osher), @ref validation_vortex_order "Vortex order of accuracy" (isentropic vortex, Taylor-Green decay), @ref validation_blast "Circular blast wave".
+Gas-dynamics pages: @ref validation_shock_tubes "Shock tubes" (Sod, Lax, 123 and Shu-Osher), @ref validation_vortex_order "Vortex order of accuracy" (isentropic vortex, Taylor-Green decay), @ref validation_blast "Circular blast wave", @ref validation_positivity "Positivity at a near-vacuum collapse".
 Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
 Multiphase pages: @ref validation_multiphase_riemann "Two-fluid flows" (water-air shock tube, interface advection, phase-change equilibrium), @ref validation_bubbles "Bubble dynamics" (Keller-Miksis collapse), @ref validation_surface_tension "Surface tension" (Laplace pressure jump), @ref validation_interface_instabilities "Interface instabilities" (viscous Rayleigh-Taylor growth rate).
 

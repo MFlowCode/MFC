@@ -1105,6 +1105,7 @@ contains
         if (amr_in_fine_advance .and. amr_bat_n > 1) call s_amr_flatten_seam_faces(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
         if (chemistry) call s_bound_species_faces(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
         if (face_bound == 1) call s_bound_face_states(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
+        if (face_bound == 2) call s_bound_face_states_zs(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
 
         ! Reconstruct viscous derivatives for viscosity
         if (weno_Re_flux) then
