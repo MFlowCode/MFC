@@ -1,0 +1,43 @@
+name: PR Description
+
+# Fails a pull request until its description completes the template
+# (.github/scripts/check_pr_description.py). Runs from the base branch, so a pull
+# request cannot change the check that judges it. It never checks out or runs the
+# pull request's code: it reads the description and file names through the API and
+# fetches the commits only to list what changed since the benchmarked one.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-description-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: PR Description
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Check the description
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR:       ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          api="repos/$GITHUB_REPOSITORY/pulls/$PR"
+          git fetch --quiet --no-tags origin "refs/pull/$PR/head"
+          # The description is read now, not from the event, so re-running the job sees the latest edit.
+          gh api "$api" --jq '.body // ""' > "$RUNNER_TEMP/body.md"
+          gh api --paginate "$api/files?per_page=100" --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/files.txt"
+          python3 .github/scripts/check_pr_description.py "$RUNNER_TEMP/body.md" "$RUNNER_TEMP/files.txt" "$(git rev-parse FETCH_HEAD)"
