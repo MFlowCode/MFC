@@ -37,8 +37,8 @@ Command that shows it:
 
 ## 3. Is it slower?
 
-Required for `src/` and build changes: benchmark your base commit and your PR on the same GPU.
-Any supported GPU will do.
+Required for `src/` and build changes: you must benchmark your base commit and your PR on the same GPU, and report which GPU it is.
+Any supported GPU will do. If you have no access to one, say so here.
 
 GPU and compiler:
 
@@ -48,7 +48,7 @@ PR commit:
 
 <!-- Paste build/speed.md here -->
 
-Explain any grind speedup below 0.95 that shows up twice.
+Explain any grind speedup below 0.95 that shows up twice. If no benchmark case uses your change, add master and PR grind times for a case that does.
 
 <details>
 <summary>Commands</summary>
