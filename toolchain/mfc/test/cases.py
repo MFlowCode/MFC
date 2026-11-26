@@ -4706,9 +4706,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "patch_icpp(2)%geometry": 3,
         }
         cyl_3d = {
-            "m": 19,
-            "n": 19,
-            "p": 19,
+            "m": 25,
+            "n": 25,
+            "p": 25,
             "bc_y%beg": -14,
             "bc_z%beg": -1,
             "bc_z%end": -1,
