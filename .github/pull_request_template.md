@@ -56,7 +56,7 @@ PR commit:
 
 <!-- Paste build/speed.md here -->
 
-Explain any grind speedup below 0.95 that shows up twice. If no benchmark case uses your change, add master and PR grind times for a case that does.
+Explain any grind speedup below 0.95 that shows up twice: rerun those cases with the second command below and paste that table too. If no benchmark case uses your change, add master and PR grind times for a case that does.
 
 <details>
 <summary>Commands</summary>
@@ -83,6 +83,23 @@ done
 
 GITHUB_STEP_SUMMARY=build/speed.md ./mfc.sh bench_diff ../mfc-$base/build/bench.yaml build/bench.yaml
 echo "Base commit: $base"; echo "PR commit: $(git rev-parse --short HEAD)"
+)
+```
+
+To rerun cases, then paste `build/rerun.md`:
+
+```bash
+# <base> is the base commit; <cases> are names from the table. Use the same --gpu, -c and -n as above.
+# If ../mfc-<base> is too old to accept --cases, leave it out to rerun every case.
+(
+set -e
+rm -f build/rerun.md
+for tree in ../mfc-<base> .; do
+    (cd $tree &&
+        rm -f build/rerun.yaml &&
+        ./mfc.sh bench --cases <cases> --mem 4 -o build/rerun.yaml -- --gpu acc -n 1)
+done
+GITHUB_STEP_SUMMARY=build/rerun.md ./mfc.sh bench_diff ../mfc-<base>/build/rerun.yaml build/rerun.yaml
 )
 ```
 
