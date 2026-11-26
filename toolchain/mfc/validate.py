@@ -2,7 +2,6 @@
 MFC Validate Command - Validate a case file without building or running.
 """
 
-import dataclasses
 import os
 import sys
 
@@ -15,10 +14,10 @@ from .state import ARG
 
 
 def _validate_batch(inputs):
-    """Check the decks against the default double build, not whatever this tree was last built as (--single refuses 3D
-    cylindrical cases)."""
+    """Check the decks against the default build configuration (state.MFCConfig()), not whatever this tree was last built
+    as: the build-dependent checks (--single, --mixed, --no-mpi) would otherwise refuse a deck depending on the local build."""
     saved = state.gCFG
-    state.gCFG = dataclasses.replace(saved, single=False)
+    state.gCFG = state.MFCConfig()
     try:
         _validate_batch_default_build(inputs)
     finally:

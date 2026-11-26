@@ -479,7 +479,8 @@ class MFCTarget:
             f"-DCMAKE_INSTALL_PREFIX={install_dirpath}",
             f"-DMFC_SINGLE_PRECISION={'ON' if (ARG('single') or ARG('mixed')) else 'OFF'}",
             f"-DMFC_MIXED_PRECISION={'ON' if ARG('mixed') else 'OFF'}",
-            f"-DMFC_BUILD_JOBS={build_jobs()}",
+            # -flto-partitions of the amdflang offload link (cmake/MFCTargets.cmake) follows -j as given, not the default job count
+            f"-DMFC_BUILD_JOBS={ARG('jobs')}",
         ]
 
         # Verbosity level 3 (-vvv): add cmake debug flags
