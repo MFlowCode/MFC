@@ -25,7 +25,8 @@ module m_amr_registers
         & s_amr_reg_prepare, freg, creg, f_amr_face_is_seam, f_amr_is_child, s_amr_set_rk_table, amr_rk_w, amr_rk_c
 
     !> The SSP-RK scheme's per-stage effective flux weights (the step is q^n + dt*sum_s amr_rk_w(s)*L(q^(s-1))) and stage-entry
-    !! times in units of the step; s_amr_set_rk_table derives both from the stage coefficients.
+    !! times in units of the step; s_amr_set_rk_table derives the weights from the stage coefficients and copies the times from the
+    !! stepper's rk_c.
     real(wp), allocatable :: amr_rk_w(:), amr_rk_c(:)
 
     !> Registers for the two block faces normal to one direction: (1:sys_size, transverse-1, transverse-2, slot).

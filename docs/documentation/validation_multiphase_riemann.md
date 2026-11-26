@@ -4,7 +4,7 @@
 
 **Status:** water-air shock tube: validated. Interface advection: validated (pressure equilibrium to round-off at every grid). Phase-change equilibrium: partially validated (equilibrium of the relaxed state only). **Code:** `master` at 5838b641c (interface advection: 3e4c53258). **Examples:** `examples/1D_kapilashocktube`, `examples/2D_advection`, `examples/1D_exp_tube_phasechange`. **Last run:** 2026-11-24. See also @ref validation.
 
-All tables were measured with GNU 13.3 (CPU, one rank, double precision); the A100 rows used NVHPC 25.11 (OpenACC, one GPU).
+Except for the interface-advection table, all tables were measured with GNU 13.3 (CPU, one rank, double precision) and the A100 rows with NVHPC 25.11 (OpenACC, one GPU); the interface-advection table states its own compilers.
 
 ## Water-air shock tube {#sec-validation-mp-riemann}
 

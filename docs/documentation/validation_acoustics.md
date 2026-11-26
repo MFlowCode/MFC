@@ -4,7 +4,7 @@
 
 **Status:** validated for 1D planar sources. The emitted pulses arrive on time and converge to linear acoustics at third order, down to a floor of about 2e-4. **Code:** `master` at 3e4c53258 with the stage-time fix of [#2462](https://github.com/MFlowCode/MFC/issues/2462). **Examples:** `examples/1D_acoustic_gauss_sigmatime`, `examples/1D_acoustic_gauss_sigmadist`, `examples/1D_acoustic_sine_frequency`, `examples/1D_acoustic_dipole`. See also @ref validation and @ref validation_coordinates (the same pulse on a stretched grid).
 
-All tables were measured on the CPU with NVHPC 25.11 (one rank, double precision). On an NVIDIA A100 (NVHPC 25.5, OpenACC) the 400-cell Gaussian run and the dipole deck give the CPU values to the digits shown.
+The tables were measured on the CPU with NVHPC 25.11 (one rank, double precision), except the stage-time rows of the time-step refinement, which ran on the A100. On an NVIDIA A100 (NVHPC 25.5, OpenACC) the 400-cell Gaussian run and the dipole deck give the CPU values to the digits shown.
 
 ## Source model
 
@@ -58,7 +58,7 @@ Time-step refinement, 800 cells, `mag` = 1e3 Pa, \f$\Delta t\f$ = 0.5 ns / q (`m
 
 The step-start source time made the whole solution first order in \f$\Delta t\f$. With the stage times the time error of WENO5-M falls at second to third order. With TENO (`teno_CT` = 1e-8) it stays at the 1e-4 level and does not fall regularly, consistent with the stencil selection switching between runs of different \f$\Delta t\f$; that was not traced further.
 
-Limits: 1D planar sources only on this page; a single linear amplitude (1 Pa on 1e5 Pa); the square and broadband pulses (`pulse = 3, 4`) and the 2D and 3D planar supports are not checked. Multifluid sources are the subject of [#1921](https://github.com/MFlowCode/MFC/issues/1921).
+Limits: 1D planar sources only on this page; two linear amplitudes (1 Pa and 1e3 Pa on 1e5 Pa); the square and broadband pulses (`pulse = 3, 4`) and the 2D and 3D planar supports are not checked. Multifluid sources are the subject of [#1921](https://github.com/MFlowCode/MFC/issues/1921).
 
 ## Focused transducer
 
@@ -70,3 +70,7 @@ The axisymmetric focused transducer (`support = 6`, `examples/2D_acoustic_suppor
 ./mfc.sh run examples/1D_acoustic_gauss_sigmatime/case.py -t pre_process simulation post_process -n 1 -- -N 400
 python3 examples/1D_acoustic_gauss_sigmatime/check_acoustic.py examples/1D_acoustic_gauss_sigmatime --case-args "-N 400"
 ```
+
+`case.py` also takes `--mag` (the `mag` = 1e3 Pa column), `--wenom` (WENO5-M instead of TENO) and `--dt-div q` (dt/q at the
+same end and save times). For the time-step refinement, run copies of the directory with `-N 800 --mag 1000 --dt-div q` for
+q = 1, 2, 4, 8 and pass them in that order to `check_acoustic.py --dt-sweep`.

@@ -4,7 +4,7 @@
 
 **Status:** isentropic vortex: validated against the expected second order, a known limit of the method
 ([#2464](https://github.com/MFlowCode/MFC/issues/2464)); 2D Taylor-Green kinetic-energy decay: validated. **Code:** `master` at
-5838b641c (vortex, Taylor-Green), 3e4c53258 (1D smooth waves). **Examples:** `examples/2D_isentropicvortex` (`--convect`), `examples/2D_TaylorGreenVortex`. **Last run:** 2026-11-25.
+5838b641c (vortex, Taylor-Green), 3e4c53258 (1D smooth waves). **Examples:** `examples/2D_isentropicvortex` (`--convect`), `examples/2D_TaylorGreenVortex`, `examples/1D_smooth_wave_order`. **Last run:** 2026-11-25.
 
 ## Purpose
 
@@ -63,7 +63,7 @@ characteristic reconstruction. MFC does neither, on purpose.
 ### 1D smooth waves: which flows reach the design order
 
 The two mechanisms can be separated in 1D, where there is no face quadrature. Two smooth periodic problems were run with the
-initial condition set to the exact conservative cell averages (10-point Gauss, read through `hcid = 170`) and the density
+initial condition set to the exact conservative cell averages (10-point Gauss, read through `hcid = 170`; `examples/1D_smooth_wave_order`) and the density
 measured against exact cell averages at the end. HLLC and SSP-RK3 were used, with CFL 0.02 (0.005 for seventh order); halving
 the CFL changes no digit shown.
 
@@ -173,6 +173,9 @@ python3 examples/2D_isentropicvortex/check_vortex.py <run N=64> <run N=128> <run
 ./mfc.sh run examples/2D_TaylorGreenVortex/case.py -t pre_process simulation -n 1 -- -N 64
 python3 examples/2D_TaylorGreenVortex/check_tgv.py <run N=32> <run N=64>
 ```
+
+The 1D smooth waves are `examples/1D_smooth_wave_order` (`--problem advect|gamma3`, `--ic avg|point`, `--order`, `--teno`,
+`--cfl`); its README gives the sweep commands. It is not in the test suite.
 
 `--convect` also takes `--scheme wenojs|wenom|wenoz|teno`, `--cfl`, `--t-end` and `--time-stepper`; without it the example runs its
 original 10-step stationary vortex on a stretched grid. The N = 256 vortex takes about 70 s on one CPU core, the 128-cell

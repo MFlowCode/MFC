@@ -1067,7 +1067,7 @@ contains
                     patch_ib(i)%vel = vel_new
                     patch_ib(i)%angular_vel = angular_new
 
-                    ! plug in analytic velocities for 1-way coupling, if it exists
+                    ! analytic velocities for 1-way coupling, at t_stage: the time of the state this stage produces
                     if (patch_ib(i)%moving_ibm == 1) then
                         @:mib_analytical()
                     end if

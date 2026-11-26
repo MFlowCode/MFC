@@ -307,7 +307,7 @@ class Case:
                 "x": "x_cc(i)",
                 "y": "y_cc(j)",
                 "z": "z_cc(k)",
-                "t": "mytime",
+                "t": "t_stage",  # time of the IB state set: s_advance_ib_pose, s_ibm_setup
                 "r": f"patch_ib({pid})%radius",
             }
 
