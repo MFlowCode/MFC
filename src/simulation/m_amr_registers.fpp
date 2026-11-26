@@ -743,21 +743,20 @@ contains
         integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
         real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
         integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb, iu, ab, ae, ib, ie, &
-            & f, side
-        integer  :: oo(3), ich
+            & f, ich
         logical  :: dta, dtb, ext, usrc, altss, amode
-        real(wp) :: fb, wl, wh, ml, mh, du, cu, sc, wt, mm, kes, ens
-        real(wp) :: ke(2), en(2), un(2)
+        real(wp) :: fb, wl, wh, ml, mh, du, cu, sc, mm, ke_lo, ke_hi, en_lo, en_hi, un_lo, un_hi
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3, 2) :: arho, alf
+            real(wp), dimension(3) :: ar_lo, ar_hi, al_lo, al_hi
         #:else
-            real(wp), dimension(num_fluids, 2) :: arho, alf
+            real(wp), dimension(num_fluids) :: ar_lo, ar_hi, al_lo, al_hi
         #:endif
 
         ! Loop bounds are hoisted to scalars: array-element bounds would force the host arrays present on the device (ACC present
         ! error). One thread per transverse cell walks the equations in turn: the outside cells' state the source coefficients
-        ! need is read before this thread writes them.
+        ! need is read before this thread writes them. The two faces are written out, not looped over: CCE's OpenACC lowering
+        ! fails on a runtime side loop with side-indexed private arrays ("Subtree parent problem").
 
         call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext); altss = alt_soundspeed; amode = amr_reg_amode
         #:for D, TA, TB, IDX in [(1, 2, 3, 'ol, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, ol, wb + g2'), (3, 1, 2, &
@@ -767,77 +766,56 @@ contains
                 nch = rr**count([dta, dtb]); dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
                 gla = glo(${TA}$); gha = ghi(${TA}$); glb = glo(${TB}$); ghb = ghi(${TB}$); wa = woff(${TA}$); wb = woff(${TB}$)
                 ol = olo(${D}$); oh = ohi(${D}$); wl = w_lo(${D}$); wh = w_hi(${D}$); ml = mlo(${D}$); mh = mhi(${D}$)
-                $:GPU_PARALLEL_LOOP(collapse=2, private='[eq, f10, f20, dd1, dd2, fb, du, cu, sc, wt, mm, kes, ens, usrc, f, &
-                                    & side, oo, ke, en, un, arho, alf, ich]', firstprivate='[iu, ab, ae, ib, ie, ext, altss, amode]')
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[eq, f10, f20, dd1, dd2, fb, du, cu, sc, mm, usrc, f, ich, ke_lo, ke_hi, &
+                                    & en_lo, en_hi, un_lo, un_hi, ar_lo, ar_hi, al_lo, al_hi]', firstprivate='[iu, ab, ae, ib, &
+                                    & ie, ext, altss, amode]')
                 do g2 = glb, ghb
                     do g1 = gla, gha
                         f10 = 0; if (dta) f10 = rr*g1
                         f20 = 0; if (dtb) f20 = rr*g2
-                        if (ext) then
-                            do side = 1, 2
-                                if (side == 1) then
-                                    oo = [${IDX}$]
-                                else
-                                    oo = [${IDX.replace('ol', 'oh')}$]
-                                end if
-                                if (merge(wl, wh, side == 1) == 0._wp) cycle
-                                ke(side) = 0._wp; mm = 0._wp
+                        #:for S, O, W, M, OP in [('lo', 'ol', 'wl', 'ml', '+'), ('hi', 'oh', 'wh', 'mh', '-')]
+                            if (ext .and. ${W}$ /= 0._wp) then
+                                ke_${S}$ = 0._wp; mm = 0._wp
                                 do f = 1, num_fluids
-                                    arho(f, side) = q(eqn_idx%cont%beg + f - 1)%sf(oo(1), oo(2), oo(3))
-                                    alf(f, side) = q(eqn_idx%adv%beg + f - 1)%sf(oo(1), oo(2), oo(3))
-                                    mm = mm + arho(f, side)
+                                    ar_${S}$(f) = q(eqn_idx%cont%beg + f - 1)%sf(${IDX.replace('ol', O)}$)
+                                    al_${S}$(f) = q(eqn_idx%adv%beg + f - 1)%sf(${IDX.replace('ol', O)}$)
+                                    mm = mm + ar_${S}$(f)
                                 end do
                                 do f = eqn_idx%mom%beg, eqn_idx%mom%end
-                                    ke(side) = ke(side) + 0.5_wp*q(f)%sf(oo(1), oo(2), oo(3))**2/max(mm, sgm_eps)
+                                    ke_${S}$ = ke_${S}$ + 0.5_wp*q(f)%sf(${IDX.replace('ol', O)}$)**2/max(mm, sgm_eps)
                                 end do
-                                en(side) = q(eqn_idx%E)%sf(oo(1), oo(2), oo(3))
-                                un(side) = q(eqn_idx%mom%beg + ${D}$ - 1)%sf(oo(1), oo(2), oo(3))/max(mm, sgm_eps)
-                            end do
-                        end if
+                                en_${S}$ = q(eqn_idx%E)%sf(${IDX.replace('ol', O)}$)
+                                un_${S}$ = q(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IDX.replace('ol', O)}$)/max(mm, sgm_eps)
+                            end if
+                        #:endfor
                         do eq = 1, sys_size
                             usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie)
                             ich = iu; if (amode .and. usrc) ich = iu + eq - ab  ! HLL Method 1: this fluid's interface alpha
-                            do side = 1, 2
-                                wt = merge(wl, wh, side == 1)
-                                if (wt == 0._wp) cycle
-                                if (side == 1) then
-                                    oo = [${IDX}$]
-                                else
-                                    oo = [${IDX.replace('ol', 'oh')}$]
-                                end if
-                                fb = 0._wp; du = 0._wp
-                                do dd2 = 0, dd2_hi
-                                    do dd1 = 0, dd1_hi
-                                        if (side == 1) then
-                                            fb = fb + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                            if (usrc) du = du + freg(${D}$)%lo(ich, f10 + dd1, f20 + dd2, islot)
-                                        else
-                                            fb = fb + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                                            if (usrc) du = du + freg(${D}$)%hi(ich, f10 + dd1, f20 + dd2, islot)
-                                        end if
+                            #:for S, O, W, M, OP in [('lo', 'ol', 'wl', 'ml', '+'), ('hi', 'oh', 'wh', 'mh', '-')]
+                                if (${W}$ /= 0._wp) then
+                                    fb = 0._wp; du = 0._wp
+                                    do dd2 = 0, dd2_hi
+                                        do dd1 = 0, dd1_hi
+                                            fb = fb + freg(${D}$)%${S}$(eq, f10 + dd1, f20 + dd2, islot)
+                                            if (usrc) du = du + freg(${D}$)%${S}$(ich, f10 + dd1, f20 + dd2, islot)
+                                        end do
                                     end do
-                                end do
-                                fb = fb/real(nch, wp)
-                                if (usrc) then
-                                    cu = merge(creg(${D}$)%lo(ich, g1, g2, islot), creg(${D}$)%hi(ich, g1, g2, islot), side == 1)
-                                    if (ext .and. amode) then
-                                        sc = -un(side)
-                                    else if (ext) then
-                                        kes = ke(side); ens = en(side)  ! scalars into the device routine (Cray OpenACC)
-                                        sc = f_amr_usrc_coef(arho(:,side), alf(:,side), kes, ens, eq, altss)
-                                    else
-                                        sc = q(eq)%sf(oo(1), oo(2), oo(3))
+                                    fb = fb/real(nch, wp)
+                                    if (usrc) then
+                                        cu = creg(${D}$)%${S}$(ich, g1, g2, islot)
+                                        if (ext .and. amode) then
+                                            sc = -un_${S}$
+                                        else if (ext) then
+                                            sc = f_amr_usrc_coef(ar_${S}$, al_${S}$, ke_${S}$, en_${S}$, eq, altss)
+                                        else
+                                            sc = q(eq)%sf(${IDX.replace('ol', O)}$)
+                                        end if
+                                        fb = fb - sc*(du/real(nch, wp) - cu)
                                     end if
-                                    fb = fb - sc*(du/real(nch, wp) - cu)
+                                    q(eq)%sf(${IDX.replace('ol', O)}$) = q(eq)%sf(${IDX.replace('ol', O)}$) &
+                                      & ${OP}$ ${W}$*dtl*(creg(${D}$)%${S}$(eq, g1, g2, islot) - fb)/${M}$
                                 end if
-                                if (side == 1) then
-                                    q(eq)%sf(oo(1), oo(2), oo(3)) = q(eq)%sf(oo(1), oo(2), oo(3)) + wl*dtl*(creg(${D}$)%lo(eq, &
-                                      & g1, g2, islot) - fb)/ml
-                                else
-                                    q(eq)%sf(oo(1), oo(2), oo(3)) = q(eq)%sf(oo(1), oo(2), &
-                                      & oo(3)) + wh*dtl*(fb - creg(${D}$)%hi(eq, g1, g2, islot))/mh
-                                end if
-                            end do
+                            #:endfor
                         end do
                     end do
                 end do
