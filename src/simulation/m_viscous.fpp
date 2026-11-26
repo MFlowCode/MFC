@@ -29,7 +29,7 @@ module m_viscous
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
         & s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, s_compact_normal_viscous_gradients, &
-        & s_finalize_viscous_module
+        & s_finalize_viscous_module, Res_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous

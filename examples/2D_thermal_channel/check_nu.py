@@ -12,7 +12,7 @@ Per run, from the mean_temp.dat rows of the last --win fraction (T_m = mixing-cu
     hold    = max |T_m / T_target - 1| over the window
 
 k is the conductivity at (T_s + T_m)/2. With two runs (wall temperatures above and below the target) it also prints the pair Nu
-from half-differences, which cancels viscous heating and the first-order property asymmetry; exit 1 if the pair Nu_src (or the
+from half-differences, which cancels the first-order property asymmetry; exit 1 if the pair Nu_src (or the
 single-run Nu_src) is farther than --tol from the exact value. D_h = 2H. The exact value comes from
 psi'' + (6 Pe_H eta (1 - eta) b + b^2) psi = 0, psi(0) = psi(1) = 0, b = beta H (axial conduction included; 7.5407 as Pe -> inf).
 """

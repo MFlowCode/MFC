@@ -11,23 +11,25 @@ $\beta$, and the wall heat transfer together.
 `check_nu.py` reads the finished run(s) and prints, for each: the hold error of $T_m$, $\beta H$ against the exact eigenvalue,
 and the Nusselt number two ways, $\mathrm{Nu}_\mathrm{src}$ from the source total (equal to the wall heat at steady state) and
 $\mathrm{Nu}_\mathrm{grad}$ from the wall temperature gradient of the last save, which does not use the source. With a hot and a
-cold run it also prints the pair value from half-differences, which cancels viscous heating and the first-order property asymmetry.
+cold run it also prints the pair value from half-differences, which cancels the first-order property asymmetry.
 The exact value includes axial conduction at the run's Peclet number ($\mathrm{Pe}_H = 53.3$ gives 7.5417).
 
     python3 examples/2D_thermal_channel/check_nu.py <hot run> [<cold run>] [--tol 0.01]
 
-Measured with GNU 13.3 (CPU, one rank), 32 cells across the gap, 25 along $x$, $T_m = 300$ K, run time 0.3 $H^2/\alpha$
-(14070 steps; the state is developed by about 0.1):
+Measured with NVHPC 25.11 (CPU, one rank), 32 cells across the gap, 25 along $x$, $T_m = 300$ K, run time 0.3 $H^2/\alpha$
+(14070 steps; the state is developed by about 0.1). The source removes the viscous dissipation from the energy equation, which
+the developed state excludes:
 
 | run | $T_m$ hold | $\beta H$ (exact 0.1412) | $\mathrm{Nu}_\mathrm{src}$ | $\mathrm{Nu}_\mathrm{grad}$ |
 |---|---:|---:|---:|---:|
-| $T_s$ = 330 K | 2e-8 | 0.1457 | 7.507 (-0.46 %) | 7.141 (-5.3 %) |
-| $T_s$ = 270 K | 4e-9 | 0.1371 | 7.600 (+0.77 %) | 7.998 (+6.1 %) |
-| pair | | 0.1414 (mean) | 7.552 (+0.13 %) | 7.554 (+0.16 %) |
+| $T_s$ = 330 K | 2e-8 | 0.1432 | 7.375 (-2.2 %) | 7.342 (-2.6 %) |
+| $T_s$ = 270 K | 6e-9 | 0.1397 | 7.746 (+2.7 %) | 7.771 (+3.0 %) |
+| pair | | | 7.553 (+0.16 %) | 7.549 (+0.09 %) |
 
-A single run is biased by viscous heating and by the property change across the gap, with opposite signs for the hot and the cold
-wall; the pair cancels both. With 64 cells across the gap (run time 0.15 $H^2/\alpha$) both pair values are 7.546 (+0.05 %). The source and the gradient estimates agree within 0.1 % after pairing, so the
-source removes the heat that crosses the walls.
+A single run is biased by the property change across the gap, with opposite signs for the hot and the cold wall; the pair cancels
+it. The source and the gradient estimates of each run agree within 0.4 %, so the source removes the heat that crosses the walls.
+At Mach 0.3 the single runs stay within 3.2 % (pair 7.556 and 7.527); before the dissipation was removed they were off by 14 % and
+29 %, and at Mach 0.1 the two estimates of a run differed by 5 %.
 
 ## Run
 

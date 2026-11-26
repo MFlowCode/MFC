@@ -4833,12 +4833,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     # Cold cylinder in quiescent 1500 K air with the sub-grid wall conduction column (12 cells per R, to 0.03 R^2/alpha, 99 steps): the heat
     # the body takes (ib_heat.dat) is in the golden; check_heat.py compares it with a body-fitted 1D reference. Golden: GNU 13 double on the
-    # AMD host CPU of an MI300A node; an A100 (NVHPC 25.11 and 25.5 identical) agrees to 1.4e-8 (min of absolute and relative error). A GNU 13
-    # build on an Intel Ice Lake CPU differs from both by 2.0e-2 (density 1e-3, momentum 1.6e-2 relative, ib_heat 7e-4): the transient starts
-    # from a near-step layer and amplifies the architecture's round-off, as the withdrawn cold-wall case of issue 1892 did across
-    # compilers; the cause is not identified. 5e-2 is 2.5 times that gap, so the test catches a broken column or time-step limit, not
-    # round-off; tighten it when CI shows whether the Intel lanes follow the AMD or the Ice Lake result.
-    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cold Wall Transient -> Wall Column", "examples/2D_ibm_cold_wall_transient/case.py", override_tol=5e-2))
+    # AMD host CPU of an MI300A node. The CPU builds that once differed by 2e-2 (Intel Ice Lake GNU, NVHPC CPU) picked the column-top
+    # probe's interpolant on round-off (issue 2443, fixed in s_tsc_weights); an NVHPC 25.11 CPU build now agrees to 2e-8 and an A100 to
+    # 1.4e-8, so 1e-6 keeps a factor 50.
+    cases.append(define_case_f("2D -> Chemistry -> IBM -> Cold Wall Transient -> Wall Column", "examples/2D_ibm_cold_wall_transient/case.py", override_tol=1e-6))
     # Moving circle in a closed periodic box (examples/2D_ibm_moving_mass_budget): the gas mass it creates with the solver-default
     # ib_mass_relax (30 for a moving body), and its viscous isothermal twin (cold wall, Re 40). 24 cells per diameter, 100 steps (a
     # quarter of a diameter of travel), TSC image points: with the default inverse-distance points an A100 (NVHPC 25.11) differs from

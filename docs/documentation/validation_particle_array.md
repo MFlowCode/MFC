@@ -61,13 +61,15 @@ All from `check_array.py` on the run directory (`D/ib_forces.dat`, `D/ib_heat.da
 
 Thermally developed state (`--thermostat`: `mean_temp_wall` at the body temperature, mixing-cup temperature held at 300 K), 20 spheres at \f$\phi\f$ = 0.2, \f$\mathrm{Re}_m\f$ = 20, 16 cells/D, Mach 0.1, \f$tW/D\f$ = 8, last 30 %, bodies at 290 K and 310 K (seed 1). Gunn gives 5.995 and the Sun et al. correlation 3.39 on the same (surface-area) basis, from the equation as fitted to their data (a mixing-cup Nusselt number per cross-section perimeter, times \f$\pi/4\f$).
 
-| bodies | Nu | Gunn | difference | F/F_St |
-| ---: | ---: | ---: | ---: | ---: |
-| 290 K (cold) | 6.647 | 5.995 | +10.9 % | 7.359 |
-| 310 K (hot) | 5.039 | 5.998 | -16.0 % | 7.430 |
-| mean of the pair | 5.84 | 5.996 | -2.6 % | |
+The thermostat removes the viscous dissipation from the energy equation (`mean_temp_wall` with `viscous`, \cite Patankar1977); the first columns are with it removed (A100, NVHPC 25.11, one rank, last 40 %), the last column is before (last 30 %).
 
-The hot and cold runs disagree by 28 %, so the pair mean (5.84, which cancels the viscous heating to first order) is the quotable number: 2.6 % below Gunn and 1.7 times the Sun et al. value. The drag does not depend on the temperature difference (7.36 and 7.43).
+| bodies | Nu | Gunn | difference | F/F_St | Nu before the removal |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 290 K (cold) | 6.113 | 5.995 | +2.0 % | 7.361 | 6.647 |
+| 310 K (hot) | 5.711 | 5.998 | -4.8 % | 7.432 | 5.039 |
+| mean of the pair | 5.91 | 5.996 | -1.4 % | | 5.84 |
+
+The hot and cold runs disagree by 7 % (28 % before the removal, which was mostly viscous heating), so the pair mean is the quotable number: 1.4 % below Gunn and 1.7 times the Sun et al. value. The drag does not depend on the temperature difference (7.36 and 7.43).
 
 ### Burning array (not repeated on `master`)
 
@@ -90,7 +92,7 @@ The single-body closed-box budget is reproducible on `master` with `examples/2D_
 - The Re 100 excess is a grid effect in part: it changes little from 16 to 24 cells/D (+10.7 % to +10.2 % for seed 1), so the 20-sphere boxes here do not show the 7 to 8 % grid error of the reference. Tenneti et al. report that their own drag converges from below with resolution and that 20 cells/D is about 7 to 8 % low at \f$\phi\f$ = 0.2 (their Fig. 3, read from the plot), so the correlation itself may sit below a converged solution; this is an argument about the reference, not a measurement of MFC.
 - The boxes hold 20 spheres in a 3.74 D cube; the literature arrays hold 80 or more. Realization scatter is large (4 % at Re 20 here).
 - Not run: 3D arrays above 1 M cells and the 80-particle boxes (0.8 to 5.8 M cells); the pre-merge drag, Mach and per-particle force tables of those runs are not repeated here.
-- **Nusselt number, open.** The hot and cold bodies of the thermostat pair differ by 28 % (6.65 and 5.04 against 5.995 for Gunn); earlier runs showed the same asymmetry and a slow relaxation of the hot case. Against the Sun et al. correlation the pair mean is 1.7 times higher (earlier runs: 1.7 to 1.9), which is not explained (the methods, constant against variable properties and the Mach number differ). Treat the Nusselt numbers as plus or minus 15 %. Two further observations on `master`: at Mach 0.3 the viscous heating is of the order of the 10 K drive (the cold run gave Nu 10.6), so use Mach 0.1 or lower; and the hot run at Mach 0.3 aborted at \f$tW/D\f$ = 8.3 with an infinite viscous CFL number (reproduce: `--dim 3 --n_bodies 20 --mach 0.3 --cfl 0.2 --cells_per_D 16 --Re 20 --tstar 12 --thermostat --tw_ratio 1.0333`), which is a solver limit, not fixed here ([#2418](https://github.com/MFlowCode/MFC/issues/2418)).
+- **Nusselt number, open.** The hot and cold bodies of the thermostat pair differ by 7 % (6.11 and 5.71 against 5.995 for Gunn). Against the Sun et al. correlation the pair mean is 1.7 times higher (earlier runs: 1.7 to 1.9), which is not explained (the methods, constant against variable properties and the Mach number differ). Treat the Nusselt numbers as plus or minus 15 %. At Mach 0.3 (Brinkman number 0.77) the hot run used to cool its core to 1 K and abort at \f$tW/D\f$ = 8.3 ([#2418](https://github.com/MFlowCode/MFC/issues/2418)); with the dissipation removed it completes \f$tW/D\f$ = 12 with the fluid between 253 K and 322 K. The cell-centre dissipation takes out about 85 % of the pump work at 16 cells/D, so the rest still biases high-Mach runs: use Mach 0.1 for a Nusselt number.
 - A closed periodic box with isothermal bodies gains mass slowly (documented in @ref ib_accuracy_limits and the mass-budget example `examples/2D_ibm_wall_mass_budget`).
 - A body force on moving particles is not a mean pressure gradient: with `mean_dpdx` the force is not applied inside the bodies, so use the controller for fixed or moving arrays alike.
 
