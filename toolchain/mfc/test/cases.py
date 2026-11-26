@@ -1833,7 +1833,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # round-off and the rank layout (the y force of 1 and 2 ranks had opposite sign from step 80, 0.13 apart). The pair was
             # mirrored about the seam with a slip of pure round-off; it is now generic (below). GNU 12.3, Intel 2024.2 (CPU), NVHPC
             # 25.11 (CPU) and an A100 agree to 8.5e-12 and a 1e-12 nudge of a centroid moves the result by 5e-12, so override_tol =
-            # 1e-10. Golden: GNU 12.3.
+            # 1e-10. Single precision differs from the double golden by up to 1.1e-4 (GNU CI lane; 3.6e-5 with GNU 12.3), so
+            # override_tol_single = 1e-3. Golden: GNU 12.3.
+            fric_single = 1e-3
+
             def friction_box(box, bodies, steps, eps, mu, **extra):
                 # still uniform gas in a periodic box of side box (0.25 cells), soft-sphere circles (x, y, vx, vy), mass 1
                 cells = round(box / 0.25) - 1
@@ -1874,7 +1877,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ox, oy = 0.25 * _OFF_X, 0.25 * _OFF_Y
             seam_bodies = [(9.35 + ox, 15.0 + oy, 0.3, 0.0), (10.65 + ox, 15.0 + oy, -0.2739, 1.37e-4)]
             seam_pair = friction_box(20.0, seam_bodies, 100, 0.003, 0.1)
-            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=1e-10))
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation across a rank seam", seam_pair, ppn=2, override_tol=1e-10, override_tol_single=fric_single))
             # Two bodies overlapping in the first cell of a rank (#2433): that cell took the last body in the rank's slot order, so 1
             # and 2 ranks differed by O(1) from step 37. Generic placement: shifted by 0.37 cells, body 2 larger and slower.
             if num_fluids == 1:
@@ -1883,12 +1886,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Wall site: a circle pressed into the slip wall y = 0 at 0.1 with a 1e-4 slide. Without ib_friction_slip_eps the friction
             # force flips sign every step with magnitude mu*|F_n|; with it the slide dies out.
             wall_slide = friction_box(10.0, [(5.0 + ox, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
-            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=1e-10))
+            cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=1e-10, override_tol_single=fric_single))
             if num_fluids == 1:
                 # The seam pair on 1 rank and transposed along y (#2432): ib_mass_relax gave a cell within reach of both shells to the
                 # first marker of the x-inner scan, so the two differed by 7.6e-3. The Convergence check asserts the transpose.
                 pair_y = friction_box(20.0, [(y, x, uy, ux) for x, y, ux, uy in seam_bodies], 100, 0.003, 0.1)
-                pairs = {a: define_case_d(stack, f"IBM -> Collision -> Contact pair along {a}", mods, override_tol=1e-10) for a, mods in (("x", seam_pair), ("y", pair_y))}
+                pairs = {
+                    a: define_case_d(stack, f"IBM -> Collision -> Contact pair along {a}", mods, override_tol=1e-10, override_tol_single=fric_single) for a, mods in (("x", seam_pair), ("y", pair_y))
+                }
                 cases.extend(pairs.values())
                 spec = ConvergenceSpec(runner=run_transpose_check, case_path="", expected_order=0.0, tol=1e-9, params={a: {**BASE_CFG, **c.mods} for a, c in pairs.items()})
                 cases.append(define_convergence_case("Convergence -> IBM -> contact pair transposition", spec=spec))
@@ -4888,7 +4893,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 functor=_ib_off_grid,
                 # The grain is off the grid's mirror lines by (_OFF_X, _OFF_Y) cells. GNU 12.3, Intel 2024.2, NVHPC 25.11 (CPU) and an
                 # A100 agree to 5e-13 and a 1e-12 nudge of the centre moves it by 2e-11, so 1e-9 (the 1e-3 hid a stale golden, 2e-7 off).
+                # Single precision differs from it by up to 3.2e-4 in the force history (GNU 12.3), so 3e-3 there.
                 override_tol=1e-9,
+                override_tol_single=3e-3,
             )
         )
 
@@ -4901,6 +4908,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 mods={"m": 25, "n": 25, "t_step_stop": 50, "t_step_save": 50, "parallel_io": "F", "ib_ip_interp": 2},
                 functor=_ib_off_grid,
                 override_tol=1e-8,  # spread 5e-13, nudge sensitivity 6e-10
+                override_tol_single=3e-3,  # single precision: 2.6e-4 in the force history (GNU 12.3)
             )
         )
 
@@ -5267,7 +5275,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_ib(1)%heat_power": 100.0,
                 "ib_heat_wrt": "T",
             },
-            override_tol=1e-6,
+            # with TSC and the quadratic wall fill (the defaults) Intel oneAPI (CI) differs from GNU by 1.24e-6 in the heat record
+            override_tol=1e-5,
         )
     )
 
