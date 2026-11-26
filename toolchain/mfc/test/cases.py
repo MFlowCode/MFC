@@ -6037,6 +6037,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "stiffened gas at a static block face", stiff))
         # the subcycled state reflux takes alpha from the step-start state
         cases.append(define_case_d(stack, "stiffened gas at a static block face -> subcycle", {**stiff, "amr_subcycle": "T"}))
+        # HLL Method 1: the source is u*(alpha*_l - alpha*_r)/dx with the interface alphas, which the registers carry per fluid
+        cases.append(define_case_d(stack, "stiffened gas at a static block face -> HLL", {**stiff, "riemann_solver": 1}))
         stack.pop()
 
         # hypoelasticity: 1D hypoelastic shock config on a static 2:1 block; the fine swap recomputes the
