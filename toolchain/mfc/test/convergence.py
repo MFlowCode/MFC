@@ -39,6 +39,7 @@ import typing
 import numpy as np
 
 from .. import common, eos
+from ..state import ARG
 
 CONS_TOL = 1e-10
 MFC = ".\\mfc.bat" if os.name == "nt" else "./mfc.sh"
@@ -531,7 +532,9 @@ def run_amr_check(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     with tempfile.TemporaryDirectory() as tmpdir:
         case = os.path.join(tmpdir, "case.json")
         common.file_write(case, json.dumps(params))
-        run = subprocess.run([MFC, "amr_check", case, "--tol", str(spec.tol)] + spec.extra_args, capture_output=True, text=True, check=False)
+        # the arguments after the test command's "--" (e.g. -c <computer>) reach the inner runs, as for every other test
+        run_args = ["--", *ARG("--")] if ARG("--") else []
+        run = subprocess.run([MFC, "amr_check", case, "--tol", str(spec.tol)] + spec.extra_args + run_args, capture_output=True, text=True, check=False)
     return run.returncode == 0, run.stdout[-3000:] + run.stderr[-1000:]
 
 
