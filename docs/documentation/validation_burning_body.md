@@ -39,7 +39,7 @@ The cause of the gap to the earlier study was traced by rerunning the 12-cell cy
 | the earlier study's build (pre-merge, `ib_ip_interp = 2` by default), this case, GNU 13 CPU | +0.92 % | +0.08 % |
 | `master`, defaults | +1.87 % | +1.36 % |
 | `master`, `ib_ip_interp = 2` (TSC image points) | +1.39 % | +0.80 % |
-| `master`, `ib_smooth_contact = T` | +1.87 % | not run |
+| `master`, `ib_smooth_contact = T` (an option since removed) | +1.87 % | not run |
 | `master`, `ib_mass_relax = 30` or `1` | +1.86 % | not run |
 | `master`, `weno_Re_flux_compact = T` | +1.86 % | +1.85 % (end of run) |
 | `master` before #2248 (wall conduction through the unbounded mirror temperature) | burn rate equal to `master` to 5 digits through 5 us | |

@@ -85,6 +85,13 @@ class TestCheckUnknownParams(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("renamed to 'lag_params%coupling'", errors[0])
 
+    def test_removed_param_says_why(self):
+        """A removed parameter should say it was removed and why."""
+        errors = check_unknown_params({"ib_smooth_contact": "T"})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("it was removed", errors[0])
+        self.assertIn("delete it from the case file", errors[0])
+
     def test_family_attr_typo_gives_targeted_error(self):
         """Typo in family attribute should list valid attributes."""
         params = {"patch_ib(1)%geometri": 1}
