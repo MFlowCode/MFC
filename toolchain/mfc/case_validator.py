@@ -2292,13 +2292,6 @@ class CaseValidator:
         )
         for k in ("qbmm", "bubbles_euler", "surface_tension"):
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
-        # Post-RK sources with no fine-block form (state built on the coarse grid, or whole-domain operator splits run
-        # after the fold) would leave the refined region evolving without them.
-        self.prohibit(
-            (self.get("chem_params%reaction_substeps") or 0) > 0,
-            "amr is incompatible with chem_params%reaction_substeps > 0: the operator-split reaction integrates the coarse "
-            "grid once per step, after the fine solution has been folded back, so the refined region would never react",
-        )
         for d in ("x", "y", "z"):
             for e in ("beg", "end"):
                 bc = self.get(f"bc_{d}%{e}")

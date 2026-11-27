@@ -102,7 +102,7 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | :--- | :--- |
 | Single- and multi-fluid Euler, 6-equation model | Supported |
 | Viscous, hypoelastic (with continuum damage), body forces | Supported |
-| Chemistry (reactions, diffusion) | Lock-step only; no reaction substepping |
+| Chemistry (reactions, diffusion) | Lock-step only; with `chem_params%%reaction_substeps > 0` each block takes the split reaction at the end of the step, before the fold |
 | Immersed boundaries (fixed, prescribed or force-driven motion; not STL, `thermal_bc`, `surface_reaction`, `ib_surface_wrt`, `ib_heat_wrt`, `ib_mass_relax` or `ib_uncover_fill`) | Supported; blocks always contain each body; moving bodies are lock-step only; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`); the default `ib_mass_relax = -1` resolves to off, so a moving body differs from a uniform-grid run, where it is on |
 | Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |

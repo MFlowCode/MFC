@@ -4328,6 +4328,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 mods={**common_mods, "chem_params%reaction_substeps": 10},
             )
         )
+        # The same reactor with a static block (np=2: across the rank seam): the state is uniform, so level 0 must match the run above
+        # to round-off, which holds only if each block reacts before the fold (s_amr_split_fine)
+        amr_reactor = {"amr": "T", "amr_block_beg(1)": 8, "amr_block_end(1)": 17, "amr_regrid_int": 0}
+        for ppn, label in ((1, "AMR"), (2, "AMR -> 2 MPI Ranks")):
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions -> {label}",
+                    "examples/nD_perfect_reactor/case.py",
+                    ["--ndim", "1"],
+                    ppn=ppn,
+                    mods={**common_mods, "chem_params%reaction_substeps": 10, **amr_reactor, **({"amr_max_grid_size": 64} if ppn == 1 else {})},
+                )
+            )
 
         # Constant-volume H2/air ignition (T0 = 1200 K) through the ignition and into the burnt state with the split integrator; the
         # uniform box has no fluxes, so the run is smooth and does not amplify cross-compiler round-off. compare_cantera.py checks the
