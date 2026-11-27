@@ -7073,7 +7073,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # amr_max_level = 3: the only golden with a third level, guarding the level-general slot cap
         # amr_maxc_fit/amr_ref_ratio**(lev - 1) (a regression to /2 passes every 2-level case) and the box-cap invariant.
         # m = 255, amr_buf = 48 and depth 3 are all required for a box between the two caps. Dynamic regrid is required
-        # (static nesting places one level-2 child). np=1; eps = 0.1 on the sharp Sod keeps tags cross-compiler stable.
+        # (the static builder's fixed inset never lands there). np=1; eps = 0.1 on the sharp Sod keeps tags cross-compiler stable.
         stack.push(
             "AMR -> 1D -> three levels",
             {
@@ -7090,6 +7090,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 128}))
+        stack.pop()
+
+        # static nesting to level 3: one block per level, each inset in its parent, with the patch 2/3 jump moved to x = 0.5 so
+        # it crosses all three. np=2 puts the level-1 block (and its co-located children) across the rank seam.
+        jump_mid = {"patch_icpp(2)%x_centroid": 0.3, "patch_icpp(2)%length_x": 0.4, "patch_icpp(3)%x_centroid": 0.75, "patch_icpp(3)%length_x": 0.5}
+        stack.push("AMR -> 1D -> three levels static", {**amr_1d_base, **jump_mid, "amr_regrid_int": 0, "amr_max_level": 3, "amr_max_blocks": 8})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
+        cases.append(define_case_d(stack, "np=2", {"amr_max_grid_size": 32}, ppn=2))
         stack.pop()
 
         # amr_tag_var: features with no density jump, which the default density tagger cannot see. Uniform density and

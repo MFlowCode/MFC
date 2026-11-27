@@ -2380,11 +2380,6 @@ class CaseValidator:
             "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
         )
         num_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
-        self.prohibit(
-            (amr_regrid_int or 0) == 0 and amr_max_level is not None and amr_max_level > 2,
-            "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most "
-            "amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting",
-        )
         # Block-geometry bounds (mirrors the Fortran checker; global cell maxima are m/n/p in the case dict)
         glb = {1: self.get("m"), 2: self.get("n"), 3: self.get("p")}
         rr = amr_ref_ratio if amr_ref_ratio is not None else 2

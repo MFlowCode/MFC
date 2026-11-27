@@ -738,51 +738,54 @@ contains
 
     end subroutine s_populate_amr_fine
 
-    !> Build the static multi-level hierarchy (amr_regrid_int = 0): nest one level-2 block inside level-1 block 1 by a fixed
-    !! geometric inset, prolong the parent state into it and keep it persistent.
+    !> Build the static multi-level hierarchy (amr_regrid_int = 0): for each level 2..amr_max_level nest one block inside the
+    !! previous level's block (level 2 inside level-1 block 1) by a fixed geometric inset, prolong the parent state into it and keep
+    !! it persistent.
     impure subroutine s_amr_build_static_multilevel()
 
-        integer :: L2, n1, par, inset(3)
+        integer :: blk, par, lev, inset(3), ext(3)
 
         if (amr_max_level < 2) return
-        n1 = amr_num_blocks
-        if (n1 < 1) return
-        ! the static hierarchy nests one level-2 block; without pool room it would silently refine only to level 1, so abort
-        ! here (n1 is unknown at checker time). Replicated inputs: collective-safe.
-        if (n1 + 1 > amr_max_blocks) call s_mpi_abort('amr static multi-level (amr_max_level > 1, ' &
-            & // 'amr_regrid_int = 0): amr_max_blocks is too small to nest the level-2 block (need >= level-1 block count + 1); ' &
-            & // 'increase amr_max_blocks')
-        L2 = n1 + 1
+        if (amr_num_blocks < 1) return
+        ! without pool room the static hierarchy would silently stop short of amr_max_level, so abort here (the level-1 block
+        ! count is unknown at checker time). Replicated inputs: collective-safe.
+        if (amr_num_blocks + amr_max_level - 1 > amr_max_blocks) call s_mpi_abort('amr static multi-level (amr_max_level > ' &
+            & // '1, amr_regrid_int = 0): amr_max_blocks is too small to nest one block per level (need >= level-1 block ' &
+            & // 'count + amr_max_level - 1); increase amr_max_blocks')
         par = 1
-        inset = merge(max((amr_region_hi_all(:,par) - amr_region_lo_all(:,par) + 1)/4, amr_cpat_mar), 0, amr_dim)
-        amr_region_lo_all(:,L2) = amr_region_lo_all(:,par) + inset
-        amr_region_hi_all(:,L2) = amr_region_hi_all(:,par) - inset
-        ! Guard the fixed-inset box against configs this builder cannot represent: (a) a level-1 block smaller than 2*inset
-        ! inverts the box; (b) a level-2 L0 extent > amr_maxc_fit/2 overruns the creg register (0:amr_maxc_fit-1) in the L2->L1
-        ! reflux capture. Replicated inputs: collective-safe.
-        if (any(amr_dim .and. amr_region_lo_all(:,L2) > amr_region_hi_all(:, &
-            & L2))) call s_mpi_abort('amr static multi-level: level-1 block 1 is too small to nest a level-2 block (the fixed ' &
-            & // 'inset inverts the box); enlarge the base amr block or reduce amr_cpat_mar')
-        if (any(amr_dim .and. amr_ref_ratio*(amr_region_hi_all(:,L2) - amr_region_lo_all(:, &
-            & L2) + 1) > amr_maxc_fit)) &
-            & call s_mpi_abort('amr static multi-level: the nested level-2 block exceeds the per-rank scratch cap ' &
-            & // '(2*L0-extent > amr_maxc_fit); static multi-level does not tile the level-2 block - use a smaller base amr ' &
-            & // 'block or the dynamic regrid path (amr_regrid_int > 0)')
-        amr_block_level(L2) = 2
-        amr_block_owner(L2) = amr_block_owner(par); amr_myblk_dirty = .true.
-        amr_num_blocks = L2; amr_num_levels = 2
-        call s_amr_reconcile_slots()
-        amr_cur = L2
-        call s_set_amr_fine_geometry(amr_region_lo_all(:,L2), amr_region_hi_all(:,L2))
-        call s_amr_reduce_xchg_flag()
-        ! the parent-fill wave assembles the L2 patch from the parent's fine array (all ranks enter; the owner prolongs in place)
-        call s_amr_parent_fill_exchange(2, .true.)
-        call s_amr_select_slot(L2)
-        if (amr_rank_owns_block) then
-            call s_amr_parent_fill_consume(L2, .true.)
-            call s_interpolate_coarse_to_fine()
-        end if
-        call s_amr_fill_wave_done()
+        do lev = 2, amr_max_level
+            blk = amr_num_blocks + 1
+            inset = merge(max((amr_region_hi_all(:,par) - amr_region_lo_all(:,par) + 1)/4, amr_cpat_mar), 0, amr_dim)
+            amr_region_lo_all(:,blk) = amr_region_lo_all(:,par) + inset
+            amr_region_hi_all(:,blk) = amr_region_hi_all(:,par) - inset
+            ! Guard the fixed-inset box against configs this builder cannot represent: (a) a parent smaller than 2*inset inverts
+            ! the box; (b) an L0 extent > amr_maxc_fit/amr_ref_ratio**(lev-1) overruns the fine coordinate arrays and the creg
+            ! register (0:amr_maxc_fit-1) in the reflux capture into the parent. Replicated inputs: collective-safe.
+            ext = amr_region_hi_all(:,blk) - amr_region_lo_all(:,blk) + 1
+            if (any(amr_dim .and. ext < 1)) call s_mpi_abort('amr static multi-level: a block is too small to nest the next ' &
+                & // 'level (the fixed inset inverts the box); enlarge the base amr block, reduce amr_max_level or reduce ' &
+                & // 'amr_cpat_mar')
+            if (any(amr_dim .and. amr_ref_ratio**(lev - 1)*ext > amr_maxc_fit)) call s_mpi_abort('amr static multi-level: ' &
+                & // 'a nested block exceeds the per-rank scratch cap (amr_ref_ratio**(level-1)*L0-extent > amr_maxc_fit); ' &
+                & // 'static multi-level does not tile nested blocks - use a smaller base amr block or the dynamic regrid ' &
+                & // 'path (amr_regrid_int > 0)')
+            amr_block_level(blk) = lev
+            amr_block_owner(blk) = amr_block_owner(par); amr_myblk_dirty = .true.
+            amr_num_blocks = blk; amr_num_levels = lev
+            call s_amr_reconcile_slots()
+            amr_cur = blk
+            call s_set_amr_fine_geometry(amr_region_lo_all(:,blk), amr_region_hi_all(:,blk))
+            call s_amr_reduce_xchg_flag()
+            ! the parent-fill wave assembles the patch from the parent's fine array (all ranks enter; the owner prolongs in place)
+            call s_amr_parent_fill_exchange(lev, .true.)
+            call s_amr_select_slot(blk)
+            if (amr_rank_owns_block) then
+                call s_amr_parent_fill_consume(blk, .true.)
+                call s_interpolate_coarse_to_fine()
+            end if
+            call s_amr_fill_wave_done()
+            par = blk
+        end do
         call s_amr_select_slot(1)
 
     end subroutine s_amr_build_static_multilevel
