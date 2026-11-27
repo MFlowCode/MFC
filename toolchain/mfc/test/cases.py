@@ -7100,6 +7100,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         turned = {f"patch_icpp({i})%{k}": v for i, yc, ly in ((1, 0.15, 0.3), (2, 0.5, 0.4), (3, 0.85, 0.3)) for k, v in (("x_centroid", 0.5), ("length_x", 1.0), ("y_centroid", yc), ("length_y", ly))}
         cases.append(define_case_d(stack, "features along x -> 2 MPI Ranks", turned, ppn=2))
         stack.pop()
+        # A disc crossing the level-1 seam y = 28|29 near its top: the level-2 boxes on the two sides join across it, so level 2
+        # covers y = 13..44 without the unrefined strip of 2*amr_cpat_mar coarse cells (#2312)
+        disc = {k: v for k, v in seam_2d.items() if not (k.startswith("patch_icpp(3)") or k.startswith("patch_icpp(2)%length"))}
+        disc.update({"num_patches": 2, "patch_icpp(1)%x_centroid": 0.5, "patch_icpp(1)%length_x": 1.0})
+        disc.update({"patch_icpp(2)%geometry": 2, "patch_icpp(2)%x_centroid": 0.5, "patch_icpp(2)%y_centroid": 0.45, "patch_icpp(2)%radius": 0.15, "patch_icpp(2)%alter_patch(1)": "T"})
+        stack.push("AMR -> 2D -> multi-level seam -> oblique disc", disc)
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
 
         # Validation examples at small sizes (docs/documentation/validation_amr.md): Sod with two levels following the shock and the
         # contact to t = 0.2 on a 32-cell base (check_sod.py), and the 2D periodic square of dense gas, two levels subcycled, on

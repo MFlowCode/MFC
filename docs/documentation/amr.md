@@ -222,7 +222,8 @@ comparable (forces on coarse faces only).
   only grow); a missing fine-level file aborts the restart.
 - **Nesting.** A level-2 or deeper block lies inside one block of the level above; regrid builds each block's children
   inside it, a few coarse cells from its edge. Where a feature crosses the seam between two parent blocks, the children
-  on the two sides are joined across it when their extents along it are equal (a feature that crosses it squarely):
+  on the two sides are joined across it when their extents along it are equal (the tag buffer usually makes them so,
+  also for a disc crossing the seam off its centre):
   each is extended to the seam, or, where that would exceed its level's size cap, the gap is filled by a thin block of
   its own. Otherwise a strip that wide on each side of the seam stays at the parent's resolution; so does every seam with
   immersed boundaries, or with `amr_prolong = 2` on a scheme with fewer
