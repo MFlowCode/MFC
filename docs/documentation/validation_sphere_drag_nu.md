@@ -20,7 +20,7 @@ sphere against the standard correlations, and the drag against a momentum balanc
 | Flow | M = 0.2, Re_D = 20 and 100, 300 K, 1 atm, dry air (`h2o2.yaml`: O2 0.21, N2 0.79 by mole), chemistry on for thermodynamics and mixture-averaged transport, reactions off; constant \f$\mu\f$ from the free stream |
 | Grid | 8 and 12 cells/D, uniform (12 cells/D: 108 x 72 x 72 cells); domain [-3 D, 6 D] x [-3 D, 3 D]^2 (area blockage 2.2 %) |
 | Boundaries | subsonic characteristic inflow, characteristic outflow holding the free-stream pressure, extrapolated lateral faces |
-| Wall | fixed, no slip, `thermal_bc = 1`, Twall = T_inf (drag runs) or 1.1 T_inf (heat runs); `ib_ip_interp = 1` |
+| Wall | fixed, no slip, `thermal_bc = 1`, Twall = T_inf (drag runs) or 1.1 T_inf (heat runs); `ib_ip_interp = 1`, `ib_wall_order = 1` and `ib_visc_compact = F`, the defaults then (the Reproduce commands pass `--wall_order 1 --visc_compact 0`) |
 | Numerics | WENO5-M, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 4`, adaptive step with CFL 0.5 and `chem_params%%transport_dt` |
 | Length | \f$t U/D\f$ = 15 (Re 20) and 20 (Re 100) at 12 cells/D, 12 at 8 cells/D; the force and the heat are constant to 1e-4 over the last saves at 12 cells/D (the 8 cells/D runs stop at 12 and 12.3, where Cd of Re 100 still falls by 0.2 % per two units) |
 | Hardware | NVIDIA A100 80GB (Georgia Tech), NVHPC 25.11, OpenACC, double precision |
@@ -59,7 +59,7 @@ Schiller-Naumann: 2.610 (Re 20) and 1.092 (Re 100); Ranz-Marshall 4.396 and 7.35
 
 ## Known limitations
 
-- **First-order wall.** The no-slip ghost value is the wall value, so the effective wall sits up to a cell inside the surface ([#2389](https://github.com/MFlowCode/MFC/issues/2389)); the wake length is low and the Nusselt number may drift with refinement (not verified).
+- **First-order wall.** In these runs the no-slip ghost value is the wall value (`ib_wall_order = 1`; the quadratic fill is now the default and was not run here), so the effective wall sits up to a cell inside the surface ([#2389](https://github.com/MFlowCode/MFC/issues/2389)); the wake length is low and the Nusselt number may drift with refinement (not verified).
 - **Domain.** The 2.2 % blockage of the 6 D x 6 D cross-section raises Cd; not measured here.
 - Not re-run on master: Re 300 (the sphere sheds late and needs t U/D of about 100), the Mach 0.3-2 rows, and 20 and 40 cells/D. Earlier measurements of this configuration at 20 cells/D on a pre-merge build gave Cd within -1.6 to +3.9 % of Schiller-Naumann and Nu between Ranz-Marshall and Whitaker, the same bands; they are not repeated here.
 - Schiller-Naumann is itself a fit of about 5 %, and the references are incompressible; Whitaker's and Ranz-Marshall's fits differ by 11 %, so Nu is a consistency check, not a validation to better than that.
@@ -69,9 +69,9 @@ Schiller-Naumann: 2.610 (Re 20) and 1.092 (Re 100); Ranz-Marshall 4.396 and 7.35
 
 ```
 ./mfc.sh run examples/3D_ibm_sphere_drag_nu/case.py -t pre_process simulation post_process -n 1 --gpu -- \
-    --silo --Re 100 --cells_per_D 12 --xu 3 --xd 6 --hy 3 --steps 0 --tstar 20 --frames 5
+    --silo --Re 100 --cells_per_D 12 --xu 3 --xd 6 --hy 3 --steps 0 --tstar 20 --frames 5 --wall_order 1 --visc_compact 0
 ./mfc.sh run examples/3D_ibm_sphere_drag_nu/case.py -t pre_process simulation post_process -n 1 --gpu -- \
-    --silo --Re 100 --cells_per_D 12 --xu 3 --xd 6 --hy 3 --steps 0 --tstar 20 --frames 5 --tw_ratio 1.1
+    --silo --Re 100 --cells_per_D 12 --xu 3 --xd 6 --hy 3 --steps 0 --tstar 20 --frames 5 --tw_ratio 1.1 --wall_order 1 --visc_compact 0
 python3 examples/3D_ibm_sphere_drag_nu/check_sphere.py <cold run> --hot <hot run>
 ```
 

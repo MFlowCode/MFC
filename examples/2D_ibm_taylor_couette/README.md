@@ -4,7 +4,7 @@ A circle of radius R = 1 turns at a prescribed rate (`moving_ibm = 1`) inside a 
 with inner radius 2 R). The gas (rho = 1, sound speed 1, constant viscosity) starts from rest and is run to steady state at tip
 Mach number 0.05 and Re = Omega R^2 / nu = 10. The steady incompressible solution is u_theta = A r + B / r, so the velocity
 profile, the torque on each wall and the wall speed are known exactly. The example measures what `ib_wall_order = 1` (mirror
-ghost velocity, default) and `ib_wall_order = 2` (two-probe quadratic) do at a curved, rotating wall.
+ghost velocity) and `ib_wall_order = 2` (two-probe quadratic) do at a curved, rotating wall.
 
 `check_couette.py` reads the run directory (serial text output) and prints the errors:
 
@@ -20,7 +20,7 @@ ghost velocity, default) and `ib_wall_order = 2` (two-probe quadratic) do at a c
 | 40 | 2 | 9.6e-5 | 1.0e-4 | +1.4e-4 | -4.4e-5 | -7.2e-4 |
 
 Order 2 converges at about second order (observed 2.0 and 1.8) and is 11 to 60 times below order 1, which converges at 0.5 to 0.9
-order and keeps a 4 to 6 % wall-speed deficit. The wall shear from local near-wall fits stays near 2 % with order 2 and the default
+order and keeps a 4 to 6 % wall-speed deficit. The wall shear from local near-wall fits stays near 2 % with order 2, inverse-distance
 image points and viscous gradient; it is a near-wall discretization error, not compressibility (`ref1d.py`, a 1D compressible solution
 of the same case, changes the shear by about 3e-5 relative), and TSC image points with `--visc_compact 1` bring it to 0.1 % at 40 cells
 per R. The measurement, its limits and the rotating-wall variants
@@ -44,5 +44,5 @@ between runs. The output is serial text, so use one rank. `ring_stl.py` writes t
 
 2D only, two Mach numbers, one machine and compiler for the table (NVIDIA A100, NVHPC 25.11, double precision). The tables use
 `master` with #2383 (a rotating body's ghost-cell wall velocity at the wall point). The wall shear read from the near-wall cells does
-not converge with order 1, and stays near 1.3 to 2 % with order 2 and the default image points and gradient (Mach 0.01 and 0.05). Mean density rises by up to 2 % over the run because the
+not converge with order 1, and stays near 1.3 to 2 % with order 2, inverse-distance image points and the WENO gradient (Mach 0.01 and 0.05). Mean density rises by up to 2 % over the run because the
 immersed boundary does not conserve mass; this is not quantified here.

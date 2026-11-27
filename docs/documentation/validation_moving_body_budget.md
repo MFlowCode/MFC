@@ -17,11 +17,11 @@ particle-resolved runs, where a particle's drag and heating are read from these 
 
 | Item | Value |
 | :--- | :--- |
-| Geometry | one circle, D = 1, centre off the grid lines by (dx/3, dx/5), in a doubly periodic square box |
+| Geometry | one circle, D = 1, centre off the grid lines by (dx/3, dx/5) in these runs (the example now starts at (0.1371 dx, dx/5): with dx/3, the default Mach and CFL put the centre on a cell-centre line at some Runge-Kutta stages), in a doubly periodic square box |
 | Gas | ideal gas, \f$\gamma\f$ = 1.4, \f$\rho\f$ = 1, p = 1/1.4 (sound speed 1), no chemistry |
 | Flow | moving twin: the circle moves at Mach 0.3 through gas at rest (`moving_ibm = 1`); fixed twin: the circle is held and the gas moves at Mach -0.3 |
 | Mass runs | inviscid, box 5 D, 16, 24 and 32 cells/D, 6 D travelled, 24 saves, no-slip wall |
-| Twin runs | Re = U D/\f$\nu\f$ = 40, Pr 0.7, isothermal wall (`thermal_bc = 1`), wall/gas temperature 0.9 and 0.2, box 8 D, 16 and 32 cells/D, 6 D travelled, `ib_ip_interp = 2` |
+| Twin runs | Re = U D/\f$\nu\f$ = 40, Pr 0.7, isothermal wall (`thermal_bc = 1`), wall/gas temperature 0.9 and 0.2, box 8 D, 16 and 32 cells/D, 6 D travelled, `ib_ip_interp = 2`, `ib_wall_order = 1`, `ib_visc_compact = F` (the defaults then; `--wall_order 1 --visc_compact 0` repeats them) |
 | Numerics | WENO5-M, HLLC, SSP-RK3, fixed step from an acoustic CFL of 0.4, `fd_order` 4, `weno_Re_flux` and `weno_avg` when viscous |
 | Correction | `ib_mass_relax` = 0 (off) and 30 |
 | Hardware | GNU 13 on an x86 CPU, double precision |
@@ -98,7 +98,7 @@ Galilean twin, viscous, moving over fixed (ratio 1 is exact agreement):
 
 ```
 ./mfc.sh run examples/2D_ibm_moving_mass_budget/case.py -t pre_process simulation -n 1 --gpu -- \
-    --cells_per_D 24 --mach 0.3 --box 5 --travel 6 --nsave 24 --relax 0
+    --cells_per_D 24 --mach 0.3 --box 5 --travel 6 --nsave 24 --relax 0 --wall_order 1
 python3 examples/2D_ibm_moving_mass_budget/check_budget.py mass <run directory>
 ```
 

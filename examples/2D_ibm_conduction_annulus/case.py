@@ -5,8 +5,8 @@ Steady conduction across a 2D annulus between two isothermal immersed boundaries
 The inner body is a circle (radius R = 1, patch_ib%geometry = 2, Twall = 2), the outer body is a flat ring read from ring.stl whose
 inner edge is the circle r = 2 R (geometry 5, Twall = 3). The gas between them is quiescent with constant conductivity, so the steady
 temperature is exactly T(r) = T1 + (T2 - T1) ln(r / R) / ln(r2 / R). The initial temperature is the exact profile on 10 shells and the run is advanced for 8
-slowest conduction times. --interp selects the image-point weights of the ghost-cell method: 1 inverse distance (default of the
-solver), 2 triangular-shaped cloud (ib_ip_interp = 2).
+slowest conduction times. --interp selects the image-point weights of the ghost-cell method: 1 inverse distance, 2 triangular-shaped cloud
+(ib_ip_interp = 2, the solver default).
 
     ./mfc.sh run examples/2D_ibm_conduction_annulus/case.py -n 1 --gpu                    # inverse distance
     ./mfc.sh run examples/2D_ibm_conduction_annulus/case.py -n 1 --gpu -- --interp 2      # TSC
@@ -134,8 +134,7 @@ for j in range(1, NSHELL + 1):
     else:
         case[pre + "radius"] = R + (r2 - R) * shell / NSHELL
         case.update({pre + f"alter_patch({i})": "T" for i in range(1, j)})
-if args.interp == 2:
-    case["ib_ip_interp"] = 2
+case["ib_ip_interp"] = args.interp  # always written: the solver default is 2
 
 if __name__ == "__main__":
     print(json.dumps(case))

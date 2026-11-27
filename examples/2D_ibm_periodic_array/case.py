@@ -48,6 +48,8 @@ def make_parser(dim=2):
     parser.add_argument("--tw_ratio", type=float, default=1.0, help="Body temperature over T_inf.")
     parser.add_argument("--thermostat", action="store_true", help="mean_temp_wall controller (needs --tw_ratio != 1).")
     parser.add_argument("--ib_ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance).")
+    parser.add_argument("--wall_order", type=int, default=2, choices=(1, 2), help="ib_wall_order (1 wall value, 2 quadratic, the solver default).")
+    parser.add_argument("--visc_compact", type=int, default=1, choices=(0, 1), help="ib_visc_compact (1 compact viscous gradient next to the body, the solver default; 0 the WENO gradient).")
     return parser
 
 
@@ -138,6 +140,8 @@ def build(args):
         "num_ibs": n,
         "many_ib_patch_parallelism": "T",
         "ib_ip_interp": args.ib_ip_interp,
+        "ib_wall_order": args.wall_order,
+        "ib_visc_compact": "T" if args.visc_compact else "F",
         "ib_state_wrt": "T",
         "ib_force_wrt": "T",
         "ib_heat_wrt": "T",

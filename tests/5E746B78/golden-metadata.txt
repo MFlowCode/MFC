@@ -1,16 +1,16 @@
-This file was created on 2026-11-23 09:55:46.278842.
+This file was created on 2026-11-26 10:25:31.871781.
 
 mfc.sh:
 
-    Invocation: test --only IBM --generate -j 24 --no-debug --no-reldebug --no-single
+    Invocation: test --no-debug --no-reldebug --no-single --no-gpu --mpi --no-build -j 12 --max-attempts 2 --generate --only 0387594F 041D5CC9 04FB9E91 05A8C23C 07D9EBD1 09FDDC81 0B07F3A1 0BD42F35 10DF5CAA 124D7972 125B82E4 127A967A 128384B4 135F548B 13945217 14FF2F66 16574715 17E2C6D1 18B832DD 1A6F40B3 1B218CF1 1D4832F8 1E62093F 1E6FD465 1EA0BD70 221C9980 24176B3D 2440B4AE 27CD0714 27F6FEF5 284ABF4C 2854A102 28D037A7 2EE0C3AA 2FB9269F 2FC9648E 3008BA80 30C84CA3 32DD0363 345FAF72 34626101 34A93376 39A3B369 3AD416B4 3C5B4542 3F5FE078 408BF558 40A4A5B8 421A6AD9 431554F7 43A1D3C6 43AF9F25 474D6E2B 48CC6F65 49893269 4B574EE6 4B8105EA 4BED9896 4C3164AE 4C64244B 4CECF724 4E0FBE72 4F5A5E32 50B98DBF 5173E637 51AC8C99 5334FF40 540C72F1 5453BB95 5A22B45F 5A6A0EC7 5BBDFB29 5BF8664C 5C04A681 5E746B78 6076815B 60F620F8 6171E9D4 641CC3F0 647715EB 65CC7EB7 66ABE269 674B68AA 69F52F95 6A439411 6AF90F3C 6B97A7F6 6DE4C39D 6E24D2F9 6ED50013 713F4716 731ACB1A 74CEDCD1 759FF2DA 78016FF2 7C8B89A5 7CA4FC48 7CC8F995 7DCA9229 7DCE34B4 7E50FFE6 7F70E665 7FA04E95 7FC2F9F8 824745F5 8339878C 86A2C59B 87C3F801 88ADD5C1 88C18DD7 8B2A7F3E 8D8F6424 8DDB767E 911FB9B6 92C38C91 947DA282 952F1CEF 993DF695 997E2B0E 9C037B27 9C0CAF25 9D95D7B8 A1B2B963 A2036630 A2ACC05A A4DABDB6 A69398F6 A69D2D28 A74B7381 A7E7A245 AA36F5D2 AA49A8BC AC3AAF00 ADD26480 AE0216C4 AE4D2FDA AFBACA70 B0CE19C5 B0E46764 B20208D4 B204C86E B317404C B5CAD86E B7A370B8 B7A6CC79 B872F80B B8D029E5 B8F6A584 BA4372C5 BA59123E BBF7C467 BFAA7587 C02C399E C1F0BCB1 C51CB3CB C5D96D9A C730942B C794BB89 C7BE8FEA C87A466A C8AD6271 CD32DCEC D1C97CD1 D5EAC17E D6794F4C D7D6DEEB D7E7DE04 D8BC2E49 D999E5E8 DE954FAA DF93F5A5 DF9526DB E085CC5A E1199F96 E2163247 E2C4CBC6 E4F6CE1E E53E6397 E597CAE4 E5B66084 E72E9486 E748B162 EA8FA07E ED2D5C0A EF38E2A6 F1F38949 F200F862 F22AC0A2 F31EAABF F389CE57 F3ECE90B F4675B3A F52F0D4C F60D6594 F7A6649D F855812E F86059C9 F8D466BD F935DA03 F980C769 FA8643EF FAF04D7A FB3F47C0 FE3DCA48
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        567fdccdd02b1d861d5d06045291400d43dfc7bb on master (dirty)
+    Git:        94656e19be961ca1b1e4b4bca300dc98793f2ada on HEAD (dirty)
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.31.8 on atl1-1-02-018-23-1.pace.gatech.edu
+        CMake v3.31.8 on atl1-1-01-005-32-2.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
@@ -26,41 +26,7 @@ syscheck:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/w124/mfc/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
-        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
-        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.31.8 on atl1-1-02-018-23-1.pace.gatech.edu
-    
-        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
-        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/w124/mfc/build/venv/bin/fypp
+        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/w152/MFC-regen/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -78,7 +44,7 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.31.8 on atl1-1-02-018-23-1.pace.gatech.edu
+        CMake v3.31.8 on atl1-1-01-005-32-2.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
@@ -94,7 +60,7 @@ simulation:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/w124/mfc/build/venv/bin/fypp
+        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/w152/MFC-regen/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -108,18 +74,18 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-post_process:
+pre_process:
 
     CMake Configuration:
     
-        CMake v3.31.8 on atl1-1-02-018-23-1.pace.gatech.edu
+        CMake v3.31.8 on atl1-1-01-005-32-2.pace.gatech.edu
     
         C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
         Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
-        POST_PROCESS  : ON
+        POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
@@ -128,7 +94,7 @@ post_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /storage/home/hcoda1/6/sbryngelson3/scratch/w124/mfc/build/venv/bin/fypp
+        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/w152/MFC-regen/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -150,29 +116,29 @@ CPU:
     CPU op-mode(s):                          32-bit, 64-bit
     Address sizes:                           46 bits physical, 48 bits virtual
     Byte Order:                              Little Endian
-    CPU(s):                                  24
-    On-line CPU(s) list:                     0-23
+    CPU(s):                                  32
+    On-line CPU(s) list:                     0-31
     Vendor ID:                               GenuineIntel
-    Model name:                              Intel(R) Xeon(R) Gold 6226 CPU @ 2.70GHz
+    Model name:                              Intel(R) Xeon(R) Gold 6226R CPU @ 2.90GHz
     CPU family:                              6
     Model:                                   85
     Thread(s) per core:                      1
-    Core(s) per socket:                      12
+    Core(s) per socket:                      16
     Socket(s):                               2
     Stepping:                                7
-    CPU(s) scaling MHz:                      95%
-    CPU max MHz:                             2700.0000
+    CPU(s) scaling MHz:                      91%
+    CPU max MHz:                             2900.0000
     CPU min MHz:                             1200.0000
-    BogoMIPS:                                5400.00
+    BogoMIPS:                                5800.00
     Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 intel_ppin ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm mpx rdt_a avx512f avx512dq rdseed adx smap clflushopt clwb intel_pt avx512cd avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts hwp hwp_act_window hwp_epp hwp_pkg_req vnmi pku ospke avx512_vnni md_clear flush_l1d arch_capabilities
     Virtualization:                          VT-x
-    L1d cache:                               768 KiB (24 instances)
-    L1i cache:                               768 KiB (24 instances)
-    L2 cache:                                24 MiB (24 instances)
-    L3 cache:                                38.5 MiB (2 instances)
+    L1d cache:                               1 MiB (32 instances)
+    L1i cache:                               1 MiB (32 instances)
+    L2 cache:                                32 MiB (32 instances)
+    L3 cache:                                44 MiB (2 instances)
     NUMA node(s):                            2
-    NUMA node0 CPU(s):                       0-11
-    NUMA node1 CPU(s):                       12-23
+    NUMA node0 CPU(s):                       0-15
+    NUMA node1 CPU(s):                       16-31
     Vulnerability Gather data sampling:      Vulnerable
     Vulnerability Indirect target selection: Vulnerable
     Vulnerability Itlb multihit:             KVM: Vulnerable

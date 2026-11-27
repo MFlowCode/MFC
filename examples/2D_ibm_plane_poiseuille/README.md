@@ -3,7 +3,7 @@
 Two static rectangle immersed boundaries at y = 0 and y = H = 1 bound a channel periodic in x and driven by a body
 acceleration. The gas (rho = 1, sound speed 1, constant viscosity) starts from rest and is run to steady state at peak Mach
 number 0.05 and Re = u_max H / nu = 1. The exact solution is u = g y (H - y) / (2 nu), with flow rate g H^3 / (12 nu), so the
-profile and the flow rate are known. The example measures `ib_wall_order = 1` (default) and `ib_wall_order = 2` at a flat wall,
+profile and the flow rate are known. The example measures `ib_wall_order = 1` (wall value) and `ib_wall_order = 2` at a flat wall,
 on the cell face and 0.37 cell inside it.
 
 `check_poiseuille.py` reads the run directory (serial text output):
@@ -18,7 +18,7 @@ Wall on a cell face, 12 slowest viscous times (error of the rms velocity over u_
 | 16 | 0.216 | 1.8e-2 | +0.322 | +2.8e-2 |
 | 32 | 0.113 | 6.7e-3 | +0.159 | +9.7e-3 |
 
-With the wall 0.37 cell inside a face: 8 cells 0.474 and 7.2e-2, 16 cells 0.223 and 2.0e-2 (orders 1 and 2). The default order acts
+With the wall 0.37 cell inside a face: 8 cells 0.474 and 7.2e-2, 16 cells 0.223 and 2.0e-2 (orders 1 and 2). Order 1 acts
 as if the no-slip sat about 0.75 cell outside the wall; order 2 removes most of it. The wall force from the face fluxes is
 a body-force balance and agrees within 1.2e-3 on a cell face for both orders; with the wall inside a cell the order 2 force splits
 unequally between the two walls (+-7 % at 8 cells, +-4 % at 16). The page @ref validation_wall_order_couette has the full tables.

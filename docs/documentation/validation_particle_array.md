@@ -22,7 +22,7 @@ mass budget.
 | Grid | 16 and 24 cells/D, uniform; 3D: 20 spheres at \f$\phi\f$ = 0.2 in a cube of 3.74 D (0.26 and 0.88 M cells) |
 | Boundaries | triply (2D: doubly) periodic |
 | Wall | fixed, no slip, `thermal_bc = 1` at the free-stream temperature (they absorb the heat the driving force dissipates); `mass = 0` keeps a body-force term out of the force record |
-| Numerics | WENO5-M, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 4`, fixed step at acoustic CFL 0.2 (3D) or 0.3 (2D) because the controller needs a constant `dt`; `ib_ip_interp = 1` (the default) |
+| Numerics | WENO5-M, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 4`, fixed step at acoustic CFL 0.2 (3D) or 0.3 (2D) because the controller needs a constant `dt`; `ib_ip_interp = 1`; these runs used `ib_wall_order = 1` and `ib_visc_compact = F`, the defaults then (the Reproduce commands pass `--wall_order 1 --visc_compact 0`; the example now follows the solver defaults 2 and T) |
 | Length | \f$t W/D\f$ = 10 (3D), 43 (2D), averages over the last 40 % |
 | Hardware | NVIDIA A100 80GB, NVHPC 25.11, double precision |
 
@@ -99,10 +99,10 @@ The single-body closed-box budget is reproducible on `master` with `examples/2D_
 ## Reproduce
 
 ```
-./mfc.sh run examples/2D_ibm_periodic_array/case.py -n 1 --gpu -- --tstar 40 --stride 20
+./mfc.sh run examples/2D_ibm_periodic_array/case.py -n 1 --gpu -- --tstar 40 --stride 20 --wall_order 1 --visc_compact 0
 python3 examples/2D_ibm_periodic_array/check_array.py examples/2D_ibm_periodic_array
 ./mfc.sh run examples/2D_ibm_periodic_array/case.py -n 1 --gpu -- --dim 3 --n_bodies 20 --phi 0.2 --mach 0.3 \
-    --Re 100 --cells_per_D 16 --tstar 10 --stride 50 --cfl 0.2 --seed 1
+    --Re 100 --cells_per_D 16 --tstar 10 --stride 50 --cfl 0.2 --seed 1 --wall_order 1 --visc_compact 0
 ```
 
 The suite runs the CI-sized case (12 cylinders, 96 x 96 cells, 200 steps, 2 ranks) as `2D -> Chemistry -> IBM -> Periodic Array`.

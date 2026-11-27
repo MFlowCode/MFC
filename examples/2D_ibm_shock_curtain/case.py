@@ -51,6 +51,7 @@ parser.add_argument("--tau", type=float, default=2.0, help="Run length t / tau_L
 parser.add_argument("--frames", type=int, default=10, help="Saves of the adaptive run (a fixed-step run saves once, at the end).")
 parser.add_argument("--cfl", type=float, default=0.4)
 parser.add_argument("--slip", action="store_true", help="Slip walls (default no slip).")
+parser.add_argument("--wall_order", type=int, default=2, choices=(1, 2), help="ib_wall_order (1 wall value, 2 quadratic, the solver default).")
 parser.add_argument("--re_ps", type=float, default=None, help="Viscous: constant mu from Re_ps = rho2 u2 D / mu (bulk viscosity 0.6 mu).")
 parser.add_argument("--moving", action="store_true", help="Free bodies with collisions (default fixed).")
 parser.add_argument("--rho_p", type=float, default=2520.0, help="Body density [kg/m^3] (--moving).")
@@ -123,6 +124,7 @@ case = {
     "bc_x%beg": -17,
     "bc_x%end": -3,
     "ib": "T",
+    "ib_wall_order": args.wall_order,
     "num_ibs": n,
     "many_ib_patch_parallelism": "T",
     "ib_state_wrt": "T",
