@@ -61,6 +61,13 @@ def bench(targets=None):
 
         CASES = [BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH)]
 
+        if ARG("cases"):
+            slugs = [case.slug for case in CASES]
+            unknown = [name for name in ARG("cases") if name not in slugs]
+            if unknown:
+                raise MFCException(f"Unknown benchmark case: {', '.join(unknown)}. Choose from: {', '.join(slugs)}")
+            CASES = [case for case in CASES if case.slug in ARG("cases")]
+
         for case in CASES:
             case.args = case.args + ARG("--")
             case.path = os.path.abspath(case.path)
