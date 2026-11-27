@@ -721,7 +721,6 @@ contains
         ib_wall_order = -1  ! auto (s_initialize_ibm_module): 2, or 1 with ib_second_order_vel
         ib_mass_relax = -1
         wall_column_dt_frac = 0.1_wp
-        ib_smooth_contact = .false.
         ib_visc_compact = .true.
         ib_uncover_fill = .false.
 

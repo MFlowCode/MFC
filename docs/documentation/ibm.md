@@ -25,7 +25,7 @@ Moving-body kinematics and the restitution of a wall collision are checked in [V
 | `ib_second_order_vel`, `ib_ip_min_dist` | linear ghost-velocity extrapolation; minimum image-point distance |
 | `ib_ip_interp` | 2 (default): triangular-shaped-cloud image-point weights; 1: inverse-distance weights |
 | `ib_wall_order` | 2 (default): two-probe quadratic wall-normal ghost velocity at no-slip walls; 1: the wall value |
-| `ib_slip_ccst`, `ib_uncover_fill` | slip-wall ghost state, fill of cells a moving body uncovers (`ib_smooth_contact` no longer has an effect) |
+| `ib_slip_ccst`, `ib_uncover_fill` | slip-wall ghost state, fill of cells a moving body uncovers |
 | `weno_Re_flux`, `weno_Re_flux_compact`, `ib_visc_compact` | the face-normal viscous gradient as a face difference and the compact velocity gradient on the viscous faces within two cells of a body (both on by default) |
 | `ib_mass_relax` | returns the spurious gas mass of a body over about N steps; the default resolves at start-up (see the parameter entry) |
 

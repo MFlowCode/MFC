@@ -218,7 +218,8 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
                 alpha_K_sum = alpha_K_sum + alpha_K(i)
             end do
-            alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
+            ! Only the fluids: with AMD flang these arrays are declared with 3 elements, more than a caller may pass
+            alpha_K(1:num_fluids) = alpha_K(1:num_fluids)/max(alpha_K_sum, sgm_eps)
         end if
         call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
 
@@ -1171,7 +1172,7 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
                 alpha_K_sum = alpha_K_sum + alpha_K(i)
             end do
-            alpha_K = alpha_K/max(alpha_K_sum, 1.e-16_wp)
+            alpha_K(1:num_fluids) = alpha_K(1:num_fluids)/max(alpha_K_sum, 1.e-16_wp)
         end if
 
         if (num_fluids == 1 .and. bubbles_euler) alpha_K(1) = q_vf(eqn_idx%adv%beg)%sf(k, l, r)

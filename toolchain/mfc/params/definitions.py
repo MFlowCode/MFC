@@ -725,7 +725,6 @@ def _load():
     _r("ib_wall_order", INT, {"ib"})
     _r("ib_mass_relax", INT, {"ib"})
     _r("wall_column_dt_frac", REAL, {"ib"})
-    _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
     _r("ib_uncover_fill", LOG, {"ib"})
 
@@ -1597,7 +1596,6 @@ _nv(
     "ib_wall_order",
     "ib_mass_relax",
     "wall_column_dt_frac",
-    "ib_smooth_contact",
     "ib_visc_compact",
     "ib_uncover_fill",
     "tau_star",

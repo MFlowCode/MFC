@@ -158,7 +158,7 @@ compiler.
 | Intel ifx | `-Og -check all` | `-Og -check bounds` |
 | NVHPC | `-O0 -C -Mbounds`, on CPU also `-Ktrap=fp` | `-O1 -Mbounds`, on CPU also `-Ktrap=fp` |
 | Cray ftn | `-O0 -K trap=fp` | `-O1 -K trap=fp` |
-| AMD flang (CPU) | `-O1`, plus `-ffpe-trap=invalid,zero,overflow -finit-local=0xff` where the compiler has them | the same |
+| AMD flang (CPU) | `-O0`, plus `-ffpe-trap=invalid,zero,overflow -finit-local=0xff` where the compiler has them | the same |
 
 The floating-point traps of NVHPC and AMD flang on CPU stop some of the suite's own tests on
 `master` today. They are known and not yet triaged: some may be values computed and then discarded,
