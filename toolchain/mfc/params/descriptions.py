@@ -331,7 +331,7 @@ DESCRIPTIONS = {
     "collision_time": "Amount of simulation time each collision will take to resolve",
     "ramp_ratio": "Maximum factor by which the adaptive time step may grow from one time step to the next",
     "coefficient_of_friction": "coefficient of friction used in collisions",
-    "friction_slip_eps": "Slip speed below which collision friction ramps linearly to zero (0 = off)",
+    "ib_friction_slip_eps": "Slip speed below which collision friction ramps linearly to zero (0 = off)",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters

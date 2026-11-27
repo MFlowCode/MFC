@@ -1876,7 +1876,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         if len(dimInfo[0]) == 2 and not viscous:
             # Soft-sphere friction across the x = 10 rank seam: two circles close nearly head-on, so the slip is far below
-            # friction_slip_eps. Without the regularisation a slip that small sets a full mu*|F_n| force whose direction depends on
+            # ib_friction_slip_eps. Without the regularisation a slip that small sets a full mu*|F_n| force whose direction depends on
             # round-off and the rank layout (the y force of 1 and 2 ranks had opposite sign from step 80, 0.13 apart). The pair was
             # mirrored about the seam with a slip of pure round-off; it is now generic (below). GNU 12.3, Intel 2024.2 (CPU), NVHPC
             # 25.11 (CPU) and an A100 agree to 8.5e-12 and a 1e-12 nudge of a centroid moves the result by 5e-12, so override_tol =
@@ -1910,7 +1910,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "coefficient_of_restitution": 0.9,
                     "collision_time": 0.8,
                     "coefficient_of_friction": mu,
-                    "friction_slip_eps": eps,
+                    "ib_friction_slip_eps": eps,
                     **{
                         f"patch_ib({i})%{k}": v
                         for i, (x, y, ux, uy) in enumerate(bodies, 1)
@@ -1920,7 +1920,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 }
 
             # The pair is off the grid and the seam by (_OFF_X, _OFF_Y) cells, closes at unequal speeds, and slides by 1.37e-4 (well
-            # under friction_slip_eps): a pair mirrored about the seam made the slip pure round-off.
+            # under ib_friction_slip_eps): a pair mirrored about the seam made the slip pure round-off.
             ox, oy = 0.25 * _OFF_X, 0.25 * _OFF_Y
             seam_bodies = [(9.35 + ox, 15.0 + oy, 0.3, 0.0), (10.65 + ox, 15.0 + oy, -0.2739, 1.37e-4)]
             seam_pair = friction_box(20.0, seam_bodies, 100, 0.003, 0.1)
@@ -1930,7 +1930,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if num_fluids == 1:
                 overlap = friction_box(20.0, [(9.4425, 15.0925, 0.3, 0.0), (10.7425, 15.0925, -0.2739, 0.0)], 100, 0.003, 0.1, **{"patch_ib(2)%radius": 0.52185})
                 cases.append(define_case_d(stack, "IBM -> Collision -> Overlap cell on a rank seam", overlap, ppn=2, override_tol=3e-4))
-            # Wall site: a circle pressed into the slip wall y = 0 at 0.1 with a 1e-4 slide. Without friction_slip_eps the friction
+            # Wall site: a circle pressed into the slip wall y = 0 at 0.1 with a 1e-4 slide. Without ib_friction_slip_eps the friction
             # force flips sign every step with magnitude mu*|F_n|; with it the slide dies out.
             wall_slide = friction_box(10.0, [(5.0 + ox, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
             cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=1e-10, override_tol_single=fric_single))

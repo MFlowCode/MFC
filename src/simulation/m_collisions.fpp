@@ -85,8 +85,8 @@ contains
 
     end function f_inv_tangential_mass
 
-    !> @brief scales the slip velocity into the friction direction, -F_t = mu*|F_n|*v_t/max(|v_t|, eps). With friction_slip_eps > 0,
-    !! eps is floored at the stick limit mu*|F_n|*dt/m_t, which keeps the explicit update stable. With 0 it is v_t/|v_t|, left
+    !> @brief scales the slip velocity into the friction direction, -F_t = mu*|F_n|*v_t/max(|v_t|, eps). With ib_friction_slip_eps >
+    !! 0, eps is floored at the stick limit mu*|F_n|*dt/m_t, which keeps the explicit update stable. With 0 it is v_t/|v_t|, left
     !! unscaled at exactly zero slip.
     subroutine s_friction_direction(tangential_vector, normal_force_mag, inv_mass_t)
 
@@ -96,8 +96,8 @@ contains
         real(wp)                :: slip
 
         slip = norm2(tangential_vector)
-        if (friction_slip_eps > 0._wp) then
-            tangential_vector = tangential_vector/max(slip, friction_slip_eps, &
+        if (ib_friction_slip_eps > 0._wp) then
+            tangential_vector = tangential_vector/max(slip, ib_friction_slip_eps, &
                 & coefficient_of_friction*normal_force_mag*dt*inv_mass_t)
         else if (.not. f_approx_equal(slip, 0._wp)) then
             tangential_vector = tangential_vector/slip
@@ -133,7 +133,7 @@ contains
         end if
 
         collisions_active = .false.
-        $:GPU_UPDATE(device='[coefficient_of_friction, friction_slip_eps]')
+        $:GPU_UPDATE(device='[coefficient_of_friction, ib_friction_slip_eps]')
         $:GPU_UPDATE(device='[ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end, ib_bc_z%beg, ib_bc_z%end]')
 
     end subroutine s_initialize_collisions_module
