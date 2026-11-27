@@ -2394,10 +2394,9 @@ class CaseValidator:
         if ib:
             # static/prescribed-motion IB AMR: bodies resolved on a static fine block.
             num_ibs = self.get("num_ibs") or 0
-            stl = any((self.get(f"patch_ib({i})%geometry")) in (5, 12) for i in range(1, num_ibs + 1))
-            self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
             moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
-            # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds every analytic geometry (STL is rejected above)
+            # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds every analytic geometry; an STL body (5, 12) has
+            # no box there, so it needs a static block
             bbox_geoms = (2, 3, 4, 6, 8, 9, 10, 11)
             self.prohibit(
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),

@@ -6406,6 +6406,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "isothermal", {"amr_max_grid_size": 32, **isothermal}))
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chk_ib, **isothermal})
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> isothermal", spec))
+        # STL body on the static block: Circle_IBM.stl (0.1 across) scaled to the same radius-0.1 disc, drawn on the fine cells
+        stl = {"patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1, "stl_models(1)%model_threshold": 0.95}
+        stl["stl_models(1)%model_filepath"] = os.path.join(common.MFC_EXAMPLE_DIRPATH, "2D_ibm_stl_test", "Circle_IBM.stl")
+        stl.update({f"stl_models(1)%model_scale({i})": 2.0 for i in (1, 2, 3)})
+        stl.update({f"stl_models(1)%model_translate({i})": -0.05 for i in (1, 2)})
+        cases.append(define_case_d(stack, "stl", {"amr_max_grid_size": 32, **stl}))
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chk_ib, **stl})
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> stl", spec))
         # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
         # fine-grid force (the coarse faces under the block are skipped)
         cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))
