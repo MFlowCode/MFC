@@ -315,7 +315,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
             "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= 2; "
-            "amr_prolong = 2 needs amr_ref_ratio = 2. "
+            "amr_prolong = 2 needs amr_ref_ratio = 2; static nesting with ib goes up to amr_max_level = 2. "
             "Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
             "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
             "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
@@ -2419,6 +2419,11 @@ class CaseValidator:
             self.prohibit(
                 amr_max_level is not None and amr_max_level > 1 and moving and (amr_regrid_int or 0) == 0,
                 "multi-level AMR (amr_max_level > 1) with a moving immersed body requires amr_regrid_int > 0",
+            )
+            # each static level is a fixed inset of its parent; past level 2 a body could straddle a level boundary unchecked
+            self.prohibit(
+                amr_max_level is not None and amr_max_level > 2 and (amr_regrid_int or 0) == 0,
+                "static multi-level AMR (amr_regrid_int = 0) with ib supports up to amr_max_level = 2 (deeper blocks are fixed insets that do not track the bodies); use amr_regrid_int > 0",
             )
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(

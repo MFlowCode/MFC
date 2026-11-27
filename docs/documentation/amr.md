@@ -14,6 +14,7 @@ With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the den
 once per level before the first step of a fresh run, so they start on the initial features, and then every
 `amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`; with `amr_max_level > 1` each
 deeper level adds one block, inset by a quarter of its parent's extent (at least the stencil margin) on each side.
+The insets ignore immersed bodies, so with `ib` static nesting stops at `amr_max_level = 2`.
 
 On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
 that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
