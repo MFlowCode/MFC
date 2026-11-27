@@ -87,7 +87,7 @@ module m_ibm
         & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, &
         & s_add_swept_cells, s_fill_uncovered_cells, s_ibm_set_conduction_temperature, s_ibm_restore_conduction_temperature, &
         & s_write_ib_conduction_temperature, s_read_ib_conduction_temperature, s_ibm_advance_wall_columns, s_wall_column_tcond, &
-        & f_wall_column_dt
+        & s_ibm_pack_fine_tcond, s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, s_read_tcond_box, f_wall_column_dt
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -1680,17 +1680,78 @@ contains
 
     end subroutine s_unpack_ghost_tcond
 
-    !> Path of the T_cond file of a save: one shared file, or one file per rank with file_per_process (as ib_state).
-    impure function f_tcond_file(t_step) result(file_loc)
+    !> s_pack_ghost_tcond for fine slot islot's parked ghosts (gp_park), keyed by the level's global cell index (block origin s),
+    !! copied to rec(1:4, 1:n_f) if present.
+    impure subroutine s_ibm_pack_fine_tcond(islot, s, rec)
 
-        integer, intent(in)                  :: t_step
+        integer, intent(in)                               :: islot, s(3)
+        real(wp), dimension(:,:), intent(inout), optional :: rec
+        integer                                           :: a, n_f, s1, s2, s3
+        integer(kind=8)                                   :: off
+
+        n_f = ib_fine(islot)%num_gps
+        if (n_f == 0) return
+        off = ib_fine(islot)%off
+        s1 = s(1); s2 = s(2); s3 = s(3)
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off, s1, s2, s3]', present='[gp_tc_rec]')
+        do a = 1, n_f
+            gp_tc_rec(1, a) = real(gp_park(off + a)%loc(1) + s1, wp)
+            gp_tc_rec(2, a) = real(gp_park(off + a)%loc(2) + s2, wp)
+            gp_tc_rec(3, a) = real(gp_park(off + a)%loc(3) + s3, wp)
+            gp_tc_rec(4, a) = gp_park(off + a)%T_cond
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[gp_tc_rec(:, 1:n_f)]')
+        if (present(rec)) rec(:,1:n_f) = gp_tc_rec(:,1:n_f)
+
+    end subroutine s_ibm_pack_fine_tcond
+
+    !> Restore fine slot islot's parked T_cond from the box tc of its level's T_cond file (box origin = block origin s).
+    impure subroutine s_ibm_fine_tcond_from_box(islot, s, tc)
+
+        integer, intent(in)                       :: islot, s(3)
+        real(wp), dimension(0:,0:,0:), intent(in) :: tc
+
+        call s_ibm_pack_fine_tcond(islot, s)
+        call s_tcond_from_box(tc, s, ib_fine(islot)%num_gps)
+        call s_ibm_unpack_fine_tcond(islot)
+
+    end subroutine s_ibm_fine_tcond_from_box
+
+    !> s_unpack_ghost_tcond for fine slot islot's parked ghosts.
+    impure subroutine s_ibm_unpack_fine_tcond(islot)
+
+        integer, intent(in) :: islot
+        integer             :: a, n_f
+        integer(kind=8)     :: off
+
+        n_f = ib_fine(islot)%num_gps
+        if (n_f == 0) return
+        off = ib_fine(islot)%off
+        $:GPU_UPDATE(device='[gp_tc_rec(:, 1:n_f)]')
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', present='[gp_tc_rec]')
+        do a = 1, n_f
+            gp_park(off + a)%T_cond = gp_tc_rec(4, a)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ibm_unpack_fine_tcond
+
+    !> Path of the T_cond file of a save: one shared file, or one file per rank with file_per_process (as ib_state). AMR level lev >
+    !! 0 (its fine ghosts) adds _L<lev>.
+    impure function f_tcond_file(t_step, lev) result(file_loc)
+
+        integer, intent(in)                  :: t_step, lev
         character(len=path_len + 2*name_len) :: file_loc
+        character(len=16)                    :: tag
 
+        tag = ''
+        if (lev > 0) write (tag, '(A,I0)') '_L', lev
         if (file_per_process) then
             write (file_loc, '(A,I0,A,I0,A,I7.7,A)') trim(case_dir) // '/restart_data/lustre_', t_step, '/ib_tcond_', t_step, &
-                   & '_', proc_rank, '.dat'
+                   & '_', proc_rank, trim(tag) // '.dat'
         else
-            write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_tcond_', t_step, '.dat'
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_tcond_', t_step, trim(tag) // '.dat'
         end if
 
     end function f_tcond_file
@@ -1704,13 +1765,25 @@ contains
     !! the primitive state at the start of the last stage, so it cannot be rebuilt from the saved conservative state. Collective.
     impure subroutine s_write_ib_conduction_temperature(t_step)
 
-        integer, intent(in)                  :: t_step
-        character(len=path_len + 2*name_len) :: file_loc
-        character(len=10)                    :: t_step_string
-        integer(kind=8)                      :: info(7), off
-        integer(kind=8), allocatable         :: tab(:,:), hdr(:)
-        integer                              :: i, n_loc, n_w
-        logical                              :: lead
+        integer, intent(in) :: t_step
+
+        call s_pack_ghost_tcond()
+        call s_write_tcond_records(t_step, 0, gp_tc_rec, num_gps)
+
+    end subroutine s_write_ib_conduction_temperature
+
+    !> The file of s_write_ib_conduction_temperature for level lev from the records rec(1:4, 1:n_rec), keeping those with a T_cond
+    !! (rec is compacted in place). Collective.
+    impure subroutine s_write_tcond_records(t_step, lev, rec, n_rec)
+
+        integer, intent(in)                     :: t_step, lev, n_rec
+        real(wp), dimension(:,:), intent(inout) :: rec
+        character(len=path_len + 2*name_len)    :: file_loc
+        character(len=10)                       :: t_step_string
+        integer(kind=8)                         :: info(7), off
+        integer(kind=8), allocatable            :: tab(:,:), hdr(:)
+        integer                                 :: i, n_loc, n_w
+        logical                                 :: lead
 
 #ifdef MFC_MPI
         integer(kind=MPI_OFFSET_KIND)       :: base, rb
@@ -1720,19 +1793,18 @@ contains
         integer :: file_unit
 #endif
 
-        call s_pack_ghost_tcond()
         n_loc = 0
         info = 0
-        do i = 1, num_gps
-            if (gp_tc_rec(4, i) <= T_cond_unset) cycle
+        do i = 1, n_rec
+            if (rec(4, i) <= T_cond_unset) cycle
             n_loc = n_loc + 1
-            gp_tc_rec(:,n_loc) = gp_tc_rec(:,i)
+            rec(:,n_loc) = rec(:,i)
             if (n_loc == 1) then
-                info(2:4) = nint(gp_tc_rec(1:3,i), 8)
+                info(2:4) = nint(rec(1:3,n_loc), 8)
                 info(5:7) = info(2:4)
             else
-                info(2:4) = min(info(2:4), nint(gp_tc_rec(1:3,i), 8))
-                info(5:7) = max(info(5:7), nint(gp_tc_rec(1:3,i), 8))
+                info(2:4) = min(info(2:4), nint(rec(1:3,n_loc), 8))
+                info(5:7) = max(info(5:7), nint(rec(1:3,n_loc), 8))
             end if
         end do
         info(1) = n_loc
@@ -1758,7 +1830,7 @@ contains
         end if
         call s_mpi_barrier()
         if (file_per_process) call s_delay_file_access(proc_rank)
-        file_loc = f_tcond_file(t_step)
+        file_loc = f_tcond_file(t_step, lev)
 
         allocate (hdr(4 + 7*n_w))
         if (lead) then
@@ -1776,18 +1848,17 @@ contains
         if (lead) call MPI_FILE_WRITE_AT(ifile, 0_MPI_OFFSET_KIND, hdr, size(hdr), MPI_INTEGER8, status, ierr)
         do k0 = 1, n_loc, tcond_chunk
             nc = min(tcond_chunk, n_loc - k0 + 1)
-            call MPI_FILE_WRITE_AT(ifile, base + int(k0 - 1, MPI_OFFSET_KIND)*rb, gp_tc_rec(:,k0:k0 + nc - 1), 4*nc, mpi_p, &
-                                   & status, ierr)
+            call MPI_FILE_WRITE_AT(ifile, base + int(k0 - 1, MPI_OFFSET_KIND)*rb, rec(:,k0:k0 + nc - 1), 4*nc, mpi_p, status, ierr)
         end do
         call MPI_FILE_CLOSE(ifile, ierr)
 #else
         open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace')
         write (file_unit) hdr
-        write (file_unit) gp_tc_rec(:,1:n_loc)
+        write (file_unit) rec(:,1:n_loc)
         close (file_unit)
 #endif
 
-    end subroutine s_write_ib_conduction_temperature
+    end subroutine s_write_tcond_records
 
     !> Restore T_cond of this rank's ghosts from the file of s_write_ib_conduction_temperature, after s_ibm_setup has found them.
     !! Rank 0 reads the header and broadcasts it (with file_per_process each rank reads its own); a rank then reads only the slabs
@@ -1799,20 +1870,41 @@ contains
 
         integer, intent(in)                     :: t_step
         real(wp), allocatable, dimension(:,:,:) :: tc
-        real(wp), allocatable, dimension(:,:)   :: buf
-        character(len=path_len + 2*name_len)    :: file_loc
-        integer(kind=8)                         :: head(4), pre, hbytes, rb, fsize, k0, cnt
+        integer(kind=8)                         :: head(4)
         integer(kind=8), allocatable            :: tab(:,:)
-        integer                                 :: i, w, r, nc, ios, file_unit, c(3), lo(3), hi(3)
-        logical                                 :: file_exist, rd
+        integer                                 :: file_unit, lo(3)
+
+        if (.not. f_tcond_open(t_step, 0, file_unit, head, tab)) return
+        lo = 0
+        lo(1:num_dims) = start_idx(1:num_dims)
+        call s_read_tcond_box(file_unit, head, tab, lo, lo + [m, n, p], tc)
+        close (file_unit)
+        call s_pack_ghost_tcond()
+        call s_tcond_from_box(tc, lo, num_gps)
+        call s_unpack_ghost_tcond()
+
+    end subroutine s_read_ib_conduction_temperature
+
+    !> Open the T_cond file of level lev and read its header (rank 0 broadcasts it unless file_per_process); false, with a warning,
+    !! if the save has none. Collective.
+    impure logical function f_tcond_open(t_step, lev, file_unit, head, tab) result(found)
+
+        integer, intent(in)                       :: t_step, lev
+        integer, intent(out)                      :: file_unit
+        integer(kind=8), intent(out)              :: head(4)
+        integer(kind=8), allocatable, intent(out) :: tab(:,:)
+        character(len=path_len + 2*name_len)      :: file_loc
+        integer(kind=8)                           :: rb, fsize
+        integer                                   :: ios
+        logical                                   :: rd
 
 #ifdef MFC_MPI
         integer :: ierr
 #endif
 
-        file_loc = f_tcond_file(t_step)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (.not. file_exist) then
+        file_loc = f_tcond_file(t_step, lev)
+        inquire (FILE=trim(file_loc), EXIST=found)
+        if (.not. found) then
             if (proc_rank == 0) print '(A)', &
                 & 'Warning: ' // trim(file_loc) // ' not found; the first stage conducts through the ghost temperature'
             return
@@ -1840,14 +1932,26 @@ contains
 #ifdef MFC_MPI
         if (.not. file_per_process) call MPI_BCAST(tab, 7*int(head(4)), MPI_INTEGER8, 0, MPI_COMM_WORLD, ierr)
 #endif
-        hbytes = 8*(4 + 7*head(4))
         inquire (UNIT=file_unit, SIZE=fsize)
-        if (fsize /= hbytes + sum(tab(1,:))*rb) call s_mpi_abort(trim(file_loc) // ' is truncated or does not match its header')
+        if (fsize /= 8*(4 + 7*head(4)) + sum(tab(1, &
+            & :))*rb) call s_mpi_abort(trim(file_loc) // ' is truncated or does not match its header')
 
-        lo = 0
-        lo(1:num_dims) = start_idx(1:num_dims)
-        hi = lo + [m, n, p]
-        allocate (tc(0:m,0:n,0:p), buf(4, tcond_chunk))
+    end function f_tcond_open
+
+    !> T_cond of the cells lo:hi (global indices of the file's level) from the slabs of an open T_cond file whose bounding box meets
+    !! them, in blocks of tcond_chunk records; T_cond_unset where the file has none. Local.
+    impure subroutine s_read_tcond_box(file_unit, head, tab, lo, hi, tc)
+
+        integer, intent(in)                                  :: file_unit, lo(3), hi(3)
+        integer(kind=8), intent(in)                          :: head(4), tab(:,:)
+        real(wp), allocatable, dimension(:,:,:), intent(out) :: tc
+        real(wp), allocatable, dimension(:,:)                :: buf
+        integer(kind=8)                                      :: pre, hbytes, rb, k0, cnt
+        integer                                              :: w, r, nc, ios, c(3)
+
+        rb = int(storage_size(0._wp)/8, 8)*4
+        hbytes = 8*(4 + 7*head(4))
+        allocate (tc(0:hi(1) - lo(1),0:hi(2) - lo(2),0:hi(3) - lo(3)), buf(4, tcond_chunk))
         tc = T_cond_unset
         pre = 0
         do w = 1, int(head(4))
@@ -1856,25 +1960,31 @@ contains
                 do k0 = 0, cnt - 1, tcond_chunk
                     nc = int(min(int(tcond_chunk, 8), cnt - k0))
                     read (file_unit, iostat=ios, pos=hbytes + (pre + k0)*rb + 1) buf(:,1:nc)
-                    if (ios /= 0) call s_mpi_abort('Error reading ' // trim(file_loc))
+                    if (ios /= 0) call s_mpi_abort('Error reading an ib_tcond file')
                     do r = 1, nc
                         c = nint(buf(1:3,r)) - lo
-                        if (all(c >= 0) .and. all(c <= [m, n, p])) tc(c(1), c(2), c(3)) = buf(4, r)
+                        if (all(c >= 0) .and. all(c <= hi - lo)) tc(c(1), c(2), c(3)) = buf(4, r)
                     end do
                 end do
             end if
             pre = pre + cnt
         end do
-        close (file_unit)
 
-        call s_pack_ghost_tcond()
-        do i = 1, num_gps
+    end subroutine s_read_tcond_box
+
+    !> Set gp_tc_rec(4, 1:n) from the box tc at the packed cells (box origin lo).
+    impure subroutine s_tcond_from_box(tc, lo, n)
+
+        real(wp), dimension(0:,0:,0:), intent(in) :: tc
+        integer, intent(in)                       :: lo(3), n
+        integer                                   :: i, c(3)
+
+        do i = 1, n
             c = nint(gp_tc_rec(1:3,i)) - lo
             gp_tc_rec(4, i) = tc(c(1), c(2), c(3))
         end do
-        call s_unpack_ghost_tcond()
 
-    end subroutine s_read_ib_conduction_temperature
+    end subroutine s_tcond_from_box
 
     !> One line at the end of a run if the reacting surface ever failed to solve. Silence means every ghost point on every step
     !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.

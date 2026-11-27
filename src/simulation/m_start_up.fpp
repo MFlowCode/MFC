@@ -55,7 +55,8 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
-    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
+    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib, &
+        & s_amr_ib_tcond_restart
     use m_amr_regrid, only: s_amr_regrid
     use m_amr_stage, only: s_amr_relax_fine, s_amr_apply_ic_patches
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
@@ -866,6 +867,7 @@ contains
 
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
+        if (ib .and. amr .and. chemistry .and. chem_params%diffusion) call s_amr_ib_tcond_restart(save_count, .true.)
         if (ib .and. ib_surface_wrt) call s_write_ib_surface(save_count)
         ! Fine-level AMR restart file (current box + intersection-local fine state) alongside the level-0 restart
         if (amr) call s_write_amr_restart(save_count)
@@ -1035,6 +1037,8 @@ contains
                 & cfl_dt) > 0) call s_read_ib_conduction_temperature(merge(n_start, t_step_start, cfl_dt))
             ! resolve the body on each fine block from the geometry
             if (amr) call s_amr_setup_ib()
+            if (amr .and. chemistry .and. chem_params%diffusion .and. merge(n_start, t_step_start, &
+                & cfl_dt) > 0) call s_amr_ib_tcond_restart(merge(n_start, t_step_start, cfl_dt), .false.)
             ! a CFL-mode run keeps t_step_start = 0, so only n_start tells a restart apart
             if (merge(n_start, t_step_start, cfl_dt) == 0) call s_write_ib_data_file(0)
         end if

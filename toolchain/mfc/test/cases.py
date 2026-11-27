@@ -6436,6 +6436,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=chem_ib)
         spec.extra_args = ["--", "-j", "4"]
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion", spec))
+        # The fine ghosts' T_cond survives a restart (ib_tcond_<step>_L1.dat beside the coarse file); at an isothermal wall it is the
+        # mirror temperature, not the ghost's own
+        tc_rst = {**chem_ib, "amr_max_grid_size": 32, "t_step_stop": 4, "t_step_save": 4, "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 400.0}
+        cases.append(define_case_d(stack, "chemistry diffusion -> isothermal", tc_rst, restart_check=True))
         # Isothermal wall with chemistry: the fine ghosts' T_cond carries Twall into the diffusion flux; inert at 400 K, and at 1200 K
         # with the gas reactions on
         for tag, tw, rx in (("isothermal", 400.0, "F"), ("isothermal -> reactions", 1200.0, "T")):
