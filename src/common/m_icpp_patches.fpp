@@ -9,6 +9,15 @@
 #:include '3dHardcodedIC.fpp'
 #:include 'macros.fpp'
 
+!> The patch_id_fp dummy of every patch routine: one byte per cell in mixed precision
+#:def PATCH_ID_FP_DUMMY()
+#ifdef MFC_MIXED_PRECISION
+    integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+#else
+    integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+#endif
+#:enddef
+
 !> @brief Constructs initial condition patch geometries (lines, circles, rectangles, spheres, etc.) on the grid
 module m_icpp_patches
 
@@ -45,11 +54,7 @@ contains
         type(ic_grid), intent(in)                                :: g
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         integer :: i
 
         if (.not. g%hardcoded .and. any(patch_icpp(1:num_patches)%hcid /= dflt_int)) then
@@ -182,11 +187,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -239,11 +240,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: th, thickness, nturns, mya
@@ -306,11 +303,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: radius
         integer                                                  :: i, j, k  !< Generic loop iterators
@@ -363,11 +356,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -421,11 +410,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -485,11 +470,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop operators
         real(wp)                                                 :: a, b
@@ -544,11 +525,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -617,11 +594,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< generic loop iterators
 
@@ -675,11 +648,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop operators
         real(wp)                                                 :: a, b, c
@@ -734,11 +703,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< generic loop iterators
         real(wp)                                                 :: L0, U0   !< Taylor Green Vortex parameters
@@ -801,11 +766,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -851,11 +812,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: r, theta, R_boundary, sum_series
         integer                                                  :: i, j, nn
@@ -907,11 +864,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         real(wp)                                                 :: dx_loc, dy_loc, dz_loc, r, theta, phi, R_surface, eta_local
         integer                                                  :: i, j, k, ll, mm
@@ -972,11 +925,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
 
         ! Generic loop iterators
@@ -1042,11 +991,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
 
@@ -1113,11 +1058,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: radius
@@ -1209,11 +1150,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k  !< Generic loop iterators
         real(wp)                                                 :: a, b, c, d
@@ -1278,11 +1215,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k                 !< loop iterators
         integer :: model_id                !< Index into the preloading stl_models(:)
@@ -1333,11 +1266,7 @@ contains
         integer, intent(in)       :: patch_id
         type(ic_grid), intent(in) :: g
 
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        @:PATCH_ID_FP_DUMMY()
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer                                                  :: i, j, k
 
