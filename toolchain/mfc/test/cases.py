@@ -6436,6 +6436,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=chem_ib)
         spec.extra_args = ["--", "-j", "4"]
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion", spec))
+        # Mean pressure gradient and heat source past the body: the fine body-force hook zeroes them in the block's own solid cells
+        # (the periodic body case alone leaves 9e-9 next to the body, hence tol 1e-7 for mean_dpdx)
+        periodic = {f"bc_{d}%{e}": -1 for d in "xy" for e in ("beg", "end")}
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-7, params={**chk_ib, **periodic, "mean_dpdx(1)": -5.0})
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> mean_dpdx", spec))
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chem_ib, **periodic, "mean_qdot": 1.0e11})
+        spec.extra_args = ["--", "-j", "4"]
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion -> mean_qdot", spec))
         # STL body on the static block: Circle_IBM.stl (0.1 across) scaled to the same radius-0.1 disc, drawn on the fine cells
         stl = {"patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1, "stl_models(1)%model_threshold": 0.95}
         stl["stl_models(1)%model_filepath"] = os.path.join(common.MFC_EXAMPLE_DIRPATH, "2D_ibm_stl_test", "Circle_IBM.stl")

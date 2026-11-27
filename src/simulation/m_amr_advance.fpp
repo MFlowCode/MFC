@@ -296,6 +296,8 @@ contains
                 ! same ldt as the coarse stage; the synthetic turbulence forcing reads the member's own primitive state
                 if (synthetic_turbulence) call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
                 call s_amr_fine_enter()
+                ! the body forces zero the mean sources in the block's own solid cells
+                if (ib .and. bodyForces) call s_ibm_load_fine_markers(1, [amr_cur], reshape([m, n, p], [3, 1]), 1, 0)
                 if (synthetic_turbulence) then
                     call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim_blk, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)
                 else
