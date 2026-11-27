@@ -30,7 +30,7 @@ module m_amr_stage
         & s_amr_apply_ic_patches, s_amr_fill_levels, s_amr_igr_keep_sigma
 
     !> cell-local end-of-step operators of s_amr_fine_cell_op
-    integer, parameter :: fine_op_relax = 1, fine_op_burn = 2, fine_op_chem = 3
+    integer, parameter :: fine_op_relax = 1, fine_op_split = 2
 
     !> Whether patch_icpp was compared with the level-0 initial data, and reproduces it
     logical :: ic_checked = .false., ic_from_patches = .false.
@@ -375,17 +375,27 @@ contains
 
         type(scalar_field), intent(inout) :: q_T_sf
 
-        if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0) call s_amr_fine_cell_op(fine_op_chem, &
-            & q_T_sf)
-        if (reactive_burn .and. rburn%substeps > 0) call s_amr_fine_cell_op(fine_op_burn)
+        if (f_split_chem() .or. f_split_burn()) call s_amr_fine_cell_op(fine_op_split, q_T_sf)
 
     end subroutine s_amr_split_fine
+
+    logical function f_split_chem()
+
+        f_split_chem = chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0
+
+    end function f_split_chem
+
+    logical function f_split_burn()
+
+        f_split_burn = reactive_burn .and. rburn%substeps > 0
+
+    end function f_split_burn
 
     !> Apply the cell-local end-of-step operator op to every owned fine block in its own frame (block order is free).
     impure subroutine s_amr_fine_cell_op(op, q_T_sf)
 
         integer, intent(in)                         :: op
-        type(scalar_field), intent(inout), optional :: q_T_sf  !< fine_op_chem: the Newton guess (any T converges)
+        type(scalar_field), intent(inout), optional :: q_T_sf  !< fine_op_split: the chemistry Newton guess
         integer                                     :: kk, nb
 
         call s_amr_refresh_my_blocks()
@@ -396,10 +406,9 @@ contains
             select case (op)
             case (fine_op_relax)
                 call s_infinite_relaxation_k(amr_cons_br)
-            case (fine_op_burn)
-                call s_reactive_burn_substep(amr_cons_br, dt, idwint)
-            case (fine_op_chem)
-                call s_chemistry_reaction_substep(amr_cons_br, q_T_sf, dt, idwint)
+            case (fine_op_split)  ! both splits in one swap per block: each is cell-local
+                if (f_split_chem()) call s_chemistry_reaction_substep(amr_cons_br, q_T_sf, dt, idwint)
+                if (f_split_burn()) call s_reactive_burn_substep(amr_cons_br, dt, idwint)
             end select
             call s_amr_fine_leave()
         end do
