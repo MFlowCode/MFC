@@ -1181,7 +1181,8 @@ contains
     !! ib_visc_band cells of a body cell by the compact one of weno_Re_flux = F: the normal difference across the face, and the mean
     !! of the two cells' central tangential differences. Ghost values extend the flow only a layer or two deep (the mirror leaves a
     !! kink at the wall), and the gradient stencil of weno_Re_flux, about five cells wide, carries that into the fluid faces next to
-    !! the wall. The face j+1/2 is read by the viscous flux from dqR(j) and dqL(j+1), so both are set.
+    !! the wall. The face j+1/2 is read by the viscous flux from dqR(j) and dqL(j+1), so both are set. On an AMR fine frame the
+    !! markers (ib_markers_fine) hold the frame's interior only; cells outside it read as fluid (bodies sit inside their blocks).
     subroutine s_compact_ib_viscous_gradients(q_prim_vf, markers, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
 
         type(scalar_field), dimension(sys_size), intent(in)                           :: q_prim_vf
@@ -1206,22 +1207,30 @@ contains
         integer, intent(in)               :: id
         type(scalar_field), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
         integer                           :: j, k, l, a, b, c, jn, kn, ln, ja, kb, lc, wz
+        integer                           :: mlo1, mlo2, mlo3, mhi1, mhi2, mhi3
         logical                           :: near
         real(wp)                          :: g, f1p, f1m, f2p, f2m
 
         ja = merge(1, 0, id == 1); kb = merge(1, 0, id == 2); lc = merge(1, 0, id == 3)
         wz = merge(ib_visc_band, 0, p > 0)
+        ! readable marker cells: the array's bounds, or the installed fine frame's interior (its markers have no ghost layers and
+        ! cells past the frame hold another frame's markers)
+        mlo1 = lbound(markers%sf, 1); mlo2 = lbound(markers%sf, 2); mlo3 = lbound(markers%sf, 3)
+        mhi1 = ubound(markers%sf, 1); mhi2 = ubound(markers%sf, 2); mhi3 = ubound(markers%sf, 3)
+        if (amr_in_fine_advance) then
+            mlo1 = 0; mlo2 = 0; mlo3 = 0; mhi1 = m; mhi2 = n; mhi3 = p
+        end if
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, jn, kn, ln, near, g, f1p, f1m, f2p, f2m]', copyin='[ja, kb, &
-                            & lc, wz]')
+                            & lc, wz, mlo1, mlo2, mlo3, mhi1, mhi2, mhi3]')
         do l = -lc, p
             do k = -kb, n
                 do j = -ja, m
                     jn = j + ja; kn = k + kb; ln = l + lc
                     near = .false.
-                    do c = -wz, wz + lc*min(wz, 1)
-                        do b = -ib_visc_band*min(n, 1), (ib_visc_band + kb)*min(n, 1)
-                            do a = -ib_visc_band, ib_visc_band + ja
+                    do c = max(-wz, mlo3 - l), min(wz + lc*min(wz, 1), mhi3 - l)
+                        do b = max(-ib_visc_band*min(n, 1), mlo2 - k), min((ib_visc_band + kb)*min(n, 1), mhi2 - k)
+                            do a = max(-ib_visc_band, mlo1 - j), min(ib_visc_band + ja, mhi1 - j)
                                 if (markers%sf(j + a, k + b, l + c) /= 0) near = .true.
                             end do
                         end do

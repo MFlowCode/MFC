@@ -4867,6 +4867,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # rank 1 sub-stepping a garbage count, which a single-rank golden cannot see.
         stack.push("substeps", {"rburn%substeps": 10})
         cases.append(define_case_d(stack, "", {}, ppn=2))
+        # the fine block takes the split burn too, before the fold (the field is uniform: level 0 matches the run without a block)
+        cases.append(define_case_d(stack, "AMR", {"amr": "T", "amr_block_beg(1)": 30, "amr_block_end(1)": 69, "amr_regrid_int": 0, "amr_max_grid_size": 64, "mpp_lim": "T"}))
         stack.pop()
         # Same burn on 2 MPI ranks: the rburn parameters must be broadcast to non-root ranks, or
         # rank 1's half of the domain burns with the sentinel default and diverges. The single-rank
@@ -5931,6 +5933,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_convergence_case(f"Convergence -> amr_check -> 1D -> {label}", spec))
 
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
+        # non-reflecting subsonic buffer at both ends: the coarse grid applies it, the block's edges are coarse/fine faces
+        cases.append(define_case_d(stack, "CBC", {"bc_x%beg": -6, "bc_x%end": -6}))
         cases.append(define_case_d(stack, "teno", {"teno": "T", "teno_CT": 1.0e-6}))
         cases.append(define_case_d(stack, "wenoz", {"wenoz": "T"}))
         cases.append(define_case_d(stack, "null_weights", {"null_weights": "T"}))
@@ -6304,6 +6308,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             chk_ib.update(mod)
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=chk_ib)
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body", spec))
+        # ib_visc_compact (default T with weno_Re_flux) on the fine block reads the fine markers, so the compact faces match
+        visc_ib = {"viscous": "T", "fluid_pp(1)%Re(1)": 1000.0, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "T"}
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chk_ib, **visc_ib})
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> ib_visc_compact", spec))
         # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
         # fine-grid force (the coarse faces under the block are skipped)
         cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))
@@ -6322,11 +6330,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # ghost-state options of the slip and viscous walls, both checked with ./mfc.sh amr_check
         cases.append(define_case_d(stack, "slip -> ib_slip_ccst", {"amr_max_grid_size": 32, "patch_ib(1)%slip": "T", "ib_slip_ccst": "T"}))
         cases.append(define_case_d(stack, "viscous", {"amr_max_grid_size": 32, "viscous": "T", "fluid_pp(1)%Re(1)": 1000.0}))
+        cases.append(define_case_d(stack, "viscous -> ib_visc_compact", {"amr_max_grid_size": 32, **visc_ib}))
         cases.append(define_case_d(stack, "ib_second_order_vel", {"amr_max_grid_size": 32, "ib_second_order_vel": "T", "ib_ip_min_dist": 1.5}))
         cases.append(define_case_d(stack, "many_ib_patch_parallelism", {"amr_max_grid_size": 32, "many_ib_patch_parallelism": "T"}))
         # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
         stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2, "t_step_stop": 20, "t_step_save": 20})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        # a non-box body: the containment box is the bounding radius the marker drawing uses (#2241)
+        cases.append(define_case_d(stack, "ellipse", {"amr_max_grid_size": 32, "patch_ib(1)%geometry": 6, "patch_ib(1)%length_x": 0.26, "patch_ib(1)%length_y": 0.14}))
         # quartic prolongation next to a body: the admissibility fallback to limited linear guards the fills
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
         # The only distributed AMR+IB coverage: at ppn=1 the level-1 tag path and per-level (index, parent) gather are skipped.
@@ -6761,6 +6772,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
         # the per-level memory table (rank_time_wrt): a static multi-level layout is recorded without a regrid
         cases.append(define_case_d(stack, "rank_time_wrt", {"amr_max_grid_size": 16, "rank_time_wrt": "T"}, ppn=2))
+        stack.pop()
+        # More blocks than the registers' initial 64 slots (12 x 12 tiles of a static block), so the first stage grows them
+        # through the device staging path (#2467: NVHPC aborted there with "rc(2:) not present")
+        reg_grow = {"m": 127, "n": 127, "amr_block_beg(1)": 8, "amr_block_end(1)": 55, "amr_block_beg(2)": 8, "amr_block_end(2)": 55}
+        stack.push("AMR -> 2D -> register growth", {**amr_2d_base, **reg_grow, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 4}))
         stack.pop()
 
         # 2D dynamic regrid at np=2: a level-1 block whose owner holds none of its covered coarse cells, so the fold-back

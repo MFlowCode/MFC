@@ -515,6 +515,10 @@ contains
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 
+        ! An AMR fine frame's edges are coarse/fine faces (blocks stay buff_size cells inside the domain): its ghosts come from the
+        ! coarse level, and the coarse grid applies the CBC at the real boundary.
+        if (amr_in_fine_advance) return
+
         cbc_dir = cbc_dir_norm
         cbc_loc = cbc_loc_norm
 

@@ -20,6 +20,7 @@ module m_amr_distribution
     use m_constants, only: K_ib
     use m_mpi_proxy, only: s_mpi_abort
     use m_ibm, only: ib_markers
+    use m_ib_patches, only: s_get_ib_bound
     use m_amr_state
     use m_phase_timing, only: s_mem_note_level
 
@@ -710,7 +711,7 @@ contains
 
         integer, intent(in)  :: i, mrg
         integer, intent(out) :: blo(3), bhi(3)
-        real(wp)             :: c(3), half(3)
+        real(wp)             :: c(3), half(3), bnd
 
         c = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
         select case (patch_ib(i)%geometry)
@@ -723,9 +724,12 @@ contains
                 half = 0.5_wp*[patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]
             end if
             half = matmul(abs(patch_ib(i)%rotation_matrix), half)
+        case (4, 6, 11)  ! airfoils, ellipse: the bounding radius the marker drawing trusts (s_get_bounding_indices)
+            call s_get_ib_bound(patch_ib(i), bnd)
+            half = bnd
         case default
             call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
-                             & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
+                             & // 'containment bounding box (STL models are not supported)')
         end select
         call s_amr_phys_to_cells(c - half, c + half, mrg, blo, bhi)
 

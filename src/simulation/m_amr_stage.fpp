@@ -13,6 +13,7 @@ module m_amr_stage
     use m_phase_timing
     use m_amr_registers, only: s_amr_apply_reflux, amr_rk_c
     use m_phase_change, only: s_infinite_relaxation_k
+    use m_reactive_burn, only: s_reactive_burn_substep
     use m_icpp_patches, only: s_apply_icpp_patches
     use m_assign_variables, only: s_initialize_assign_variables_module
     use m_variables_conversion, only: s_convert_primitive_to_conservative_variables
@@ -22,8 +23,10 @@ module m_amr_stage
     implicit none
 
     private
-    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine, &
+    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine, s_amr_burn_fine, &
         & s_amr_apply_ic_patches, s_amr_fill_levels
+
+    integer, parameter :: fine_op_relax = 1, fine_op_burn = 2  !< cell-local end-of-step operators of s_amr_fine_cell_op
 
     !> Whether patch_icpp was compared with the level-0 initial data, and reproduces it
     logical :: ic_checked = .false., ic_from_patches = .false.
@@ -295,20 +298,42 @@ contains
     impure subroutine s_amr_relax_fine(q_cons)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
-        integer                                                :: kk, nb
+
+        call s_amr_fine_cell_op(fine_op_relax)
+        call s_amr_restrict_fold(q_cons)
+
+    end subroutine s_amr_relax_fine
+
+    !> End-of-step operator-split burn (rburn%substeps > 0) on the fine blocks over the full step; the coarse grid's is in
+    !! m_time_steppers. Called before s_amr_step_fold, which restricts the burnt fine cells into the covered coarse cells.
+    impure subroutine s_amr_burn_fine()
+
+        call s_amr_fine_cell_op(fine_op_burn)
+
+    end subroutine s_amr_burn_fine
+
+    !> Apply the cell-local end-of-step operator op to every owned fine block in its own frame (block order is free).
+    impure subroutine s_amr_fine_cell_op(op)
+
+        integer, intent(in) :: op
+        integer             :: kk, nb
 
         call s_amr_refresh_my_blocks()
         nb = amr_bat_n; amr_bat_n = 1  ! one block's extents in the frame, not a batch slab
         do kk = 1, amr_n_my
             call s_amr_select_slot(amr_my_blk(kk))
             call s_amr_fine_enter()
-            call s_infinite_relaxation_k(amr_cons_br)
+            select case (op)
+            case (fine_op_relax)
+                call s_infinite_relaxation_k(amr_cons_br)
+            case (fine_op_burn)
+                call s_reactive_burn_substep(amr_cons_br, dt, idwint)
+            end select
             call s_amr_fine_leave()
         end do
         amr_bat_n = nb
-        call s_amr_restrict_fold(q_cons)
 
-    end subroutine s_amr_relax_fine
+    end subroutine s_amr_fine_cell_op
 
     !> Fresh start: set every owned fine block to the initial condition patches evaluated at its own cell centers, replacing the
     !! data interpolated from level 0, then restrict. Skipped when the patches alone do not reproduce the level-0 data.

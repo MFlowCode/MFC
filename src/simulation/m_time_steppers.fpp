@@ -35,7 +35,7 @@ module m_time_steppers
     use m_stage_hooks, only: s_stage_hooks_pre_ib, s_stage_hooks_post_ib
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
-    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_burn_fine
     use m_amr_advance, only: s_amr_fine_stage_ib
     use m_amr_registers, only: s_amr_set_rk_table
 
@@ -672,6 +672,7 @@ contains
         if (amr_sub_on) call s_amr_subcycle_fine(q_cons_ts(1)%vf, q_cons_ts(stor)%vf, rk_coef, q_T_sf, bc_type, pb_ts(1)%sf, &
             & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
         amr_sub_on = .false.
+        if (amr .and. reactive_burn .and. rburn%substeps > 0) call s_amr_burn_fine()
         if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
 
         if (ib) then
