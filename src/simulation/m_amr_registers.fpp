@@ -9,14 +9,16 @@
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine block boundary. Depends only on m_derived_types and
 !! m_global_parameters so m_rhs (capture) and m_time_steppers (apply) can use it without cycles. creg is indexed 0-based relative to
 !! the rank's block intersection; freg 0-based local fine (children of coarse cell t are 2*t, 2*t+1). The slot dimension grows on
-!! demand (s_amr_reg_reserve). The captured flux is the 1:sys_size advective flux of flux_rsx_vf plus the viscous, species-diffusion
-!! and conduction fluxes of flux_src_rsx_vf; the non-conservative alpha*div(u) remainder is not captured (held by mpp_lim).
+!! demand (s_amr_reg_reserve). The captured flux is the advective flux of flux_rsx_vf plus the viscous, species-diffusion and
+!! conduction fluxes of flux_src_rsx_vf. With adv_src_mode_vel_iface a last channel (amr_reg_u) holds the interface velocity, so the
+!! volume fractions' reflux also corrects their alpha*div(u) source (s_amr_apply_reflux).
 module m_amr_registers
 
     use m_derived_types
     use m_global_parameters
     use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf
-    use m_phase_timing, only: s_mem_note, MEM_REG
+    use m_phase_timing, only: s_mem_note, MEM_REG, s_mem_note_reg_slot
+    use m_eos, only: s_compute_mixture_coefficients, f_pressure, s_phase_bulk_modulus
 
     implicit none
 
@@ -25,10 +27,11 @@ module m_amr_registers
         & s_amr_reg_prepare, freg, creg, f_amr_face_is_seam, f_amr_is_child, s_amr_set_rk_table, amr_rk_w, amr_rk_c
 
     !> The SSP-RK scheme's per-stage effective flux weights (the step is q^n + dt*sum_s amr_rk_w(s)*L(q^(s-1))) and stage-entry
-    !! times in units of the step; s_amr_set_rk_table derives both from the stage coefficients.
+    !! times in units of the step; s_amr_set_rk_table derives the weights from the stage coefficients and copies the times from the
+    !! stepper's rk_c.
     real(wp), allocatable :: amr_rk_w(:), amr_rk_c(:)
 
-    !> Registers for the two block faces normal to one direction: (1:sys_size, transverse-1, transverse-2, slot).
+    !> Registers for the two block faces normal to one direction: (1:amr_nreg, transverse-1, transverse-2, slot).
     type t_face_reg
         real(wp), allocatable :: lo(:,:,:,:)
         real(wp), allocatable :: hi(:,:,:,:)
@@ -41,7 +44,12 @@ module m_amr_registers
     !> Slot capacity the registers are sized for (grows geometrically; amr_max_blocks is only a cap) and the transverse extents.
     integer, parameter :: amr_reg_floor = 64  !< initial slot capacity; growth doubles from here
     integer            :: amr_reg_cap = 0
-    integer            :: rc(3), rf(3)        !< coarse / fine transverse extents (creg is 0:rc-1, freg is 0:rf)
+    !> Register channels: sys_size fluxes, then from amr_reg_u the quantity the volume fractions' source rides on, so their reflux
+    !! can correct that source too (two or more fluids): the face-normal interface velocity (adv_src_mode_vel_iface, one channel) or
+    !! each fluid's interface alpha (adv_src_mode_alpha_iface, HLL Method 1, num_fluids channels; amr_reg_amode).
+    integer :: amr_nreg = 0, amr_reg_u = 0
+    logical :: amr_reg_amode = .false.
+    integer :: rc(3), rf(3)  !< coarse / fine transverse extents (creg is 0:rc-1, freg is 0:rf)
     !> Mesh-epoch and block-count keys of the last s_amr_reg_prepare build.
     integer(8) :: amr_reg_epoch_built = -1_8
     integer    :: amr_reg_nblk_built = -1
@@ -71,7 +79,8 @@ contains
 
         integer, intent(in) :: nslot
         integer             :: oldcap, newcap
-        integer             :: eq, t1, t2, c4
+        integer             :: eq, t1, t2, c4, nr
+        integer             :: u2, u3  !< transverse upper bounds as plain scalars (rc/rf are not on the device)
         !> slot count above which growth uses the host round trip instead of device staging
         integer, parameter    :: amr_reg_grow_dev_cap = 512
         real(wp), allocatable :: rtmp(:,:,:,:), rtmp_d(:,:,:,:)
@@ -79,6 +88,7 @@ contains
         if (nslot <= amr_reg_cap) return
         oldcap = amr_reg_cap
         newcap = min(amr_max_blocks, max(2*oldcap, nslot))
+        nr = amr_nreg
 
         #:for D, A, B in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             #:for R, OFF in [('c', ' - 1'), ('f', '')]
@@ -90,22 +100,23 @@ contains
                         if (oldcap > amr_reg_grow_dev_cap) then
                             ! above the threshold stage through the host: device staging would transiently hold 2*oldcap slots
                             $:GPU_UPDATE(host='[' + ARR + ']')
-                            allocate (rtmp(1:sys_size,0:${U2}$,0:${U3}$,1:oldcap))
+                            allocate (rtmp(1:amr_nreg,0:${U2}$,0:${U3}$,1:oldcap))
                             rtmp = ${ARR}$(:,:,:,1:oldcap)
                             @:DEALLOCATE(${ARR}$)
-                            @:ALLOCATE(${ARR}$(1:sys_size, 0:${U2}$, 0:${U3}$, 1:newcap))
+                            @:ALLOCATE(${ARR}$(1:amr_nreg, 0:${U2}$, 0:${U3}$, 1:newcap))
                             ${ARR}$ = 0._wp
                             ${ARR}$(:,:,:,1:oldcap) = rtmp
                             deallocate (rtmp)
                             $:GPU_UPDATE(device='[' + ARR + ']')
                         else
                             ! stage the live slots on the device
-                            @:ALLOCATE(rtmp_d(1:sys_size, 0:${U2}$, 0:${U3}$, 1:oldcap))
+                            u2 = ${U2}$; u3 = ${U3}$
+                            @:ALLOCATE(rtmp_d(1:amr_nreg, 0:u2, 0:u3, 1:oldcap))
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do c4 = 1, oldcap
-                                do t2 = 0, ${U3}$
-                                    do t1 = 0, ${U2}$
-                                        do eq = 1, sys_size
+                                do t2 = 0, u3
+                                    do t1 = 0, u2
+                                        do eq = 1, nr
                                             rtmp_d(eq, t1, t2, c4) = ${ARR}$(eq, t1, t2, c4)
                                         end do
                                     end do
@@ -113,12 +124,12 @@ contains
                             end do
                             $:END_GPU_PARALLEL_LOOP()
                             @:DEALLOCATE(${ARR}$)
-                            @:ALLOCATE(${ARR}$(1:sys_size, 0:${U2}$, 0:${U3}$, 1:newcap))
+                            @:ALLOCATE(${ARR}$(1:amr_nreg, 0:u2, 0:u3, 1:newcap))
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do c4 = 1, oldcap
-                                do t2 = 0, ${U3}$
-                                    do t1 = 0, ${U2}$
-                                        do eq = 1, sys_size
+                                do t2 = 0, u3
+                                    do t1 = 0, u2
+                                        do eq = 1, nr
                                             ${ARR}$(eq, t1, t2, c4) = rtmp_d(eq, t1, t2, c4)
                                         end do
                                     end do
@@ -128,9 +139,9 @@ contains
                             @:DEALLOCATE(rtmp_d)
                             $:GPU_PARALLEL_LOOP(collapse=4)
                             do c4 = oldcap + 1, newcap
-                                do t2 = 0, ${U3}$
-                                    do t1 = 0, ${U2}$
-                                        do eq = 1, sys_size
+                                do t2 = 0, u3
+                                    do t1 = 0, u2
+                                        do eq = 1, nr
                                             ${ARR}$(eq, t1, t2, c4) = 0._wp
                                         end do
                                     end do
@@ -279,12 +290,21 @@ contains
         rc = merge(maxc_fit, 1, amr_dim)
         rf = merge(amr_ref_ratio*rc - 1, 0, amr_dim)
         amr_reg_cap = min(amr_max_blocks, amr_reg_floor)
+        amr_nreg = sys_size; amr_reg_u = 0; amr_reg_amode = .false.
+        ! one fluid: alpha = 1 stays 1, so there is nothing to correct
+        if (num_fluids > 1 .and. eqn_idx%adv%beg >= 1) then
+            if (adv_src_mode == adv_src_mode_vel_iface) then
+                amr_nreg = sys_size + 1; amr_reg_u = sys_size + 1
+            else if (adv_src_mode == adv_src_mode_alpha_iface) then
+                amr_nreg = sys_size + num_fluids; amr_reg_u = sys_size + 1; amr_reg_amode = .true.
+            end if
+        end if
         #:for D, A, B in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             if (amr_dim(${D}$)) then
-                @:ALLOCATE(creg(${D}$)%lo(1:sys_size, 0:rc(${A}$) - 1, 0:rc(${B}$) - 1, 1:amr_reg_cap))
-                @:ALLOCATE(creg(${D}$)%hi(1:sys_size, 0:rc(${A}$) - 1, 0:rc(${B}$) - 1, 1:amr_reg_cap))
-                @:ALLOCATE(freg(${D}$)%lo(1:sys_size, 0:rf(${A}$), 0:rf(${B}$), 1:amr_reg_cap))
-                @:ALLOCATE(freg(${D}$)%hi(1:sys_size, 0:rf(${A}$), 0:rf(${B}$), 1:amr_reg_cap))
+                @:ALLOCATE(creg(${D}$)%lo(1:amr_nreg, 0:rc(${A}$) - 1, 0:rc(${B}$) - 1, 1:amr_reg_cap))
+                @:ALLOCATE(creg(${D}$)%hi(1:amr_nreg, 0:rc(${A}$) - 1, 0:rc(${B}$) - 1, 1:amr_reg_cap))
+                @:ALLOCATE(freg(${D}$)%lo(1:amr_nreg, 0:rf(${A}$), 0:rf(${B}$), 1:amr_reg_cap))
+                @:ALLOCATE(freg(${D}$)%hi(1:amr_nreg, 0:rf(${A}$), 0:rf(${B}$), 1:amr_reg_cap))
             end if
         #:endfor
         @:ALLOCATE(bcap(1:11, 1:amr_max_blocks, 0:3))
@@ -354,12 +374,12 @@ contains
 
     end subroutine s_amr_capture_slot
 
-    !> Batched boundary-flux capture: reg(id)%lo/hi(eq, t1, t2, slot) [+=/=] cf * flux over each slot's window (bcap rows 5:8) for
-    !! eq in [eqb:eqe]; reg is freg (fine) or creg. acc selects accumulate vs overwrite; advective selects flux_rsx_vf vs
+    !> Batched boundary-flux capture: reg(id)%lo/hi(eq + doff, t1, t2, slot) [+=/=] cf * flux(eq) over each slot's window (bcap rows
+    !! 5:8) for eq in [eqb:eqe]; reg is freg (fine) or creg. acc selects accumulate vs overwrite; advective selects flux_rsx_vf vs
     !! flux_src_rsx_vf. Inactive slots and out-of-window cells are cycled.
-    impure subroutine s_amr_capture_batch(set, nb, id, fine, advective, cf, acc, maxt1, maxt2, eqb, eqe)
+    impure subroutine s_amr_capture_batch(set, nb, id, fine, advective, cf, acc, maxt1, maxt2, eqb, eqe, doff)
 
-        integer, intent(in)  :: set, nb, id, maxt1, maxt2, eqb, eqe
+        integer, intent(in)  :: set, nb, id, maxt1, maxt2, eqb, eqe, doff
         logical, intent(in)  :: fine, advective, acc
         real(wp), intent(in) :: cf
         integer              :: eq, t1, t2, slot, i1, i2, i3, j1, j2, j3
@@ -394,11 +414,11 @@ contains
                                     v = flux_src_rsx_vf(${IX}$1, ${IX}$2, ${IX}$3, eq)
                                 end if
                                 if (fine) then
-                                    freg(id)%${SIDE}$(eq, t1, t2, slot) = merge(freg(id)%${SIDE}$(eq, t1, t2, slot), 0._wp, &
-                                         & acc) + cf*v
+                                    freg(id)%${SIDE}$(eq + doff, t1, t2, slot) = merge(freg(id)%${SIDE}$(eq + doff, t1, t2, &
+                                         & slot), 0._wp, acc) + cf*v
                                 else
-                                    creg(id)%${SIDE}$(eq, t1, t2, slot) = merge(creg(id)%${SIDE}$(eq, t1, t2, slot), 0._wp, &
-                                         & acc) + cf*v
+                                    creg(id)%${SIDE}$(eq + doff, t1, t2, slot) = merge(creg(id)%${SIDE}$(eq + doff, t1, t2, &
+                                         & slot), 0._wp, acc) + cf*v
                                 end if
                             end if
                         #:endfor
@@ -410,9 +430,10 @@ contains
 
     end subroutine s_amr_capture_batch
 
-    !> Capture the filled slots (s_amr_capture_slot) into freg (fine) or creg: advective, viscous (mom..E), and chemistry diffusion
-    !! (species, plus the energy flux only when not viscous, since the viscous pass already captured it). Coarse and fine share this
-    !! routine so the reflux subtracts matching fluxes. Set 0 is pushed here and cleared after.
+    !> Capture the filled slots (s_amr_capture_slot) into freg (fine) or creg: advective, viscous (mom..E), chemistry diffusion
+    !! (species, plus the energy flux only when not viscous, since the viscous pass already captured it), and the interface velocity
+    !! into channel amr_reg_u. Coarse and fine share this routine so the reflux subtracts matching quantities. Set 0 is pushed here
+    !! and cleared after.
     impure subroutine s_amr_capture_total(set, nb, id, fine, cf, acc)
 
         integer, intent(in)  :: set, nb, id
@@ -425,11 +446,23 @@ contains
             $:GPU_UPDATE(device='[bcap(:, 1:nb, 0)]')
         end if
         m1 = bmax(1, set); m2 = bmax(2, set)
-        call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, sys_size)
-        if (viscous) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%mom%beg, eqn_idx%E)
+        if (adv_src_mode == adv_src_mode_vel_iface .and. amr_reg_u == 0 .and. eqn_idx%adv%beg >= 1 &
+            & .and. eqn_idx%adv%end >= eqn_idx%adv%beg) then
+            ! one fluid: alpha = 1 stays 1 only if its flux (the face velocity) is not refluxed (#2473), so its rows stay zero
+            call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, eqn_idx%adv%beg - 1, 0)
+            if (eqn_idx%adv%end < sys_size) call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, &
+                & eqn_idx%adv%end + 1, sys_size, 0)
+        else
+            call s_amr_capture_batch(set, nb, id, fine, .true., cf, acc, m1, m2, 1, sys_size, 0)
+        end if
+        ! the volume fractions' source rides on the face velocity (or, HLL Method 1, each fluid's interface alpha); the apply
+        ! corrects it with the flux
+        if (amr_reg_u > 0) call s_amr_capture_batch(set, nb, id, fine, .false., cf, acc, m1, m2, eqn_idx%adv%beg, &
+            & merge(eqn_idx%adv%end, eqn_idx%adv%beg, amr_reg_amode), amr_reg_u - eqn_idx%adv%beg)
+        if (viscous) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%mom%beg, eqn_idx%E, 0)
         if (chemistry .and. chem_params%diffusion) then
-            call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%species%beg, eqn_idx%species%end)
-            if (.not. viscous) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%E, eqn_idx%E)
+            call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%species%beg, eqn_idx%species%end, 0)
+            if (.not. viscous) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%E, eqn_idx%E, 0)
         end if
         if (set == 0) then
             bcap(11,:,0) = 0; bmax(:,0) = 0
@@ -541,19 +574,22 @@ contains
 
     !> Correct the coarse rhs in the first cell outside each block face so the update sees the child-averaged fine flux: the low
     !! face is the outside cell's right face (rhs += (F_coarse - Fbar_fine)/dx), the high face its left face (rhs += (Fbar_fine -
-    !! F_coarse)/dx). c1/c2 are relative 0-based coarse transverse indices. CCE 19.0.0: two or more of the per-direction loop nests
-    !! in one procedure fail (ftn-7991 on offload, bad code on CPU), so each lives in its own procedure
-    !! (s_amr_apply_reflux_d1/d2/d3); keep them separate.
-    impure subroutine s_amr_apply_reflux(rhs_vf)
+    !! F_coarse)/dx). A volume fraction's rhs also has +alpha*u on its right face and -alpha*u on its left (alpha*div(u)), so with
+    !! amr_reg_u it gets alpha*(ubar_fine - u_coarse)/dx on the low face and the negative on the high face, alpha from q_src at the
+    !! outside cell: zero for uniform alpha, and material interfaces stay in p/u equilibrium. c1/c2 are relative 0-based coarse
+    !! transverse indices. CCE 19.0.0: two or more of the per-direction loop nests in one procedure fail (ftn-7991 on offload, bad
+    !! code on CPU), so each lives in its own procedure (s_amr_apply_reflux_d1/d2/d3); keep them separate.
+    impure subroutine s_amr_apply_reflux(rhs_vf, q_src)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_src
 
         if (.not. amr) return
         call s_amr_reg_prepare()
         if (igr) return
 
         #:for D in [1, 2, 3]
-            if (amr_dim(${D}$)) call s_amr_apply_reflux_d${D}$(rhs_vf)
+            if (amr_dim(${D}$)) call s_amr_apply_reflux_d${D}$(rhs_vf, q_src)
         #:endfor
 
     end subroutine s_amr_apply_reflux
@@ -563,14 +599,21 @@ contains
     #:for D, TA, TB, IDX in [(1, 2, 3, 'aint(1, k, 1), i2, i3'), (2, 1, 3, 'i2, aint(1, k, 2), i3'), (3, 1, 2, &
                               & 'i2, i3, aint(1, k, 3)')]
         !> Reflux correction for the faces normal to direction ${D}$. Called only when amr_dim(${D}$).
-        impure subroutine s_amr_apply_reflux_d${D}$(rhs_vf)
+        impure subroutine s_amr_apply_reflux_d${D}$(rhs_vf, q_src)
 
             type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+            type(scalar_field), dimension(sys_size), intent(in)    :: q_src
             integer                                                :: eq, c1, c2, c1w, c2w, k, gmax1, gmax2
             integer                                                :: f10, f20, dd1, dd2, nch, rr, dd1_hi, dd2_hi, side
-            integer                                                :: i2, i3
-            logical                                                :: dta, dtb
-            real(wp)                                               :: fb
+            integer                                                :: i2, i3, iu, ab, ae, ib, ie, f, oo(3), ich
+            logical                                                :: dta, dtb, ext, usrc, altss, amode
+            real(wp)                                               :: fb, du, cu, sc, ke, en, rh
+
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(3) :: arho, alf
+            #:else
+                real(wp), dimension(num_fluids) :: arho, alf
+            #:endif
 
             call s_amr_coarse_tables()
             if (a_n(${D}$) == 0) return
@@ -579,9 +622,11 @@ contains
             nch = rr**count([dta, dtb])
             dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
             gmax1 = a_m(1, ${D}$); gmax2 = a_m(2, ${D}$)
+            call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext); altss = alt_soundspeed; amode = amr_reg_amode
             ! separate launches: one block's high outside cell can be another's low outside cell
             do side = 0, 1
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fb, i2, i3]')
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fb, du, cu, sc, ke, en, rh, f, oo, usrc, &
+                                    & arho, alf, i2, i3, ich]', firstprivate='[iu, ab, ae, ib, ie, ext, altss, amode]')
                 do k = 1, amr_reg_n
                     do c2w = 0, gmax2
                         do c1w = 0, gmax1
@@ -592,24 +637,58 @@ contains
                                 i2 = aint(3, k, ${D}$) + c1; i3 = aint(4, k, ${D}$) + c2
                                 f10 = 0; if (dta) f10 = rr*c1
                                 f20 = 0; if (dtb) f20 = rr*c2
-                                fb = 0._wp
+                                usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie)
+                                ich = iu; if (amode .and. usrc) ich = iu + eq - ab  ! HLL Method 1: this fluid's interface alpha
+                                fb = 0._wp; du = 0._wp
                                 do dd2 = 0, dd2_hi
                                     do dd1 = 0, dd1_hi
                                         if (side == 0) then
                                             fb = fb + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, k)
+                                            if (usrc) du = du + freg(${D}$)%lo(ich, f10 + dd1, f20 + dd2, k)
                                         else
                                             fb = fb + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, k)
+                                            if (usrc) du = du + freg(${D}$)%hi(ich, f10 + dd1, f20 + dd2, k)
                                         end if
                                     end do
                                 end do
                                 fb = fb/real(nch, wp)
                                 if (side == 0) then
-                                    rhs_vf(eq)%sf(${IDX}$) = rhs_vf(eq)%sf(${IDX}$) + (creg(${D}$)%lo(eq, c1, c2, &
-                                           & k) - fb)/areal(1, k, ${D}$)
+                                    oo = [${IDX}$]
                                 else
-                                    rhs_vf(eq)%sf(${IDX.replace('aint(1,', 'aint(2,')}$) &
-                                           & = rhs_vf(eq)%sf(${IDX.replace('aint(1,', 'aint(2,')}$) + (fb - creg(${D}$)%hi(eq, &
-                                           & c1, c2, k))/areal(2, k, ${D}$)
+                                    oo = [${IDX.replace('aint(1,', 'aint(2,')}$]
+                                end if
+                                if (usrc) then
+                                    ! du sums the nch fine face velocities; fb absorbs s*(du/nch - u_coarse), s the coefficient
+                                    ! of the face velocity in eq's rhs at the outside cell, so one update carries both
+                                    cu = merge(creg(${D}$)%lo(ich, c1, c2, k), creg(${D}$)%hi(ich, c1, c2, k), side == 0)
+                                    if (ext) then
+                                        rh = 0._wp; ke = 0._wp
+                                        do f = 1, num_fluids
+                                            arho(f) = q_src(eqn_idx%cont%beg + f - 1)%sf(oo(1), oo(2), oo(3))
+                                            alf(f) = q_src(eqn_idx%adv%beg + f - 1)%sf(oo(1), oo(2), oo(3))
+                                            rh = rh + arho(f)
+                                        end do
+                                        do f = eqn_idx%mom%beg, eqn_idx%mom%end
+                                            ke = ke + 0.5_wp*q_src(f)%sf(oo(1), oo(2), oo(3))**2/max(rh, sgm_eps)
+                                        end do
+                                        en = q_src(eqn_idx%E)%sf(oo(1), oo(2), oo(3))
+                                        if (amode) then
+                                            ! HLL Method 1: the rhs carries u*(alpha*_l - alpha*_r)/dx, u the cell's normal velocity
+                                            sc = -q_src(eqn_idx%mom%beg + ${D}$ - 1)%sf(oo(1), oo(2), oo(3))/max(rh, sgm_eps)
+                                        else
+                                            sc = f_amr_usrc_coef(arho, alf, ke, en, eq, altss)
+                                        end if
+                                    else
+                                        sc = q_src(eq)%sf(oo(1), oo(2), oo(3))
+                                    end if
+                                    fb = fb - sc*(du/real(nch, wp) - cu)
+                                end if
+                                if (side == 0) then
+                                    rhs_vf(eq)%sf(oo(1), oo(2), oo(3)) = rhs_vf(eq)%sf(oo(1), oo(2), oo(3)) + (creg(${D}$)%lo(eq, &
+                                           & c1, c2, k) - fb)/areal(1, k, ${D}$)
+                                else
+                                    rhs_vf(eq)%sf(oo(1), oo(2), oo(3)) = rhs_vf(eq)%sf(oo(1), oo(2), &
+                                           & oo(3)) + (fb - creg(${D}$)%hi(eq, c1, c2, k))/areal(2, k, ${D}$)
                                 end if
                             end do
                         end do
@@ -626,9 +705,10 @@ contains
 
         logical, intent(in) :: fine
         integer, intent(in) :: slo, shi
-        integer             :: d, ta, tb, eq, t1, t2, t1_hi, t2_hi, islot
+        integer             :: d, ta, tb, eq, t1, t2, t1_hi, t2_hi, islot, nr
 
         if (shi < slo) return
+        nr = amr_nreg
         do d = 1, num_dims
             ta = merge(2, 1, d == 1); tb = merge(2, 3, d == 3)
             t1_hi = merge(rf(ta), rc(ta) - 1, fine); t2_hi = merge(rf(tb), rc(tb) - 1, fine)
@@ -636,7 +716,7 @@ contains
             do islot = slo, shi
                 do t2 = 0, t2_hi
                     do t1 = 0, t1_hi
-                        do eq = 1, sys_size
+                        do eq = 1, nr
                             if (fine) then
                                 freg(d)%lo(eq, t1, t2, islot) = 0._wp
                                 freg(d)%hi(eq, t1, t2, islot) = 0._wp
@@ -654,7 +734,8 @@ contains
     end subroutine s_amr_zero_registers
 
     !> Berger-Colella state reflux: q(outside) += w*dtl*(F_coarse - Fbar_fine)/m on the low face and the negative on the high face,
-    !! per active dim, with F_coarse = creg and Fbar_fine = freg averaged over the rr**(ndim-1) covering fine faces. Framing is
+    !! per active dim, with F_coarse = creg and Fbar_fine = freg averaged over the rr**(ndim-1) covering fine faces; the volume
+    !! fractions also take their alpha*div(u) correction (s_amr_apply_reflux), alpha from q at the outside cell. Framing is
     !! caller-passed: islot dense register slot; olo/ohi outside coarse-cell index below/above the face; glo/ghi creg-local loop
     !! range; woff transverse write origin; w_lo/w_hi per-face weight; mlo/mhi outside-cell width. A zero weight skips the write
     !! because the outside index may be out of bounds on an unowned face.
@@ -663,13 +744,23 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q
         integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
         real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
-        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb
-        logical :: dta, dtb
-        real(wp) :: fblo, fbhi, wl, wh, ml, mh
+        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb, iu, ab, ae, ib, ie, &
+            & f, ich
+        logical  :: dta, dtb, ext, usrc, altss, amode
+        real(wp) :: fb, wl, wh, ml, mh, du, cu, sc, mm, ke_lo, ke_hi, en_lo, en_hi, un_lo, un_hi
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: ar_lo, ar_hi, al_lo, al_hi
+        #:else
+            real(wp), dimension(num_fluids) :: ar_lo, ar_hi, al_lo, al_hi
+        #:endif
 
         ! Loop bounds are hoisted to scalars: array-element bounds would force the host arrays present on the device (ACC present
-        ! error).
+        ! error). One thread per transverse cell walks the equations in turn: the outside cells' state the source coefficients
+        ! need is read before this thread writes them. The two faces are written out, not looped over: CCE's OpenACC lowering
+        ! fails on a runtime side loop with side-indexed private arrays ("Subtree parent problem").
 
+        call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext); altss = alt_soundspeed; amode = amr_reg_amode
         #:for D, TA, TB, IDX in [(1, 2, 3, 'ol, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, ol, wb + g2'), (3, 1, 2, &
                                   & 'wa + g1, wb + g2, ol')]
             if (amr_dim(${D}$) .and. (w_lo(${D}$) /= 0._wp .or. w_hi(${D}$) /= 0._wp)) then
@@ -677,24 +768,56 @@ contains
                 nch = rr**count([dta, dtb]); dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
                 gla = glo(${TA}$); gha = ghi(${TA}$); glb = glo(${TB}$); ghb = ghi(${TB}$); wa = woff(${TA}$); wb = woff(${TB}$)
                 ol = olo(${D}$); oh = ohi(${D}$); wl = w_lo(${D}$); wh = w_hi(${D}$); ml = mlo(${D}$); mh = mhi(${D}$)
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-                do eq = 1, sys_size
-                    do g2 = glb, ghb
-                        do g1 = gla, gha
-                            f10 = 0; if (dta) f10 = rr*g1
-                            f20 = 0; if (dtb) f20 = rr*g2
-                            fblo = 0._wp; fbhi = 0._wp
-                            do dd2 = 0, dd2_hi
-                                do dd1 = 0, dd1_hi
-                                    fblo = fblo + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                    fbhi = fbhi + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[eq, f10, f20, dd1, dd2, fb, du, cu, sc, mm, usrc, f, ich, ke_lo, ke_hi, &
+                                    & en_lo, en_hi, un_lo, un_hi, ar_lo, ar_hi, al_lo, al_hi]', firstprivate='[iu, ab, ae, ib, &
+                                    & ie, ext, altss, amode]')
+                do g2 = glb, ghb
+                    do g1 = gla, gha
+                        f10 = 0; if (dta) f10 = rr*g1
+                        f20 = 0; if (dtb) f20 = rr*g2
+                        #:for S, O, W, M, OP in [('lo', 'ol', 'wl', 'ml', '+'), ('hi', 'oh', 'wh', 'mh', '-')]
+                            if (ext .and. ${W}$ /= 0._wp) then
+                                ke_${S}$ = 0._wp; mm = 0._wp
+                                do f = 1, num_fluids
+                                    ar_${S}$(f) = q(eqn_idx%cont%beg + f - 1)%sf(${IDX.replace('ol', O)}$)
+                                    al_${S}$(f) = q(eqn_idx%adv%beg + f - 1)%sf(${IDX.replace('ol', O)}$)
+                                    mm = mm + ar_${S}$(f)
                                 end do
-                            end do
-                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                            if (wl /= 0._wp) q(eq)%sf(${IDX}$) = q(eq)%sf(${IDX}$) + wl*dtl*(creg(${D}$)%lo(eq, g1, g2, &
-                                & islot) - fblo)/ml
-                            if (wh /= 0._wp) q(eq)%sf(${IDX.replace('ol', 'oh')}$) = q(eq)%sf(${IDX.replace('ol', 'oh')}$) &
-                                & + wh*dtl*(fbhi - creg(${D}$)%hi(eq, g1, g2, islot))/mh
+                                do f = eqn_idx%mom%beg, eqn_idx%mom%end
+                                    ke_${S}$ = ke_${S}$ + 0.5_wp*q(f)%sf(${IDX.replace('ol', O)}$)**2/max(mm, sgm_eps)
+                                end do
+                                en_${S}$ = q(eqn_idx%E)%sf(${IDX.replace('ol', O)}$)
+                                un_${S}$ = q(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IDX.replace('ol', O)}$)/max(mm, sgm_eps)
+                            end if
+                        #:endfor
+                        do eq = 1, sys_size
+                            usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie)
+                            ich = iu; if (amode .and. usrc) ich = iu + eq - ab  ! HLL Method 1: this fluid's interface alpha
+                            #:for S, O, W, M, OP in [('lo', 'ol', 'wl', 'ml', '+'), ('hi', 'oh', 'wh', 'mh', '-')]
+                                if (${W}$ /= 0._wp) then
+                                    fb = 0._wp; du = 0._wp
+                                    do dd2 = 0, dd2_hi
+                                        do dd1 = 0, dd1_hi
+                                            fb = fb + freg(${D}$)%${S}$(eq, f10 + dd1, f20 + dd2, islot)
+                                            if (usrc) du = du + freg(${D}$)%${S}$(ich, f10 + dd1, f20 + dd2, islot)
+                                        end do
+                                    end do
+                                    fb = fb/real(nch, wp)
+                                    if (usrc) then
+                                        cu = creg(${D}$)%${S}$(ich, g1, g2, islot)
+                                        if (ext .and. amode) then
+                                            sc = -un_${S}$
+                                        else if (ext) then
+                                            sc = f_amr_usrc_coef(ar_${S}$, al_${S}$, ke_${S}$, en_${S}$, eq, altss)
+                                        else
+                                            sc = q(eq)%sf(${IDX.replace('ol', O)}$)
+                                        end if
+                                        fb = fb - sc*(du/real(nch, wp) - cu)
+                                    end if
+                                    q(eq)%sf(${IDX.replace('ol', O)}$) = q(eq)%sf(${IDX.replace('ol', O)}$) &
+                                      & ${OP}$ ${W}$*dtl*(creg(${D}$)%${S}$(eq, g1, g2, islot) - fb)/${M}$
+                                end if
+                            #:endfor
                         end do
                     end do
                 end do
@@ -704,35 +827,94 @@ contains
 
     end subroutine s_amr_reflux_apply_faces
 
-    !> amr_rk_w and amr_rk_c from the rows (c1, c2, c3, c4) of q <- (c1*q + c2*q^n + c3*dt*L(q))/c4, one per stage.
-    impure subroutine s_amr_set_rk_table(coef)
+    !> Equations whose rhs carries a face-velocity term the reflux corrects (s_amr_capture_total's amr_reg_u channel): the volume
+    !! fractions [ab:ae], and with the 6-equation model the internal energies [ib:ie] (empty ranges otherwise). ext: some of those
+    !! coefficients need the cell's pressure (alt_soundspeed's K, the internal energies' alpha_k*p), not alpha alone.
+    impure subroutine s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext)
 
-        real(wp), intent(in) :: coef(:,:)
+        integer, intent(out) :: iu, ab, ae, ib, ie
+        logical, intent(out) :: ext
+
+        iu = amr_reg_u; ab = eqn_idx%adv%beg; ae = merge(eqn_idx%adv%end, ab - 1, iu > 0); ib = 1; ie = 0
+        if (iu > 0 .and. model_eqns == model_eqns_6eq .and. .not. amr_reg_amode) then
+            ib = eqn_idx%int_en%beg; ie = eqn_idx%int_en%end
+        end if
+        ext = iu > 0 .and. (amr_reg_amode .or. alt_soundspeed .or. model_eqns == model_eqns_6eq)
+
+    end subroutine s_amr_usrc_ranges
+
+    !> Coefficient s of the face velocity in equation eq's rhs at one cell, which carries s*(u_r - u_l)/dx (m_rhs), from the cell's
+    !! partial densities arho, volume fractions alf, kinetic energy ke and total energy en: alpha_j for a volume fraction, plus K on
+    !! the first and minus K on the last with alt_soundspeed (K = a1 a2 (B2 - B1)/(a1 B2 + a2 B1)), and -alpha_k*p for a 6-equation
+    !! internal energy. p is the mixture pressure of the cell, as the conversion computes it (no chemistry).
+    function f_amr_usrc_coef(arho, alf, ke, en, eq, altss) result(sc)
+
+        $:GPU_ROUTINE(function_name='f_amr_usrc_coef', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: arho, alf
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: arho, alf
+        #:endif
+        real(wp), intent(in) :: ke, en
+        integer, intent(in)  :: eq
+        logical, intent(in)  :: altss
+        real(wp)             :: sc, rho, gam, pinf, qv, pres, b1, b2, kk, a1, a2, r1, r2
+        logical              :: adv
+
+        adv = eq >= eqn_idx%adv%beg .and. eq <= eqn_idx%adv%end
+        sc = 0._wp
+        if (adv) sc = alf(eq - eqn_idx%adv%beg + 1)
+        if (adv .and. .not. altss) return
+        call s_compute_mixture_coefficients(arho, alf, rho, gam, pinf, qv)
+        pres = f_pressure(en - ke, gam, pinf, qv)
+        if (adv) then
+            a1 = alf(1); a2 = alf(2); r1 = arho(1); r2 = arho(2)  ! scalars into the device routine (Cray OpenACC)
+            call s_phase_bulk_modulus(pres, a1, r1, 1, b1)
+            call s_phase_bulk_modulus(pres, a2, r2, 2, b2)
+            kk = a1*a2*(b2 - b1)/(a1*b2 + a2*b1)
+            if (eq == eqn_idx%adv%beg) sc = sc + kk
+            if (eq == eqn_idx%adv%end) sc = sc - kk
+        else
+            sc = -alf(eq - eqn_idx%int_en%beg + 1)*pres
+        end if
+
+    end function f_amr_usrc_coef
+
+    !> amr_rk_w from the rows (c1, c2, c3, c4) of q <- (c1*q + c2*q^n + c3*dt*L(q))/c4, one per stage; amr_rk_c are the stage times
+    !! c(1:ns) of the stepper.
+    impure subroutine s_amr_set_rk_table(coef, c)
+
+        real(wp), intent(in) :: coef(:,:), c(:)
         integer              :: s, t, ns
 
         ns = size(coef, 1)
         allocate (amr_rk_w(ns), amr_rk_c(ns))
-        amr_rk_c(1) = 0._wp
+        amr_rk_c = c(1:ns)
         do s = 1, ns
             amr_rk_w(s) = coef(s, 3)/coef(s, 4)
             do t = s + 1, ns
                 amr_rk_w(s) = amr_rk_w(s)*coef(t, 1)/coef(t, 4)
             end do
-            if (s < ns) amr_rk_c(s + 1) = (coef(s, 1)*amr_rk_c(s) + coef(s, 3))/coef(s, 4)
         end do
 
     end subroutine s_amr_set_rk_table
 
     impure subroutine s_finalize_amr_registers()
 
-        integer :: d
+        integer    :: d
+        integer(8) :: slot_bytes, reg_bytes
 
         if (.not. amr) return
+        slot_bytes = 0_8
         do d = 1, num_dims
-            call s_mem_note(MEM_REG, storage_size(creg(d)%lo, kind=8)/8_8*(size(creg(d)%lo, kind=8) + size(creg(d)%hi, &
-                            & kind=8) + size(freg(d)%lo, kind=8) + size(freg(d)%hi, kind=8)))
+            reg_bytes = storage_size(creg(d)%lo, kind=8)/8_8*(size(creg(d)%lo, kind=8) + size(creg(d)%hi, &
+                                     & kind=8) + size(freg(d)%lo, kind=8) + size(freg(d)%hi, kind=8))
+            call s_mem_note(MEM_REG, reg_bytes)
+            slot_bytes = slot_bytes + reg_bytes/int(max(amr_reg_cap, 1), 8)
             @:DEALLOCATE(creg(d)%lo, creg(d)%hi, freg(d)%lo, freg(d)%hi)
         end do
+        call s_mem_note_reg_slot(slot_bytes)
         @:DEALLOCATE(bcap, aint, areal)
         if (allocated(amr_reg_of)) deallocate (amr_reg_of)
         if (allocated(amr_rk_w)) deallocate (amr_rk_w, amr_rk_c)

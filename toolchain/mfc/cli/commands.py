@@ -53,9 +53,9 @@ COMMON_JOBS = CommonArgumentSet(
         Argument(
             name="jobs",
             short="j",
-            help="Allows for JOBS concurrent jobs.",
+            help="Concurrent jobs. Builds default to min(cores, 16); test cases run one at a time unless -j is given.",
             type=int,
-            default=1,
+            default=None,
             metavar="JOBS",
         ),
     ],
@@ -414,6 +414,13 @@ TEST_COMMAND = Command(
             help="Percentage of tests to run.",
             type=int,
             default=100,
+        ),
+        Argument(
+            name="max-tests",
+            help="Cap the run at this many tests, evenly spaced through the selected ones (0: no limit). The canary tests and any test whose own files changed run beyond the cap.",
+            type=int,
+            default=0,
+            dest="max_tests",
         ),
         Argument(
             name="max-attempts",
@@ -851,13 +858,23 @@ BENCH_COMMAND = Command(
             default=1,
             metavar="MEM",
         ),
+        Argument(
+            name="cases",
+            help="Only run these cases (names from toolchain/bench.yaml).",
+            nargs="+",
+            type=str,
+            default=[],
+            metavar="CASE",
+        ),
     ],
     examples=[
         Example("./mfc.sh bench -o results.yaml", "Run benchmarks and save results"),
+        Example("./mfc.sh bench -o rerun.yaml --cases ibm igr", "Rerun two cases"),
     ],
     key_options=[
         ("-o, --output FILE", "Output file for benchmark results (required)"),
         ("-m, --mem SIZE", "Memory limit for benchmarks"),
+        ("--cases CASE ...", "Only run these cases"),
     ],
 )
 
@@ -1370,7 +1387,7 @@ VIZ_COMMAND = Command(
 PARAMS_COMMAND = Command(
     name="params",
     help="Search and explore MFC case parameters.",
-    description="Search, list, and get information about MFC's ~3,300 case parameters.",
+    description="Search, list, and get information about MFC's case parameters.",
     positionals=[
         Positional(
             name="query",

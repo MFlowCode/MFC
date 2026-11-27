@@ -1,0 +1,30 @@
+name: Runner Watch
+
+# Every half hour, check that each cluster's runners are picking up jobs; open an issue when a
+# cluster has stopped and close it when it resumes (see .github/scripts/runner-watch.sh).
+on:
+  schedule:
+    - cron: '11,41 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  issues: write
+
+concurrency:
+  group: runner-watch
+  cancel-in-progress: true
+
+jobs:
+  watch:
+    name: Watch Runners
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Watch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+        run: bash .github/scripts/runner-watch.sh

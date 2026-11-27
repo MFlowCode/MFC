@@ -10,7 +10,7 @@ import uuid
 
 import rich.table
 
-from .build import DEFAULT_TARGETS, SIMULATION, get_targets
+from .build import SIMULATION, get_targets
 from .common import MFC_BENCH_FILEPATH, MFC_BUILD_DIR, MFCException, console_safe, create_directory, file_dump_yaml, file_load_yaml, format_list_to_string, log_tail, system
 from .gpu_diagnostics import fault_diagnostic_env, summarize_rocm_debug_agent
 from .printer import cons
@@ -60,6 +60,13 @@ def bench(targets=None):
         cons.print()
 
         CASES = [BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH)]
+
+        if ARG("cases"):
+            slugs = [case.slug for case in CASES]
+            unknown = [name for name in ARG("cases") if name not in slugs]
+            if unknown:
+                raise MFCException(f"Unknown benchmark case: {', '.join(unknown)}. Choose from: {', '.join(slugs)}")
+            CASES = [case for case in CASES if case.slug in ARG("cases")]
 
         for case in CASES:
             case.args = case.args + ARG("--")
@@ -193,7 +200,7 @@ def bench(targets=None):
         cons.unindent()
 
 
-def _write_step_summary(lhs_path: str, rhs_path: str, rows: typing.List[typing.Tuple[str, str, str, str]], warnings: typing.List[str]):
+def _write_step_summary(lhs_path: str, rhs_path: str, rows: typing.List[typing.Tuple[str, str]], warnings: typing.List[str]):
     """Put the speedup table on the workflow run's summary page.
 
     The same numbers already go to stdout, but reading them there means expanding the
@@ -212,12 +219,12 @@ def _write_step_summary(lhs_path: str, rhs_path: str, rows: typing.List[typing.T
     lines = [
         heading,
         "",
-        f"Speedups from `{lhs_path}` to `{rhs_path}`; greater than 1 is faster.",
+        f"Grind time speedups from `{lhs_path}` to `{rhs_path}`; greater than 1 is faster.",
         "",
-        "| Case | Pre Process | Simulation | Post Process |",
-        "| --- | --- | --- | --- |",
+        "| Case | Grind speedup |",
+        "| --- | --- |",
     ]
-    lines += [f"| `{slug}` | {pre} | {sim} | {post} |" for slug, pre, sim, post in rows]
+    lines += [f"| `{slug}` | {speedup} |" for slug, speedup in rows]
     if warnings:
         lines += ["", "**Below threshold**", ""] + [f"- {w}" for w in warnings]
     lines.append("")
@@ -236,9 +243,7 @@ def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
     lhs_path = os.path.relpath(ARG("lhs"))
     rhs_path = os.path.relpath(ARG("rhs"))
-    cons.print(
-        f"[bold]Comparing Benchmarks: Speedups from [magenta]{lhs_path}[/magenta] to [magenta]{rhs_path}[/magenta] are displayed below. Thus, numbers > 1 represent increases in performance.[/bold]"
-    )
+    cons.print(f"[bold]Comparing Benchmarks: Grind time speedups from [magenta]{lhs_path}[/magenta] to [magenta]{rhs_path}[/magenta] are displayed below; numbers > 1 are faster.[/bold]")
 
     if lhs["metadata"] != rhs["metadata"]:
 
@@ -267,48 +272,31 @@ def diff():
 
     table = rich.table.Table(show_header=True, box=rich.table.box.SIMPLE)
     table.add_column("[bold]Case[/bold]", justify="left")
-    table.add_column("[bold]Pre Process[/bold]", justify="right")
-    table.add_column("[bold]Simulation[/bold]", justify="right")
-    table.add_column("[bold]Post Process[/bold]", justify="right")
+    table.add_column("[bold]Grind speedup[/bold]", justify="right")
 
     err = 0
     summary_rows = []
     warnings = []
     for slug in slugs:
-        lhs_summary, rhs_summary = lhs["cases"][slug]["output_summary"], rhs["cases"][slug]["output_summary"]
-        speedups = ["N/A", "N/A", "N/A"]
+        speedup = "N/A"
 
-        for i, target in enumerate(sorted(DEFAULT_TARGETS, key=lambda t: t.runOrder)):
-            if (target.name not in lhs_summary) or (target.name not in rhs_summary):
-                cons.print(f"{target.name} not present in lhs_summary or rhs_summary - Case: {slug}")
+        try:
+            lhs_grind, rhs_grind = (side["cases"][slug]["output_summary"][SIMULATION.name]["grind"] for side in (lhs, rhs))
+            if not math.isfinite(lhs_grind) or not math.isfinite(rhs_grind):
                 err = 1
-                continue
+                cons.print(f"lhs_summary or rhs_summary reports non-real grind time - Case: {slug}")
 
-            if not math.isfinite(lhs_summary[target.name]["exec"]) or not math.isfinite(rhs_summary[target.name]["exec"]):
-                err = 1
-                cons.print(f"lhs_summary or rhs_summary reports non-real exec time for {target.name} - Case: {slug}")
-            try:
-                exec_time_value = lhs_summary[target.name]["exec"] / rhs_summary[target.name]["exec"]
-                if exec_time_value < 0.9:
-                    cons.print(f"[bold yellow]Warning[/bold yellow]: Exec time speedup for {target.name} is less than 0.9 - Case: {slug}")
-                    warnings.append(f"exec speedup {exec_time_value:.2f} < 0.90 for {target.name} in `{slug}`")
-                speedups[i] = f"Exec: {exec_time_value:.2f}"
-                if target == SIMULATION:
-                    if not math.isfinite(lhs_summary[target.name]["grind"]) or not math.isfinite(rhs_summary[target.name]["grind"]):
-                        err = 1
-                        cons.print(f"lhs_summary or rhs_summary reports non-real grind time for {target.name} - Case: {slug}")
+            ratio = lhs_grind / rhs_grind
+            speedup = f"{ratio:.2f}"
+            if ratio < 0.95:
+                cons.print(f"[bold yellow]Warning[/bold yellow]: Grind time speedup below threshold (<0.95) - Case: {slug}")
+                warnings.append(f"grind speedup {ratio:.2f} < 0.95 in `{slug}`")
+        except Exception as e:
+            cons.print(f"[bold red]ERROR[/bold red]: Failed to compute grind speedup in {slug}: {e!r}\n{traceback.format_exc()}")
+            err = 1
 
-                    grind_time_value = lhs_summary[target.name]["grind"] / rhs_summary[target.name]["grind"]
-                    speedups[i] += f" & Grind: {grind_time_value:.2f}"
-                    if grind_time_value < 0.95:
-                        cons.print(f"[bold yellow]Warning[/bold yellow]: Grind time speedup for {target.name} below threshold (<0.95) - Case: {slug}")
-                        warnings.append(f"grind speedup {grind_time_value:.2f} < 0.95 for {target.name} in `{slug}`")
-            except Exception as e:
-                cons.print(f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}\n{traceback.format_exc()}")
-                err = 1
-
-        table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
-        summary_rows.append((slug, *speedups))
+        table.add_row(f"[magenta]{slug}[/magenta]", speedup)
+        summary_rows.append((slug, speedup))
 
     cons.raw.print(table)
     _write_step_summary(lhs_path, rhs_path, summary_rows, warnings)

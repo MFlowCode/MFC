@@ -430,6 +430,8 @@ contains
                                         grid_spacing = y_cc(y + 1) - y_cc(y)
                                     case (3)
                                         grid_spacing = z_cc(z + 1) - z_cc(z)
+                                        ! 3D cylindrical: z is theta, so the face gradient is (1/r) d/dtheta
+                                        if (grid_geometry == 3) grid_spacing = y_cc(y)*grid_spacing
                                     end select
 
                                     ! Extract species mass fractions
@@ -598,6 +600,8 @@ contains
                                         grid_spacing = y_cc(y + 1) - y_cc(y)
                                     case (3)
                                         grid_spacing = z_cc(z + 1) - z_cc(z)
+                                        ! 3D cylindrical: z is theta, so the face gradient is (1/r) d/dtheta
+                                        if (grid_geometry == 3) grid_spacing = y_cc(y)*grid_spacing
                                     end select
 
                                     ! Extract species mass fractions

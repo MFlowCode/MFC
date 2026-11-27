@@ -6,6 +6,8 @@ This replaces the former self-consistent scalar-dissipation flamelet solve;
 the counterflow's nominal strain rate is an explicit initialization parameter.
 """
 
+import contextlib
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -175,8 +177,25 @@ def ic_cache_valid(ic_dir, file_extension, expected_lines, cache_key=None):
     return True
 
 
+def keyed_ic_dir(case_dir, cache_key):
+    """IC/<hash of cache_key>: each grid and parameter set gets its own directory, so evaluating the
+    case with other arguments (precheck at the default size, a test at its own) never rewrites the
+    files another run is reading."""
+    digest = hashlib.sha256(json.dumps(cache_key, sort_keys=True).encode()).hexdigest()[:16]
+    return os.path.join(case_dir, "IC", digest)
+
+
+@contextlib.contextmanager
+def atomic_write(path):
+    """Write `path` under a temporary name and rename it into place, so a reader never sees a partial file."""
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as fh:
+        yield fh
+    os.replace(tmp, path)
+
+
 def write_cache_key(ic_dir, cache_key):
     """Record the parameters an IC/ was generated with, so ic_cache_valid can detect a
     stale cache (different --hot/cold mode or physical parameters at the same grid size)."""
-    with open(os.path.join(ic_dir, ".cache_key.json"), "w") as fh:
+    with atomic_write(os.path.join(ic_dir, ".cache_key.json")) as fh:
         json.dump(cache_key, fh, sort_keys=True)

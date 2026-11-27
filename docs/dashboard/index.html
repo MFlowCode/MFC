@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFC | Status</title>
+    <meta name="description" content="Where MFC stands right now: whether master passes on each machine and compiler, what its CI costs, and what changed in performance and tests." />
+    <link rel="icon" type="image/x-icon" href="../res/icon.ico">
+    <style>
+        :root { --page: #ffffff; --surface: #ffffff; --ink: #0f172a; --ink-2: #475569; --muted: #64748b; --grid: #e2e8f0; --axis: #cbd5e1; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); font: 15px/1.5 system-ui, sans-serif; }
+        a { color: inherit; }
+        p.note, span.note { color: var(--ink-2); font-size: 13px; }
+        p.note { margin: 0 0 10px; max-width: 75ch; }
+        table { border-collapse: collapse; font-size: 14px; width: 100%; }
+        th, td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--grid); text-align: left; }
+        th { color: var(--ink-2); font-weight: 600; }
+        .scrollx { overflow-x: auto; }
+    </style>
+    <link rel="stylesheet" href="ci-pages.css">
+</head>
+<body>
+<header class="site" id="site-header"></header>
+<main><div class="wrap">
+    <p class="updated" id="updated"></p>
+    <h1>Status</h1>
+    <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
+
+    <h2>Last 14 days</h2>
+    <ul class="events" id="events"></ul>
+
+    <h2>Lanes on master</h2>
+    <div class="scrollx"><table id="lanes" class="sortable"></table></div>
+    <div id="key"></div>
+</div></main>
+<footer class="site" id="site-footer"></footer>
+<script src="ci-pages.js"></script>
+<script>
+"use strict";
+MFCCI.chrome("index.html");
+const $ = id => document.getElementById(id), { esc, day, commitLink } = MFCCI;
+const part = (href, label, dot, text) => `<a href="${MFCCI.withParams(href)}"><span class="label">${label}</span><span class="dot ${dot}"></span><b>${text}</b></a>`;
+
+Promise.all([MFCCI.load.runs(), MFCCI.load.usage(), MFCCI.load.bench(), MFCCI.live(), MFCCI.load.scaling()]).then(([runs, usage, bench, now, scalingRuns]) => {
+    const scale = MFCCI.scalingStatus(scalingRuns), weak = scale?.rows.filter(x => x.kind === "weak" && !x.base).at(-1);
+    if (!runs.length && !bench.length) { $("statusline").innerHTML = `<span class="note">No history is available yet.</span>`; return; }
+    MFCCI.updated($("updated"), Math.max(runs.at(-1)?.t || 0, bench.at(-1)?.t || 0), 3);
+    const DAYS = 14, from = Date.now() - DAYS * 864e5;
+    const status = MFCCI.laneStatus(runs), ok = status.rows.filter(r => r.ok).length, n = status.rows.length;
+    const hours = MFCCI.frontierHours(runs, usage, 7), share = hours / MFCCI.CAP;
+    const shifts = MFCCI.shifts(bench, MFCCI.benchLanes(bench)).filter(e => e.r.t >= from);
+    const slower = shifts.filter(e => e.spans.some(s => s.hits.some(h => h.pct > 0))).length;
+    const tests = MFCCI.testStats(runs, 30, "master").tests, failing = tests.filter(t => t.f).length, retried = tests.filter(t => !t.f && t.r).length;
+
+    const going = MFCCI.liveSummary(now);
+    $("statusline").innerHTML =
+        (going ? part("ci.html", `Workflow runs at ${MFCCI.clock(now.at)}`, "idle", going.text) : "")
+        + part("ci.html", "Master", !n ? "idle" : ok === n ? "good" : "bad", n ? `${ok} of ${n} lanes passing` : "no runs on record")
+        + part("ci.html", "Frontier node-hours, 7 days", share >= 0.9 ? "bad" : share >= 0.7 ? "warn" : "good", `${Math.round(hours).toLocaleString()} of ${MFCCI.CAP.toLocaleString()} (${Math.round(100 * share)}%)`)
+        + part("benchmarks.html", `Performance, ${DAYS} days`, slower ? "bad" : "good", shifts.length ? `${shifts.length} lasting ${shifts.length === 1 ? "change" : "changes"}, ${slower} slower` : "no lasting change")
+        + (weak ? part("benchmarks.html#scaling", `Scaling on Frontier, ${MFCCI.day(scale.latest.t)}`, scale.bad.length ? "bad" : "good", scale.bad.length ? `regressed at ${scale.bad.map(x => `${x.nodes}`).join(", ")} nodes` : `${weak.eff.toFixed(0)}% weak at ${weak.ranks} GPUs`) : "")
+        + part("tests.html", "Tests on master, 30 days", failing ? "bad" : retried ? "warn" : "good", `${failing} failing, ${retried} passed only on a retry`);
+
+    // Events, newest first: a lane turning red or green on master, a lasting change in grind time, a test
+    // failing on master for the first time in the record.
+    const events = [];
+    const ms = MFCCI.masterRuns(runs);
+    const turns = new Map();                             // one event per run and direction, naming the lanes that turned
+    for (const row of status.rows) {
+        let before = null;
+        for (const r of ms) { const c = r.cells[row.key]; if (!c || c.c === "cancelled") continue;
+            const good = c.c === "success";
+            if (before !== null && good !== before && r.t >= from) { const k = `${r.run}|${good}`, e = turns.get(k) || { r, good, rows: [] }; e.rows.push(row); turns.set(k, e); }
+            before = good; }
+    }
+    for (const { r, good, rows } of turns.values()) events.push({ t: r.t, dot: good ? "good" : "bad",
+        html: `<a href="${MFCCI.withParams("ci.html")}"><b>${rows.length === 1 ? `${rows[0].lane.label} · ${rows[0].kind === "test" ? "tests" : "case optimization"}` : `${rows.length} lanes`} ${good ? "passed again" : "started failing"}</b></a> at ${commitLink(r.sha, r.pr)} ${esc(r.title)}`
+            + (rows.length > 1 ? `<br><span class="note">${rows.map(x => `${x.lane.label} ${x.kind === "test" ? "tests" : "case opt."}`).join(" · ")}</span>` : "") });
+    for (const e of shifts) {
+        const all = e.spans.flatMap(s => s.hits.map(h => h.pct)).sort((a, b) => a - b), mid = all[all.length >> 1], lanes = e.spans.map(s => s.lane.view === "Frontier" ? s.lane.label : `${s.lane.view} ${s.lane.label}`);
+        events.push({ t: e.r.t, dot: mid > 0 ? "bad" : "good", html: `<a href="${MFCCI.withParams("benchmarks.html")}"><b>Grind time ${mid > 0 ? "up" : "down"} ${Math.abs(mid).toFixed(0)}%</b></a> on ${esc(lanes.join(", "))}: `
+            + (e.suspects.length === 1 ? `${commitLink(e.suspects[0][0], e.suspects[0][2])} ${esc(e.suspects[0][1])}` : `one of ${e.suspects.map(c => commitLink(c[0], c[2])).join(", ")}`) });
+    }
+    const everFailed = new Map();
+    for (const r of ms) for (const j of r.jobs) for (const [uuid, name] of j.f || []) if (!everFailed.has(uuid)) everFailed.set(uuid, { r, j, name });
+    for (const [uuid, x] of everFailed) if (x.r.t >= from) events.push({ t: x.r.t, dot: "bad",
+        html: `<a href="${MFCCI.withParams("tests.html")}"><b>Test ${esc(x.name)}</b></a> <code>${uuid}</code> first failure on master, on ${esc(MFCCI.CI_LANES.find(l => l.key === x.j.l)?.label || x.j.l)}` });
+    events.sort((a, b) => b.t - a.t);
+    $("events").innerHTML = events.length ? events.map(e => `<li><time>${day(e.t)}</time><span class="what"><span class="dot ${e.dot}"></span>${e.html}</span></li>`).join("")
+                                          : `<li><time></time><span class="what">No changes.</span></li>`;
+
+    $("lanes").innerHTML = `<tr><th>Lane</th><th>Latest result</th><th>Since</th><th>Last passed</th></tr>` + status.rows.map(r =>
+        `<tr><td>${r.lane.label} · ${r.kind === "test" ? "tests" : "case opt."}</td><td><span class="dot ${!r.last ? "idle" : r.ok ? "good" : "bad"}"></span>${!r.last ? "No result" : r.ok ? "Passing" : "Failing"}${(l => l && !(r.last && r.last.run === l.run.id) ? ` · ${l.state} now at ${l.run.sha.slice(0, 7)}` : "")(MFCCI.liveLane(now, r.lane.key, r.kind))}</td>`
+        + `<td>${r.firstBad ? `${day(r.firstBad.t)} (${r.badRuns} ${r.badRuns === 1 ? "run" : "runs"})` : r.last ? day(r.last.t) : "–"}</td><td>${r.passed ? `${commitLink(r.passed.sha, r.passed.pr)} · ${day(r.passed.t)}` : "Not in the record"}</td></tr>`).join("");
+    MFCCI.sortable($("lanes"));
+    $("key").innerHTML = MFCCI.LANE_KEY;
+});
+</script>
+</body>
+</html>

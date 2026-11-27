@@ -1,118 +1,19 @@
-This file was created on 2024-11-19 15:37:23.329507.
+This file was created on 2026-11-26 13:29:21.553102.
 
 mfc.sh:
 
-    Invocation: test -j 8 --generate -f A69D2D28 -t 221C9980
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        579a5781114de323052ab02506c34c372de365ce on master (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
-    
-        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
-    
-        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
-    
-        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --no-debug --no-reldebug --no-single --no-gpu --mpi --no-build -j 64 --max-attempts 2 --generate --only 0387594F 041D5CC9 04FB9E91 05A8C23C 07D9EBD1 09FDDC81 0B07F3A1 0BD42F35 10DF5CAA 124D7972 127A967A 128384B4 135F548B 13945217 14FF2F66 16574715 17E2C6D1 18B832DD 1A6F40B3 1B218CF1 1D4832F8 1E62093F 1E6FD465 221C9980 24176B3D 2440B4AE 245321C0 27CD0714 27F6FEF5 284ABF4C 2854A102 28D037A7 2EE0C3AA 2FB9269F 2FC9648E 3008BA80 30C84CA3 32DD0363 34626101 34A93376 39A3B369 3AD416B4 3C5B4542 3F5FE078 408BF558 40A4A5B8 421A6AD9 431554F7 43A1D3C6 43AF9F25 474D6E2B 48CC6F65 493989F3 49893269 4B574EE6 4B8105EA 4BED9896 4C3164AE 4C64244B 4CECF724 4E0FBE72 4F5A5E32 50B98DBF 5173E637 51AC8C99 5334FF40 540C72F1 5453BB95 5A22B45F 5A6A0EC7 5BBDFB29 5BF8664C 5C04A681 5E746B78 6076815B 60F620F8 6171E9D4 641CC3F0 647715EB 65CC7EB7 66ABE269 674B68AA 69F52F95 6A439411 6AF90F3C 6B97A7F6 6DE4C39D 6E24D2F9 6ED50013 731ACB1A 74CEDCD1 759FF2DA 78016FF2 7C8B89A5 7CA4FC48 7CC8F995 7DCA9229 7DCE34B4 7E50FFE6 7F70E665 7FA04E95 7FC2F9F8 824745F5 8339878C 86A2C59B 87C3F801 88ADD5C1 88C18DD7 8B2A7F3E 8D8F6424 8DDB767E 911FB9B6 92C38C91 947DA282 952F1CEF 993DF695 997E2B0E 9C037B27 9C0CAF25 9D95D7B8 A1B2B963 A2036630 A2ACC05A A4DABDB6 A69398F6 A69D2D28 A74B7381 A7E7A245 AA36F5D2 AA49A8BC AC3AAF00 ADD26480 AE0216C4 AE4D2FDA AFBACA70 B0CE19C5 B0E46764 B20208D4 B204C86E B317404C B5CAD86E B7A370B8 B7A6CC79 B872F80B B8D029E5 B8F6A584 BA4372C5 BA59123E BBF7C467 BFAA7587 C02C399E C1F0BCB1 C51CB3CB C5D96D9A C730942B C794BB89 C7BE8FEA C87A466A C8AD6271 CD32DCEC D1C97CD1 D5EAC17E D6794F4C D7D6DEEB D7E7DE04 D8BC2E49 D999E5E8 DE954FAA DF93F5A5 DF9526DB E085CC5A E1199F96 E2163247 E2C4CBC6 E4F6CE1E E53E6397 E597CAE4 E5B66084 E72E9486 E748B162 EA8FA07E ED2D5C0A EF38E2A6 F1F38949 F200F862 F22AC0A2 F31EAABF F389CE57 F3ECE90B F4675B3A F52F0D4C F60D6594 F7A6649D F855812E F8D466BD F935DA03 F980C769 FA8643EF FAF04D7A FB3F47C0 FE3DCA48 -- -c tuo
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        79b69c54acd2d5224950d62c3d790cb21e209a06 on tests-generic-and-defaults (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.30.3 on ipsec-10-2-65-237.vpn.gatech.edu
+        CMake v3.24.2 on tuolumne2056
     
-        C       : AppleClang v13.1.6.13160021 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.2.0 (/opt/homebrew/bin/gfortran)
+        C       : GNU v13.3.1 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : GNU v13.3.1 (/opt/cray/pe/craype/2.7.34/bin/ftn)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -123,17 +24,86 @@ pre_process:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /Users/haochey/Documents/Github/MFChaocheyfork/build/venv/bin/fypp
+        Fypp    : /p/vast1/bryngelson1/w152/MFC/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tuolumne2056
+    
+        C       : GNU v13.3.1 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : GNU v13.3.1 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /p/vast1/bryngelson1/w152/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tuolumne2056
+    
+        C       : GNU v13.3.1 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : GNU v13.3.1 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /p/vast1/bryngelson1/w152/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -141,10 +111,33 @@ pre_process:
 CPU:
 
     CPU Info:
-    From sysctl -a 
-    machdep.cpu.brand_string: Apple M1 Pro
-    machdep.cpu.core_count: 10
-    machdep.cpu.cores_per_package: 10
-    machdep.cpu.logical_per_package: 10
-    machdep.cpu.thread_count: 10
+    From lscpu
+    Architecture:        x86_64
+    CPU op-mode(s):      32-bit, 64-bit
+    Byte Order:          Little Endian
+    CPU(s):              192
+    On-line CPU(s) list: 0-191
+    Thread(s) per core:  2
+    Core(s) per socket:  24
+    Socket(s):           4
+    NUMA node(s):        4
+    Vendor ID:           AuthenticAMD
+    CPU family:          25
+    Model:               144
+    Model name:          AMD Instinct MI300A Accelerator
+    Stepping:            1
+    CPU MHz:             3272.286
+    CPU max MHz:         3700.0000
+    CPU min MHz:         1500.0000
+    BogoMIPS:            7399.73
+    Virtualization:      AMD-V
+    L1d cache:           32K
+    L1i cache:           32K
+    L2 cache:            1024K
+    L3 cache:            32768K
+    NUMA node0 CPU(s):   0-23,96-119
+    NUMA node1 CPU(s):   24-47,120-143
+    NUMA node2 CPU(s):   48-71,144-167
+    NUMA node3 CPU(s):   72-95,168-191
+    Flags:               fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl nonstop_tsc cpuid extd_apicid aperfmperf pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local avx512_bf16 clzero irperf xsaveerptr wbnoinvd amd_ppin cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid overflow_recov succor smca fsrm flush_l1d
 

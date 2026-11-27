@@ -25,7 +25,12 @@ DEPS_CACHE_VERSION=1
 
 # Number of files and their total size: the completeness check of an entry.
 _deps_cache_census() {
-    ( cd "$1" 2>/dev/null && find . -type f ! -name .complete -printf '%s\n' | awk '{ n++; s += $1 } END { print n + 0, s + 0 }' )
+    ( cd "$1" 2>/dev/null && find . -type f ! -name .complete -exec wc -c {} \; | awk '{ n++; s += $1 } END { print n + 0, s + 0 }' )
+}
+
+# rename(2) refuses a non-empty target; plain mv would move into it, and mv -T is GNU only.
+_deps_cache_rename() {
+    python3 -c 'import os, sys; os.rename(sys.argv[1], sys.argv[2])' "$1" "$2"
 }
 
 _deps_cache_valid() {
@@ -33,7 +38,8 @@ _deps_cache_valid() {
 }
 
 deps_cache_init() {
-    local c
+    local c sha=sha256sum
+    command -v sha256sum > /dev/null 2>&1 || sha="shasum -a 256" # macOS
     deps_cache_dir="${MFC_DEPS_CACHE_DIR:-/lustre/orion/cfd154/proj-shared/runners/.deps-cache}"
     deps_cache_key=$({
         echo "v$DEPS_CACHE_VERSION cluster=$1 opts=$2 arch=$(uname -m)"
@@ -42,8 +48,8 @@ deps_cache_init() {
             command -v "$c" > /dev/null 2>&1 && "$c" --version 2>&1 | head -n 3
         done
         # the dependency definitions, the find modules they use, and the toolchain's dependency targets
-        find toolchain/dependencies toolchain/cmake toolchain/mfc/build.py -type f 2> /dev/null | LC_ALL=C sort | xargs -r sha256sum
-    } | sha256sum | cut -d' ' -f1)
+        find toolchain/dependencies toolchain/cmake toolchain/mfc/build.py -type f 2> /dev/null | LC_ALL=C sort | xargs -r $sha
+    } | $sha | cut -d' ' -f1)
     deps_cache_entry="$deps_cache_dir/$deps_cache_key"
     [ "$deps_cache_dir" = off ] && deps_cache_entry=""
     return 0
@@ -101,11 +107,11 @@ deps_cache_save() {
         _deps_cache_census "$tmp" > "$tmp/.complete" || exit 1
         # A damaged entry would otherwise block its key for good.
         if [ -e "$deps_cache_entry" ] && ! _deps_cache_valid "$deps_cache_entry"; then
-            mv -T "$deps_cache_entry" "$tmp.damaged" || exit 1
+            _deps_cache_rename "$deps_cache_entry" "$tmp.damaged" || exit 1
             rm -rf "$tmp.damaged"
         fi
         # rename(2) refuses a non-empty target, so the first job to publish a key wins
-        mv -T "$tmp" "$deps_cache_entry" || exit 1
+        _deps_cache_rename "$tmp" "$deps_cache_entry" || exit 1
     ) 2> /dev/null; then
         echo "deps cache: saved ($deps_cache_key): ${deps[*]}"
     else

@@ -20,15 +20,18 @@ module m_amr_distribution
     use m_constants, only: K_ib
     use m_mpi_proxy, only: s_mpi_abort
     use m_ibm, only: ib_markers
+    use m_ib_patches, only: s_get_ib_bound
     use m_amr_state
+    use m_phase_timing, only: s_mem_note_level
 
     implicit none
 
     private
-    public :: f_amr_overlap_count, f_amr_rank_overlaps, s_amr_adopt_block_owners, s_amr_assign_block_owners, s_amr_body_bbox, &
-        & s_amr_box_isect, s_amr_compute_isect, s_amr_expand_box_over_bodies, s_amr_rank_coarse_range, s_amr_rank_decomp, &
-        & s_amr_rank_interior, s_amr_ranks_overlapping, s_amr_refresh_lists, s_amr_refresh_my_blocks, s_amr_sfc_cut, &
-        & s_amr_sort_by_key, s_amr_tile_box, s_amr_validate_decomp, s_amr_validate_owner
+    public :: s_amr_note_level_fill, f_amr_overlap_count, f_amr_rank_overlaps, s_amr_adopt_block_owners, &
+        & s_amr_assign_block_owners, s_amr_body_bbox, s_amr_box_isect, s_amr_compute_isect, s_amr_expand_box_over_bodies, &
+        & s_amr_rank_coarse_range, s_amr_rank_decomp, s_amr_rank_interior, s_amr_ranks_overlapping, s_amr_refresh_lists, &
+        & s_amr_refresh_my_blocks, s_amr_sfc_cut, s_amr_sort_by_key, s_amr_tile_box, f_amr_rank_tile, s_amr_validate_decomp, &
+        & s_amr_validate_owner
 
 contains
 
@@ -344,6 +347,7 @@ contains
         amr_n_l1r = 0
         amr_n_fch = 0
         amr_n_own = 0
+        amr_nest_seam = .false.
         amr_child_ptr(0:amr_num_blocks) = 0
         do b = 1, amr_num_blocks
             if (amr_owns_all(b)) then
@@ -356,6 +360,8 @@ contains
                 amr_parent_blk(b) = pblk
                 ! pblk == 0 is impossible on a nested mesh, but counting it would land in amr_child_ptr(0) and corrupt the lists
                 if (pblk > 0) then
+                    if (any(amr_dim .and. (amr_region_lo_all(:,b) < amr_region_lo_all(:,pblk) + mar .or. amr_region_hi_all(:, &
+                        & b) > amr_region_hi_all(:,pblk) - mar))) amr_nest_seam = .true.
                     amr_child_ptr(pblk) = amr_child_ptr(pblk) + 1
                     if (amr_block_owner(pblk) == proc_rank .and. amr_block_owner(b) /= proc_rank) then
                         amr_n_fch = amr_n_fch + 1
@@ -433,7 +439,8 @@ contains
     !> Owner-aware placement (amr_place_owner) of one level's na blocks (slots aidx, weights wt, Morton keys key): each block goes
     !! to the rank owning most of the coarse cells under it. A rank above (1 + place_tol) x the mean sheds its last blocks in Morton
     !! order, first to the least-loaded rank next to the block, then to the least-loaded rank anywhere, never pushing the receiver
-    !! above the cap. Replicated inputs in a fixed order, so every rank computes the same owners.
+    !! above the cap (or above the block's own weight, when one block exceeds it). Replicated inputs in a fixed order, so every rank
+    !! computes the same owners.
     impure subroutine s_amr_place_owner(key, wt, aidx, na, own)
 
         integer, intent(in)         :: na, aidx(na)
@@ -482,7 +489,8 @@ contains
                         m = minloc(load, 1) - 1
                     end if
                     if (m < 0) cycle
-                    if (load(m) + wt(a) > cap) cycle
+                    ! a block heavier than the cap may land on a rank it alone fills; never a move that does not lower the max
+                    if (load(m) + wt(a) > max(cap, wt(a)) .or. load(m) + wt(a) >= load(r)) cycle
                     own(a) = m; load(r) = load(r) - wt(a); load(m) = load(m) + wt(a)
                 end do
             end do
@@ -565,6 +573,31 @@ contains
         call s_amr_validate_owner()
 
     end subroutine s_amr_adopt_block_owners
+
+    !> Note each level's per-rank block high-water mark and the share of its store column each block's fine cells fill (rank 0,
+    !! rank_time_wrt) for the end-of-run memory table. The column includes the ghost layers, so a block at the size cap fills less
+    !! than 1. Called from s_amr_reconcile_slots, which every layout change passes through.
+    impure subroutine s_amr_note_level_fill()
+
+        real(wp), allocatable :: rc(:), fill(:)
+        integer               :: k, lev, nb
+
+        if (.not. rank_time_wrt .or. proc_rank /= 0) return
+        allocate (rc(0:num_procs - 1), fill(amr_num_blocks))
+        do lev = 1, amr_max_level
+            rc = 0._wp; nb = 0
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= lev) cycle
+                rc(amr_block_owner(k)) = rc(amr_block_owner(k)) + 1._wp
+                nb = nb + 1
+                fill(nb) = product(merge(real((amr_region_hi_all(:,k) - amr_region_lo_all(:,k) + 1)*amr_ref_ratio**lev, &
+                     & wp)/real(mbuf_hi - mbuf_lo + 1, wp), 1._wp, amr_dim))
+            end do
+            if (nb > 0) call s_mem_note_level(lev, nint(maxval(rc)), fill(1:nb), 2_8*f_amr_col_bytes(), &
+                & 1._wp - product(merge(real(max_f + 1, wp), 1._wp, amr_dim))/product(real(mbuf_hi - mbuf_lo + 1, wp)))
+        end do
+
+    end subroutine s_amr_note_level_fill
 
     !> Per-level and total load-balance report (rank 0, rank_time_wrt): max/mean assigned block weight over ranks (1 = perfect).
     !! no_blocks_ranks is the granularity floor of a level with fewer boxes than ranks, not idleness.
@@ -678,22 +711,25 @@ contains
 
         integer, intent(in)  :: i, mrg
         integer, intent(out) :: blo(3), bhi(3)
-        real(wp)             :: c(3), half(3)
+        real(wp)             :: c(3), half(3), bnd
 
         c = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
         select case (patch_ib(i)%geometry)
-        case (2, 8)  ! circle, sphere
+        case (ib_circle, ib_sphere)
             half = patch_ib(i)%radius
-        case (3, 9, 10)  ! rectangle, box, cylinder (axis x): body-frame half-extents, rotated by the body's angles
-            if (patch_ib(i)%geometry == 10) then
+        case (ib_rectangle, ib_cuboid, ib_cylinder)  ! cylinder axis x: body-frame half-extents, rotated by the body's angles
+            if (patch_ib(i)%geometry == ib_cylinder) then
                 half = [0.5_wp*patch_ib(i)%length_x, patch_ib(i)%radius, patch_ib(i)%radius]
             else
                 half = 0.5_wp*[patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]
             end if
             half = matmul(abs(patch_ib(i)%rotation_matrix), half)
+        case (4, 6, 11)  ! airfoils, ellipse: the bounding radius the marker drawing trusts (s_get_bounding_indices)
+            call s_get_ib_bound(patch_ib(i), bnd)
+            half = bnd
         case default
             call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
-                             & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
+                             & // 'containment bounding box (STL models are not supported)')
         end select
         call s_amr_phys_to_cells(c - half, c + half, mrg, blo, bhi)
 
@@ -727,6 +763,61 @@ contains
         end do
 
     end subroutine s_amr_expand_box_over_bodies
+
+    !> Tile size for the level-1 regrid boxes: from amr_maxc_fit, shrink one cell in one dimension at a time (in turn, not below
+    !! amr_rank_tile_min) until there is at least one tile per rank, P = min(num_procs, amr_max_blocks), so a small refined region
+    !! gives every rank work while blocks stay as large as that allows. A size is skipped if its tile count overflows the block pool
+    !! or a box would leave a last tile narrower than the seam halo (buff_size fine cells); if none reaches P, the valid size with
+    !! the most tiles; if no size is valid, the size the unguarded rule picks. amr_maxc_fit as is with amr_max_grid_size set or on
+    !! one rank. Replicated input: rank-invariant. (Choosing the size that best balances ceil(n/P)*P/n was 8 % slower at 128 MI250X
+    !! ranks: more, smaller blocks.)
+    pure function f_amr_rank_tile(boxes, nboxes) result(tc)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes
+        integer, parameter      :: amr_rank_tile_min = 16
+        integer                 :: tc(3), cur(3), k, d, dd, ntl, s, minw, wmin
+        integer(8)              :: n, tgt, nbest
+        integer                 :: tc0(3)
+        logical                 :: have0
+
+        tc = amr_maxc_fit
+        if (amr_max_grid_size > 0 .or. num_procs == 1) return
+        tgt = int(min(num_procs, amr_max_blocks), 8)
+        wmin = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio  ! narrowest tile, in coarse cells, the seam exchange supports
+        cur = amr_maxc_fit; d = 0; nbest = 0_8; tc0 = amr_maxc_fit; have0 = .false.
+        do
+            n = 0_8; minw = huge(1)
+            do k = 1, nboxes
+                n = n + product(int((boxes(k)%hi - boxes(k)%lo + cur)/cur, 8))
+                do dd = 1, 3
+                    if (.not. amr_dim(dd)) cycle
+                    ! s_amr_tile_box: ntl tiles of s cells, the remainder in the last
+                    ntl = (boxes(k)%hi(dd) - boxes(k)%lo(dd) + cur(dd))/cur(dd)
+                    if (ntl == 1) cycle  ! an unsplit dimension keeps the box's own width, whatever cur is
+                    s = (boxes(k)%hi(dd) - boxes(k)%lo(dd) + ntl)/ntl
+                    minw = min(minw, boxes(k)%hi(dd) - boxes(k)%lo(dd) + 1 - (ntl - 1)*s)
+                end do
+            end do
+            if (n <= int(amr_max_blocks, 8) .and. minw >= wmin .and. n >= nbest) then
+                tc = cur; nbest = n
+                if (n >= tgt) return
+            end if
+            ! master's choice, guards aside: the fallback when no size passes them
+            if (.not. have0 .and. n <= int(amr_max_blocks, 8)) tc0 = cur
+            if (n >= tgt) have0 = .true.
+            if (n > int(amr_max_blocks, 8) .or. all(.not. amr_dim .or. cur <= amr_rank_tile_min)) then
+                if (nbest == 0_8) tc = tc0
+                return
+            end if
+            do
+                d = mod(d, 3) + 1
+                if (amr_dim(d) .and. cur(d) > amr_rank_tile_min) exit
+            end do
+            cur(d) = cur(d) - 1
+        end do
+
+    end function f_amr_rank_tile
 
     !> Split box [lo:hi] into an even grid of adjacent sub-boxes each <= amr_maxc_fit per dim (the max a rank can whole-own),
     !! appended to out(nt+1:); sets capped=1 and stops if the cap is hit. Collapsed dims stay [0:0].

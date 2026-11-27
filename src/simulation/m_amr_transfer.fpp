@@ -159,7 +159,7 @@ contains
             type(t_amr_wave_side), intent(in) :: w
             logical, intent(in)               :: pack
             integer                           :: tsl(w%nx), toff(w%nx), tsd(w%nx)
-            integer                           :: t, nt, n1, n2, eq, a, b, j
+            integer                           :: t, nt, n0, n1, n2, eq, a, b, j
 
             nt = 0
             do t = 1, w%nx
@@ -167,13 +167,13 @@ contains
                 nt = nt + 1; tsl(nt) = w%bl(3, t); toff(nt) = w%off(t); tsd(nt) = w%bl(2, t)
             end do
             if (nt == 0) return
-            n1 = size(freg(${D}$)%lo, 2); n2 = size(freg(${D}$)%lo, 3)
+            n0 = size(freg(${D}$)%lo, 1); n1 = size(freg(${D}$)%lo, 2); n2 = size(freg(${D}$)%lo, 3)
             $:GPU_PARALLEL_LOOP(collapse=4, copyin='[tsl, toff, tsd]', private='[j]')
             do t = 1, nt
                 do b = 0, n2 - 1
                     do a = 0, n1 - 1
-                        do eq = 1, sys_size
-                            j = toff(t) + eq + sys_size*(a + n1*b)
+                        do eq = 1, n0
+                            j = toff(t) + eq + n0*(a + n1*b)
                             if (pack) then
                                 if (tsd(t) == 1) then
                                     amr_rf_sq(j) = freg(${D}$)%lo(eq, a, b, tsl(t))
@@ -1016,8 +1016,9 @@ contains
     end subroutine s_amr_restrict_l1_batched
 
     !> Sibling-seam face weights for level>=2 block kb under parent pblk: 0 on a face shared with a same-parent sibling tile
-    !! (fine-fine; refluxing there double-writes), 1 otherwise. Uses replicated metadata only, and both the reflux apply and the
-    !! freg wire-skip call it, so shipped and consumed faces agree.
+    !! (fine-fine; refluxing there double-writes) and on a face on the parent's edge (a seam with a child of the neighbouring
+    !! parent, f_amr_nested; the outside cell is not the parent's), 1 otherwise. Uses replicated metadata only, and both the reflux
+    !! apply and the freg wire-skip call it, so shipped and consumed faces agree.
     impure subroutine s_amr_sibling_face_weights(kb, pblk, w_lo, w_hi)
 
         integer, intent(in)   :: kb, pblk
@@ -1028,6 +1029,10 @@ contains
 
         w_lo = 1._wp; w_hi = 1._wp
         if (pblk <= 0) return  ! orphan parent: no siblings; the CSR would index ptr(-1)
+        do d = 1, num_dims
+            if (amr_region_lo_all(d, kb) == amr_region_lo_all(d, pblk)) w_lo(d) = 0._wp
+            if (amr_region_hi_all(d, kb) == amr_region_hi_all(d, pblk)) w_hi(d) = 0._wp
+        end do
         do c = amr_child_ptr(pblk - 1) + 1, amr_child_ptr(pblk)
             y = amr_child_idx(c)
             if (y == kb) cycle
@@ -1073,9 +1078,12 @@ contains
             ghi(d) = phi(d) - plo(d)
             woff(d) = plo(d)
         end do
+        ! a zero-weight face may have its outside cell beyond the parent's coordinates
         #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
-            if (amr_dim(${D}$)) then; mlo(${D}$) = amr_slots(pblk)%d${X}$(olo(${D}$)); mhi(${D}$) &
-                & = amr_slots(pblk)%d${X}$(ohi(${D}$)); end if
+            if (amr_dim(${D}$)) then
+                if (w_lo(${D}$) /= 0._wp) mlo(${D}$) = amr_slots(pblk)%d${X}$(olo(${D}$))
+                if (w_hi(${D}$) /= 0._wp) mhi(${D}$) = amr_slots(pblk)%d${X}$(ohi(${D}$))
+            end if
         #:endfor
         loc_pblk = amr_loc_of(pblk)
         call s_amr_br_load_faces(loc_pblk, olo, ohi, glo, ghi, woff, w_lo, w_hi)

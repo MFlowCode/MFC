@@ -1,0 +1,169 @@
+name: CI History
+
+# After every Test Suite or Benchmark run, append what its cluster jobs did (result, time waiting
+# for a runner, duration, SLURM node-time and queue wait) to MFlowCode/MFC-ci-data, which
+# docs/dashboard/ci.html reads. Runs from the default branch with the repository's secrets, including for
+# pull requests from forks; it never checks out or runs code from the pull request.
+on:
+  workflow_run:
+    workflows: ['Test Suite', 'Benchmark']
+    types: [completed]
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  # write: opens an issue when the history cannot be recorded.
+  issues: write
+
+jobs:
+  record:
+    name: Record CI History
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on: ubuntu-latest
+    outputs:
+      retry: ${{ steps.record.outputs.retry }}
+      wait:  ${{ steps.record.outputs.wait }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Record
+        id: record
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          DEPLOY_KEY: ${{ secrets.CI_DATA_DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then echo "::error::The CI_DATA_DEPLOY_KEY secret is not set and the CI history cannot be recorded."; exit 1; fi
+          api="repos/$GITHUB_REPOSITORY"
+          gh api "$api/actions/runs/$RUN_ID" > run.json
+          gh api --paginate "$api/actions/runs/$RUN_ID/jobs?per_page=100&filter=all" | jq -s '{jobs: map(.jobs) | add}' > jobs.json
+
+          # SLURM usage notices left on the jobs that ran on a cluster.
+          : > usage.txt
+          for job in $(jq -r '.jobs[] | select(.labels | any(. == "frontier" or . == "gt")) | select(.conclusion != "skipped") | .id' jobs.json); do
+            gh api --paginate "$api/check-runs/$job/annotations" --jq ".[] | select(.title == \"slurm-usage\") | \"$job \" + .message" >> usage.txt || true
+          done
+
+          # A scheduled master run is the first to test every merge since the scheduled run before it.
+          echo '{}' > compare.json
+          if [ "$(jq -r '.event' run.json)" = schedule ]; then
+            wf=$(jq -r '.workflow_id' run.json); head=$(jq -r '.head_sha' run.json)
+            prev=$(gh api "$api/actions/workflows/$wf/runs?event=schedule&branch=master&per_page=30" \
+              --jq "[.workflow_runs[] | select(.id < $RUN_ID) | select(.head_sha != \"$head\")][0].head_sha // \"\"")
+            if [ -n "$prev" ]; then gh api "$api/compare/$prev...$head" > compare.json || echo '{}' > compare.json; fi
+          fi
+
+          # Logs of the cluster test jobs (which tests failed or needed a retry) and of every failed
+          # cluster job (why it failed).
+          mkdir -p logs
+          for job in $(jq -r '.jobs[] | select(.labels | any(. == "frontier" or . == "gt")) | select(.conclusion == "failure" or (.conclusion == "success" and (.name | test("^(Bench|Case Opt)") | not))) | .id' jobs.json); do
+            # curl, not `gh api`: gh 2.97 and later refuses to print a log, which always holds colour codes.
+            curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/$api/actions/jobs/$job/logs" > "logs/$job.txt" \
+              || { rm -f "logs/$job.txt"; echo "::warning::Could not download the log of job $job"; }
+          done
+
+          # The pull request a pull request run belongs to (the run itself names it only for same-repository PRs).
+          pr=$(jq -r '.pull_requests[0].number // empty' run.json)
+          if [ -z "$pr" ] && [ "$(jq -r '.event' run.json)" = pull_request ]; then
+            # A fork's commit is not in this repository, so look the pull request up by its branch.
+            head=$(jq -r '"\(.head_repository.owner.login):\(.head_branch)"' run.json)
+            pr=$(gh api -X GET "$api/pulls" -f head="$head" -f state=all --jq '.[0].number // empty' || true)
+          fi
+
+          python3 .github/scripts/ci-record.py run.json jobs.json --usage usage.txt --compare compare.json --logs logs ${pr:+--pr "$pr"} --problems unread.txt > line.json
+          # A job the recorder could not read means a job was renamed or the log format changed.
+          # Left open for a person to close: the fix is in ci-record.py, not in a later run.
+          if [ -s unread.txt ]; then
+            cat unread.txt
+            REPO="$GITHUB_REPOSITORY" bash .github/scripts/ci-issue.sh open "CI recorder cannot read some jobs" "$(printf 'In run %s:\n\n%s\n\nUpdate LANE or the log patterns in .github/scripts/ci-record.py.\n' "$RUN_ID" "$(sed 's/^/- /' unread.txt | head -20)")" || true
+          fi
+          if [ ! -s line.json ]; then echo "No cluster job in run $RUN_ID."; exit 0; fi
+
+          # Re-run the failed jobs when no failure is the change's own: every failed job is a cluster
+          # job that died of the machine or the plumbing, and this is not already the third attempt.
+          # A SLURM time limit is retried once. A newer run of the same workflow and branch wins.
+          # The causes and the SLURM notices are read from job logs and annotations, which a pull request's
+          # own code can print. The most that buys it is two re-runs of its own run or invented SLURM rows
+          # in the history; nothing here runs what it prints.
+          attempt=$(jq -r '.run_attempt' run.json)
+          hosted=$(jq --argjson a "$attempt" '[.jobs[] | select(.run_attempt == $a and .conclusion == "failure") | select(.labels | any(. == "frontier" or . == "gt") | not)] | length' jobs.json)
+          # A hosted job that failed without failing the run was continue-on-error: it says nothing here.
+          if [ "$(jq -r '.conclusion' run.json)" != failure ]; then hosted=0; fi
+          causes=$(jq -r --argjson a "$attempt" '[.jobs[] | select(.a == $a and .c == "failure") | .why // "other"] | unique | join(" ")' line.json)
+          retry=false
+          # Not gated on the run having failed: the Frontier lanes are continue-on-error, so a run they
+          # failed in concludes "success". A cancelled run was replaced or stopped by someone.
+          if [ "$(jq -r '.conclusion' run.json)" != cancelled ] && [ "$attempt" -lt 3 ] && [ "$hosted" -eq 0 ] && [ -n "$causes" ]; then
+            retry=true
+            for cause in $causes; do
+              case "$cause" in
+                cluster|queue|node|checkout|upload|runner) ;;
+                timeout) [ "$attempt" -eq 1 ] || retry=false ;;
+                *) retry=false ;;
+              esac
+            done
+          fi
+          echo "Attempt $attempt failed of: ${causes:-nothing on a cluster} (hosted failures: $hosted). Re-run: $retry"
+          # A cluster that is down or a queue that is full needs time; anything else can go again at once.
+          case " $causes " in *" cluster "*|*" queue "*) wait=45 ;; *) wait=0 ;; esac
+          { echo "retry=$retry"; echo "wait=$wait"; } >> "$GITHUB_OUTPUT"
+
+          install -m 600 /dev/null ~/deploy_key && printf '%s\n' "$DEPLOY_KEY" > ~/deploy_key
+          export GIT_SSH_COMMAND="ssh -i ~/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          # Several recorders can finish together: on a rejected push, start again from a fresh clone.
+          file="ci/$(jq -r '.date[0:7]' line.json).jsonl"
+          for attempt in 1 2 3 4 5; do
+            rm -rf ../history
+            git clone --depth=1 git@github.com:MFlowCode/MFC-ci-data.git ../history
+            # One file per month; a re-run replaces its run's earlier line.
+            mkdir -p ../history/ci && touch "../history/$file"
+            grep -v "\"run\":$RUN_ID," "../history/$file" > merged.jsonl || true
+            cat line.json >> merged.jsonl && mv merged.jsonl "../history/$file"
+            git -C ../history config user.name  'MFC Action'
+            git -C ../history config user.email '<>'
+            git -C ../history add "$file"
+            git -C ../history commit -m "CI run $RUN_ID" || exit 0
+            if git -C ../history push; then exit 0; fi
+            sleep $((attempt * 7))
+          done
+          echo "::error::Could not push the CI history after 5 attempts."; exit 1
+
+      - name: Say so when the history cannot be recorded
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+        run: |
+          bash .github/scripts/ci-issue.sh open "CI history is not being recorded" "The CI History workflow failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. The CI health and test health pages stop updating until it is fixed. A missing or revoked \`CI_DATA_DEPLOY_KEY\` is the usual cause."
+
+      - name: Clear that once it records again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+        run: |
+          bash .github/scripts/ci-issue.sh close "CI history is not being recorded" "Recording again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+
+  retry:
+    name: Re-run Infrastructure Failures
+    needs: record
+    if: needs.record.outputs.retry == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Re-run failed jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+          RUN_ID:   ${{ github.event.workflow_run.id }}
+          WORKFLOW: ${{ github.event.workflow_run.workflow_id }}
+          BRANCH:   ${{ github.event.workflow_run.head_branch }}
+          EVENT:    ${{ github.event.workflow_run.event }}
+          WAIT:     ${{ needs.record.outputs.wait }}
+        run: |
+          sleep "$((WAIT * 60))"
+          newest=$(gh api "repos/$REPO/actions/workflows/$WORKFLOW/runs?event=$EVENT&per_page=1" -f branch="$BRANCH" -X GET --jq '.workflow_runs[0].id')
+          if [ "$newest" != "$RUN_ID" ]; then echo "Run $newest has replaced run $RUN_ID; not re-running."; exit 0; fi
+          gh run rerun "$RUN_ID" -R "$REPO" --failed

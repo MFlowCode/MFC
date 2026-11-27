@@ -263,11 +263,12 @@ contains
     end subroutine s_amr_build_seam_pairs
 
     !> Fine-fine halo between tiled sub-blocks: overwrite seam ghosts with the neighbour's stage-entry interior (cross-rank via the
-    !! seam wave, same-rank by local copy). Wire is wp, cast to stp on unpack.
-    impure subroutine s_amr_fine_fine_post()
+    !! seam wave, same-rank by local copy). Wire is wp, cast to stp on unpack. With lev, only that level's seams.
+    impure subroutine s_amr_fine_fine_post(lev)
 
-        integer :: xb, yb, d, rX, rY, cnt, xm(3), tsz, fmul, idx, lo, hi
-        integer :: r, sblk, sdlo, sdhi, ublk, udlo, udhi, eblk, edlo, edhi
+        integer, intent(in), optional :: lev
+        integer                       :: xb, yb, d, rX, rY, cnt, xm(3), tsz, fmul, idx, lo, hi
+        integer                       :: r, sblk, sdlo, sdhi, ublk, udlo, udhi, eblk, edlo, edhi
 
         amr_sw_nsame = 0
         if (.not. amr) return
@@ -284,6 +285,9 @@ contains
         call s_amr_wave_reset(amr_wseam_snd); call s_amr_wave_reset(amr_wseam_rcv)
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
+            if (present(lev)) then
+                if (amr_block_level(xb) /= lev) cycle
+            end if
             rX = amr_block_owner(xb); rY = amr_block_owner(yb)
             if (proc_rank /= rX .and. proc_rank /= rY) cycle
             fmul = amr_ref_ratio**amr_block_level(xb)

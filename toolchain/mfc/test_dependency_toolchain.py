@@ -9,7 +9,7 @@ not visible, the dependent target cannot configure, and nothing ever rebuilt it.
 
 import os
 
-from mfc.build import _stale_dependencies, cmake_cache_compilers, compiler_fingerprint, compiler_mismatches
+from mfc.build import _interrupted_build, _stale_dependencies, cmake_cache_compilers, compiler_fingerprint, compiler_mismatches
 
 GFORTRAN = "/opt/gcc/bin/gfortran"
 AMDFLANG = "/opt/rocm/bin/amdflang"
@@ -192,3 +192,54 @@ def test_compiler_fingerprint_tells_wrappers_apart_by_version(tmp_path, monkeypa
     gnu = compiler_fingerprint()
     monkeypatch.setenv("WRAPPED_COMPILER", "nvfortran")
     assert compiler_fingerprint() != gnu
+
+
+def test_compiler_fingerprint_probes_each_compiler_once(tmp_path, monkeypatch):
+    """Slugs are computed many times per case; a probe per call cost over an hour of a Phoenix CI job."""
+    calls = tmp_path / "calls"
+    wrapper = tmp_path / "mpifort"
+    wrapper.write_text(f'#!/bin/sh\necho x >> "{calls}"\necho "wrapped 1.0"\n')
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    monkeypatch.setenv("FC", "mpifort")
+    monkeypatch.delenv("CC", raising=False)
+    monkeypatch.delenv("CXX", raising=False)
+
+    assert len({compiler_fingerprint() for _ in range(3)}) == 1
+    assert calls.read_text().count("x") == 1
+
+
+def test_compiler_fingerprint_ignores_the_build_hosts_cpu(tmp_path, monkeypatch):
+    """nvfortran --version names the host CPU (-tp); a build on one node type must find its binaries on another."""
+    wrapper = tmp_path / "mpifort"
+    wrapper.write_text('#!/bin/sh\necho ""\necho "nvfortran 25.5-0 64-bit target on x86-64 Linux -tp $HOST_CPU "\n')
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
+    monkeypatch.setenv("FC", "mpifort")
+    monkeypatch.delenv("CC", raising=False)
+    monkeypatch.delenv("CXX", raising=False)
+
+    monkeypatch.setenv("HOST_CPU", "cascadelake")
+    build_node = compiler_fingerprint()
+    monkeypatch.setenv("HOST_CPU", "emeraldrapids")
+    assert compiler_fingerprint() == build_node
+    assert "nvfortran 25.5-0" in build_node
+
+
+def test_an_interrupted_dependency_is_rebuilt_from_scratch(tmp_path):
+    # #2501: a dependency build stopped before install keeps its CMakeCache.txt, and CMake keeps the cached compiler whatever
+    # FC is (or the module default when FC is unset), so the next configure would reuse the old toolchain
+    dep = FakeTarget(str(tmp_path), "hipfort", True, installed=False)
+    write_cache(dep.get_staging_dirpath(None), fortran=GFORTRAN)
+    assert _interrupted_build(dep, None)
+
+
+def test_installed_or_never_configured_dependencies_are_left_alone(tmp_path):
+    dep = FakeTarget(str(tmp_path), "hipfort", True, installed=True)
+    write_cache(dep.get_staging_dirpath(None), fortran=GFORTRAN)
+    assert not _interrupted_build(dep, None)  # _stale_dependencies owns installed ones
+    fresh = FakeTarget(str(tmp_path), "fftw", True, installed=False)
+    assert not _interrupted_build(fresh, None)  # nothing configured yet
+    target = FakeTarget(str(tmp_path), "simulation", False, installed=False)
+    write_cache(target.get_staging_dirpath(None), fortran=AMDFLANG)
+    assert not _interrupted_build(target, None)  # not a dependency

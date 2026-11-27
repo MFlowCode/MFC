@@ -76,7 +76,7 @@ print(
             "model_eqns": "5eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
+            "mpp_lim": "F",
             "time_stepper": "rk3",
             "riemann_solver": "lax_friedrichs",
             "igr": "T",

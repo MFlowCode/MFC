@@ -16,7 +16,7 @@ import rich.table
 from rich.panel import Panel
 
 from .. import common, sched
-from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
+from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, _compiler_version, build
 from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
 from ..gpu_diagnostics import (
     GPU_FAULT_MARKER,
@@ -208,8 +208,8 @@ def _assert_species_bounds(case: TestCase, pack, stdout: str, single: bool = Fal
 def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:
     """The set of labels --only matches a case against: its trace elements and its UUID.
 
-    With include_chemistry, also "Chemistry" for any case that turns chemistry
-    on, whatever its trace says. That label selects a build, not just a test: on
+    With include_chemistry, also "Chemistry" and the mechanism's file name (e.g.
+    "h2o2.yaml") for any case that turns chemistry on, whatever its trace says. That label selects a build, not just a test: on
     Frontier AMD's GPU lane the chemistry binaries are compiled by a separate
     SLURM job invoked with `-o Chemistry` (.github/workflows/common/build.sh),
     because amdflang needs ~1 h per device link and building base + chemistry
@@ -229,8 +229,11 @@ def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]
     check = set(case.trace.split(" -> "))
     check.add(case.get_uuid())
 
-    if include_chemistry and case.to_case().params.get("chemistry", "F") == "T":
-        check.add("Chemistry")
+    if include_chemistry:
+        params = case.to_case().params
+        if params.get("chemistry", "F") == "T":
+            # The mechanism selects the binary too, so CI can build each one in its own process.
+            check.update({"Chemistry", os.path.basename(params.get("cantera_file", ""))} - {""})
 
     return check
 
@@ -269,6 +272,46 @@ def _filter_only(cases, skipped_cases):
             skipped_cases.append(case)
 
     return cases, skipped_cases
+
+
+# Cases with a known GPU-only result difference on NVHPC < 25.11 (CPU builds and 25.11+ pass): the pinned Phoenix compiler
+# is 25.5. The cause is not identified, so the skip is reported per case and tolerances stay untouched. See
+# https://github.com/MFlowCode/MFC/issues/2181
+# 009447E8 (uniform-box H2/air ignition) shows it without any flow: species differ by up to 1e-3 from the CPU result; it needs -O1 or higher.
+# 8994884D (1D CJ detonation front formation) differs by 2e-2 relative and 1E0EF4E5 (2D flame-vortex pair) by 1e-3 in a minor species on 25.5; both agree to 2e-6 on 25.11.
+NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS = {"124D7972", "009447E8", "8994884D", "1E0EF4E5"}
+NVHPC_GPU_FIXED_VERSION = (25, 11)
+
+
+def nvhpc_gpu_known_difference(uuid: str, gpu: str, fc_version: str) -> bool:
+    """True if `uuid` is a known difference for a GPU build with `fc_version` (first line of `FC --version`).
+
+    An unparsable or non-nvfortran version never matches, so the case runs.
+    """
+    match = re.match(r"nvfortran\s+(\d+)\.(\d+)", fc_version)
+    return uuid in NVHPC_GPU_KNOWN_DIFFERENCE_UUIDS and gpu != "no" and bool(match) and (int(match[1]), int(match[2])) < NVHPC_GPU_FIXED_VERSION
+
+
+def gpu_fc_version(fc_version: str, probe=lambda: _compiler_version("nvfortran")) -> str:
+    """`fc_version` unless it names no known compiler (a wrapper such as mpifort or ftn that hides it): then `nvfortran --version`."""
+    return fc_version if re.search(r"\b(nvfortran|gnu|cray|ifx|ifort|flang|clang)", fc_version, re.I) else probe()
+
+
+def cap_evenly(cases: list, cap: int, runs=lambda case: True, keep=lambda case: False) -> typing.Tuple[list, list]:
+    """Keep at most `cap` of the cases that will run, spread evenly over the list; return (kept, dropped).
+
+    The list is ordered by feature, so an even spread samples every area where the
+    first `cap` cases would sample one. Cases for which `runs` is false are left in
+    place and do not count: something later skips them anyway. Cases for which
+    `keep` is true are always kept, and the spread fills what is left of the cap.
+    """
+    pool = [c for c in cases if runs(c)]
+    if cap <= 0 or len(pool) <= cap:
+        return cases, []
+    rest = [c for c in pool if not keep(c)]
+    room = max(cap - (len(pool) - len(rest)), 0)
+    kept = {id(c) for c in pool if keep(c)} | {id(rest[i * len(rest) // room]) for i in range(min(room, len(rest)))}
+    return [c for c in cases if id(c) in kept or not runs(c)], [c for c in pool if id(c) not in kept]
 
 
 def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase]]:
@@ -347,16 +390,39 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 # pair's override_tol=5e-9 is unsatisfiable below single epsilon
                 "AMR -> 1D -> acoustic",
                 "nonpolytropic",
+                # Single-precision pressure noise (1e-7 of 1e5 Pa over a 1e-5 m cell) accelerates the quiescent gas by ~1e-3 of
+                # the uniform-acceleration signal, and a one-step shift of the contact onset flips the rebound; both exceed the single tolerance.
+                # Double builds agree to 1e-12 across O0, O3 and reldebug.
+                "Constant Acceleration",
+                "Wall Collision",
+                # A Mach 1.66 shock on 12 cells per diameter: single-precision round-off moves the front by about 1e-4 relative at 100,
+                # 200 and 300 steps alike (measured 1.0e-4 to 1.1e-4 against the 1e-4 tolerance), (WENO-JS too).
+                "Shock Curtain",
+                # Single precision moves the near-zero momentum entries of the flow past a slip cylinder (|rho v| of 0.5 against 3e2 in the
+                # bulk) by 2e-4 relative after 50 steps; the lane allows 1e-4. Double builds agree to 1e-7 across GNU and NVHPC on an A100.
+                "Slip Cylinder",
+                # WENO5 weights acting on a near-uniform gas amplify single-precision round-off: the moving-circle mass budget and the
+                # bow-shock stand-off differ from the double golden by up to 9e-3 (absolute) after 100-150 steps, against the 1e-4 tolerance.
+                "Mass Budget",
+                "Bow Shock Standoff",
             ]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
                 skipped_cases.append(case)
 
     for case in cases[:]:
-        if ARG("gpu"):
+        if ARG("gpu") != "no":
             skip = ["Gauss Seidel"]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
+
+    fc = os.environ.get("FC", "").split(maxsplit=1)
+    fc_version = gpu_fc_version(_compiler_version(fc[0]) if fc else "") if ARG("gpu") != "no" else ""
+    for case in cases[:]:
+        if nvhpc_gpu_known_difference(case.get_uuid(), ARG("gpu"), fc_version):
+            cons.print(f"[yellow]skipped {case.get_uuid()} ({case.trace}): known difference on NVHPC < 25.11 GPU, see #2181[/yellow]")
+            cases.remove(case)
+            skipped_cases.append(case)
 
     # Skip tests that fail under nvfortran in Docker (pass natively/Apptainer):
     #  - 3D_rayleigh_taylor_muscl: segfaults with nvfortran+MPI (seccomp/mprotect)
@@ -386,6 +452,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
         if not cases:
             raise MFCException(f"--shard {ARG('shard')} matched zero test cases. Total cases before sharding may be less than shard count.")
 
+    changed = None
     if ARG("only_changes") or ARG("select_enforce"):
         import datetime
 
@@ -404,6 +471,20 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 cases = to_run
             else:
                 cons.print("[dim](shadow mode: running full suite; pass --select-enforce to actually skip)[/dim]")
+
+    if ARG("max_tests") > 0:
+        # --no-chemistry drops chemistry cases later; keep them out of the cap's pool.
+        runs = (lambda c: c.to_case().params.get("chemistry", "F") != "T") if ARG("no_chemistry") else (lambda c: True)
+        # Kept whatever the cap: a test whose own files (its golden data) changed, whether or not the coverage
+        # map could be loaded, and the canaries, which selection never skips either.
+        if changed is None and (ARG("only_changes") or ARG("select_enforce")):
+            from .. import common
+            from .coverage import get_changed_files
+
+            changed = get_changed_files(common.MFC_ROOT_DIR, ARG("changes_branch"), explicit=ARG("changed_files"))
+        touched = {m.group(1) for f in changed or () if (m := re.match(r"tests/([0-9A-F]{8})/", f))}
+        cases, capped = cap_evenly(cases, ARG("max_tests"), runs, lambda c: c.get_uuid() in touched or getattr(c, "canary", False))
+        skipped_cases += capped
 
     if ARG("percent") == 100:
         return cases, skipped_cases
@@ -471,7 +552,9 @@ def test():
     global errors, failed_tests, test_start_time  # noqa: PLW0603
 
     test_start_time = time.time()  # Start timing
-    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, "failed_uuids.txt")
+    # One file per shard: concurrent shards share a checkout in CI.
+    shard_tag = f"-{ARG('shard').replace('/', '-of-')}" if ARG("shard") else ""
+    failed_uuids_path = os.path.join(common.MFC_TEST_DIR, f"failed_uuids{shard_tag}.txt")
     cases = list_cases()
 
     # Delete UUIDs that are not in the list of cases from tests/
@@ -506,7 +589,7 @@ def test():
             if slug not in unique:
                 build(code, case.to_input_file())
                 unique.add(slug)
-        build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
+        build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=ARG("jobs") or 1)
         return
 
     builders, skipped_cases = __filter(cases)
@@ -566,7 +649,7 @@ def test():
     # because running a test case may cause it to rebuild, and thus
     # interfere with the other test cases. It is a niche feature so we won't
     # engineer around this issue (for now).
-    sched.sched([sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases], ARG("jobs"), ARG("gpus"))
+    sched.sched([sched.Task(ppn=case.ppn, func=handle_case, args=[case], load=case.get_cell_count()) for case in cases], ARG("jobs") or 1, ARG("gpus"))
 
     # Check if we aborted due to high failure rate
     if abort_tests.is_set():

@@ -224,6 +224,9 @@ class Case:
                 "x": "x_cc(i)",
                 "y": "y_cc(j)",
                 "z": "z_cc(k)",
+                "dx": "g%dx_min",
+                "dy": "g%dy_min",
+                "dz": "g%dz_min",
                 "xc": f"patch_icpp({pid})%x_centroid",
                 "yc": f"patch_icpp({pid})%y_centroid",
                 "zc": f"patch_icpp({pid})%z_centroid",
@@ -304,7 +307,7 @@ class Case:
                 "x": "x_cc(i)",
                 "y": "y_cc(j)",
                 "z": "z_cc(k)",
-                "t": "mytime",
+                "t": "t_stage",  # time of the IB state set: s_advance_ib_pose, s_ibm_setup
                 "r": f"patch_ib({pid})%radius",
             }
 

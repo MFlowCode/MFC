@@ -1,87 +1,19 @@
-This file was created on 2026-05-01 14:26:13.232019.
+This file was created on 2026-11-26 10:50:18.201028.
 
 mfc.sh:
 
-    Invocation: test -o Lagrange Bubbles --no-gpu -j 8 --generate
+    Invocation: test --no-debug --no-reldebug --no-single --no-gpu --mpi --no-build -j 12 --max-attempts 3 --generate --only 0083C150 00C20EE8 016C1B8B 02748F0F 02B08B80 0387594F 03D598D0 041D5CC9 092A339C 0A022883 0BD42F35 0D1FA5C5 0D21B728 0FF51EDE 10041BB7 105673CA 11DAFD23 121D4ECA 124D7972 127A967A 128384B4 12ECE133 13C46E94 15C5C910 1658214E 18B832DD 1967AE06 1B0A7157 1B218CF1 1BA21D14 1C0780C8 1D88CFE0 1E0EF4E5 1E288DE4 1F1C6816 203572A8 2122A4F6 221C9980 22DEE9D1 245321C0 2494E9C6 25D4C5CE 265366F3 284ABF4C 295D22C1 29BBE2C2 2A6136EF 2BA0324F 2DE548B7 2F58A83F 2F7C33A2 2FB9269F 2FC423D3 2FC9648E 304DAF95 3053B44F 32DD0363 33813627 356A5C50 3643454B 36C4FA01 39A3B369 39AB5442 39E68BD8 3A474BEE 3B3F8C68 3C5B4542 3D320EA4 3E23CB5D 3F5FE078 3F6F9E4F 3F864CFF 404D1458 408BF558 40A4A5B8 41C830CC 431554F7 4587725A 48CC6F65 4927BF4B 4A1BD9B8 4B08E9B7 4B574EE6 4C64244B 4C751DAF 4CA9CAC0 4D831C2F 4EAA3C32 51AC8C99 5304E59F 54632DFD 549393AA 5576FEEA 56AF3BE5 56F8C4BC 57FE221F 59B127EF 5A255D19 5B195322 5B7A746F 5CAA4E68 5DAF1F94 5E454E32 6076815B 6171E9D4 630E2099 63F2D0C0 641CC3F0 65C375B4 65CC7EB7 66693DCC 66ABE269 6917FECE 6DD45F93 6E24D2F9 6F35CD77 71E145FE 72A40EA6 731ACB1A 749F3DD3 759FF2DA 7854BA64 78A3B0C4 7912AB81 7B67FDE5 7C2FF26F 7CC8F995 7DCE34B4 7DEA8C54 7E15602E 7E50FFE6 7EA8261B 7F70E665 7FA04E95 8019ACE3 80CC6F73 82A64F89 8339878C 84FC700A 86A2C59B 87C3F801 87FBC893 8B2A7F3E 8D8F6424 92C38C91 986BC1A2 98ED56C3 999812A9 9A23C212 9C3B986E 9C9B2CBC 9CB03CEF 9D95D7B8 9E2CA336 9ED54F28 A04A396A A078904B A0E9B272 A1383B40 A1B2B963 A582B270 A5B196F9 A69D2D28 A74B7381 A7E7A245 A9085DAF AB9A11DA ACCC8390 AE02324F B0CE19C5 B1DB4CA7 B20208D4 B2310476 B2CBB9FE B317404C B54BB9D8 B5CAD86E B7250A5B B7A6CC79 B85C5AB6 B872F80B B89113D9 B8D029E5 B9553426 BA4B25A0 BAC48125 BB0CAADB BCE1BBAE BE0B2040 BE3CF022 BFAA7587 C0127FD0 C02C399E C071BA12 C1F0BCB1 C2D278B4 C4B81FF0 C4EB58A8 C5205982 C5D96D9A C74AFA56 C7598989 C87A466A CB853530 CC7CD45B CD32DCEC CD6DC908 CDD62819 CE7B0BC7 CE9DBA3F D13FDB23 D33BD146 D43B3BCD D49C3C51 D626076C D64170CF D644524E D6794F4C D749AF0F D827EA4B D999E5E8 DA54B209 DC391F9B DD0F8B19 DF9526DB DFF6E349 E16570CC E18624FD E21940B3 E2C4CBC6 E53E6397 E597CAE4 E5B66084 E752CD0F EC935FC5 EE34D7DC EE58C595 EE8D38CF EF38E2A6 F1E9F8BC F200F862 F22AC0A2 F3127A57 F389CE57 F3E2DAC6 F428FDC0 F4675B3A F4883338 F52F0D4C F5493DA5 F628CCC9 F7A6649D F8D466BD F9EB7B49 FAF04D7A FBB296DA FC3FE863
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        1aa5ff21a2309bd96cf4620e81d5fd3921a68833 on MovingBubblesFresh-clean (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
-    
-        C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : nvc
-        CXX      : nvc++
-        FC       : nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
-    
-        C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : nvc
-        CXX      : nvc++
-        FC       : nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        672dd7da01f5042f5137516d2d5297ef8409e4aa on w170 (dirty)
 
 simulation:
 
     CMake Configuration:
     
-        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
+        CMake v3.31.8 on atl1-1-02-007-11-2.pace.gatech.edu
     
-        C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -94,16 +26,50 @@ simulation:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
+        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/w170/MFC-c/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc
-        CXX      : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc++
-        FC       : /fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.31.8 on atl1-1-02-007-11-2.pace.gatech.edu
+    
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/w170/MFC-c/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -112,10 +78,10 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
+        CMake v3.31.8 on atl1-1-02-007-11-2.pace.gatech.edu
     
-        C       : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/fastscratch/bwilfong3/software/hpc_sdk_25_9/Linux_x86_64/25.11/compilers/bin/nvfortran)
+        C       : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc)
+        Fortran : GNU v12.3.0 (/usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -128,16 +94,16 @@ pre_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/bwilfong3/software/MFC-Wilfong/build/venv/bin/fypp
+        Fypp    : /storage/project/r-sbryngelson3-0/sbryngelson3/w170/MFC-c/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : nvc
-        CXX      : nvc++
-        FC       : nvfortran
+        CC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gcc
+        CXX      : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/g++
+        FC       : /usr/local/pace-apps/spack/packages/linux-rhel9-x86_64_v3/gcc-11.3.1/gcc-12.3.0-ukkkutsxfl5kpnnaxflpkq2jtliwthfz/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -146,46 +112,49 @@ CPU:
 
     CPU Info:
     From lscpu
-    Architecture:                         x86_64
-    CPU op-mode(s):                       32-bit, 64-bit
-    Address sizes:                        52 bits physical, 57 bits virtual
-    Byte Order:                           Little Endian
-    CPU(s):                               128
-    On-line CPU(s) list:                  0-127
-    Vendor ID:                            GenuineIntel
-    Model name:                           Intel(R) Xeon(R) Gold 6338 CPU @ 2.00GHz
-    CPU family:                           6
-    Model:                                106
-    Thread(s) per core:                   2
-    Core(s) per socket:                   32
-    Socket(s):                            2
-    Stepping:                             6
-    CPU(s) scaling MHz:                   51%
-    CPU max MHz:                          3200.0000
-    CPU min MHz:                          800.0000
-    BogoMIPS:                             4000.00
-    Flags:                                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local split_lock_detect wbnoinvd dtherm ida arat pln pts vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq la57 rdpid fsrm md_clear pconfig flush_l1d arch_capabilities
-    Virtualization:                       VT-x
-    L1d cache:                            3 MiB (64 instances)
-    L1i cache:                            2 MiB (64 instances)
-    L2 cache:                             80 MiB (64 instances)
-    L3 cache:                             96 MiB (2 instances)
-    NUMA node(s):                         2
-    NUMA node0 CPU(s):                    0-31,64-95
-    NUMA node1 CPU(s):                    32-63,96-127
-    Vulnerability Gather data sampling:   Mitigation; Microcode
-    Vulnerability Itlb multihit:          Not affected
-    Vulnerability L1tf:                   Not affected
-    Vulnerability Mds:                    Not affected
-    Vulnerability Meltdown:               Not affected
-    Vulnerability Mmio stale data:        Mitigation; Clear CPU buffers; SMT vulnerable
-    Vulnerability Reg file data sampling: Not affected
-    Vulnerability Retbleed:               Not affected
-    Vulnerability Spec rstack overflow:   Not affected
-    Vulnerability Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl
-    Vulnerability Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization
-    Vulnerability Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBPB conditional; RSB filling; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
-    Vulnerability Srbds:                  Not affected
-    Vulnerability Tsx async abort:        Not affected
-    Vulnerability Vmscape:                Not affected
+    Architecture:                            x86_64
+    CPU op-mode(s):                          32-bit, 64-bit
+    Address sizes:                           46 bits physical, 48 bits virtual
+    Byte Order:                              Little Endian
+    CPU(s):                                  32
+    On-line CPU(s) list:                     0-31
+    Vendor ID:                               GenuineIntel
+    Model name:                              Intel(R) Xeon(R) Gold 6226R CPU @ 2.90GHz
+    CPU family:                              6
+    Model:                                   85
+    Thread(s) per core:                      1
+    Core(s) per socket:                      16
+    Socket(s):                               2
+    Stepping:                                7
+    CPU(s) scaling MHz:                      82%
+    CPU max MHz:                             2900.0000
+    CPU min MHz:                             1200.0000
+    BogoMIPS:                                5800.00
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 intel_ppin ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm mpx rdt_a avx512f avx512dq rdseed adx smap clflushopt clwb intel_pt avx512cd avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts hwp hwp_act_window hwp_epp hwp_pkg_req vnmi pku ospke avx512_vnni md_clear flush_l1d arch_capabilities
+    Virtualization:                          VT-x
+    L1d cache:                               1 MiB (32 instances)
+    L1i cache:                               1 MiB (32 instances)
+    L2 cache:                                32 MiB (32 instances)
+    L3 cache:                                44 MiB (2 instances)
+    NUMA node(s):                            2
+    NUMA node0 CPU(s):                       0-15
+    NUMA node1 CPU(s):                       16-31
+    Vulnerability Gather data sampling:      Vulnerable
+    Vulnerability Indirect target selection: Vulnerable
+    Vulnerability Itlb multihit:             KVM: Vulnerable
+    Vulnerability L1tf:                      Not affected
+    Vulnerability Mds:                       Not affected
+    Vulnerability Meltdown:                  Not affected
+    Vulnerability Mmio stale data:           Vulnerable
+    Vulnerability Old microcode:             Not affected
+    Vulnerability Reg file data sampling:    Not affected
+    Vulnerability Retbleed:                  Vulnerable
+    Vulnerability Spec rstack overflow:      Not affected
+    Vulnerability Spec store bypass:         Vulnerable
+    Vulnerability Spectre v1:                Vulnerable: __user pointer sanitization and usercopy barriers only; no swapgs barriers
+    Vulnerability Spectre v2:                Vulnerable; IBPB: disabled; STIBP: disabled; PBRSB-eIBRS: Vulnerable; BHI: Vulnerable
+    Vulnerability Srbds:                     Not affected
+    Vulnerability Tsa:                       Not affected
+    Vulnerability Tsx async abort:           Mitigation; TSX disabled
+    Vulnerability Vmscape:                   Vulnerable
 

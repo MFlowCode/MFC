@@ -11,7 +11,7 @@ module m_riemann_state
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: verysmall, contact_ramp, sgm_eps
+    use m_constants, only: verysmall, sgm_eps, BC_REFLECTIVE, BC_AXIS
     use m_hb_function
 
     implicit none
@@ -29,6 +29,13 @@ module m_riemann_state
     !> @{
     real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsx_vf
     $:GPU_DECLARE(create='[flux_gsrc_rsx_vf]')
+
+    !> Share of the r = y_cb(0) face source flux (mom..E) that the cylindrical axis cell takes in face form beside its cell-centred
+    !! viscous and conduction stress: 3D capillary and, with viscosity, species diffusion. Bracketed by s_split_axis_flux, consumed
+    !! and zeroed by m_rhs.
+    logical                                 :: axis_face_split
+    real(wp), allocatable, dimension(:,:,:) :: flux_axis_vf
+    $:GPU_DECLARE(create='[flux_axis_vf]')
 
     real(wp), allocatable, dimension(:,:,:,:) :: nc_iface_vel_rsx_vf
     $:GPU_DECLARE(create='[nc_iface_vel_rsx_vf]')
@@ -118,18 +125,6 @@ contains
         end if
 
     end function f_low_Mach_pcorr_hll
-
-    !> Weight on the left state of the contact-upwinded tangential interface velocity: the step sign(s_S) smoothed to a linear ramp
-    !! of half-width contact_ramp*c, so a face with s_S at round-off averages the two sides rather than picking one.
-    pure function f_contact_weight(s_S, c) result(w)
-
-        $:GPU_ROUTINE(function_name='f_contact_weight', parallelism='[seq]', cray_inline=True)
-        real(wp), intent(in) :: s_S, c
-        real(wp)             :: w
-
-        w = min(max(5.e-1_wp + 5.e-1_wp*s_S/max(contact_ramp*c, sgm_eps), 0._wp), 1._wp)
-
-    end function f_contact_weight
 
     !> The same correction for the HLLC flux, where the star state supplies the pressure jump directly and the correction scales
     !! with the mass flux through the acoustic waves instead. Zero unless low_Mach == 1.
@@ -274,18 +269,17 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-        & dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dz_vf, q_prim_vf, norm_dir)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
              & dvelR_dy_vf, dvelL_dz_vf, dvelR_dz_vf
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: norm_dir
-        type(int_bounds_info), intent(in)                   :: ix, iy, iz
 
-        if (grid_geometry == 3) then
+        if (cyl_coord) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-                & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
+                & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
                 & dvelR_dz_vf, q_prim_vf, norm_dir)
@@ -630,6 +624,28 @@ contains
 
     end subroutine s_populate_riemann_states_variables_buffers
 
+    !> Add sgn times the r-face 0 source flux to flux_axis_vf on a rank holding the cylindrical axis. Calls with sgn = -1 and +1
+    !! around a flux contribution isolate it.
+    subroutine s_split_axis_flux(sgn)
+
+        real(wp), intent(in) :: sgn
+        integer              :: i, j, l
+
+        if (.not. axis_face_split) return
+        if (bc_y%beg /= BC_REFLECTIVE .and. bc_y%beg /= BC_AXIS) return
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, l]')
+        do i = eqn_idx%mom%beg, eqn_idx%E
+            do l = 0, p
+                do j = 0, m
+                    flux_axis_vf(j, l, i) = flux_axis_vf(j, l, i) + sgn*flux_src_rsx_vf(j, 0, l, i)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_split_axis_flux
+
     !> Set up the chosen Riemann solver algorithm for the current direction
     subroutine s_initialize_riemann_solver(norm_dir)
 
@@ -780,7 +796,7 @@ contains
 
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-        & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir)
 
         type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
@@ -788,7 +804,6 @@ contains
         type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer, intent(in)                                 :: norm_dir
-        type(int_bounds_info), intent(in)                   :: ix, iy, iz
 
         ! Local variables
 
@@ -822,16 +837,17 @@ contains
         real(wp) :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
         real(wp), dimension(2) :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
+        real(wp) :: alpha_sum
         integer :: fl
-        integer :: Re_size_loc1, Re_size_loc2  !< host copies; amdflang reads Re_size stale cross-TU
 
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
                             & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const, &
-                            & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]', firstprivate='[Re_size_loc1, Re_size_loc2]')
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
+                            & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, alpha_sum, fl]')
+        ! Bounds from isx/isy/isz (device-updated in s_populate_riemann_states_variables_buffers): the caller's bounds are
+        ! not current on the device
+        do l = isz%beg, isz%end
+            do k = isy%beg, isy%end
+                do j = isx%beg, isx%end
                     ! Determine indices for the 'right' state for averaging across the interface
                     idx_rp = [j, k, l]
                     idx_rp(norm_dir) = idx_rp(norm_dir) + 1
@@ -879,13 +895,18 @@ contains
                             end if
                         #:endif
                         gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                        alpha_sum = 0._wp
                         do fl = 1, num_fluids
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j, k, &
                                       & l) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_rp(1), idx_rp(2), idx_rp(3)))
-                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
+                            ! Alphas over/undershoot near interfaces: clamp to [0, 1]; rescale a sum above 1 (3+ fluids)
                             alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
+                            alpha_sum = alpha_sum + alpha_avg(fl)
                         end do
-                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn, Re_size_loc1, Re_size_loc2)
+                        do fl = 1, num_fluids
+                            alpha_avg(fl) = alpha_avg(fl)/max(alpha_sum, 1._wp)
+                        end do
+                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if
 
                     ! Get Re numbers and interface velocity for viscous work
@@ -898,7 +919,7 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     case (2)  ! y-face (radial face in r_cyl direction)
                         if (any_non_newtonian) then
@@ -908,7 +929,7 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cb(k)
                     case (3)  ! z-face (azimuthal face in theta_cyl direction)
                         if (any_non_newtonian) then
@@ -918,9 +939,12 @@ contains
                             Re_s = Re_avg_rsx_vf(j, k, l, 1)
                             Re_b = Re_avg_rsx_vf(j, k, l, 2)
                         end if
-                        vel_src_int = vel_src_rsx_vf(j, k, l,1:num_dims)
+                        vel_src_int(1:num_dims) = vel_src_rsx_vf(j, k, l,1:num_dims)
                         r_eff = y_cc(k)
                     end select
+                    ! The axis face (r = 0) flux is unused (the axis cell takes the cell-centred stress); a unit radius keeps its
+                    ! divisions finite under FP traps
+                    if (r_eff <= 0._wp) r_eff = 1._wp
 
                     ! Divergence in cylindrical coordinates (vx=vz_cyl, vy=vr_cyl, vz=vtheta_cyl)
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
@@ -1025,25 +1049,24 @@ contains
             real(wp), dimension(num_dims, num_dims) :: current_tau_bulk  !< Current bulk stress tensor.
             real(wp), dimension(num_dims)           :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
         #:endif
-        integer, dimension(3)           :: idx_right_phys              !< Physical (j,k,l) indices for right state.
-        real(wp)                        :: Re_shear                    !< Interface shear Reynolds number.
-        real(wp)                        :: Re_bulk                     !< Interface bulk Reynolds number.
-        integer                         :: j_loop                      !< Physical x-index loop iterator.
-        integer                         :: k_loop                      !< Physical y-index loop iterator.
-        integer                         :: l_loop                      !< Physical z-index loop iterator.
-        integer                         :: i_dim                       !< Generic dimension/component iterator.
-        integer                         :: vel_comp_idx                !< Velocity component iterator (1=u, 2=v, 3=w).
-        real(wp)                        :: divergence_v                !< Velocity divergence at interface.
+        integer, dimension(3)           :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+        real(wp)                        :: Re_shear        !< Interface shear Reynolds number.
+        real(wp)                        :: Re_bulk         !< Interface bulk Reynolds number.
+        integer                         :: j_loop          !< Physical x-index loop iterator.
+        integer                         :: k_loop          !< Physical y-index loop iterator.
+        integer                         :: l_loop          !< Physical z-index loop iterator.
+        integer                         :: i_dim           !< Generic dimension/component iterator.
+        integer                         :: vel_comp_idx    !< Velocity component iterator (1=u, 2=v, 3=w).
+        real(wp)                        :: divergence_v    !< Velocity divergence at interface.
         real(wp)                        :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
         real(wp), dimension(2)          :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
+        real(wp)                        :: alpha_sum
         integer                         :: fl
-        integer                         :: Re_size_loc1, Re_size_loc2  !< host copies; amdflang reads Re_size stale cross-TU
 
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
                             & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx, gamma_dot, D_xx, D_yy, &
-                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                            & D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, alpha_sum, fl]')
         do l_loop = isz%beg, isz%end
             do k_loop = isy%beg, isy%end
                 do j_loop = isx%beg, isx%end
@@ -1090,14 +1113,19 @@ contains
                             end if
                         #:endif
                         gamma_dot = f_compute_shear_rate_from_components(D_xx, D_yy, D_zz, D_xy, D_xz, D_yz)
+                        alpha_sum = 0._wp
                         do fl = 1, num_fluids
                             alpha_avg(fl) = 0.5_wp*(q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(j_loop, k_loop, &
                                       & l_loop) + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(idx_right_phys(1), idx_right_phys(2), &
                                       & idx_right_phys(3)))
-                            ! Raw cell-centered alphas can under/overshoot near interfaces; clamp to [0,1]
+                            ! Alphas over/undershoot near interfaces: clamp to [0, 1]; rescale a sum above 1 (3+ fluids)
                             alpha_avg(fl) = min(max(alpha_avg(fl), 0._wp), 1._wp)
+                            alpha_sum = alpha_sum + alpha_avg(fl)
                         end do
-                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn, Re_size_loc1, Re_size_loc2)
+                        do fl = 1, num_fluids
+                            alpha_avg(fl) = alpha_avg(fl)/max(alpha_sum, 1._wp)
+                        end do
+                        call s_compute_mixture_inv_re(alpha_avg, gamma_dot, Res_gs, Re_nn)
                     end if
 
                     divergence_v = 0.0_wp
@@ -1229,7 +1257,7 @@ contains
 
     !> Compute the shear and volume Reynolds numbers of one Riemann state by inverse-weighting the fluid Reynolds numbers with the
     !! volume fractions.
-    subroutine s_compute_interface_reynolds(alpha_K, Re_K, Re_size_loc1, Re_size_loc2)
+    subroutine s_compute_interface_reynolds(alpha_K, Re_K)
 
         $:GPU_ROUTINE(function_name='s_compute_interface_reynolds', parallelism='[seq]', cray_inline=True)
 
@@ -1239,18 +1267,16 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha_K
         #:endif
         real(wp), dimension(2), intent(out) :: Re_K
-        !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
-        integer, intent(in) :: Re_size_loc1, Re_size_loc2
-        integer             :: i, q  !< Loop iterators
+        integer                             :: i, q  !< Loop iterators
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, 2
             Re_K(i) = dflt_real
 
-            if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_K(i) = 0._wp
+            if (Re_size(i) > 0) Re_K(i) = 0._wp
 
             $:GPU_LOOP(parallelism='[seq]')
-            do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
+            do q = 1, Re_size(i)
                 Re_K(i) = alpha_K(Re_idx(i, q))/Res_gs(i, q) + Re_K(i)
             end do
 

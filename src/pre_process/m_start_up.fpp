@@ -290,7 +290,7 @@ contains
 
             if (file_check) then
                 open (1, FILE=trim(file_loc), form='unformatted', STATUS='old', ACTION='read')
-                read (1) q_cons_vf_in(i)%sf
+                read (1) q_cons_vf_in(i)%sf(0:m,0:n,0:p)  ! simulation writes the interior only
                 close (1)
             else
                 call s_mpi_abort('File q_cons_vf' // trim(file_num) // '.dat is missing in ' // trim(t_step_dir) // '. Exiting.')

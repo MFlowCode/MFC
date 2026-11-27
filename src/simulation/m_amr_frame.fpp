@@ -116,27 +116,32 @@ contains
     !> Extend one axis of the installed fine grid into the ghost shell with the same parent-cell bisection the interior uses:
     !! boundary jg belongs to parent cell cl = isect_lo + floor(jg/rr), and k = modulo(jg, rr) picks the rr-way split. The parent
     !! boundaries are gcb for a level-1 block; a level>=2 block's parent grid is rebuilt from replicated metadata (the parent's own
-    !! arrays exist only on its owner). Blocks stay buff_size inside the domain, so every ghost parent is an in-domain cell.
+    !! arrays exist only on its owner). Blocks stay buff_size inside the domain, so every ghost parent is an in-domain cell. A
+    !! level>=2 block may touch its parent's edge (seam nesting), so the parent grid is rebuilt padded past it.
     impure subroutine s_amr_extend_ghost_coords(d, cb, cc, dd, ext, glb, gcb)
 
         integer, intent(in)     :: d, ext, glb
         real(wp), intent(inout) :: cb(-1 - buff_size:), cc(-buff_size:), dd(-buff_size:)
         real(wp), intent(in)    :: gcb(glb:)
         real(wp), allocatable   :: pcb(:), tcc(:), tdx(:)
-        integer                 :: jg, cl, k, rr, pblk, pnf
+        integer                 :: jg, cl, k, rr, pblk, pnf, q, sh
 
         rr = amr_slots(amr_cur)%amr_ref_ratio
         if (amr_block_level(amr_cur) >= 2) then
             pblk = f_amr_parent_block(amr_cur)
-            pnf = amr_ref_ratio**amr_block_level(pblk)*(amr_region_hi_all(d, pblk) - amr_region_lo_all(d, pblk) + 1) - 1
+            ! ghosts reach ceil((buff_size+1)/rr)+1 parent cells past the parent's edge: q grandparent cells cover that
+            q = ((buff_size + rr)/rr + rr)/rr
+            sh = q*rr  ! pcb(i + sh) is the parent's boundary i
+            pnf = amr_ref_ratio**amr_block_level(pblk)*(amr_region_hi_all(d, pblk) - amr_region_lo_all(d, pblk) + 1) - 1 + 2*sh
             allocate (pcb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
-            call s_amr_build_block_coords(pblk, gcb, glb, pcb, tcc, tdx, d)
+            call s_amr_build_block_coords(pblk, gcb, glb, pcb, tcc, tdx, d, q)
         else
+            sh = 0
             allocate (pcb(glb:ubound(gcb, 1))); pcb = gcb
         end if
         do jg = -1 - buff_size, ext + buff_size
             if (jg >= 0 .and. jg <= ext) cycle
-            cl = amr_isect_lo(d) + floor(real(jg, wp)/real(rr, wp))
+            cl = amr_isect_lo(d) + floor(real(jg, wp)/real(rr, wp)) + sh
             k = modulo(jg, rr)
             if (k == rr - 1) then
                 cb(jg) = pcb(cl)

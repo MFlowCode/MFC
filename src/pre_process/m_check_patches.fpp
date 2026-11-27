@@ -43,51 +43,47 @@ contains
         do i = 1, num_patches_max
             if (i <= num_patches) then
                 call s_int_to_str(i, iStr)
-                @:PROHIBIT(patch_icpp(i)%geometry == 6, &
-                           & "Invalid patch geometry number. " // "patch_icpp(" // trim(iStr) // ")%geometry is deprecated.")
-                @:PROHIBIT(patch_icpp(i)%geometry == 7, &
-                           & "Invalid patch geometry number. " // "patch_icpp(" // trim(iStr) // ")%geometry is deprecated.")
-                @:PROHIBIT(patch_icpp(i)%geometry == 15, &
+                @:PROHIBIT(any(patch_icpp(i)%geometry == icpp_retired), &
                            & "Invalid patch geometry number. " // "patch_icpp(" // trim(iStr) // ")%geometry is deprecated.")
                 @:PROHIBIT(patch_icpp(i)%geometry == dflt_int, &
                            & "Invalid patch geometry number. " // "patch_icpp(" // trim(iStr) // ")%geometry must be set.")
 
                 ! Constraints on the geometric initial condition patch parameters
-                if (patch_icpp(i)%geometry == 1) then
+                if (patch_icpp(i)%geometry == icpp_line_segment) then
                     call s_check_line_segment_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 2) then
+                else if (patch_icpp(i)%geometry == icpp_circle) then
                     call s_check_circle_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 3) then
+                else if (patch_icpp(i)%geometry == icpp_rectangle) then
                     call s_check_rectangle_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 4) then
+                else if (patch_icpp(i)%geometry == icpp_sweep_line) then
                     call s_check_line_sweep_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 5) then
+                else if (patch_icpp(i)%geometry == icpp_ellipse) then
                     call s_check_ellipse_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 8) then
+                else if (patch_icpp(i)%geometry == icpp_sphere) then
                     call s_check_sphere_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 9) then
+                else if (patch_icpp(i)%geometry == icpp_cuboid) then
                     call s_check_cuboid_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 10) then
+                else if (patch_icpp(i)%geometry == icpp_cylinder) then
                     call s_check_cylinder_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 11) then
+                else if (patch_icpp(i)%geometry == icpp_sweep_plane) then
                     call s_check_plane_sweep_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 12) then
+                else if (patch_icpp(i)%geometry == icpp_ellipsoid) then
                     call s_check_ellipsoid_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 13) then
+                else if (patch_icpp(i)%geometry == icpp_2d_modal) then
                     call s_check_2d_modal_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 14) then
+                else if (patch_icpp(i)%geometry == icpp_spherical_harmonic) then
                     call s_check_3d_spherical_harmonic_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 16) then
+                else if (patch_icpp(i)%geometry == icpp_bubble_pulse) then
                     call s_check_1d_bubble_pulse_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 17) then
+                else if (patch_icpp(i)%geometry == icpp_spiral) then
                     call s_check_spiral_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 18) then
+                else if (patch_icpp(i)%geometry == icpp_varcircle) then
                     call s_check_varcircle_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 19) then
+                else if (patch_icpp(i)%geometry == icpp_3d_varcircle) then
                     call s_check_3d_varcircle_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 20) then
+                else if (patch_icpp(i)%geometry == icpp_taylor_green) then
                     call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
-                else if (patch_icpp(i)%geometry == 21) then
+                else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_check_model_geometry(i)
                 else
                     call s_prohibit_abort("Invalid patch geometry number", &
@@ -113,10 +109,7 @@ contains
 
         ! Constraints on smoothing initial condition patch parameters
         do i = 1, num_patches
-            if (i > 1 .and. (patch_icpp(i)%geometry == 2 .or. patch_icpp(i)%geometry == 3 .or. patch_icpp(i)%geometry == 4 &
-                & .or. patch_icpp(i)%geometry == 5 .or. patch_icpp(i)%geometry == 8 .or. patch_icpp(i)%geometry == 9 &
-                & .or. patch_icpp(i)%geometry == 10 .or. patch_icpp(i)%geometry == 11 .or. patch_icpp(i)%geometry == 12 &
-                & .or. patch_icpp(i)%geometry == 13 .or. patch_icpp(i)%geometry == 14)) then
+            if (i > 1 .and. any(patch_icpp(i)%geometry == icpp_smoothable)) then
                 call s_check_supported_patch_smoothing(i)
             else
                 call s_check_unsupported_patch_smoothing(i)
@@ -552,8 +545,8 @@ contains
                    & "Patch " // trim(iStr) // ": gamma must be greater than zero when model_eqns = 1")
         @:PROHIBIT(model_eqns == model_eqns_gamma_law .and. patch_icpp(patch_id)%pi_inf < 0._wp, &
                    & "Patch " // trim(iStr) // ": pi_inf must be greater than or equal to zero when model_eqns = 1")
-        @:PROHIBIT(patch_icpp(patch_id)%geometry == 5 .and. patch_icpp(patch_id)%pi_inf > 0, &
-                   & "Patch " // trim(iStr) // ": pi_inf must be less than or equal to zero when geometry = 5")
+        @:PROHIBIT(patch_icpp(patch_id)%geometry == icpp_ellipse .and. patch_icpp(patch_id)%pi_inf > 0, &
+                   & "Patch " // trim(iStr) // ": pi_inf must be less than or equal to zero when geometry = 5 (ellipse)")
         @:PROHIBIT(model_eqns == model_eqns_5eq .and. any(patch_icpp(patch_id)%alpha_rho(1:num_fluids) < 0._wp), &
                    & "Patch " // trim(iStr) &
                    & // ": alpha_rho(1:num_fluids) must be greater than or equal to zero when model_eqns = 2")

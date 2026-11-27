@@ -107,7 +107,7 @@ def __print_greeting():
         f"[bold]{host_line}[/bold]",
         "-" * len(host_line),
         "",
-        f"[bold]--jobs [magenta]{ARG('jobs')}[/magenta][/bold]",
+        f"[bold]--jobs [magenta]{ARG('jobs') or 'auto'}[/magenta][/bold]",
         f"[bold]{' '.join(state.gCFG.make_options())}[/bold]",
         targets_line if ARG("command") != "test" else "",
         "",

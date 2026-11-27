@@ -32,7 +32,78 @@ module m_collisions
     !> true when any IB-IB or IB-wall contact was detected on this rank since the last adaptive-dt computation
     logical :: collisions_active
 
+    !> One bit per unordered pair (a < b) of this rank's IBs (local + neighborhood indices, a triangular index over
+    !! pair_bits_capacity): the ghost-point candidate pass claims each pair with an atomic OR, so only the first thread to find a
+    !! pair records it and duplicates are dropped on the GPU. Bits are cleared after the forces are applied, so the set is empty
+    !! between calls. Sized from num_ibs and regrown with it; memory is quadratic in the body count (1e4 bodies take 6 MB).
+    integer, allocatable, dimension(:) :: pair_bits
+    integer                            :: pair_bits_capacity  !< Number of IBs the bitset is indexed for
+    $:GPU_DECLARE(create='[pair_bits]')
+
 contains
+
+    !> @brief the point that decides which rank owns a body pair: the contact point built from the lower global id's own centroid
+    !! and the minimum-image offset to the other, so every rank holding the pair computes the same bits whichever periodic images it
+    !! found the pair through
+    subroutine s_pair_owner_point(pa, pb, point)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        type(ib_patch_parameters), intent(in) :: pa, pb
+        real(wp), intent(out)                 :: point(3)
+        real(wp)                              :: base(3), rel(3), rb, span
+
+        if (pa%gbl_patch_id < pb%gbl_patch_id) then
+            base = [pa%x_centroid, pa%y_centroid, 0._wp]; rel = [pb%x_centroid, pb%y_centroid, 0._wp] - base; rb = pa%radius
+            if (num_dims == 3) then
+                base(3) = pa%z_centroid; rel(3) = pb%z_centroid - base(3)
+            end if
+        else
+            base = [pb%x_centroid, pb%y_centroid, 0._wp]; rel = [pa%x_centroid, pa%y_centroid, 0._wp] - base; rb = pb%radius
+            if (num_dims == 3) then
+                base(3) = pb%z_centroid; rel(3) = pa%z_centroid - base(3)
+            end if
+        end if
+        #:for X, D in [('x', 1), ('y', 2), ('z', 3)]
+            if (num_dims >= ${D}$ .and. ib_bc_${X}$%beg == BC_PERIODIC) then
+                span = glb_bounds(${D}$)%end - glb_bounds(${D}$)%beg
+                rel(${D}$) = rel(${D}$) - span*anint(rel(${D}$)/span)
+            end if
+        #:endfor
+        point = base + rel/norm2(rel)*(rb - 0.5_wp*(pa%radius + pb%radius - norm2(rel)))
+
+    end subroutine s_pair_owner_point
+
+    !> @brief inverse effective tangential mass of a sphere or circle at its contact point: 1/m + r^2/I
+    function f_inv_tangential_mass(patch) result(inv_mass)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        type(ib_patch_parameters), intent(in) :: patch
+        real(wp)                              :: inv_mass
+
+        inv_mass = 1._wp/patch%mass
+        if (patch%moment > 0._wp) inv_mass = inv_mass + patch%radius**2/patch%moment
+
+    end function f_inv_tangential_mass
+
+    !> @brief scales the slip velocity into the friction direction, -F_t = mu*|F_n|*v_t/max(|v_t|, eps). With friction_slip_eps > 0,
+    !! eps is floored at the stick limit mu*|F_n|*dt/m_t, which keeps the explicit update stable. With 0 it is v_t/|v_t|, left
+    !! unscaled at exactly zero slip.
+    subroutine s_friction_direction(tangential_vector, normal_force_mag, inv_mass_t)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(inout) :: tangential_vector(3)
+        real(wp), intent(in)    :: normal_force_mag, inv_mass_t
+        real(wp)                :: slip
+
+        slip = norm2(tangential_vector)
+        if (friction_slip_eps > 0._wp) then
+            tangential_vector = tangential_vector/max(slip, friction_slip_eps, &
+                & coefficient_of_friction*normal_force_mag*dt*inv_mass_t)
+        else if (.not. f_approx_equal(slip, 0._wp)) then
+            tangential_vector = tangential_vector/slip
+        end if
+
+    end subroutine s_friction_direction
 
     subroutine s_initialize_collisions_module()
 
@@ -58,13 +129,30 @@ contains
             @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
             wall_overlap_distances = 0
             $:GPU_UPDATE(device='[wall_overlap_distances]')
+            call s_resize_pair_bits(num_ibs)
         end if
 
         collisions_active = .false.
-        $:GPU_UPDATE(device='[coefficient_of_friction]')
+        $:GPU_UPDATE(device='[coefficient_of_friction, friction_slip_eps]')
         $:GPU_UPDATE(device='[ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end, ib_bc_z%beg, ib_bc_z%end]')
 
     end subroutine s_initialize_collisions_module
+
+    !> Size the pair bitset for num_bodies IBs, doubled so a growing body count does not reallocate every step (empty on exit)
+    subroutine s_resize_pair_bits(num_bodies)
+
+        integer, intent(in) :: num_bodies
+
+        if (allocated(pair_bits)) then
+            @:DEALLOCATE(pair_bits)
+        end if
+
+        pair_bits_capacity = min(max(2*num_bodies, 2), num_local_ibs_max)
+        @:ALLOCATE(pair_bits(f_pair_bit_index(pair_bits_capacity - 1, pair_bits_capacity, pair_bits_capacity)/32 + 1))
+        pair_bits = 0
+        $:GPU_UPDATE(device='[pair_bits]')
+
+    end subroutine s_resize_pair_bits
 
     subroutine s_apply_IB_collisions(ghost_points, num_gps, ib_markers, forces, torques)
 
@@ -83,6 +171,9 @@ contains
         ! return if no collisions
 
         if (collision_model == 0) return
+
+        ! IBs migrating onto this rank can outgrow the bitset
+        if (num_ibs > pair_bits_capacity) call s_resize_pair_bits(num_ibs)
 
         ! iterating over particles, determine if they are colliding with the wall
         max_overlap = 0._wp
@@ -112,7 +203,8 @@ contains
             force = 0._wp; torque = 0._wp
             select case (collision_model)
             case(1)  ! soft sphere model
-                call s_soft_sphere_wall_force(pos, vel, radius, mass, wall_overlaps, force, angular_vel, torque)
+                call s_soft_sphere_wall_force(pos, vel, radius, mass, f_inv_tangential_mass(patch_ib(i)), wall_overlaps, force, &
+                                              & angular_vel, torque)
             end select
 
             ! one thread per IB, so no atomics
@@ -157,10 +249,11 @@ contains
             ! only overlapping pairs are passed to the collision model
             distance = norm2(pos_2 - pos)
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - distance
-            if (overlap_distance <= 0._wp) cycle
+            if (overlap_distance <= 0._wp .or. distance < sgm_eps) cycle
 
-            ! IB forces are summed across ranks afterwards, so only the rank holding the contact point applies the pair
-            contact_point = pos + (pos_2 - pos)*(patch_ib(pid1)%radius - 0.5_wp*overlap_distance)/distance
+            ! IB forces are summed across ranks afterwards, so only the rank holding the contact point applies the pair; the point
+            ! is computed the same way on every rank (pid1 and the images are rank-local)
+            call s_pair_owner_point(patch_ib(pid1), patch_ib(pid2), contact_point)
             if (.not. f_local_rank_owns_location(contact_point, glb_bounds)) cycle
 
             vel = patch_ib(pid1)%vel
@@ -172,7 +265,9 @@ contains
             select case (collision_model)
             case (1)  ! soft sphere model
                 call s_perform_soft_sphere_collision(pos, vel, patch_ib(pid1)%radius, patch_ib(pid1)%mass, pos_2, vel_2, &
-                                                     & patch_ib(pid2)%radius, patch_ib(pid2)%mass, force, angular_vel, &
+                                                     & patch_ib(pid2)%radius, patch_ib(pid2)%mass, &
+                                                     & f_inv_tangential_mass(patch_ib(pid1)) &
+                                                     & + f_inv_tangential_mass(patch_ib(pid2)), force, angular_vel, &
                                                      & angular_vel_2, torque, torque_2)
             end select
 
@@ -189,6 +284,8 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        call s_clear_pair_bits(num_considered_collisions)
 
     end subroutine s_apply_IB_collisions
 
@@ -222,7 +319,7 @@ contains
             force = 0._wp
             select case (collision_model)
             case (1)  ! soft sphere model
-                call s_soft_sphere_wall_force(pos, vel, radii(i), masses(i), wall_overlaps, force)
+                call s_soft_sphere_wall_force(pos, vel, radii(i), masses(i), 1._wp/masses(i), wall_overlaps, force)
             end select
 
             do l = 1, num_dims
@@ -256,16 +353,21 @@ contains
             select case (collision_model)
             case (1)  ! soft sphere model
                 call s_perform_soft_sphere_collision(pos, vel, radii(pid1), masses(pid1), pos_2, vel_2, radii(pid2), &
-                                                     & masses(pid2), force)
+                                                     & masses(pid2), 1._wp/masses(pid1) + 1._wp/masses(pid2), force)
             end select
 
-            ! equal and opposite force on the second particle
+            ! equal and opposite force on the second particle; a halo copy (pid2 > num_particles) has no added mass here and its
+            ! owner applies the force itself
             do l = 1, num_dims
                 $:GPU_ATOMIC(atomic='update')
                 accelerations(pid1, l) = accelerations(pid1, l) + force(l)/(masses(pid1) + added_masses(pid1))
-                $:GPU_ATOMIC(atomic='update')
-                accelerations(pid2, l) = accelerations(pid2, l) - force(l)/(masses(pid2) + added_masses(pid2))
             end do
+            if (pid2 <= num_particles) then
+                do l = 1, num_dims
+                    $:GPU_ATOMIC(atomic='update')
+                    accelerations(pid2, l) = accelerations(pid2, l) - force(l)/(masses(pid2) + added_masses(pid2))
+                end do
+            end if
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -273,13 +375,14 @@ contains
 
     !> Linear spring-dashpot with Coulomb friction (Cundall & Strack, Geotechnique 29(1), 1979) between two overlapping spheres or
     !! circles. Body 2 receives -force_1. Rotation and torques are included only when they are passed.
-    subroutine s_perform_soft_sphere_collision(pos_1, vel_1, radius_1, mass_1, pos_2, vel_2, radius_2, mass_2, force_1, &
-        & angular_vel_1, angular_vel_2, torque_1, torque_2)
+    subroutine s_perform_soft_sphere_collision(pos_1, vel_1, radius_1, mass_1, pos_2, vel_2, radius_2, mass_2, inv_mass_t, &
+        & force_1, angular_vel_1, angular_vel_2, torque_1, torque_2)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(3), intent(in) :: pos_1, vel_1, pos_2, vel_2
         real(wp), intent(in) :: radius_1, mass_1, radius_2, mass_2
+        real(wp), intent(in) :: inv_mass_t  !< inverse effective tangential mass of the contact, for the friction stick limit
         real(wp), dimension(3), intent(out) :: force_1
         real(wp), dimension(3), intent(in), optional :: angular_vel_1, angular_vel_2
         real(wp), dimension(3), intent(out), optional :: torque_1, torque_2
@@ -319,10 +422,10 @@ contains
 
         normal_velocity = dot_product(vel1 - vel2, normal_vector)*normal_vector
         tangential_vector = (vel1 - vel2) - normal_velocity
-        if (.not. f_approx_equal(norm2(tangential_vector), 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
 
         ! compute force and torque
         normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
+        call s_friction_direction(tangential_vector, norm2(normal_force), inv_mass_t)
         tangential_force = -coefficient_of_friction*norm2(normal_force)*tangential_vector
         force_1 = normal_force + tangential_force
 
@@ -335,12 +438,13 @@ contains
     end subroutine s_perform_soft_sphere_collision
 
     !> Soft-sphere contact between one sphere or circle and every domain wall it overlaps
-    subroutine s_soft_sphere_wall_force(pos, vel, radius, mass, wall_overlaps, force, angular_vel, torque)
+    subroutine s_soft_sphere_wall_force(pos, vel, radius, mass, inv_mass_t, wall_overlaps, force, angular_vel, torque)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(3), intent(in) :: pos, vel
         real(wp), intent(in) :: radius, mass
+        real(wp), intent(in) :: inv_mass_t  !< inverse effective tangential mass, for the friction stick limit
         real(wp), dimension(6), intent(in) :: wall_overlaps
         real(wp), dimension(3), intent(out) :: force
         real(wp), dimension(3), intent(in), optional :: angular_vel
@@ -390,9 +494,8 @@ contains
             ! standard soft-sphere collision  with the wall
             normal_velocity = dot_product(velocity, normal_vector)*normal_vector
             tangential_vector = velocity - normal_velocity
-            if (.not. f_approx_equal(norm2(tangential_vector), &
-                & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
             normal_force = -k*wall_overlaps(i)*normal_vector - eta*normal_velocity
+            call s_friction_direction(tangential_vector, norm2(normal_force), inv_mass_t)
             tangential_force = -coefficient_of_friction*norm2(normal_force)*tangential_vector
             force = force + (normal_force + tangential_force)
 
@@ -405,112 +508,119 @@ contains
 
     end subroutine s_soft_sphere_wall_force
 
-    !> uses ghost-point/image-point information to determine if it is possible if two IBs are colliding, effectively an optimized
-    !! nearest neighbor search
+    !> Triangular index (0-based) of the unordered pair a < b, both in 1 to num_bodies
+    pure function f_pair_bit_index(a, b, num_bodies) result(idx)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in) :: a, b, num_bodies
+        integer(kind=8)     :: idx
+
+        idx = int(a - 1, 8)*int(2*num_bodies - a, 8)/2 + int(b - a - 1, 8)
+
+    end function f_pair_bit_index
+
+    !> Uses ghost-point information to find IB pairs that may be colliding, effectively an optimized nearest-neighbor search: every
+    !! ghost point with another patch's marker within 2 cells gives a candidate pair. Both patches record it: the rank that owns the
+    !! contact point may hold interior ghost points of only one of them, so one-sided detection can leave that rank blind to a
+    !! contact within a cell of its boundary. The many duplicate candidates are dropped on the GPU: each candidate is mapped to its
+    !! sorted neighborhood pair (a, b) and claims that pair's bit in pair_bits with an atomic OR, and only the thread that flips the
+    !! bit appends the pair. Bits are cleared by s_clear_pair_bits after the forces. A pair's periodic image is taken from the
+    !! claiming candidate; two different images of one pair would need a domain about two particles across.
     subroutine s_detect_ib_collisions(gps, ib_markers, num_gps, num_considered_collisions)
 
         type(ghost_point), dimension(num_gps), intent(in) :: gps
         type(integer_field), intent(in)                   :: ib_markers
         integer, intent(in)                               :: num_gps
         integer, intent(out)                              :: num_considered_collisions
-        integer                                           :: i, j, k, z_bound, ii, jj, kk
-        integer, dimension(2)                             :: decoded_pairs
-        integer                                           :: gp_idx, gp_patch_id, neighbor_patch_id, local_idx
-        integer                                           :: pair_idx, out_idx
-        logical                                           :: already_found
+        integer                                           :: i, j, k, ii, jj, kk, z_bound, gp_idx, gp_patch_id, neighbor_patch_id
+        integer                                           :: a, b, gbl_a, gbl_b, enc_a, enc_b, xp, yp, zp, bit, mask, old_word, slot
+        integer                                           :: num_found, max_pairs, num_bodies
+        integer(kind=8)                                   :: idx, word
 
-        ! Temporary array to hold all detected pairs (with potential duplicates)
-        integer, dimension(num_gps, 2) :: raw_pairs
-        integer                        :: num_raw, local_num_raw
-
-        num_raw = 0
+        num_found = 0
+        max_pairs = size(collision_lookup, 1)
+        num_bodies = pair_bits_capacity
         z_bound = 0; if (num_dims == 3) z_bound = 2
 
-        $:GPU_PARALLEL_LOOP(private='[gp_idx, gp_patch_id, neighbor_patch_id, local_num_raw, i, j, k, ii, jj, kk]', &
-                            & copy='[raw_pairs, num_raw]', copyin='[z_bound]')
+        $:GPU_PARALLEL_LOOP(private='[gp_idx, i, j, k, ii, jj, kk, gp_patch_id, neighbor_patch_id, a, b, gbl_a, gbl_b, enc_a, &
+                            & enc_b, xp, yp, zp, idx, word, bit, mask, old_word, slot]', copy='[num_found]', copyin='[z_bound, &
+                            & max_pairs, num_bodies]')
         do gp_idx = 1, num_gps
             i = gps(gp_idx)%loc(1)
             j = gps(gp_idx)%loc(2)
             k = 0; if (num_dims == 3) k = gps(gp_idx)%loc(3)
             gp_patch_id = ib_markers%sf(i, j, k)
 
-            ! search in a cube around the BG for Ib markers belonging to another patch
+            ! first marker of another patch in the cube around the ghost point
+            neighbor_patch_id = 0
             neighbor_search: do ii = i - 2, i + 2
                 do jj = j - 2, j + 2
                     do kk = k - z_bound, k + z_bound
-                        neighbor_patch_id = ib_markers%sf(ii, jj, kk)
-
-                        ! Any neighbor of a different patch is a candidate pair. Both patches record it: the rank that owns the
-                        ! contact point may hold interior ghost points of only one of them, so one-sided detection can leave
-                        ! that rank blind to a contact that sits within a cell of its boundary. The host pass below sorts the
-                        ! pair and drops duplicates.
-                        if (neighbor_patch_id /= 0 .and. neighbor_patch_id /= gp_patch_id) then
-                            $:GPU_ATOMIC(atomic='capture')
-                            num_raw = num_raw + 1
-                            local_num_raw = num_raw
-                            $:END_GPU_ATOMIC_CAPTURE()
-
-                            raw_pairs(local_num_raw, 1) = gp_patch_id
-                            raw_pairs(local_num_raw, 2) = neighbor_patch_id
+                        if (ib_markers%sf(ii, jj, kk) /= 0 .and. ib_markers%sf(ii, jj, kk) /= gp_patch_id) then
+                            neighbor_patch_id = ib_markers%sf(ii, jj, kk)
                             exit neighbor_search
                         end if
                     end do
                 end do
             end do neighbor_search
+            if (neighbor_patch_id == 0) cycle
+
+            ! sorted neighborhood indices, the encoded ids (which carry the periodic image) following their patch
+            call s_decode_patch_periodicity(gp_patch_id, gbl_a, xp, yp, zp)
+            call s_get_neighborhood_idx(gbl_a, a)
+            call s_decode_patch_periodicity(neighbor_patch_id, gbl_b, xp, yp, zp)
+            call s_get_neighborhood_idx(gbl_b, b)
+            if (a <= 0 .or. b <= 0 .or. a == b) cycle
+            enc_a = gp_patch_id
+            enc_b = neighbor_patch_id
+            if (b < a) then
+                slot = a; a = b; b = slot
+                slot = enc_a; enc_a = enc_b; enc_b = slot
+            end if
+
+            ! claim the pair: the thread whose OR flips the bit is the first to find it
+            idx = f_pair_bit_index(a, b, num_bodies)
+            word = idx/32 + 1
+            bit = int(mod(idx, 32_8))
+            mask = ishft(1, bit)
+            $:GPU_ATOMIC(atomic='capture')
+            old_word = pair_bits(word)
+            pair_bits(word) = ior(pair_bits(word), mask)
+            $:END_GPU_ATOMIC_CAPTURE()
+            if (iand(old_word, mask) /= 0) cycle
+
+            $:GPU_ATOMIC(atomic='capture')
+            num_found = num_found + 1
+            slot = num_found
+            $:END_GPU_ATOMIC_CAPTURE()
+            if (slot > max_pairs) cycle
+            collision_lookup(slot, 1) = a
+            collision_lookup(slot, 2) = b
+            collision_lookup(slot, 3) = enc_a
+            collision_lookup(slot, 4) = enc_b
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! Coalesce collisions unique pairs
-        num_considered_collisions = 0
-        collision_lookup = 0
-        ! for each pair found in the raw collection
-        do pair_idx = 1, num_raw
-            already_found = .false.
-
-            ! get the decoded pairs for checking if they exist, using ii,jj,kk as dummy indices
-            call s_decode_patch_periodicity(raw_pairs(pair_idx, 1), decoded_pairs(1), ii, jj, kk)
-            call s_decode_patch_periodicity(raw_pairs(pair_idx, 2), decoded_pairs(2), ii, jj, kk)
-            call s_get_neighborhood_idx(decoded_pairs(1), local_idx)
-            decoded_pairs(1) = local_idx
-            call s_get_neighborhood_idx(decoded_pairs(2), local_idx)
-            decoded_pairs(2) = local_idx
-
-            ! skip self-collisions (an IB cannot collide with its own periodic image)
-            if (decoded_pairs(1) == decoded_pairs(2)) cycle
-
-            ! need to swap to guarantee the smaller decoded marker value is in index 1 and prevent double-counting
-            if (decoded_pairs(2) < decoded_pairs(1)) then
-                decoded_pairs(1) = decoded_pairs(1) + decoded_pairs(2)
-                decoded_pairs(2) = decoded_pairs(1) - decoded_pairs(2)
-                decoded_pairs(1) = decoded_pairs(1) - decoded_pairs(2)
-                raw_pairs(pair_idx, 1) = raw_pairs(pair_idx, 1) + raw_pairs(pair_idx, 2)
-                raw_pairs(pair_idx, 2) = raw_pairs(pair_idx, 1) - raw_pairs(pair_idx, 2)
-                raw_pairs(pair_idx, 1) = raw_pairs(pair_idx, 1) - raw_pairs(pair_idx, 2)
-            end if
-
-            ! check if it is already in the list
-            do out_idx = 1, num_considered_collisions
-                if (collision_lookup(out_idx, 1) == decoded_pairs(1) .and. collision_lookup(out_idx, 2) == decoded_pairs(2)) then
-                    already_found = .true.
-                    exit
-                end if
-            end do
-
-            ! and if it is not, append it to the list of pairs
-            if (.not. already_found) then
-                num_considered_collisions = num_considered_collisions + 1
-                @:PROHIBIT(num_considered_collisions > size(collision_lookup, 1) , &
-                           & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
-
-                collision_lookup(num_considered_collisions, 1) = decoded_pairs(1)
-                collision_lookup(num_considered_collisions, 2) = decoded_pairs(2)
-                collision_lookup(num_considered_collisions, 3) = raw_pairs(pair_idx, 1)
-                collision_lookup(num_considered_collisions, 4) = raw_pairs(pair_idx, 2)
-            end if
-        end do
-        $:GPU_UPDATE(device='[collision_lookup]')
+        @:PROHIBIT(num_found > max_pairs, &
+                   & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
+        num_considered_collisions = num_found
 
     end subroutine s_detect_ib_collisions
+
+    !> Clear the bits the last s_detect_ib_collisions set (every set bit belongs to a recorded pair, so whole words can be zeroed)
+    subroutine s_clear_pair_bits(num_considered_collisions)
+
+        integer, intent(in) :: num_considered_collisions
+        integer             :: n, num_bodies
+
+        num_bodies = pair_bits_capacity
+        $:GPU_PARALLEL_LOOP(private='[n]', copyin='[num_bodies]')
+        do n = 1, num_considered_collisions
+            pair_bits(f_pair_bit_index(collision_lookup(n, 1), collision_lookup(n, 2), num_bodies)/32 + 1) = 0
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_clear_pair_bits
 
     !> Naive O(N^2) search pairing each owned EL particle i with every later owned particle or halo copy j; appends every
     !! overlapping pair to collision_lookup
@@ -623,6 +733,7 @@ contains
             @:DEALLOCATE(collision_lookup)
         end if
         if (ib) then
+            @:DEALLOCATE(pair_bits)
             @:DEALLOCATE(wall_overlap_distances)
         end if
 

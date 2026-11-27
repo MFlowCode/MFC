@@ -4,7 +4,9 @@ MFC Validate Command - Validate a case file without building or running.
 
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
+from . import state
 from .case_validator import CaseConstraintError, CaseValidator
 from .common import MFCException
 from .printer import cons
@@ -13,20 +15,37 @@ from .state import ARG
 
 
 def _validate_batch(inputs):
+    """Check the decks against the default build configuration (state.MFCConfig()), not whatever this tree was last built
+    as: the build-dependent checks (--single, --mixed, --no-mpi) would otherwise refuse a deck depending on the local build."""
+    saved = state.gCFG
+    state.gCFG = state.MFCConfig()
+    try:
+        _validate_batch_default_build(inputs)
+    finally:
+        state.gCFG = saved
+
+
+def _validate_batch_default_build(inputs):
     """Load + constraint-validate many case files in ONE process. Used by precheck to validate every example
     case without re-paying the mfc.sh/venv bootstrap per case (the serial per-case './mfc.sh validate' loop
-    was ~90% bootstrap overhead). Only a load/parse failure fails the command - constraint issues are warnings -
-    matching the historical per-file exit behavior (a single './mfc.sh validate' exits non-zero only on load error).
-    Cases with constraint issues are still surfaced (listed in the summary) so the batched output is not misleading."""
+    was ~90% bootstrap overhead). A load/parse failure or a pre_process/simulation constraint violation fails the
+    command (a run of that case would be refused); warnings and post_process violations (an example need not select
+    output variables) are listed in the summary only."""
     failed = []
+    refused = []
     with_issues = []
-    for c in inputs:
-        if not os.path.isfile(c):
-            failed.append(c)
-            continue
+
+    def _load(c):
         try:
-            case = run_input.load(c, do_print=False)
+            return run_input.load(c, do_print=False) if os.path.isfile(c) else None
         except MFCException:
+            return None
+
+    # Each load runs the case file in its own interpreter (~0.5 s, most of the time), so run them side by side.
+    with ThreadPoolExecutor(max_workers=min(16, os.cpu_count() or 1)) as pool:
+        cases = list(pool.map(_load, inputs))
+    for c, case in zip(inputs, cases):
+        if case is None:
             failed.append(c)
             continue
         had_issue = False
@@ -35,13 +54,20 @@ def _validate_batch(inputs):
                 if CaseValidator(case.params).validate(stage):  # non-empty -> warnings
                     had_issue = True
             except CaseConstraintError:
-                had_issue = True  # constraint violation is a warning here, not a load failure
+                had_issue = True
+                if stage != "post_process":
+                    refused.append(f"{c} ({stage})")
         if had_issue:
             with_issues.append(c)
     n = len(inputs)
     if failed:
         cons.print(f"[bold red]✗ {len(failed)}/{n} case(s) failed to load:[/bold red]")
         for c in failed:
+            cons.print(f"    {c}")
+        sys.exit(1)
+    if refused:
+        cons.print(f"[bold red]✗ {len(refused)} case(s) violate a constraint a run enforces; run './mfc.sh validate <case>' for details:[/bold red]")
+        for c in refused:
             cons.print(f"    {c}")
         sys.exit(1)
     if with_issues:

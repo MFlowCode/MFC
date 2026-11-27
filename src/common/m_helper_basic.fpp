@@ -143,10 +143,11 @@ contains
 
     !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-        & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+        & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number, gp_layers)
 
         integer, intent(in)                                :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in)                                :: m, n, p, num_dims, igr_order, fd_number
+        integer, intent(in), optional                      :: gp_layers  !< IB ghost-point shell depth (simulation)
         integer, intent(inout)                             :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
         logical, intent(in)                                :: viscous, euler_lagrange
@@ -173,7 +174,9 @@ contains
         end if
 
         if (ib) then
+            ! an image point lies up to about 2*sqrt(num_dims) cells per ghost layer from its ghost point; 10 covers 3 layers
             buff_size = max(buff_size, 10)
+            if (present(gp_layers)) buff_size = max(buff_size, 10 + 4*(gp_layers - 3))
         end if
 
         ! Configuring Coordinate Direction Indexes

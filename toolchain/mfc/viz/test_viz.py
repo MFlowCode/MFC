@@ -252,6 +252,39 @@ class TestAssembleBinary1D(unittest.TestCase):
         self.assertNotIn("vel1", data.variables)
 
 
+class TestReadAMRRestart(unittest.TestCase):
+    """read_amr_restart on a synthetic serial AMR restart: one owned and one foreign block."""
+
+    def test_blocks(self):
+        import struct
+
+        import numpy as np
+
+        from .reader import read_amr_restart
+
+        def rec(f, b):
+            f.write(struct.pack("<i", len(b)) + b + struct.pack("<i", len(b)))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            d = os.path.join(tmp, "p_all", "p0", "6")
+            os.makedirs(d)
+            q = np.arange(2 * 8, dtype="<f8").reshape((2, 8))
+            with open(os.path.join(d, "amr_fine.dat"), "wb") as f:
+                rec(f, struct.pack("<6i", 2, 2, 2, 2, 1, 8))
+                rec(f, struct.pack("<10i", 3, 0, 0, 6, 0, 0, 1, 7, 0, 0))
+                for v in q:
+                    rec(f, v.tobytes())
+                rec(f, struct.pack("<10i", 9, 0, 0, 10, 0, 0, 1, -1, -1, -1))
+            for i in (1, 2):
+                with open(os.path.join(d, f"q_cons_vf{i}.dat"), "wb") as f:
+                    rec(f, np.full(16, float(i)).tobytes())
+            q0, blocks = read_amr_restart(tmp, 6)
+        self.assertEqual(q0.shape, (2, 16))
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual((blocks[0].lo[0], blocks[0].hi[0], blocks[0].level), (3, 6, 1))
+        np.testing.assert_array_equal(blocks[0].q[:, :, 0, 0], q)
+
+
 class TestAssembleBinary1DMultiRank(unittest.TestCase):
     """Test multi-rank assembly with overlapping ghost cells (1D, 2 ranks)."""
 

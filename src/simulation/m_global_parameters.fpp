@@ -183,6 +183,12 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
 
+    !> Cap on the VCFL of the adaptive step: the measured SSP-RK3 limit of the viscous stencil in num_dims dimensions with a margin
+    !! (s_set_visc_dt_cap); visc_dt_stencil names the stencil for messages
+    real(wp)          :: visc_dt_cap
+    character(len=40) :: visc_dt_stencil
+    $:GPU_DECLARE(create='[visc_dt_cap]')
+
     ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values
     !> @{
     real(wp) :: wa_flg
@@ -205,7 +211,8 @@ module m_global_parameters
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
-    $:GPU_DECLARE(create='[buff_size]')
+    integer :: gp_layers  !< Depth of the solid shell the IBM fills with ghost points
+    $:GPU_DECLARE(create='[buff_size, gp_layers]')
 
     ! shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices: in m_global_parameters_common
 
@@ -231,7 +238,7 @@ module m_global_parameters
     !> @name Immersed Boundaries
     !> patch_ib, ib_airfoil, stl_models, particle_cloud: auto-generated in generated_decls.fpp
     !> @{
-    integer, dimension(num_local_ibs_max) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
+    integer, allocatable, dimension(:) :: local_ib_patch_ids  !< lookup table of IBs in the local compute domain
     integer, allocatable, dimension(:,:,:) :: ib_neighbor_ranks  !< MPI ranks of neighborhood domains, indexed (-N:N,-N:N,-N:N)
     type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids  !< Per-airfoil computed surface grids
 
@@ -295,11 +302,12 @@ module m_global_parameters
     !> @{
     !> @}
 
-    real(wp)                                    :: mytime  !< Current simulation time
+    real(wp)                                    :: mytime  !< Current simulation time (start of the step)
+    real(wp)                                    :: t_rhs   !< Time of the state the current RHS evaluates (its RK stage time)
     type(pres_field), allocatable, dimension(:) :: pb_ts
     type(pres_field), allocatable, dimension(:) :: mv_ts
 
-    $:GPU_DECLARE(create='[mytime, pb_ts, mv_ts]')
+    $:GPU_DECLARE(create='[t_rhs, pb_ts, mv_ts]')
 
     !> @name lagrangian subgrid bubble parameters
     !> lag_params: auto-generated in generated_decls.fpp
@@ -432,6 +440,22 @@ contains
 
     end subroutine s_amr_select_slot
 
+    !> Time at the fraction c of the step of length dt_step that starts at mytime. A fixed dt uses the t_step*dt form a restart
+    !! resumes from (m_start_up), so a restarted run sees bitwise the same times.
+    pure function f_step_time(c, t_step, dt_step) result(t)
+
+        real(wp), intent(in) :: c, dt_step
+        integer, intent(in)  :: t_step
+        real(wp)             :: t
+
+        if (cfl_dt) then
+            t = mytime + c*dt_step
+        else
+            t = (t_step + c)*dt_step
+        end if
+
+    end function f_step_time
+
     !> Assigns default values to the user inputs before reading them in. This enables for an easier consistency check of these
     !! parameters once they are read from the input file.
     impure subroutine s_assign_default_values_to_user_inputs
@@ -496,6 +520,7 @@ contains
         mp_weno = .false.
         weno_avg = .false.
         weno_Re_flux = .false.
+        weno_Re_flux_compact = .true.
         riemann_hypo_ADC = .false.
         ADC_kappa = 1.0_wp
         hll_u_interface = .false.
@@ -540,6 +565,8 @@ contains
         chem_params%adap_substeps = .false.
         chem_params%reaction_substeps_max = 0
         chem_params%transport_dt = .false.
+
+        call s_assign_ic_patch_defaults
 
         num_bc_patches = 0
         bc_io = .false.
@@ -648,11 +675,13 @@ contains
 
         ! Immersed Boundaries (sim-specific extras)
         ib_neighborhood_radius = 0
+        num_local_ibs_max = 30000
         collision_model = 0
         collision_temporal_resolution = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
         coefficient_of_friction = 0._wp
+        friction_slip_eps = 0._wp
         ib_state_wrt = .false.
         rank_time_wrt = .false.
         amr = .false.
@@ -662,6 +691,7 @@ contains
         amr_tag_eps = 0.1_wp
         amr_tag_abs = .false.
         amr_tag_var = 1
+        amr_tag_species = 1
         amr_place_owner = .false.
         amr_buf = 3
         amr_snap = 0
@@ -687,11 +717,11 @@ contains
         ib_ip_min_dist = 0._wp
         ib_flux_wall = .false.
         ib_slip_ccst = .false.
-        ib_ip_interp = 1
-        ib_wall_order = 1
+        ib_ip_interp = -1  ! auto (s_initialize_ibm_module): 2, or 1 with ib_second_order_vel
+        ib_wall_order = -1  ! auto (s_initialize_ibm_module): 2, or 1 with ib_second_order_vel
         ib_mass_relax = -1
-        ib_smooth_contact = .false.
-        ib_visc_compact = .false.
+        wall_column_dt_frac = 0.1_wp
+        ib_visc_compact = .true.
         ib_uncover_fill = .false.
 
         ! Bubble modeling (sim-specific)
@@ -881,6 +911,8 @@ contains
             patch_ib(i)%emissivity = 0._wp
             patch_ib(i)%T_rad = 0._wp
             patch_ib(i)%heat_power = 0._wp
+            patch_ib(i)%wall_column = .false.
+            patch_ib(i)%wall_column_len = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp
@@ -1053,6 +1085,18 @@ contains
                 end do
             end if
         end if
+        ! weno_Re_flux_compact (default T) applies to Cartesian weno_Re_flux runs only
+        weno_Re_flux_compact = weno_Re_flux_compact .and. weno_Re_flux .and. .not. cyl_coord
+        ! ib_visc_compact (default T) applies to Cartesian viscous weno_Re_flux runs with a body: the wide WENO gradient would read
+        ! solid cells past the filled ghost layers, which hold the frozen wall velocity, not the ghost fill (#2041)
+        ib_visc_compact = ib_visc_compact .and. ib .and. viscous .and. weno_Re_flux .and. .not. cyl_coord
+        ! Without it and without weno_Re_flux_compact (cylindrical, or both opted out) the WENO-chain face-normal viscous gradient
+        ! reads 2*weno_polyn + 2 cells into the solid: fill them all
+        gp_layers = 3
+        if (ib .and. viscous .and. weno_Re_flux .and. .not. (ib_visc_compact .or. weno_Re_flux_compact)) then
+            gp_layers = max(gp_layers, 2*weno_polyn + 2)
+        end if
+        call s_set_visc_dt_cap()
 
         ! Herschel-Bulkley non-Newtonian viscosity: gather per-fluid parameters into device arrays
         @:ALLOCATE(is_non_newtonian(1:num_fluids))
@@ -1088,6 +1132,7 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
+        if (ib) allocate (local_ib_patch_ids(num_local_ibs_max))
 
         ! Configure WENO averaging flag (arithmetic mean vs. unaltered values)
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
@@ -1131,7 +1176,7 @@ contains
         end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+                                           & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number, gp_layers)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Allocation bounds: the coarse subdomain, widened to hold a refined block when amr_max_grid_size pins one larger than it.
@@ -1192,7 +1237,7 @@ contains
         use_nc_iface_vel = hypo_nc_mode == hypo_nc_mode_interface .or. (hypo_nc_mode == hypo_nc_mode_dual_pass &
             & .and. grid_geometry == 2) .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
 
-        $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
+        $:GPU_UPDATE(device='[sys_size, buff_size, gp_layers, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
@@ -1262,6 +1307,28 @@ contains
         @:PREFER_GPU(dz)
 
     end subroutine s_initialize_global_parameters_module
+
+    !> visc_dt_cap: about 0.9 of the largest VCFL, (4/3 mu + mu_b)/rho*dt*sum(dx_d^-2), measured stable with SSP-RK3 (periodic box,
+    !! seeded noise, uniform grid, no bulk viscosity) for the stencil in 1D/2D/3D. Bulk viscosity raises the VCFL faster than the
+    !! stiffest mode's rate, so the cap stays conservative with it. chem_params%transport_dt and igr keep their own limits (no cap).
+    impure subroutine s_set_visc_dt_cap()
+
+        real(wp), dimension(3), parameter :: cap_face = [0.56_wp, 0.61_wp, 0.64_wp]  !< weno_Re_flux = F or compact
+        real(wp), dimension(3), parameter :: cap_ibvc = [0.56_wp, 0.67_wp, 0.72_wp]  !< ib_visc_compact (needs 2D+)
+        ! WENO chain of weno_Re_flux: stable to about 1.6 (2D), capped at 1 to stay within run_time_info's VCFL <= 1 abort
+        real(wp), dimension(3), parameter :: cap_weno = [1._wp, 1._wp, 1._wp]
+
+        if (.not. weno_Re_flux .or. weno_Re_flux_compact) then
+            visc_dt_cap = cap_face(num_dims); visc_dt_stencil = 'the face-difference viscous gradient'
+        else if (ib_visc_compact) then
+            visc_dt_cap = cap_ibvc(num_dims); visc_dt_stencil = 'ib_visc_compact'
+        else
+            visc_dt_cap = cap_weno(num_dims); visc_dt_stencil = 'the weno_Re_flux viscous gradient'
+        end if
+        if (igr .or. chem_params%transport_dt) visc_dt_cap = huge(1._wp)
+        $:GPU_UPDATE(device='[visc_dt_cap]')
+
+    end subroutine s_set_visc_dt_cap
 
     !> Initialize the Lagrangian bubble projected-field indices (bub_q_idx).
     impure subroutine s_initialize_bubble_idx
@@ -1381,6 +1448,7 @@ contains
         deallocate (MPI_IO_DATA%var, MPI_IO_DATA%view)
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
+        if (allocated(local_ib_patch_ids)) deallocate (local_ib_patch_ids)
 
         if (allocated(neighbor_ranks)) then
             @:DEALLOCATE(neighbor_ranks)

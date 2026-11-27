@@ -1,0 +1,125 @@
+name: 'Runtime Checks'
+
+# Once a week, the tests on CPU with the compilers' runtime checks on (cmake/GPU.cmake).
+# AMD flang, the whole suite on one Frontier node in under an hour: stops at an invalid operation,
+# a division by zero or an overflow, and fills uninitialised locals with NaN. Its issue lists each
+# week's failures and closes when the suite passes.
+# NVHPC, a fifth of the tests on a hosted runner in about three hours (the whole suite would not
+# fit): bounds and the same floating-point traps. The fifth is drawn anew each week, so a week
+# that passes does not show last week's failures fixed: its issue is closed by hand.
+on:
+  schedule:
+    - cron: '23 5 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  REPO:     ${{ github.repository }}
+  RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+concurrency:
+  group: checks
+  cancel-in-progress: false
+
+jobs:
+  amd:
+    name: Checks | Frontier (AMD) (cpu)
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on:
+      group: phoenix
+      labels: frontier
+    timeout-minutes: 480
+    env:
+      TITLE: 'Runtime checks fail with AMD flang on CPU'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          clean: false
+
+      # As the other Frontier lanes: on the login node, since a compute node cannot download
+      # sources, and from a clean build directory, since the checkout is shared with other compilers.
+      - name: Fetch Dependencies
+        timeout-minutes: 120
+        run: bash .github/workflows/frontier_amd/build.sh cpu none
+
+      - name: Build and test
+        run: |
+          rm -f checks*.out
+          # --stepmgr: the suite's srun steps otherwise congest the Frontier controller (see submit-slurm-job.sh).
+          job() { sbatch --wait -J MFC-checks -A CFD154 -N 1 -t 01:30:00 -q normal --stepmgr -o "$1" \
+            --wrap ". ./mfc.sh load -c famd -m c && ./mfc.sh test -v -a -j 32 --no-gpu --reldebug $2 -- -c frontier_amd"; }
+          # The -O0 build runs the suite in about 2 h: build every variant once, then two shards side by side.
+          job checks-build.out --dry-run || { cat checks-build.out > checks.out; exit 1; }
+          job checks-1.out '--no-build --shard 1/2' & p1=$!
+          job checks-2.out '--no-build --shard 2/2' & p2=$!
+          e=0; wait $p1 || e=1; wait $p2 || e=1
+          cat checks-1.out checks-2.out > checks.out
+          exit $e
+
+      - name: Print Log
+        if: always()
+        run: tail -n 400 checks.out || true
+
+      - name: Cancel SLURM Job
+        if: cancelled()
+        run: scancel --me --name=MFC-checks || true
+
+      - name: Open an issue listing the failed tests
+        if: failure()
+        run: |
+          bash .github/scripts/ci-issue.sh report "$TITLE" "$(printf 'Run: %s\n\n%s\n' "$RUN_URL" "$(bash .github/scripts/failed-tests.sh checks.out)")"
+
+      - name: Close it once they pass
+        if: success()
+        run: |
+          bash .github/scripts/ci-issue.sh close "$TITLE" "Passing in $RUN_URL"
+
+  # The container steps follow the NVHPC lanes of test.yml.
+  nvhpc:
+    name: Checks | NVHPC 26.9 (cpu)
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    env:
+      TITLE: 'Runtime checks fail with NVHPC on CPU'
+      IMAGE: nvcr.io/nvidia/nvhpc:26.9-devel-cuda_multi-ubuntu22.04
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost \
+            /opt/hostedtoolcache /usr/local/graalvm /usr/local/.ghcup /usr/local/share/chromium \
+            /usr/local/lib/node_modules
+          sudo docker image prune -af
+
+      - uses: actions/checkout@v5
+
+      - name: Pull NVHPC container
+        run: |
+          for attempt in 1 2 3 4 5; do
+            docker pull "$IMAGE" && exit 0
+            sleep $((attempt * 30))
+          done
+          exit 1
+
+      - name: Build and test
+        run: |
+          set -o pipefail
+          docker run --rm --security-opt seccomp=unconfined -v "$PWD:/workspace" -w /workspace \
+            -e CC=nvc -e CXX=nvc++ -e FC=nvfortran -e "FFLAGS=-tp=px -Kieee -noswitcherror" \
+            -e CFLAGS=-tp=px -e CXXFLAGS=-tp=px "$IMAGE" bash -c '
+              set -e
+              apt-get update -y
+              apt-get install -y cmake python3 python3-venv python3-pip libfftw3-dev libhdf5-dev hdf5-tools git
+              git config --global --add safe.directory /workspace
+              ulimit -s unlimited || ulimit -s 65536 || true
+              /bin/bash mfc.sh test -v -a -j $(nproc) --no-mpi --reldebug -% 20
+            ' 2>&1 | tee checks.out
+
+      - name: Open an issue listing the failed tests
+        if: failure()
+        run: |
+          bash .github/scripts/ci-issue.sh report "$TITLE" "$(printf 'Run: %s\n\n%s\n' "$RUN_URL" "$(bash .github/scripts/failed-tests.sh checks.out)")"

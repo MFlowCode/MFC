@@ -52,7 +52,7 @@ print(
             # Two fluids: water and air
             "num_fluids": 2,
             # time step
-            "mpp_lim": "T",
+            "mpp_lim": "F",
             # Correct errors when computing speed of sound
             "mixture_err": "T",
             # Use TVD RK3 for time marching

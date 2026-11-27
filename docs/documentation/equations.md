@@ -420,11 +420,12 @@ A thermal diffusion CFL limit (`TCFL`) is added to the adaptive time-step candid
 
 Additional geometric source terms appear with \f$1/r\f$ factors in the continuity, momentum, and energy equations. Key modifications:
 
-- **Radial momentum:** extra \f$p/r\f$ and \f$\tau_{\theta\theta}/r\f$ terms
-- **Viscous stress:** \f$\tau_{yy}\f$ includes \f$v/r\f$ corrections:
+- **Radial momentum:** extra \f$p/r\f$ and \f$-\tau_{\theta\theta}/r\f$ terms; in 3D the azimuthal momentum gets \f$+\tau_{r\theta}/r\f$
+- **Viscous stress:** the divergence includes \f$v/r\f$ (and \f$(1/r)\,\partial w/\partial\theta\f$ in 3D), e.g.
 
 \f[\tau_{yy} = \mu\left(\frac{4}{3}\frac{\partial v}{\partial r} - \frac{2}{3}\frac{\partial u}{\partial x} - \frac{2}{3}\frac{v}{r}\right)\f]
 
+- **Azimuthal direction (3D):** \f$z\f$ is \f$\theta\f$ in radians, so every \f$\theta\f$ derivative carries \f$1/r\f$: once in the face gradient of a diffusive flux and once in its divergence, \f$(1/r)\,\partial F_\theta/\partial\theta\f$ (verified in @ref validation_coordinates)
 - **Axis singularity:** axis placed at cell boundary with spectral filtering in the azimuthal direction
 
 ---
@@ -811,7 +812,7 @@ With a target bulk mass flux \f$Q_i^\ast\f$, \f$f_i^{n+1} = f_i^n + (G/\Delta t)
 \f[\frac{\partial E}{\partial t}\bigg|_\text{mts} = \dot q, \qquad \dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right),\f]
 
 with \f$T_b\f$ the mass-averaged fluid temperature.
-With `mean_temp_wall` \f$= T_s\f$, \f$\dot q\f$ becomes the local \f$\beta[\rho c_p u_1 \psi - \partial_x(\lambda\psi) - \lambda\partial_x\psi + \beta\lambda\psi]\f$, \f$\psi = T - T_s\f$, with \f$\beta\f$ from \f$\dot q V_f = \beta(\sum\rho c_p u_1\psi\,dV + \beta\sum\lambda\psi\,dV)\f$ and the controller on the mixing-cup \f$T_m\f$: the periodic part of the thermally developed \f$T = T_s + \psi e^{-\beta x}\f$.
+With `mean_temp_wall` \f$= T_s\f$, \f$\dot q\f$ becomes the local \f$\beta[\rho c_p u_1 \psi - \partial_x(\lambda\psi) - \lambda\partial_x\psi + \beta\lambda\psi]\f$, \f$\psi = T - T_s\f$, with \f$\beta\f$ from \f$\dot q V_f = \beta(\sum\rho c_p u_1\psi\,dV + \beta\sum\lambda\psi\,dV)\f$ and the controller on the mixing-cup \f$T_m\f$: the periodic part of the thermally developed \f$T = T_s + \psi e^{-\beta x}\f$. With viscosity, the dissipation \f$\tau : \nabla u\f$ is removed from the energy equation of the fluid cells in this mode, since the developed state excludes it \cite Patankar1977.
 
 ---
 
@@ -875,7 +876,7 @@ The parameter \f$q\f$ controls the convergence rate at critical points (typicall
 
 If \f$\xi_r < C_T\f$, set \f$\alpha_r = 0\f$ (stencil excluded).
 
-Primitive variable reconstruction is used to avoid spurious oscillations at interfaces.
+Primitive variables are reconstructed, which keeps material interfaces in pressure and velocity equilibrium (no spurious oscillations). The cell values are converted from the conserved averages cell by cell and treated as averages of the primitives; that conversion is exact only where the primitives are linear in the conserved variables (uniform u and p), so on nonlinear smooth flows the spatial order is two for every `weno_order`. In multiple dimensions the single-point (midpoint) face flux of the dimension-by-dimension scheme is a second such limit \cite ZhangZhangShu2011. The reconstruction order still sets the error at moderate resolution and the shock capturing; see @ref validation_vortex_order.
 
 #### MUSCL (`muscl_order = 2`)
 

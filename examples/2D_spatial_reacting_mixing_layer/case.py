@@ -87,7 +87,6 @@ rng = np.random.default_rng(seed=0)
 bf_freq = 2 * np.pi * 0.25 * freq_nom * (np.arange(8) + rng.uniform(-0.5, 0.5, size=8))
 bf_phase = rng.uniform(0, 2 * np.pi, size=8)
 
-ic_dir = os.path.join(current_dir, "IC")
 # Key the cache on grid size + mode + physics so a cached IC isn't silently reused across
 # a --hot/cold switch or a physical-parameter change that leaves the line count unchanged.
 cache_key = {
@@ -107,6 +106,7 @@ cache_key = {
     "initializer": flamelet_ic.INITIALIZER_VERSION,
     "mechanism": flamelet_ic.mechanism_fingerprint(sol),
 }
+ic_dir = flamelet_ic.keyed_ic_dir(current_dir, cache_key)
 if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(stream_coord) * len(cross_coord), cache_key):
     flamelet_ic.generate_ic_files_spatial(
         output_dir=ic_dir,

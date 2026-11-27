@@ -39,7 +39,7 @@ print(
             "model_eqns": "5eq",
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
+            "mpp_lim": "T",  # kept for the published grind-time table (expectedPerformance.md); the case runs without it
             "mixture_err": "T",
             "time_stepper": "rk3",
             "weno_order": 5,

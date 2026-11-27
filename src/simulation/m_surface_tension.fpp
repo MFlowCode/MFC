@@ -16,7 +16,7 @@ module m_surface_tension
     use m_muscl
     use m_helper
     use m_boundary_common
-    use m_riemann_state, only: flux_src_rsx_vf
+    use m_riemann_state, only: flux_src_rsx_vf, s_split_axis_flux
 
     implicit none
 
@@ -155,6 +155,8 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         else if (id == 2) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                ! The 3D cylindrical axis cell takes this face flux in face form
+                if (p > 0) call s_split_axis_flux(-1._wp)
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
@@ -195,6 +197,7 @@ contains
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
+                if (p > 0) call s_split_axis_flux(1._wp)
             #:endif
         else if (id == 3) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
@@ -281,6 +284,8 @@ contains
                     do j = 0, m
                         c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k, &
                                & l + 1) - q_prim_vf(eqn_idx%c)%sf(j, k, l - 1))
+                        ! 3D cylindrical: z is theta, so the gradient is (1/r) dc/dtheta
+                        if (grid_geometry == 3) c_divs(3)%sf(j, k, l) = c_divs(3)%sf(j, k, l)/y_cc(k)
                     end do
                 end do
             end do

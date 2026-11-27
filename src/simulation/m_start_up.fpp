@@ -57,7 +57,7 @@ module m_start_up
     use m_igr
     use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
     use m_amr_regrid, only: s_amr_regrid
-    use m_amr_stage, only: s_amr_relax_fine
+    use m_amr_stage, only: s_amr_relax_fine, s_amr_apply_ic_patches
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
@@ -67,7 +67,8 @@ module m_start_up
 
     private; public :: s_read_input_file, s_check_input_file, s_read_data_files, s_read_serial_data_files, &
         & s_read_parallel_data_files, s_initialize_internal_energy_equations, s_initialize_modules, s_initialize_gpu_vars, &
-        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics
+        & s_amr_start_fresh_blocks, s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, &
+        & s_save_performance_metrics
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
@@ -626,16 +627,9 @@ contains
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         call s_phase_step_tic()
-        ! one regrid per level, so each level is tagged on the one above it
-        if (t_step == t_step_start .and. amr_fresh_start .and. amr_regrid_int > 0) then
-            call s_phase_tic(PH_REGRID)
-            do i = 1, amr_max_level
-                call s_amr_regrid(q_cons_ts(1)%vf)
-            end do
-            call s_phase_toc(PH_REGRID)
-        end if
         if (t_step == t_step_start) then
             call s_amr_check_fixed_dt()
+            call s_check_fixed_dt_viscous()
             if (amr_regrid_int > 0) call s_amr_check_fixed_dt(reach=.true.)
         end if
         if (cfl_dt) then
@@ -707,12 +701,12 @@ contains
         end if
 
         ! Advance time after RK so source terms see current-step time. With a fixed dt, use the same t_step*dt a restart
-        ! starts from (p_main): a running sum drifts from it (1290 ulps by step 27000), so a restarted run would see the
+        ! starts from (p_main): a running sum drifts from it, so a restarted run would see the
         ! prescribed IB kinematics, inflow ramps and forcing at slightly different times than the run it continues
         if (cfl_dt) then
             mytime = mytime + dt
         else
-            mytime = (t_step + 1)*dt
+            mytime = real(t_step + 1, wp)*dt
         end if
 
         if (relax) then
@@ -775,7 +769,7 @@ contains
                 open (1, file='time_data.dat', position='append', status='old')
             else
                 open (1, file='time_data.dat', status='new')
-                ! time_final is the fastest single RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
+                ! time_final: max over ranks of each rank's fastest RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
                 write (1, '(A10, A15, A15)') "Ranks", "s/rhs", "ns/gp/eq/rhs"
             end if
 
@@ -788,7 +782,7 @@ contains
                 open (1, file='io_time_data.dat', position='append', status='old')
             else
                 open (1, file='io_time_data.dat', status='new')
-                ! io_time_final is the mean time of one s_save_data call
+                ! io_time_final is the max over ranks of each rank's mean s_save_data time
                 write (1, '(A10, A15)') "Ranks", "s/save"
             end if
 
@@ -1114,6 +1108,9 @@ contains
 #endif
 #endif
 
+        ! After the device is bound: the update in s_mpi_initialize went to the default device
+        $:GPU_UPDATE(device='[num_procs, proc_rank]')
+
         if (proc_rank == 0) then
             call s_assign_default_values_to_user_inputs()
             call s_read_input_file()
@@ -1225,6 +1222,23 @@ contains
         #:endif
 
     end subroutine s_initialize_gpu_vars
+
+    !> Fresh AMR run, before the first save: put the initial condition patches on the blocks and, under dynamic regrid, regrid once
+    !! per level, so each level is tagged on the one above it.
+    impure subroutine s_amr_start_fresh_blocks
+
+        integer :: i
+
+        if (.not. amr_fresh_start) return
+        call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+        if (amr_regrid_int > 0) then
+            do i = 1, amr_max_level
+                call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_amr_apply_ic_patches(q_cons_ts(1)%vf)
+            end do
+        end if
+
+    end subroutine s_amr_start_fresh_blocks
 
     !> Read the Lagrangian bubbles or particles this rank starts with: the input-file rows (and their global IDs) on a fresh start,
     !! otherwise the restart-file rows, which also reset mytime and dt.
@@ -1491,7 +1505,7 @@ contains
             idx_in_cloud = idx_in_cloud - particle_cloud(cloud_idx)%num_particles
         end do
 
-        ib_patch%geometry = merge(2, 8, num_dims < 3)
+        ib_patch%geometry = merge(ib_circle, ib_sphere, num_dims < 3)
         ib_patch%step_x_centroid = 0._wp
         ib_patch%step_y_centroid = 0._wp
         ib_patch%step_z_centroid = 0._wp
@@ -1522,6 +1536,8 @@ contains
         ib_patch%emissivity = 0._wp
         ib_patch%T_rad = 0._wp
         ib_patch%heat_power = 0._wp
+        ib_patch%wall_column = .false.
+        ib_patch%wall_column_len = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0
@@ -1601,7 +1617,7 @@ contains
 
             num_ibs = num_ibs + 1
             @:PROHIBIT(num_ibs > num_local_ibs_max, &
-                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
+                       & "Too many IBs on a single processor rank. Modify case file or increase num_local_ibs_max to resolve.")
             if (gbl_id <= size(namelist_ibs)) then
                 patch_ib(num_ibs) = namelist_ibs(gbl_id)
             else
@@ -1710,6 +1726,8 @@ contains
             do i = 1, n_nbrs
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                @:PROHIBIT(num_ibs + recv_counts(i) > num_local_ibs_max, &
+                           & "Owned plus neighboring IBs on a rank exceed num_local_ibs_max, which sizes ib_box and ib_face_ft. Use more ranks or increase num_local_ibs_max.")
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i))%owner_rank = nbr_ranks(i)
                 num_ibs = num_ibs + recv_counts(i)
@@ -1881,8 +1899,9 @@ contains
 
     subroutine s_get_neighbor_bounds()
 
-        real(wp) :: beg_val, end_val, recv_val, bound, max_ib_bound, local_rank_width, min_rank_width
-        integer  :: k, send_neighbor, recv_neighbor, ierr, temporary_radius
+        real(wp)           :: beg_val, end_val, recv_val, bound, max_ib_bound, min_rank_width
+        integer            :: k, send_neighbor, recv_neighbor, ierr, hops_auto, hops_min
+        character(len=256) :: radius_msg
 
         ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
 
@@ -1894,34 +1913,39 @@ contains
         neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
-        ! perform setup if we are doing automatic radius checking
+        ! Hops the largest body needs in each decomposed direction: its half-extent over that direction's thinnest rank (a
+        ! direction with one rank never hops). The radius is a count of rank hops, so the hop that needs the most is the one
+        ! across the thinnest rank. The automatic choice adds a 1.1 margin; a radius from the case file must reach the bare count,
+        ! or a rank the body covers drops it and silently runs without it.
+        max_ib_bound = -1._wp
+        do k = 1, num_ibs
+            call s_get_ib_bound(patch_ib(k), bound)
+            max_ib_bound = max(max_ib_bound, bound)
+        end do
+        do k = 1, num_particle_clouds
+            max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
+        end do
+
+        hops_auto = 1
+        hops_min = 1
+        #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
+            if (num_dims >= ${ID}$) then
+                call s_mpi_allreduce_min(abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)), min_rank_width)
+                if (num_procs_${X}$ > 1 .and. max_ib_bound > 0._wp) then
+                    hops_auto = max(hops_auto, ceiling(1.1_wp*max_ib_bound/min_rank_width))
+                    hops_min = max(hops_min, ceiling(max_ib_bound/min_rank_width))
+                end if
+            end if
+        #:endfor
+
         if (ib_neighborhood_radius < 1) then
-            ib_neighborhood_radius = 0  ! ensure we are starting with 0 neighborhood radius
-
-            ! determine the maximum length of space that needs to be contained by the neighborhood
-            max_ib_bound = -1._wp
-            do k = 1, num_ibs
-                call s_get_ib_bound(patch_ib(k), bound)
-                max_ib_bound = max(max_ib_bound, bound)
-            end do
-            do k = 1, num_particle_clouds
-                max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
-            end do
-
-            ! Narrowest rank extent, over every direction as well as every rank. The radius is a count of rank
-            ! hops, so the distance one hop covers is the extent of the rank it steps over, and the direction
-            ! needing the most hops to span the body is the one whose ranks are thinnest. Reducing over each
-            ! rank's widest extent first reports the wrong number whenever ranks are anisotropic, which is the
-            ! norm on a stretched grid or an elongated domain.
-            local_rank_width = huge(0._wp)
-            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
-                if (num_dims >= ${ID}$) local_rank_width = min(local_rank_width, abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)))
-            #:endfor
-            call s_mpi_allreduce_min(local_rank_width, min_rank_width)
-
-            ! approximate the size of the neighborhood with a local 1.1x fudge factor for safety, lower bound of 1
-            ib_neighborhood_radius = max(1, ceiling(1.1_wp*max_ib_bound/(min_rank_width)))
+            ib_neighborhood_radius = hops_auto
             if (proc_rank == 0) print *, "Automatic choice of ib_neighborhood_radius selected: ", ib_neighborhood_radius
+        else if (ib_neighborhood_radius < hops_min) then
+            write (radius_msg, '(A,I0,A,I0,A)') 'ib_neighborhood_radius = ', ib_neighborhood_radius, &
+                   & ' is too small: the largest immersed body spans ', hops_min, &
+                   & ' rank hops in a decomposed direction. Raise it, or leave it at 0 to choose it automatically.'
+            call s_mpi_abort(trim(radius_msg))
         end if
 
         ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =

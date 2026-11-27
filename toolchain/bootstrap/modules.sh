@@ -39,20 +39,18 @@ done
 # lint: cluster-menu-begin
 if [ -z "$u_c" ]; then
     log   "Select a system:"
-    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Wombat (w)"
+    log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd)"
     log   "$B""LLNL $W:   Tuolumne   (tuo) | Tuolumne_amd (tamd)"
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d) | DeltaAI (dai)"
     log   "$Y""Gatech$W:  Phoenix    (p) | Phoenix IFX (pifx)"
     log   "$C""CSCS$W:    Santis     (san)"
     log   "$R""Caltech$W: Richardson (r)"
     log   "$BR""Brown$W: Oscar (o)"
-    log   "$BR""Purdue$W: Anvil (pa)"
-    log   "$OR""Tennessee$W: Isaac (i)"
     log   "$B""DoD$W:     Carpenter Cray (cc) | Carpenter GNU (c) |  Nautilus (n)"
     log   "$OR""Florida$W: HiPerGator (h)"
     log   "$C""WPI $W:   Turing   (t)"
     log   "$R""AMD$W:     HPCFund  (amdfund)"
-    log_n "(${G}a${W}/${G}f${W}/${G}famd${W}/${G}w${W}/${B}tuo${W}/${B}tamd${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${Y}pifx${CR}/${C}san${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
+    log_n "(${G}a${W}/${G}f${W}/${G}famd${W}/${B}tuo${W}/${B}tamd${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${Y}pifx${CR}/${C}san${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
     read u_c
     log
 fi
@@ -236,9 +234,9 @@ fi
 # Frontier (famd) and Tuolumne (tamd): AFAR LLVM Flang (amdflang) + Cray MPICH.
 if [ "$u_c" '==' 'famd' ] || [ "$u_c" '==' 'tamd' ]; then
     if [ "$u_c" '==' 'famd' ]; then
-        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
+        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/ccs/proj/cfd154/sw/therock-afar-24.4.0-multiarch-10.3.0-a71da8f}"
     else
-        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
+        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/p/lustre5/bryngelson1/afar/therock-afar-24.4.0-multiarch-10.3.0-a71da8f}"
     fi
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
@@ -248,13 +246,19 @@ if [ "$u_c" '==' 'famd' ] || [ "$u_c" '==' 'tamd' ]; then
 
     # AFAR >= 23.2: no mpich3.4a2, hipfort moved under lib/llvm.
     # AFAR >= 24.3: hipfort is per-compiler, under lib/llvm/{include,lib}/fortran/flang.
-    export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich4.3.1"
+    # AFAR >= 24.4: no bundled MPICH modules (set AFAR_MPICH_INCDIR to the include dir of MPICH 4.3.1 built with
+    # that amdflang); hipfort library is under lib/llvm/lib64.
+    export CRAY_MPICH_INC="-I${AFAR_MPICH_INCDIR:-${OLCF_AFAR_ROOT}/include/mpich4.3.1}"
     export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/lib/llvm/include/fortran/flang/hipfort/amdgcn -I${OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
-    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
+    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib64/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
     export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
                         -lmpifort_amd -lmpi_amd -lmpi -lpmi -lpmi2"
+    # GPU-aware MPI (rdma_mpi): GTL, set by craype-accel-amd-gfx90a on Frontier GPU loads
+    if [ "$u_c" '==' 'famd' ] && [ "$cg" '==' 'gpu' ]; then
+        export CRAY_MPICH_LIB="${CRAY_MPICH_LIB} ${PE_MPICH_GTL_DIR_amd_gfx90a} ${PE_MPICH_GTL_LIBS_amd_gfx90a}"
+    fi
     export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${CRAY_LD_LIBRARY_PATH}"
     export CMAKE_PREFIX_PATH="${OLCF_AFAR_ROOT}:${CMAKE_PREFIX_PATH}"
     export FC="${OLCF_AFAR_ROOT}/bin/amdflang"

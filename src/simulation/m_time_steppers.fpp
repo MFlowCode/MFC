@@ -35,7 +35,7 @@ module m_time_steppers
     use m_stage_hooks, only: s_stage_hooks_pre_ib, s_stage_hooks_post_ib
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
-    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_burn_fine
     use m_amr_advance, only: s_amr_fine_stage_ib
     use m_amr_registers, only: s_amr_set_rk_table
 
@@ -53,9 +53,11 @@ module m_time_steppers
     integer, private                              :: num_ts  !< Number of time stages in the time-stepping scheme
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
+    real(wp), allocatable, dimension(:)           :: rk_c    !< stage times as fractions of dt (rk_c(nstage + 1) = 1)
     integer, private                              :: num_probe_ts
     !> Max dt*(species loss rate) of the explicit reaction source over the run
     real(wp), private :: chem_stiff_max = 0._wp
+    logical, private  :: visc_cap_warned = .false.  !< The one-time notice that visc_dt_cap limits the step was printed
     logical, private  :: chem_stiff_warned = .false.
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
@@ -211,8 +213,10 @@ contains
 
             do i = 1, num_probe_ts
                 do j = 1, sys_size
+                    ! Zeroed: the acceleration probe reads all four levels from the first step, before they hold a state
                     @:ALLOCATE(q_prim_ts1(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
+                    q_prim_ts1(i)%vf(j)%sf = 0._wp
                 end do
                 @:ACC_SETUP_VFs(q_prim_ts1(i))
             end do
@@ -227,6 +231,7 @@ contains
                 do j = 1, sys_size
                     @:ALLOCATE(q_prim_ts2(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
+                    q_prim_ts2(i)%vf(j)%sf = 0._wp
                 end do
                 @:ACC_SETUP_VFs(q_prim_ts2(i))
             end do
@@ -455,7 +460,13 @@ contains
                 rk_coef(3,:) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
             $:GPU_UPDATE(device='[rk_coef, stor]')
-            if (amr) call s_amr_set_rk_table(rk_coef)
+            ! Stage times as fractions of dt: stage s evaluates its RHS at rk_c(s) and produces the state at rk_c(s + 1)
+            allocate (rk_c(time_stepper + 1))
+            rk_c(1) = 0._wp
+            do i = 1, time_stepper
+                rk_c(i + 1) = (rk_coef(i, 1)*rk_c(i) + rk_coef(i, 3))/rk_coef(i, 4)
+            end do
+            if (amr) call s_amr_set_rk_table(rk_coef, rk_c)
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -468,13 +479,13 @@ contains
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
-        real(wp)                :: start, finish
+        integer(kind=8)         :: step_t0, step_t1
         real(wp)                :: a_w               !< weight of this stage's state in the step's result (swept-cell booking)
         integer(kind=8)         :: stage_t0, stage_t1, clock_rate, clock_max
         real(wp)                :: stage_time
         integer, parameter      :: n_warmup = 2      !< time steps excluded before the timing floor (warmup/JIT/first-touch)
 
-        call cpu_time(start)
+        call system_clock(step_t0)
         call nvtxStartRange("TIMESTEP")
 
         ! Adaptive dt: initial stage
@@ -483,15 +494,15 @@ contains
 
         do s = 1, nstage
             call system_clock(stage_t0)
-            ! mytime is read on the device by the GRCBC inflow ramp, so it has to be current before the RHS that
-            ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
-            ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
-            $:GPU_UPDATE(device='[mytime]')
-            ! Dirichlet inflows ramp too; their ghost fill lives in common code, which cannot read mytime
+            ! Explicitly time-dependent terms (sources, forcing, inflow ramps) are evaluated at the stage's own time; the
+            ! step-start time in every stage makes them first order. The GRCBC ramp reads t_rhs on the device.
+            t_rhs = f_step_time(rk_c(s), t_step, dt)
+            $:GPU_UPDATE(device='[t_rhs]')
+            ! Dirichlet inflows ramp too; their ghost fill lives in common code, which cannot read t_rhs
             if (any([bc_x%vel_in_ramp, bc_y%vel_in_ramp, bc_z%vel_in_ramp] > 0._wp)) then
-                bc_vel_ramp = [f_vel_ramp(bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0, mytime), &
-                                          & f_vel_ramp(bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0, mytime), &
-                                          & f_vel_ramp(bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0, mytime)]
+                bc_vel_ramp = [f_vel_ramp(bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0, t_rhs), &
+                                          & f_vel_ramp(bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0, t_rhs), &
+                                          & f_vel_ramp(bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0, t_rhs)]
                 $:GPU_UPDATE(device='[bc_vel_ramp]')
             end if
             call s_amr_stage_begin(q_cons_ts(1)%vf)
@@ -613,7 +624,13 @@ contains
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, 0)
+
+                ! Wall columns advance once per step, from the first stage's RHS state, and set each stage's conduction temperature
+                if (ib_wall_col) then
+                    if (s == 1) call s_ibm_advance_wall_columns(q_cons_ts(1)%vf, q_prim_vf, q_T_sf, dt)
+                    call s_wall_column_tcond(q_cons_ts(1)%vf, q_prim_vf, q_T_sf)
+                end if
             end if
 
             call s_stage_hooks_post_ib(q_cons_ts(1)%vf, 0)
@@ -623,12 +640,7 @@ contains
             ! (not cpu_time, which counts MPI spin-wait) and the minimum (jitter only adds
             ! time) make it reproducible; the min over stages drops the I/O-bearing s==1 stage.
             call system_clock(stage_t1, clock_rate, clock_max)
-            ! Correct the delta for the rare case of the clock counter wrapping past clock_max.
-            if (stage_t1 >= stage_t0) then
-                stage_time = real(stage_t1 - stage_t0, wp)/real(clock_rate, wp)
-            else
-                stage_time = real(stage_t1 - stage_t0 + clock_max + 1_8, wp)/real(clock_rate, wp)
-            end if
+            stage_time = f_clock_seconds(stage_t0, stage_t1, clock_rate, clock_max)
             if (t_step - t_step_start < n_warmup) then
                 time_avg = 0._wp
             else if (time_avg <= 0._wp) then
@@ -660,26 +672,28 @@ contains
         if (amr_sub_on) call s_amr_subcycle_fine(q_cons_ts(1)%vf, q_cons_ts(stor)%vf, rk_coef, q_T_sf, bc_type, pb_ts(1)%sf, &
             & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
         amr_sub_on = .false.
+        if (amr .and. reactive_burn .and. rburn%substeps > 0) call s_amr_burn_fine()
         if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
 
         if (ib) then
+            ! Before the handoff: ib_heat and ib_shell are indexed by the patch_ib slots the stages used
+            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
+            if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
             if (moving_immersed_boundary_flag) then
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
-            else if (ib_state_wrt) then
+            else if (ib_state_wrt .or. ib_force_wrt) then
                 call s_compute_ib_forces()
             end if
-            if (ib_exchange) call s_update_ib_temperatures(dt, q_cons_ts(1)%vf)
-            if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
         end if
 
         ! Adaptive dt: final stage
         if (adap_dt) call s_adaptive_dt_bubble(3)
 
         call nvtxEndRange
-        call cpu_time(finish)
-
-        wall_time = abs(finish - start)
+        ! wall clock: cpu_time also counts host-thread and MPI spin time
+        call system_clock(step_t1, clock_rate, clock_max)
+        wall_time = f_clock_seconds(step_t0, step_t1, clock_rate, clock_max)
 
         if (t_step - t_step_start >= 2) then
             wall_time_avg = (wall_time + (t_step - t_step_start - 2)*wall_time_avg)/(t_step - t_step_start - 1)
@@ -689,12 +703,25 @@ contains
 
     end subroutine s_tvd_rk
 
+    !> Seconds between two system_clock counts, correcting for the counter wrapping past cmax.
+    pure function f_clock_seconds(t0, t1, rate, cmax) result(sec)
+
+        integer(kind=8), intent(in) :: t0, t1, rate, cmax
+        real(wp)                    :: sec
+
+        sec = real(merge(t1 - t0, t1 - t0 + cmax + 1_8, t1 >= t0), wp)/real(rate, wp)
+
+    end function f_clock_seconds
+
     !> Bubble source part in Strang operator splitting scheme
     impure subroutine s_adaptive_dt_bubble(stage)
 
         integer, intent(in) :: stage
 
-        call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwbuff)
+        ! The interior only: before the first RHS the conservative ghosts are unset (a zero bubble number density
+        ! divides by zero there). The Euler source reads no ghost cell; Lagrange refills the primitive ones below.
+
+        call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
 
         if (bubbles_euler) then
             call s_compute_bubble_EE_source(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, divu)
@@ -712,11 +739,11 @@ contains
 
     !> Compute the global time step size from CFL stability constraints across all cells
     !> Sets dt from the CFL criteria, each limited by the finest cell over the coarse cell under AMR. With dt_cand it only returns
-    !! the global candidates at cfl_target (ICFL, VCFL, CCFL, TCFL, collision cap) and leaves dt alone.
+    !! the global candidates at cfl_target (ICFL, VCFL, CCFL, TCFL, collision cap, WCOL) and leaves dt alone.
     impure subroutine s_compute_dt(dt_cand)
 
-        real(wp), dimension(5), intent(out), optional :: dt_cand
-        real(wp), dimension(5)                        :: dt_candidates_glb
+        real(wp), dimension(6), intent(out), optional :: dt_cand
+        real(wp), dimension(6)                        :: dt_candidates_glb
         real(wp)                                      :: dt_prev
         real(wp)                                      :: rho  !< Cell-avg. density
 
@@ -727,26 +754,25 @@ contains
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:endif
-        real(wp)                         :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)                         :: pres  !< Cell-avg. pressure
-        real(wp)                         :: gamma  !< Cell-avg. sp. heat ratio
-        real(wp)                         :: pi_inf  !< Cell-avg. liquid stiffness function
-        real(wp)                         :: qv  !< Cell-avg. fluid reference energy
-        real(wp)                         :: c  !< Cell-avg. sound speed
-        real(wp), dimension(2)           :: Re  !< Cell-avg. Reynolds numbers
-        real(wp), dimension(4)           :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
-        real(wp)                         :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
-        real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)                         :: rf, pw1, pw2, pw3  !< amr_cfl_rf of the cell, amr_cfl_pow (scalars for the kernel)
-        real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
-        real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
-        real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
-        logical                          :: is_fluid_cell  !< Cell lies outside every immersed boundary
-        integer                          :: bad_cell  !< 1 + linear index of a fluid cell with no valid dt, 0 if none
-        integer                          :: j, k, l  !< Generic loop iterators
-        integer                          :: fl  !< Fluid loop iterator
-        !> Host copies; amdflang reads Re_size stale cross-TU
-        integer :: Re_size_loc1, Re_size_loc2
+        real(wp) :: vel_sum                          !< Cell-avg. velocity sum
+        real(wp) :: pres                             !< Cell-avg. pressure
+        real(wp) :: gamma                            !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf                           !< Cell-avg. liquid stiffness function
+        real(wp) :: qv                               !< Cell-avg. fluid reference energy
+        real(wp) :: c                                !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp) :: Dth                              !< Cell thermal diffusivity (s_compute_cell_diffusivity)
+        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp) :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(6) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap, WCOL)
+        real(wp) :: rf, pw1, pw2, pw3                !< amr_cfl_rf of the cell, amr_cfl_pow (scalars for the kernel)
+        real(wp), dimension(num_species) :: Ys       !< Cell mass fractions, for chem_params%transport_dt
+        real(wp), dimension(2) :: Re_chem            !< Transport-limited Reynolds numbers, for chem_params%transport_dt
+        real(wp) :: T_cell                           !< Cell temperature, passed as a scalar (array elements are misaddressed)
+        logical :: is_fluid_cell                     !< Cell lies outside every immersed boundary
+        integer :: bad_cell                          !< 1 + linear index of a fluid cell with no valid dt, 0 if none
+        integer :: j, k, l                           !< Generic loop iterators
+        integer :: fl                                !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -759,15 +785,13 @@ contains
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         pw1 = amr_cfl_pow(1); pw2 = amr_cfl_pow(2); pw3 = amr_cfl_pow(3)
         ! One loop body, two kernels: without amr it is the plain CFL loop, so the non-AMR dt does not depend on the AMR terms
         #:for ON_AMR in [False, True]
             if (amr .eqv. ${'.true.' if ON_AMR else '.false.'}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, &
-                                    & Re_size_loc2' + (', pw1, pw2, pw3' if ON_AMR else '') + ']', private='[vel, alpha, &
-                                    & alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, &
-                                    & Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
+                $:GPU_PARALLEL_LOOP(collapse=3, firstprivate=('[pw1, pw2, pw3]' if ON_AMR else None), private='[vel, alpha, &
+                                    & alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, &
+                                    & Ys, Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
                                     & vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
                 do l = 0, p
                     do k = 0, n
@@ -780,10 +804,10 @@ contains
                             if (is_fluid_cell) then
                                 if (igr) then
                                     call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, &
-                                                              & vel, vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
+                                                              & vel, vel_sum, qv, j, k, l)
                                 else
                                     call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
-                                                              & vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
+                                                              & vel_sum, qv, j, k, l)
                                 end if
 
                                 ! Compute mixture sound speed
@@ -817,7 +841,8 @@ contains
                                     Re = Re_chem
                                 end if
 
-                                call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+                                call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)
+                                call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, Dth, j, k, l)
                                 #:if ON_AMR
                                     rf = amr_cfl_rf(j, k, l)
                                     max_dt(1) = max_dt(1)/rf**pw1
@@ -856,6 +881,8 @@ contains
         dt_candidates_loc(3) = ccfl_dt_local
         dt_candidates_loc(4) = tcfl_dt_local
         dt_candidates_loc(5) = coll_dt_local
+        dt_candidates_loc(6) = huge(1.0_wp)
+        if (ib_wall_col) dt_candidates_loc(6) = f_wall_column_dt(q_prim_vf, q_T_sf)
 
         if (num_procs == 1) then
             dt_candidates_glb = dt_candidates_loc
@@ -870,6 +897,12 @@ contains
 
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
+        if (dt_limiter == 'VCFL' .and. cfl_target > visc_dt_cap .and. .not. visc_cap_warned) then
+            visc_cap_warned = .true.
+            if (proc_rank == 0) print '(A,ES11.4,A,F5.2,A,I0,A,F5.2,A)', ' WARNING: viscous step limited to dt = ', dt, &
+                & ' (VCFL = ', visc_dt_cap, ', stability limit of ' // trim(visc_dt_stencil) // ' in ', num_dims, &
+                & 'D); cfl_target = ', cfl_target, ' exceeds it'
+        end if
 
         ! limit how much the time step can grow relative to the previous step
         if (ramp_ratio > 0._wp .and. dt_prev > 0._wp .and. ramp_ratio*dt_prev < dt) then
@@ -886,8 +919,7 @@ contains
     impure subroutine s_amr_check_fixed_dt(reach)
 
         logical, intent(in), optional :: reach
-        real(wp), dimension(5)        :: dt_cand
-        real(wp)                      :: cfl_save
+        real(wp), dimension(6)        :: dt_cand
         real(wp), allocatable         :: rf_save(:,:,:)
         logical                       :: all_fine
         character(len=256)            :: msg
@@ -900,11 +932,7 @@ contains
             rf_save = amr_cfl_rf; amr_cfl_rf = real(amr_ref_ratio**amr_max_level, wp)
             $:GPU_UPDATE(device='[amr_cfl_rf]')
         end if
-        cfl_save = cfl_target; cfl_target = 1._wp
-        $:GPU_UPDATE(device='[cfl_target]')
-        call s_compute_dt(dt_cand)
-        cfl_target = cfl_save
-        $:GPU_UPDATE(device='[cfl_target]')
+        call s_compute_dt_limits(dt_cand)
         if (all_fine) then
             amr_cfl_rf = rf_save
             $:GPU_UPDATE(device='[amr_cfl_rf]')
@@ -922,6 +950,43 @@ contains
         call s_mpi_abort(trim(msg))
 
     end subroutine s_amr_check_fixed_dt
+
+    !> The dt candidates of s_compute_dt at cfl_target = 1: the stability limits of the current state
+    impure subroutine s_compute_dt_limits(dt_cand)
+
+        real(wp), dimension(6), intent(out) :: dt_cand
+        real(wp)                            :: cfl_save
+
+        cfl_save = cfl_target; cfl_target = 1._wp
+        $:GPU_UPDATE(device='[cfl_target]')
+        call s_compute_dt(dt_cand)
+        cfl_target = cfl_save
+        $:GPU_UPDATE(device='[cfl_target]')
+
+    end subroutine s_compute_dt_limits
+
+    !> Fixed dt with viscosity: warn at start-up if dt exceeds the viscous stability limit (visc_dt_cap) of the stencil. The
+    !! chemistry temperature is the Newton guess of the next conversion, so it is restored and the run stays bitwise unchanged.
+    impure subroutine s_check_fixed_dt_viscous()
+
+        real(wp), dimension(6) :: dt_cand
+        real(stp), allocatable :: T_save(:,:,:)
+
+        if (cfl_dt .or. .not. viscous .or. relativity) return
+        if (chemistry) then
+            $:GPU_UPDATE(host='[q_T_sf%sf]')
+            T_save = q_T_sf%sf
+        end if
+        call s_compute_dt_limits(dt_cand)
+        if (chemistry) then
+            q_T_sf%sf = T_save
+            $:GPU_UPDATE(device='[q_T_sf%sf]')
+        end if
+        if (proc_rank == 0 .and. dt > dt_cand(2)) print '(A,ES11.4,A,F7.3,A,I0,A,ES11.4,A)', ' WARNING: dt = ', dt, ' is ', &
+            & dt/dt_cand(2), ' times the viscous stability limit of ' // trim(visc_dt_stencil) // ' in ', num_dims, &
+            & 'D (stable up to dt = ', dt_cand(2), '); the run may diverge. Reduce dt or set cfl_adap_dt.'
+
+    end subroutine s_check_fixed_dt_viscous
 
     !> Abort with the location of a fluid cell whose state admits no valid time step (NaN or non-positive inviscid dt).
     impure subroutine s_abort_on_bad_dt_cell(idx)
@@ -957,14 +1022,7 @@ contains
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces()
 
-        if (cfl_dt) then
-            t_stage = mytime + dt
-            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
-        else
-            ! The same t_step*dt form a restart evaluates the kinematics at, so a restart sees bitwise the same body
-            t_stage = (t_step + 1)*dt
-            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = (t_step + 0.5_wp)*dt
-        end if
+        t_stage = f_step_time(rk_c(s + 1), t_step, dt)
 
         $:GPU_PARALLEL_LOOP(private='[i, gbl_id, vel_new, angular_new]', copyin='[s, t_stage]')
         do i = 1, num_ibs
@@ -1010,7 +1068,7 @@ contains
                     patch_ib(i)%vel = vel_new
                     patch_ib(i)%angular_vel = angular_new
 
-                    ! plug in analytic velocities for 1-way coupling, if it exists
+                    ! analytic velocities for 1-way coupling, at t_stage: the time of the state this stage produces
                     if (patch_ib(i)%moving_ibm == 1) then
                         @:mib_analytical()
                     end if
@@ -1287,6 +1345,7 @@ contains
         @:DEALLOCATE(bc_type)
         if (any(time_stepper == (/1, 2, 3/))) then
             @:DEALLOCATE(rk_coef)
+            deallocate (rk_c)
         end if
 
     end subroutine s_finalize_time_steppers_module

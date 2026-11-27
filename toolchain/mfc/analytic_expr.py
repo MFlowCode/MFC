@@ -57,6 +57,15 @@ def fortranize_expr(expr: str, var_map: Dict[str, str]) -> str:
     return _emit(tree.body, expr, var_map, 0)
 
 
+def _int_exponent(node) -> str:
+    """An integer-literal exponent (x**2, x**-2) kept integer, so Fortran uses the exact integer power; else ''."""
+    neg = isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub)
+    lit = node.operand if neg else node
+    if not (isinstance(lit, ast.Constant) and type(lit.value) is int):
+        return ""
+    return f"(-{lit.value})" if neg else str(lit.value)
+
+
 def _emit(node, expr: str, var_map: Dict[str, str], parent_prec: int) -> str:
     if isinstance(node, ast.BinOp):
         op = type(node.op)
@@ -65,7 +74,7 @@ def _emit(node, expr: str, var_map: Dict[str, str], parent_prec: int) -> str:
         prec = _PREC[op]
         if op is ast.Pow:  # right-associative
             left = _emit(node.left, expr, var_map, prec + 1)
-            right = _emit(node.right, expr, var_map, prec)
+            right = _int_exponent(node.right) or _emit(node.right, expr, var_map, prec)
         else:
             left = _emit(node.left, expr, var_map, prec)
             right = _emit(node.right, expr, var_map, prec + 1)
@@ -94,9 +103,7 @@ def _emit(node, expr: str, var_map: Dict[str, str], parent_prec: int) -> str:
         raise AnalyticExprError(f"unknown variable '{node.id}' in {expr!r}. Available: {valid} (plus intrinsics)")
     if isinstance(node, ast.Constant):
         if isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
-            s = repr(node.value)
-            if isinstance(node.value, float) and ("e" in s or "E" in s):
-                s += "_wp"  # exponent form defaults to single precision in Fortran
-            return s
+            # Fortran literals are default real (single precision) or integer (1/2 = 0): make every one working precision
+            return f"{node.value}._wp" if isinstance(node.value, int) else f"{node.value!r}_wp"
         raise AnalyticExprError(f"unsupported literal {node.value!r} in {expr!r}")
     raise AnalyticExprError(f"unsupported syntax in {expr!r}: {type(node).__name__}")

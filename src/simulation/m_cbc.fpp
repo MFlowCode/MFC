@@ -512,10 +512,12 @@ contains
         real(wp)                             :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)                             :: vel_K_sum, vel_dv_dt_sum
         integer                              :: i, j, k, r  !< Generic loop iterators
-        !> Host copies; amdflang reads Re_size stale cross-TU
-        integer :: Re_size_loc1, Re_size_loc2
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
+
+        ! An AMR fine frame's edges are coarse/fine faces (blocks stay buff_size cells inside the domain): its ghosts come from the
+        ! coarse level, and the coarse grid applies the CBC at the real boundary.
+        if (amr_in_fine_advance) return
 
         cbc_dir = cbc_dir_norm
         cbc_loc = cbc_loc_norm
@@ -596,17 +598,15 @@ contains
                 end if
 
                 ! FD2 or FD4 of RHS at j = 0
-                Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
                 $:GPU_PARALLEL_LOOP(collapse=2, private='[r, k, alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, &
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
-                        ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
-                        ! computed on the host and copied every Runge-Kutta stage. Unity unless a ramp is set.
-                        ramp = f_vel_ramp(bc_${XYZ}$%vel_in_ramp, bc_${XYZ}$%vel_in_t0, bc_${XYZ}$%vel_in_frac0, mytime)
+                        ! Ramp factor for a smoothly starting inflow at this RK stage's time. Unity unless a ramp is set.
+                        ramp = f_vel_ramp(bc_${XYZ}$%vel_in_ramp, bc_${XYZ}$%vel_in_t0, bc_${XYZ}$%vel_in_frac0, t_rhs)
 
                         ! Transferring the Primitive Variables
                         $:GPU_LOOP(parallelism='[seq]')
@@ -632,8 +632,7 @@ contains
                             adv_local(i) = q_prim_rs${XYZ}$_vf(0, k, r, eqn_idx%E + i)
                         end do
 
-                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc, &
-                            & Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
+                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, eqn_idx%cont%end

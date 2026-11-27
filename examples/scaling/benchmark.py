@@ -176,7 +176,7 @@ print(
             "model_eqns": 2,
             "alt_soundspeed": "F",
             "num_fluids": 2,
-            "mpp_lim": "T",
+            "mpp_lim": "T",  # kept for the reference.dat timings; the case runs without it
             "mixture_err": "T",
             "time_stepper": 3,
             "weno_order": 5,

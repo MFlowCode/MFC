@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFC | Test Health</title>
+    <meta name="description" content="Which MFC test cases fail or need a retry on which compiler and offload model, and why cluster test jobs fail." />
+    <link rel="icon" type="image/x-icon" href="../res/icon.ico">
+    <style>
+        :root {
+            --page: #ffffff; --surface: #ffffff; --ink: #0f172a; --ink-2: #475569; --muted: #64748b;
+            --grid: #e2e8f0; --axis: #cbd5e1; --critical: #d03b3b; --warn: #eda100;
+            --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+        a { color: inherit; }
+        h1 { font-size: 26px; margin: 0 0 4px; }
+        h2 { font-size: 18px; margin: 32px 0 4px; }
+        p.lede, p.note, #status { color: var(--ink-2); max-width: 75ch; }
+        p.lede { margin: 0 0 20px; } p.note, #status { font-size: 13px; margin: 0 0 10px; }
+        .controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-bottom: 14px; }
+        .seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; }
+        .seg button { font: inherit; color: var(--ink-2); background: transparent; border: 0; padding: 5px 12px; cursor: pointer; }
+        .seg button + button { border-left: 1px solid var(--axis); }
+        .seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+        input[type="search"] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 10px; min-width: 0; width: 240px; max-width: 100%; }
+        .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+        .tile { background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 14px; }
+        .tile .k { color: var(--ink-2); font-size: 13px; } .tile .v { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; }
+        .tile .s { color: var(--ink-2); font-size: 12px; }
+        .panel { background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px; overflow-x: auto; }
+        table { border-collapse: collapse; font-size: 13px; width: 100%; }
+        th, td { padding: 5px 10px; border-bottom: 1px solid var(--grid); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        th { color: var(--ink-2); font-weight: 600; vertical-align: bottom; }
+        th:first-child, td:first-child { text-align: left; }
+        td.name { white-space: normal; min-width: 240px; max-width: 420px; }
+        td.name code { color: var(--ink-2); font-size: 12px; }
+        td.tag, th.tag { text-align: left; }
+        tr.test { cursor: pointer; } tr.test:hover td { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+        tr.detail td { text-align: left; white-space: normal; color: var(--ink-2); font-size: 12px; background: color-mix(in srgb, var(--ink) 3%, transparent); }
+        table.explain td { white-space: normal; vertical-align: top; }
+        table.explain td:first-child { white-space: nowrap; font-weight: 600; }
+        svg { display: block; width: 100%; height: auto; } svg text { fill: var(--muted); font-size: 11px; }
+        .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 10px; padding: 0; list-style: none; color: var(--ink-2); font-size: 13px; }
+        .legend li { display: inline-flex; align-items: center; gap: 6px; }
+        .sw { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+        .retry { color: var(--ink-2); }
+        .zero { color: var(--muted); }
+    </style>
+    <link rel="stylesheet" href="ci-pages.css">
+</head>
+<body>
+<header class="site" id="site-header"></header>
+<main><div class="wrap">
+    <p class="updated" id="updated"></p>
+    <h1>Test health</h1>
+    <div class="statusline" id="statusline"><span class="note">Loading&hellip;</span></div>
+    <div class="controls">
+        <div class="seg" id="range" role="group" aria-label="Time range">
+            <button data-v="14" aria-pressed="false">14 days</button>
+            <button data-v="30" aria-pressed="false">30 days</button>
+            <button data-v="90" aria-pressed="true">90 days</button>
+        </div>
+        <div class="seg" id="scope" role="group" aria-label="Runs">
+            <button data-v="master" aria-pressed="true">Master only</button>
+            <button data-v="all" aria-pressed="false">Master and pull requests</button>
+        </div>
+    </div>
+
+    <h2 id="why-h">Failed test jobs by cause</h2>
+    <p class="note">Failed cluster test jobs by cause. <a href="#how">Causes</a>.</p>
+    <div class="panel"><table id="why" class="sortable"></table></div>
+
+    <h2 id="cases-h">Test cases</h2>
+    <p class="note">&#10005; failed, &#8635; passed on retry. On <code>master</code> the count is out of the lane's test jobs. Click a row for the jobs.</p>
+    <div class="controls">
+        <div class="seg" id="pattern" role="group" aria-label="Pattern">
+            <button data-v="" aria-pressed="true">All</button>
+            <button data-v="compiler" aria-pressed="false">One compiler only</button>
+            <button data-v="offload" aria-pressed="false">One offload model only</button>
+            <button data-v="every" aria-pressed="false">Every lane</button>
+        </div>
+        <input type="search" id="find" placeholder="Filter by test name or id" aria-label="Filter by test name or id">
+    </div>
+    <div class="panel"><table id="tests"></table></div>
+
+    <h2 id="took-h">Test duration</h2>
+    <p class="note">Median test-phase minutes of full-suite jobs per day. Dashed line: Frontier job limit.</p>
+    <ul class="legend" id="lanekeys"></ul>
+    <div class="panel"><svg id="took"></svg></div>
+
+    <h2 id="size-h">Test suite size</h2>
+    <p class="note">Tests run by a full run on each lane, median per day.</p>
+    <div class="panel"><svg id="size"></svg></div>
+
+    <h2>Slowest test cases</h2>
+    <p class="note">Median seconds per lane.</p>
+    <div class="panel"><table id="slow" class="sortable"></table></div>
+
+    <h2 id="how">Failure causes</h2>
+    <p class="note">A test job checks out the code, builds, runs the tests and uploads logs. It can fail at any step.</p>
+    <div class="panel"><table class="explain">
+        <tr><th>Cause</th><th class="tag">What happened</th><th class="tag">Usually</th><th class="tag">Do</th></tr>
+        <tr><td>Tests</td><td class="tag">A test failed three attempts, or the run stopped early at a high failure rate.</td><td class="tag">The change; one lane only: that lane.</td><td class="tag">Find the case above.</td></tr>
+        <tr><td>Build</td><td class="tag">MFC did not compile, twice.</td><td class="tag">The change, or that compiler.</td><td class="tag">Read the build log.</td></tr>
+        <tr><td>Cluster down</td><td class="tag">Partitions were not accepting jobs.</td><td class="tag">The cluster.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Never started</td><td class="tag">The SLURM job waited past CI's 3 h queue limit.</td><td class="tag">The queue.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>SLURM time limit</td><td class="tag">The job reached its time limit (1 h 59 min on Frontier, 3 h for tests on Phoenix).</td><td class="tag">A slow node or filesystem.</td><td class="tag">Re-run once is automatic.</td></tr>
+        <tr><td>Bad node</td><td class="tag">The pre-test node check failed on two nodes in a row.</td><td class="tag">The cluster.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Git checkout</td><td class="tag">The runner could not check out the code.</td><td class="tag">The runner or filesystem.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Artifact upload</td><td class="tag">Uploading logs to GitHub failed after the work was done.</td><td class="tag">GitHub or the network.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Runner</td><td class="tag">The runner stopped, lost its filesystem, or a setup step timed out.</td><td class="tag">The runner.</td><td class="tag">Nothing: re-run is automatic.</td></tr>
+        <tr><td>Other</td><td class="tag">Not recognized in the log.</td><td class="tag">Unknown.</td><td class="tag">Read the job.</td></tr>
+    </table></div>
+    <p class="note"><strong>Cancelled:</strong> replaced by a newer commit. <strong>Passed on retry:</strong> failed, then passed within three attempts.</p>
+
+    <h2>Test error classes</h2>
+    <div class="panel"><table class="explain">
+        <tr><th>Error</th><th class="tag">Meaning</th><th class="tag">Retry helps</th></tr>
+        <tr><td>Tolerance mismatch</td><td class="tag">Output differs from the reference beyond tolerance.</td><td class="tag">No</td></tr>
+        <tr><td>Execution failed</td><td class="tag">A program did not start or exited with an error.</td><td class="tag">Sometimes</td></tr>
+        <tr><td>GPU memory fault</td><td class="tag">The program faulted in GPU memory.</td><td class="tag">No</td></tr>
+        <tr><td>Timeout</td><td class="tag">The case ran past its time limit.</td><td class="tag">Sometimes</td></tr>
+        <tr><td>NaN detected</td><td class="tag">The solution became NaN.</td><td class="tag">No</td></tr>
+    </table></div>
+    <div id="key"></div>
+</div></main>
+<footer class="site" id="site-footer"></footer>
+<script src="ci-pages.js"></script>
+<script>
+"use strict";
+MFCCI.chrome("tests.html");
+// One line per run, a file per month, written by .github/workflows/ci-record.yml. A test job carries
+// n (tests passed), f (failed: [uuid, name, error class]), r (passed on a retry) and, if it failed, why.
+const JOB_URL = (run, job) => `https://github.com/MFlowCode/MFC/actions/runs/${run}/job/${job}`;
+const LANES = MFCCI.CI_LANES;
+const WHY = [["tests", "Tests"], ["build", "Build"], ["cluster", "Cluster down"], ["queue", "Never started"], ["timeout", "SLURM time limit"], ["node", "Bad node"], ["checkout", "Git checkout"], ["upload", "Artifact upload"], ["runner", "Runner"], ["other", "Other"]];
+
+const state = { days: [14, 30, 90].includes(+MFCCI.param("range")) ? +MFCCI.param("range") : 90, scope: MFCCI.param("scope") === "all" ? "all" : "master",
+                pattern: ["compiler", "offload", "every"].includes(MFCCI.param("pattern")) ? MFCCI.param("pattern") : "", find: MFCCI.param("find") || "", runs: [], open: null };
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const day = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+// Test jobs in range and scope whose log was read (they carry n).
+function jobs() {
+    const from = Date.now() - state.days * 864e5, out = [];
+    for (const r of state.runs) if (r.t >= from && (state.scope === "all" || r.master)) for (const j of r.jobs) if (j.k === "test" && j.n !== undefined) out.push({ r, j });
+    return out;
+}
+
+function pattern(lanes) {
+    const hit = LANES.filter(l => lanes.has(l.key)), present = LANES.filter(l => state.runs.some(r => r.jobs.some(j => j.l === l.key)));
+    const compilers = new Set(hit.map(l => l.compiler)), offloads = new Set(hit.map(l => l.offload));
+    if (hit.length === present.length && present.length > 1) return { kind: "every", label: "Every lane" };
+    if (compilers.size === 1) return { kind: "compiler", label: `${[...compilers][0]} only` };
+    if (offloads.size === 1) return { kind: "offload", label: `${[...offloads][0]} only` };
+    return { kind: "mixed", label: "Several lanes" };
+}
+
+function render() {
+    const js = jobs(), per = new Map(LANES.map(l => [l.key, js.filter(x => x.j.l === l.key)]));
+
+    // Why jobs failed.
+    const failed = js.filter(x => x.j.c === "failure");
+    $("why").innerHTML = `<tr><th>Lane</th><th>Test jobs</th><th>Failed</th>${WHY.map(w => `<th>${w[1]}</th>`).join("")}</tr>`
+        + LANES.map(l => { const all = per.get(l.key), bad = all.filter(x => x.j.c === "failure");
+            return `<tr><td>${l.label}</td><td>${all.length.toLocaleString()}</td><td>${bad.length.toLocaleString()}</td>`
+                + WHY.map(w => { const n = bad.filter(x => (x.j.why || "other") === w[0]).length; return `<td${n ? "" : ' class="zero"'}>${n || "–"}</td>`; }).join("") + `</tr>`; }).join("");
+
+    // Per test: failures and retries by lane.
+    let rows = MFCCI.testStats(state.runs, state.days, state.scope).tests.map(t => {
+        const failedOn = new Set([...t.lanes].filter(([, c]) => c.f).map(([l]) => l));
+        return { ...t, pat: failedOn.size ? pattern(failedOn) : { kind: "retry", label: "Retries only" }, top: [...t.cls].sort((a, b) => b[1] - a[1])[0][0] };
+    });
+
+    const lanesHit = new Map(LANES.map(l => [l.key, rows.filter(t => t.lanes.get(l.key)?.f).length]));
+    const worst = [...lanesHit].sort((a, b) => b[1] - a[1])[0], wl = LANES.find(l => l.key === worst[0]);
+    const real = failed.filter(x => x.j.why === "tests").length, nf = rows.filter(t => t.f).length, nr = rows.filter(t => !t.f && t.r).length;
+    const part = (href, label, dot, text) => `<a href="${href}"><span class="label">${label}</span>${dot ? `<span class="dot ${dot}"></span>` : ""}<b>${text}</b></a>`;
+    $("statusline").innerHTML =
+        part("#cases-h", `Test cases failing, ${state.scope === "master" ? "on master" : "all runs"}, ${state.days} days`, nf ? "bad" : "good", nf.toLocaleString())
+        + part("#cases-h", "Passed only on a retry", nr ? "warn" : "good", nr.toLocaleString())
+        + part("#why-h", "Failed test jobs that were not tests", "", failed.length ? `${failed.length - real} of ${failed.length}` : "none failed")
+        + part("#cases-h", "Lane with the most failing cases", "", worst[1] ? `${wl.compiler} · ${wl.offload} (${worst[1]})` : "–")
+        + part("#took-h", "Test jobs read", "", js.length.toLocaleString());
+
+    const q = state.find.trim().toLowerCase();
+    rows = rows.filter(t => (!state.pattern || t.pat.kind === state.pattern) && (!q || t.name.toLowerCase().includes(q) || (t.uuid || "").toLowerCase().includes(q)));
+    const cell = (t, l) => {
+        const c = t.lanes.get(l.key), n = per.get(l.key).length;
+        if (!c) return `<td class="zero">–</td>`;
+        const share = state.scope === "master" && n ? c.f / n : Math.min(1, c.f / 10);
+        return `<td style="background:color-mix(in srgb, var(--critical) ${Math.round(45 * Math.min(1, share * 2))}%, transparent)">`
+            + (c.f ? `${c.f}${state.scope === "master" ? `/${n}` : ""} &#10005;` : "") + (c.r ? ` <span class="retry">${c.r} &#8635;</span>` : "") + `</td>`;
+    };
+    $("tests").innerHTML = `<tr><th>Test case</th><th class="tag">Pattern</th><th class="tag">Usual error</th>${LANES.map(l => `<th>${l.label.split(" · ").join("<br>")}</th>`).join("")}</tr>`
+        + (rows.length ? "" : `<tr><td colspan="${3 + LANES.length}" class="zero">No test case matches.</td></tr>`)
+        + rows.slice(0, 200).map(t => `<tr class="test" data-k="${esc(t.key)}"><td class="name">${esc(t.name)} ${t.uuid ? `<code>${t.uuid}</code>` : ""}</td><td class="tag">${t.pat.label}</td><td class="tag">${esc(t.top)}</td>${LANES.map(l => cell(t, l)).join("")}</tr>`
+            + (state.open === t.key ? `<tr class="detail"><td colspan="${3 + LANES.length}">` + t.where.sort((a, b) => b.r.t - a.r.t).slice(0, 12).map(w => { const l = LANES.find(x => x.key === w.j.l), lane = l ? l.label : esc(w.j.l);
+                return `${day(w.r.t)} · <a href="${JOB_URL(w.r.run, w.j.id)}" target="_blank" rel="noopener">${lane}${w.j.s ? ` [${w.j.s}]` : ""}</a> · ${w.kind === "f" ? "failed" : "passed on a retry"}${(e => e ? ` — ${esc(e)}` : "")(((w.j[w.kind] || []).find(x => (x[0] || x[1]) === (t.uuid || t.name)) || [])[3])} · ${w.r.master ? "master" : "pull request"}: ${esc(w.r.title)}`; }).join("<br>")
+                + (t.where.length > 12 ? `<br>and ${t.where.length - 12} more` : "") + `</td></tr>` : "")).join("")
+        + (rows.length > 200 ? `<tr><td colspan="${3 + LANES.length}" class="zero">Showing the 200 worst of ${rows.length}.</td></tr>` : "");
+    durations(); slowest();
+}
+
+// Test-phase minutes of full-suite jobs per day and lane, and the slowest cases.
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+const { med } = MFCCI;
+const perDay = (l, values) => { const d = new Map();                // [date, value] pairs -> one median point per day
+    for (const [date, v] of values) d.set(date, [...(d.get(date) || []), v]);
+    return { l, pts: [...d].sort().map(([date, v]) => ({ t: Date.parse(date + "T12:00:00Z"), v: med(v), n: v.length })) }; };
+function durations() {
+    const js = jobs();
+    $("lanekeys").innerHTML = LANES.map(l => `<li><span class="sw" style="background:var(--s${LANES.indexOf(l) % 6 + 1})"></span>${l.label}</li>`).join("");
+    // A whole shard of the suite: a run that selected a few tests says nothing about how long the suite takes.
+    trend($("took"), LANES.map(l => perDay(l, js.filter(({ j }) => j.l === l.key && j.tt && j.n >= 300).map(({ r, j }) => [r.date.slice(0, 10), j.tt / 60]))), "min", "job", 119, "Frontier job limit, 1 h 59 min");
+    // The suite's size: tests run by a full run on a lane, its shards added up.
+    trend($("size"), LANES.map(l => { const runs = new Map();
+        for (const { r, j } of js) if (j.l === l.key && j.m === "full") runs.set(r.run, { date: r.date.slice(0, 10), n: (runs.get(r.run)?.n || 0) + j.n + (j.f || []).length });
+        return perDay(l, [...runs.values()].filter(x => x.n >= 300).map(x => [x.date, x.n])); }), "tests", "run");
+}
+// One line per lane over time, each labelled at its end; an optional limit is drawn dashed.
+function trend(svg, series, unit, counted, LIMIT = 0, limitText = "") {
+    const W = 900, H = 240, L = 46, B = 24, T = 14, ss = series.filter(s => s.pts.length);
+    const color = l => `var(--s${LANES.indexOf(l) % 6 + 1})`, name = l => l.label;
+    svg.replaceChildren(); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const all = ss.flatMap(s => s.pts); if (!all.length) return;
+    const t0 = Math.min(...all.map(p => p.t)), t1 = Math.max(...all.map(p => p.t), t0 + 1), hi = Math.max(...all.map(p => p.v), LIMIT) * 1.06;
+    const RM = 190, x = t => L + (t - t0) / (t1 - t0) * (W - L - RM), y = v => T + (1 - v / hi) * (H - T - B);
+    for (let i = 0; i <= 4; i++) { const v = hi * i / 4;
+        el("line", { x1: L, x2: W - 8, y1: y(v), y2: y(v), stroke: i ? "var(--grid)" : "var(--axis)", "stroke-width": 1 }, svg);
+        el("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = Math.round(v); }
+    el("text", { x: L, y: H - 6 }, svg).textContent = day(t0); el("text", { x: x(t1), y: H - 6, "text-anchor": "end" }, svg).textContent = day(t1);
+    if (LIMIT) {
+        el("rect", { x: L, y: y(LIMIT), width: W - L - 8, height: y(LIMIT - 20) - y(LIMIT), fill: "#d03b3b", opacity: .08 }, svg);
+        el("line", { x1: L, x2: W - 8, y1: y(LIMIT), y2: y(LIMIT), stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "4 3" }, svg);
+        el("text", { x: W - 10, y: y(LIMIT) - 5, "text-anchor": "end" }, svg).textContent = limitText;
+    }
+    for (const s of ss) {
+        el("path", { d: s.pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(""), fill: "none", stroke: color(s.l), "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+        for (const p of s.pts) el("title", {}, el("circle", { cx: x(p.t), cy: y(p.v), r: 3.5, fill: color(s.l), stroke: "var(--surface)", "stroke-width": 1 }, svg)).textContent = `${name(s.l)}, ${day(p.t)}: ${Math.round(p.v)} ${unit} (${p.n} ${p.n === 1 ? counted : counted + "s"})`;
+    }
+    const ends = ss.map(s => ({ s, at: y(s.pts.at(-1).v) })).sort((a, b) => a.at - b.at);
+    for (let i = 1; i < ends.length; i++) ends[i].at = Math.max(ends[i].at, ends[i - 1].at + 13);
+    for (const e of ends) { const end = e.s.pts.at(-1);
+        el("line", { x1: x(end.t) + 5, x2: W - RM + 22, y1: y(end.v), y2: e.at, stroke: color(e.s.l), "stroke-width": 1, opacity: .5 }, svg);
+        el("text", { x: W - RM + 26, y: e.at + 4, style: "fill:var(--ink);font-size:12px" }, svg).textContent = `${e.s.l.label} · ${Math.round(end.v)} ${unit}`; }
+
+}
+
+// The slowest cases, by median seconds per lane.
+function slowest() {
+    const js = jobs();
+    const cases = new Map();
+    for (const { j } of js) for (const [uuid, nm, secs] of j.slow || []) {
+        const c = cases.get(uuid) || { uuid, name: nm, by: new Map() };
+        if (nm.length > c.name.length || c.name.endsWith("...") && !nm.endsWith("...")) c.name = nm;
+        c.by.set(j.l, [...(c.by.get(j.l) || []), secs]); cases.set(uuid, c);
+    }
+    // Three or more sightings on a lane, so that one hung run does not make a case look slow.
+    for (const c of cases.values()) for (const [l, v] of c.by) if (v.length < 3) c.by.delete(l);
+    const rows = [...cases.values()].filter(c => c.by.size).map(c => ({ ...c, top: Math.max(...[...c.by.values()].map(med)) })).sort((a, b) => b.top - a.top).slice(0, 25);
+    $("slow").innerHTML = `<tr><th>Test case</th>${LANES.map(l => `<th>${l.label.split(" · ").join("<br>")}</th>`).join("")}</tr>`
+        + rows.map(c => `<tr><td class="name">${esc(c.name)} <code>${c.uuid}</code></td>${LANES.map(l => c.by.has(l.key) ? `<td>${Math.round(med(c.by.get(l.key)))} s</td>` : `<td class="zero">–</td>`).join("")}</tr>`).join("");
+}
+
+for (const [id, key, cast] of [["range", "days", Number], ["scope", "scope", String], ["pattern", "pattern", String]]) {
+    $(id).addEventListener("click", e => {
+        const b = e.target.closest("button"); if (!b) return;
+        state[key] = cast(b.dataset.v);
+        MFCCI.param(id, b.dataset.v); if (id === "range") MFCCI.chrome("tests.html");
+        for (const o of $(id).children) o.setAttribute("aria-pressed", o === b);
+        render();
+    });
+}
+$("find").addEventListener("input", e => { state.find = e.target.value; MFCCI.param("find", state.find); render(); });
+$("tests").addEventListener("click", e => { const tr = e.target.closest("tr.test"); if (!tr || e.target.closest("a")) return; state.open = state.open === tr.dataset.k ? null : tr.dataset.k; render(); });
+
+for (const [id, key] of [["range", "days"], ["scope", "scope"], ["pattern", "pattern"]]) for (const o of $(id).children) o.setAttribute("aria-pressed", o.dataset.v === String(state[key]));
+$("find").value = state.find;
+MFCCI.load.runs().then(runs => {
+    state.runs = runs;
+    if (!runs.some(r => r.jobs.some(j => j.k === "test" && j.n !== undefined))) { $("statusline").innerHTML = `<span class="note">No test history is available yet.</span>`; return; }
+    MFCCI.updated($("updated"), runs.at(-1).t, 3);
+    MFCCI.sortable($("why")); MFCCI.sortable($("slow"));
+    $("key").innerHTML = MFCCI.LANE_KEY;
+    render();
+});
+</script>
+</body>
+</html>

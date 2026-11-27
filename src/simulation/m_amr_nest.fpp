@@ -16,13 +16,14 @@ module m_amr_nest
     use m_global_parameters
     use m_amr_cluster, only: s_amr_cluster
     use m_eos, only: s_compute_mixture_coefficients, f_pressure
+    use m_thermochem, only: num_species, get_temperature
     use m_amr, only: amr_slots, amr_cons_st, amr_loc_of, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, &
         & amr_cpat_mar, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_boxes_overlap
 
     implicit none
 
     private
-    public :: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_grad_sf
+    public :: s_amr_regrid_nest_children, f_amr_boxes_compatible, f_amr_nested, f_amr_tag_val_sf, f_amr_tag_vort_sf, f_amr_tag_ind
 
     !> Nested children were dropped for lack of block capacity (warn once per regrid)
     logical :: amr_child_dropped = .false.
@@ -84,7 +85,8 @@ contains
     !!
     !! Per level: pass 1 tags each parent's window from owned old blocks and packs (index, kb) pairs; an alltoall routes them to the
     !! parent's round-robin owner; pass 2 rebuilds the window and clusters it into children; an allgatherv plus a stable sort by kb
-    !! replays the children in serial order, so the list and its truncation are rank-invariant. IB nesting is np=1 only.
+    !! replays the children in serial order, so the list and its truncation are rank-invariant; s_amr_nest_close_seams then joins
+    !! children across parent seams. IB nesting is np=1 only.
     impure subroutine s_amr_regrid_nest_children(boxes, nboxes, box_level)
 
         type(t_box), allocatable, intent(inout) :: boxes(:)
@@ -93,7 +95,7 @@ contains
         integer                                 :: lev, plo, phi, newlo, kb, ob, jch, nloc_send, ntot_g, nmych, ntot_ch, nct
         integer                                 :: mlo(3), mhi(3)
         integer, allocatable                    :: mlo_all(:,:), mhi_all(:,:), powner(:), mych(:,:), gch(:,:), chord(:)
-        integer, allocatable                    :: skb(:), gkb(:), ctags(:,:)
+        integer, allocatable                    :: skb(:), gkb(:), ctags(:,:), par(:)
         integer(8), allocatable                 :: sidx(:), gidx(:)
         logical, allocatable                    :: mine(:), covered(:), gwin(:,:,:)
 
@@ -111,6 +113,7 @@ contains
             $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ob))]')
         end do
         call s_amr_refresh_my_blocks()
+        allocate (par(amr_max_blocks))
 
         plo = 1; phi = nboxes  ! parents
         do lev = 2, amr_max_level
@@ -159,7 +162,9 @@ contains
                 if (nboxes + 1 > amr_max_blocks) exit  ! canonical order gives the same truncation
                 nboxes = nboxes + 1
                 boxes(nboxes)%lo = gch(1:3,chord(jch)); boxes(nboxes)%hi = gch(4:6,chord(jch)); box_level(nboxes) = lev
+                par(nboxes) = gch(7, chord(jch))
             end do
+            call s_amr_nest_close_seams(boxes, par, box_level, newlo, nboxes, lev)
             deallocate (gch, chord, powner, mych, gidx, gkb, covered, mine, mlo_all, mhi_all)
             plo = newlo; phi = nboxes
         end do
@@ -196,6 +201,188 @@ contains
 #endif
 
     end subroutine s_amr_nest_mark_parents
+
+    !> Join children across parent seams. Where parent pb sits on parent pa's high face in dim d, and a child of each ends at its
+    !! nesting window there with the same transverse extents, both are brought to the shared parent face (s_amr_nest_reach): the
+    !! boxes on it become a fine-fine seam pair and the strip between the children is refined. The parent patch of such a box
+    !! reaches amr_cpat_mar cells into the parent's ghosts, which the parents' own seam exchange fills. A closure that leaves a
+    !! neighbour with a partly shared face is undone (a tile joins only if the tiles beside it do), as is one the block pool has no
+    !! room for. One dim at a time, so a later dim sees the new extents and can close the corner where four parents meet. Replicated
+    !! inputs: rank-invariant. Not with IB.
+    impure subroutine s_amr_nest_close_seams(boxes, par, box_level, clo, nboxes, lev)
+
+        type(t_box), intent(inout) :: boxes(:)
+        integer, intent(inout)     :: par(:), box_level(:), nboxes
+        integer, intent(in)        :: clo, lev
+        integer                    :: a, b, d, i, k, nc, n0, cap
+        integer, allocatable       :: cj(:,:)  !< per closure: the two boxes on the shared parent face (0: undone)
+        logical                    :: changed, tr(3)
+
+        if (ib .or. amr_cpat_mar > buff_size .or. nboxes <= clo) return
+        allocate (cj(2, amr_max_blocks))
+        do d = 1, num_dims
+            cap = max(amr_maxc_fit(d)/amr_ref_ratio**(lev - 1), 1) - amr_cpat_mar  ! widest box that may still be extended
+            if (cap < 0) cycle  ! a strip itself would break the level cap
+            tr = [1, 2, 3] /= d
+            nc = 0; n0 = nboxes
+            do a = clo, n0
+                if (boxes(a)%hi(d) /= boxes(par(a))%hi(d) - amr_cpat_mar) cycle
+                do b = clo, n0
+                    if (boxes(par(b))%lo(d) /= boxes(par(a))%hi(d) + 1 .or. boxes(b)%lo(d) /= boxes(par(b))%lo(d) + amr_cpat_mar) &
+                        & cycle
+                    if (any(tr .and. (boxes(b)%lo /= boxes(a)%lo .or. boxes(b)%hi /= boxes(a)%hi))) cycle
+                    if (nboxes + count([boxes(a)%hi(d) - boxes(a)%lo(d), &
+                        & boxes(b)%hi(d) - boxes(b)%lo(d)] + 1 > cap) > amr_max_blocks) exit
+                    nc = nc + 1
+                    call s_amr_nest_reach(boxes, par, box_level, nboxes, a, d, 1, cap, cj(1, nc))
+                    call s_amr_nest_reach(boxes, par, box_level, nboxes, b, d, -1, cap, cj(2, nc))
+                    exit
+                end do
+            end do
+            ! undo this dim's closures until every box on a parent face is compatible with its level
+            changed = nc > 0
+            do while (changed)
+                changed = .false.
+                do i = 1, nc
+                    if (cj(1, i) == 0) cycle
+                    if (f_amr_nest_fits(boxes, clo, nboxes, cj(1, i), d) .and. f_amr_nest_fits(boxes, clo, nboxes, cj(2, i), &
+                        & d)) cycle
+                    call s_amr_nest_retract(boxes, par, n0, cj(1, i), d, 1)
+                    call s_amr_nest_retract(boxes, par, n0, cj(2, i), d, -1)
+                    cj(1, i) = 0; changed = .true.
+                end do
+            end do
+            ! drop the undone strips
+            k = n0
+            do i = n0 + 1, nboxes
+                if (boxes(i)%hi(d) < boxes(i)%lo(d)) cycle
+                k = k + 1; boxes(k) = boxes(i); par(k) = par(i); box_level(k) = box_level(i)
+            end do
+            nboxes = k
+        end do
+
+    end subroutine s_amr_nest_close_seams
+
+    !> Bring box k from its nesting window to its parent's edge in dim d on `side` (+1 high, -1 low): extend it, or, if it is wider
+    !! than `cap`, append the strip between as its own tile. j = the box now on the edge.
+    pure subroutine s_amr_nest_reach(boxes, par, box_level, nboxes, k, d, side, cap, j)
+
+        type(t_box), intent(inout) :: boxes(:)
+        integer, intent(inout)     :: par(:), box_level(:), nboxes
+        integer, intent(in)        :: k, d, side, cap
+        integer, intent(out)       :: j
+
+        j = k
+        if (boxes(k)%hi(d) - boxes(k)%lo(d) + 1 > cap) then
+            nboxes = nboxes + 1; j = nboxes
+            boxes(j) = boxes(k); par(j) = par(k); box_level(j) = box_level(k)
+            boxes(j)%lo(d) = boxes(k)%hi(d) + 1; boxes(j)%hi(d) = boxes(k)%lo(d) - 1  ! the far bound is set below
+        end if
+        if (side > 0) then
+            boxes(j)%hi(d) = boxes(par(k))%hi(d)
+        else
+            boxes(j)%lo(d) = boxes(par(k))%lo(d)
+        end if
+
+    end subroutine s_amr_nest_reach
+
+    !> Undo s_amr_nest_reach for box j: a strip (j > n0) is emptied in dim d, an extended box goes back to its nesting window.
+    pure subroutine s_amr_nest_retract(boxes, par, n0, j, d, side)
+
+        type(t_box), intent(inout) :: boxes(:)
+        integer, intent(in)        :: par(:), n0, j, d, side
+
+        if (j > n0) then
+            boxes(j)%hi(d) = boxes(j)%lo(d) - 1
+        else if (side > 0) then
+            boxes(j)%hi(d) = boxes(par(j))%hi(d) - amr_cpat_mar
+        else
+            boxes(j)%lo(d) = boxes(par(j))%lo(d) + amr_cpat_mar
+        end if
+
+    end subroutine s_amr_nest_retract
+
+    !> Box j is compatible with every other box of clo..chi (those emptied in dim d aside).
+    pure logical function f_amr_nest_fits(boxes, clo, chi, j, d) result(ok)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: clo, chi, j, d
+        integer                 :: k
+
+        ok = .true.
+        do k = clo, chi
+            if (k == j .or. boxes(k)%hi(d) < boxes(k)%lo(d)) cycle
+            ok = ok .and. f_amr_boxes_compatible(boxes(j)%lo, boxes(j)%hi, boxes(k)%lo, boxes(k)%hi)
+        end do
+
+    end function f_amr_nest_fits
+
+    !> Same-level box kk shares box k's whole face in dim d on `side` (+1 high, -1 low).
+    pure logical function f_amr_box_seam(boxes, nboxes, box_level, k, d, side) result(seam)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes, box_level(:), k, d, side
+        integer                 :: kk
+
+        seam = .false.
+        do kk = 1, nboxes
+            if (seam) exit
+            if (box_level(kk) /= box_level(k)) cycle
+            if (merge(boxes(kk)%lo(d) - boxes(k)%hi(d), boxes(k)%lo(d) - boxes(kk)%hi(d), side > 0) /= 1) cycle
+            seam = all((boxes(kk)%lo == boxes(k)%lo .and. boxes(kk)%hi == boxes(k)%hi) .or. [1, 2, 3] == d)
+        end do
+
+    end function f_amr_box_seam
+
+    !> Proper nesting of level >= 2 box k: it overlaps one parent-level box and each of its faces lies inside that parent's nesting
+    !! window, or on the parent's edge as a seam with a same-level box (s_amr_nest_close_seams).
+    pure logical function f_amr_nested(boxes, nboxes, box_level, k) result(ok)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: nboxes, box_level(:), k
+        integer                 :: kk, d, npar, mlo(3), mhi(3)
+
+        ok = .true.; npar = 0
+        do kk = 1, nboxes
+            if (box_level(kk) /= box_level(k) - 1) cycle
+            if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, boxes(kk)%lo, boxes(kk)%hi)) cycle
+            npar = npar + 1
+            call s_amr_nest_window(boxes(kk), mlo, mhi)
+            do d = 1, num_dims
+                if (boxes(k)%lo(d) < mlo(d)) ok = ok .and. boxes(k)%lo(d) == boxes(kk)%lo(d) .and. f_amr_box_seam(boxes, nboxes, &
+                    & box_level, k, d, -1)
+                if (boxes(k)%hi(d) > mhi(d)) ok = ok .and. boxes(k)%hi(d) == boxes(kk)%hi(d) .and. f_amr_box_seam(boxes, nboxes, &
+                    & box_level, k, d, 1)
+            end do
+        end do
+        ok = ok .and. npar == 1
+
+    end function f_amr_nested
+
+    !> True iff two same-level blocks can coexist: disjoint, and either >= 2 empty coarse cells apart or face-adjacent with an exact
+    !! transverse match. Mirrors s_amr_check_seam_topology (m_amr_regrid).
+    pure logical function f_amr_boxes_compatible(alo, ahi, blo, bhi) result(ok)
+
+        integer, intent(in) :: alo(3), ahi(3), blo(3), bhi(3)
+        integer             :: d, t, gap
+        logical             :: tmatch, tover
+
+        ok = .true.
+        if (all(alo <= bhi .and. blo <= ahi)) then; ok = .false.; return; end if
+        do d = 1, 3
+            if (.not. amr_dim(d)) cycle
+            gap = max(blo(d) - ahi(d), alo(d) - bhi(d)) - 1  ! empty cells along d (< 0: overlap)
+            if (gap >= 2 .or. gap < 0) cycle
+            tover = .true.; tmatch = .true.
+            do t = 1, 3
+                if (t == d .or. .not. amr_dim(t)) cycle
+                tover = tover .and. alo(t) <= bhi(t) .and. blo(t) <= ahi(t)
+                tmatch = tmatch .and. alo(t) == blo(t) .and. ahi(t) == bhi(t)
+            end do
+            if (tover .and. .not. (gap == 0 .and. tmatch)) then; ok = .false.; return; end if
+        end do
+
+    end function f_amr_boxes_compatible
 
     !> The nesting window of a parent: its box inset by amr_cpat_mar, so a child's ghost prolongation reads valid parent interior.
     pure subroutine s_amr_nest_window(box, mlo, mhi)
@@ -500,7 +687,8 @@ contains
     end subroutine s_amr_tag_child_from_fine
 
     !> The tagged variable at one cell (amr_tag_var): 1 total density (sum of the continuity variables), 2 volume fraction of fluid
-    !! 1, 3 velocity magnitude, 4 pressure (five-equation mixture). `_st` reads the flat store, `_sf` the level-0 field.
+    !! 1, 3 velocity magnitude, 4 pressure (five-equation mixture), 6 temperature (as s_compute_q_T_sf), 7 mass fraction of species
+    !! amr_tag_species. `_st` reads the flat store, `_sf` the level-0 field. The vorticity (5) has its own stencil, f_amr_tag_vort.
     #:for RSFX, RSRC in [('st', 'amr_cons_st'), ('sf', '')]
         #:set RARG = 'loc' if RSRC else 'q'
         #:set RHO = 'f_amr_tag_val_' + RSFX
@@ -514,7 +702,8 @@ contains
                 type(scalar_field), dimension(:), intent(in) :: q
             #:endif
             integer, intent(in) :: ci, cj, ck
-            real(wp)            :: r, u2, gam, pinf, qv
+            real(wp)            :: r, u2, gam, pinf, qv, T
+            real(wp)            :: Ys(num_species)
             integer             :: f
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
                 real(wp), dimension(3) :: ar, al
@@ -531,12 +720,24 @@ contains
                 r = r + ${QPRE}$f${QPOST}$
             end do
             if (amr_tag_var < 3) return
+            if (amr_tag_var == 7) then
+                r = ${QPRE}$eqn_idx%species%beg + amr_tag_species - 1${QPOST}$/max(r, 1.e-30_wp)
+                return
+            end if
             u2 = 0._wp
             do f = eqn_idx%mom%beg, eqn_idx%mom%end
                 u2 = u2 + ${QPRE}$f${QPOST}$**2
             end do
             if (amr_tag_var == 3) then
                 r = sqrt(u2)/max(r, 1.e-30_wp)
+                return
+            end if
+            if (amr_tag_var == 6) then
+                do f = 1, num_species
+                    Ys(f) = ${QPRE}$eqn_idx%species%beg + f - 1${QPOST}$/r
+                end do
+                call get_temperature((${QPRE}$eqn_idx%E${QPOST}$ - 0.5_wp*u2/r)/r, dflt_T_guess, Ys, .true., T)
+                r = T
                 return
             end if
             ar = 0._wp; al = 0._wp
@@ -549,30 +750,63 @@ contains
 
         end function f_amr_tag_val_${RSFX}$
 
-        !> Tag indicator (jump of the amr_tag_var variable) at one cell, max over the active dimensions. `_st` clamps the stencil to
-        !! the block (fm1:fm3 = block extents) since its ghosts are stale; `_sf` reads the level-0 halo.
-        function f_amr_tag_grad_${RSFX}$(${RARG}$, ci, cj, ck${', fm1, fm2, fm3' if RSRC else ''}$) result(g)
+        !> Cell-scaled vorticity magnitude |curl u|*dx at cell c (amr_tag_var = 5), from the velocity differences between its
+        !! neighbours im and ip along each direction (im = ip - 1 at a clamped block edge: a one-sided difference).
+        function f_amr_tag_vort_${RSFX}$(${RARG}$, c, im, ip) result(w)
 
             #:if RSRC
-                integer, intent(in) :: loc, fm1, fm2, fm3
+                integer, intent(in) :: loc  !< flat-store slot
             #:else
                 type(scalar_field), dimension(:), intent(in) :: q
             #:endif
-            integer, intent(in) :: ci, cj, ck
-            real(wp)            :: g, r0
-            integer             :: ip(3), im(3)
+            integer, intent(in) :: c(3), im(3), ip(3)
+            real(wp)            :: w, rho, wt, hr(3)
+            real(wp)            :: du(3, 3)  !< du(a, d) = dx*d(u_a)/d(x_d)
+            integer             :: a, d, s, f, ci, cj, ck, e(3)
 
-            ip = [ci, cj, ck] + 1; im = [ci, cj, ck] - 1
-            #:if RSRC
-                ip = min(ip, [fm1, fm2, fm3]); im = max(im, 0)
-            #:endif
-            r0 = ${RHO}$(${RARG}$, ci, cj, ck)
-            g = f_amr_tag_ind(${RHO}$(${RARG}$, ip(1), cj, ck), r0, ${RHO}$(${RARG}$, im(1), cj, ck))
-            if (n_glb > 0) g = max(g, f_amr_tag_ind(${RHO}$(${RARG}$, ci, ip(2), ck), r0, ${RHO}$(${RARG}$, ci, im(2), ck)))
-            if (p_glb > 0) g = max(g, f_amr_tag_ind(${RHO}$(${RARG}$, ci, cj, ip(3)), r0, ${RHO}$(${RARG}$, ci, cj, im(3))))
+            hr = 1._wp
+            if (n_glb > 0) hr(2) = dx(0)/dy(0)
+            if (p_glb > 0) hr(3) = dx(0)/dz(0)
+            du = 0._wp
+            do d = 1, num_dims
+                do s = -1, 1, 2
+                    e = c; e(d) = merge(ip(d), im(d), s > 0)
+                    ci = e(1); cj = e(2); ck = e(3)
+                    rho = 0._wp
+                    do f = eqn_idx%cont%beg, eqn_idx%cont%end
+                        rho = rho + ${QPRE}$f${QPOST}$
+                    end do
+                    wt = real(s, wp)*hr(d)/(real(ip(d) - im(d), wp)*max(rho, 1.e-30_wp))
+                    do a = 1, min(3, eqn_idx%mom%end - eqn_idx%mom%beg + 1)
+                        du(a, d) = du(a, d) + wt*${QPRE}$eqn_idx%mom%beg + a - 1${QPOST}$
+                    end do
+                end do
+            end do
+            w = sqrt((du(3, 2) - du(2, 3))**2 + (du(1, 3) - du(3, 1))**2 + (du(2, 1) - du(1, 2))**2)
 
-        end function f_amr_tag_grad_${RSFX}$
+        end function f_amr_tag_vort_${RSFX}$
     #:endfor
+
+    !> Tag indicator (jump of the amr_tag_var variable, or the cell-scaled vorticity) at one cell of a block in the flat store, max
+    !! over the active dimensions. The stencil is clamped to the block (fm1:fm3 = block extents) since its ghosts are stale.
+    function f_amr_tag_grad_st(loc, ci, cj, ck, fm1, fm2, fm3) result(g)
+
+        integer, intent(in) :: loc, fm1, fm2, fm3
+        integer, intent(in) :: ci, cj, ck
+        real(wp)            :: g, r0
+        integer             :: ip(3), im(3)
+
+        ip = min([ci, cj, ck] + 1, [fm1, fm2, fm3]); im = max([ci, cj, ck] - 1, 0)
+        if (amr_tag_var == 5) then
+            g = f_amr_tag_vort_st(loc, [ci, cj, ck], im, ip)
+            return
+        end if
+        r0 = f_amr_tag_val_st(loc, ci, cj, ck)
+        g = f_amr_tag_ind(f_amr_tag_val_st(loc, ip(1), cj, ck), r0, f_amr_tag_val_st(loc, im(1), cj, ck))
+        if (n_glb > 0) g = max(g, f_amr_tag_ind(f_amr_tag_val_st(loc, ci, ip(2), ck), r0, f_amr_tag_val_st(loc, ci, im(2), ck)))
+        if (p_glb > 0) g = max(g, f_amr_tag_ind(f_amr_tag_val_st(loc, ci, cj, ip(3)), r0, f_amr_tag_val_st(loc, ci, cj, im(3))))
+
+    end function f_amr_tag_grad_st
 
     !> Tag indicator from the tagged variable at i+1, i, i-1: central difference over 2*r_i, or with amr_tag_abs the larger absolute
     !! face jump.

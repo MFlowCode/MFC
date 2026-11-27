@@ -13,7 +13,7 @@ module m_amr_state
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
     use m_amr_restart_io, only: s_amr_subdivide_cb
-    use m_constants, only: mapCells
+    use m_constants, only: mapCells, eos_mie_gruneisen
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_array_max
     use m_amr_registers, only: s_amr_parent_foot
@@ -120,6 +120,8 @@ module m_amr_state
     integer              :: amr_n_own = 0
     !> cached f_amr_parent_block (0 for level <= 1), avoiding an O(global blocks) scan per block per stage
     integer, allocatable :: amr_parent_blk(:)
+    !> a level >= 2 block lies within amr_cpat_mar coarse cells of its parent's edge, so its parent patch reads the parent's ghosts
+    logical              :: amr_nest_seam = .false.
     integer, allocatable :: amr_child_ptr(:)   !< children of p = amr_child_idx(amr_child_ptr(p-1)+1 : amr_child_ptr(p)), ascending
     integer, allocatable :: amr_child_idx(:)   !< (amr_child_ptr(0) = 0)
     integer(8)           :: amr_l1r_epoch = -1_8
@@ -271,17 +273,21 @@ contains
 
     !> Fine cell coordinates of block k in dimension d, rebuilt from the global coarse boundaries gcb by replaying k's ancestor
     !! chain from replicated metadata, so any rank can reproduce them. Do not bisect amr_slots(parent)%x_cb instead: the parent's
-    !! slot exists only on its owner, which a level>=2 block's owner need not be.
-    impure subroutine s_amr_build_block_coords(k, gcb, glb, fcb, fcc, fdx, d)
+    !! slot exists only on its owner, which a level>=2 block's owner need not be. With pad, every level is widened by pad parent
+    !! cells per side, so the result holds k's boundaries over -1-pad*rr : nf+pad*rr, stored from fcb(-1).
+    impure subroutine s_amr_build_block_coords(k, gcb, glb, fcb, fcc, fdx, d, pad)
 
         integer, intent(in)                  :: k, d
         real(wp), intent(in)                 :: gcb(:)  !< global L0 cell boundaries
         integer, intent(in)                  :: glb     !< index of gcb's first element (-1, or -1 - buff_size for a padded build)
         real(wp), allocatable, intent(inout) :: fcb(:), fcc(:), fdx(:)
-        integer                              :: chain(0:amr_max_level), lev, j, a, lo, nf, span, rr, plo(3), phi(3), clb
+        integer, intent(in), optional        :: pad
+        integer                              :: chain(0:amr_max_level), lev, j, a, lo, nf, span, rr, plo(3), phi(3), clb, q
         real(wp), allocatable                :: cur(:), scb(:), scc(:), sdx(:)
 
         rr = amr_ref_ratio
+        q = 0
+        if (present(pad)) q = pad
         lev = amr_block_level(k)
         a = k
         do j = lev, 1, -1  ! chain(j) = k's ancestor at level j; chain(lev) = k
@@ -295,7 +301,7 @@ contains
         do j = 1, lev
             a = chain(j)
             span = amr_region_hi_all(d, a) - amr_region_lo_all(d, a) + 1  ! L0 cells the box covers
-            nf = rr**j*span - 1  ! its fine extent at level j
+            nf = rr**j*span - 1 + 2*q*rr  ! its fine extent at level j, padded
             if (j == 1) then
                 lo = amr_region_lo_all(d, a)  ! global L0 index of the box's low corner
             else
@@ -303,12 +309,12 @@ contains
                 lo = plo(d)
             end if
             if (j == lev) then
-                call s_build_level_coords(cur, clb, lo, nf, fcb, fcc, fdx)
+                call s_build_level_coords(cur, clb, lo - q, nf, fcb, fcc, fdx)
             else
                 if (allocated(scb)) deallocate (scb, scc, sdx)
                 allocate (scb(-1:nf), scc(0:nf), sdx(0:nf))
-                call s_build_level_coords(cur, clb, lo, nf, scb, scc, sdx)
-                cur = scb; clb = -1
+                call s_build_level_coords(cur, clb, lo - q, nf, scb, scc, sdx)
+                cur = scb; clb = -1 - q*rr
             end if
         end do
         if (allocated(scb)) deallocate (scb, scc, sdx)
@@ -500,20 +506,28 @@ contains
     end function f_amr_cons_ok
 
     !> Average over one half (xi < 0 left, > 0 right; |xi| = 1/4) of the middle of five cell averages q: the conservative quartic,
-    !! or MC-limited linear where either half leaves the range of the three nearest averages. At a local extremum of the averages
-    !! that range is widened by their smallest second difference; where they are monotone it is not, so the children make no new
-    !! extremum (at the foot of a steep front that difference is as large as q(0)). Both halves are tested so the two children share
-    !! one reconstruction (their mean stays q(0)).
+    !! or MC-limited linear where either half leaves the range of the three nearest averages. That range is widened only where the
+    !! three second differences share a sign (smooth data): by the smallest of them, c, at a local extremum of the averages, and
+    !! where they are monotone by c/4 times the ratio of the smallest to the largest, never across zero. A smooth extremum in the
+    !! next cell needs c/8 (without it the fill is second order there) and has a ratio near one; at the foot of a steep front c is
+    !! as large as q(0) and the ratio is small; at an under- or overshoot beside a front the differences change sign and the
+    !! quartic's slope is the front's, not the cell's. Both halves are tested so the two children share one reconstruction (their
+    !! mean stays q(0)).
     pure real(wp) function f_amr_quartic_half(q, xi) result(v)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: q(-2:2), xi
-        real(wp)             :: c, a, b, d, lo, hi
+        real(wp)             :: c, a, b, d, dl, dc, dr, lo, hi
 
         d = (3._wp*(q(-2) - q(2)) - 22._wp*(q(-1) - q(1)))/128._wp
         a = q(1) - q(0); b = q(0) - q(-1)
+        dl = q(-2) - 2._wp*q(-1) + q(0); dc = a - b; dr = q(0) - 2._wp*q(1) + q(2)
+        lo = min(q(-1), q(0), q(1)); hi = max(q(-1), q(0), q(1))
         c = 0._wp
-        if (a*b <= 0._wp) c = min(abs(q(-2) - 2._wp*q(-1) + q(0)), abs(a - b), abs(q(0) - 2._wp*q(1) + q(2)))
-        lo = min(q(-1), q(0), q(1)) - c; hi = max(q(-1), q(0), q(1)) + c
+        if (dl*dc > 0._wp .and. dc*dr > 0._wp) then
+            c = min(abs(dl), abs(dc), abs(dr))
+            if (a*b > 0._wp) c = min(0.25_wp*c*c/max(abs(dl), abs(dc), abs(dr)), max(lo, 0._wp, -hi))
+        end if
+        lo = lo - c; hi = hi + c
         if (min(q(0) - abs(d), q(0) + abs(d)) >= lo .and. q(0) + abs(d) <= hi) then
             v = q(0) + sign(1._wp, xi)*d
         else
@@ -633,5 +647,48 @@ contains
         end if
 
     end subroutine s_amr_size_real
+
+    !> Bytes of one block's column of the flat store (one field family): the mbuf extents (interior plus ghost layers) x sys_size at
+    !! the store's precision.
+    pure function f_amr_col_bytes() result(b)
+
+        integer(8) :: b
+
+        b = product(int(mbuf_hi - mbuf_lo + 1, 8))*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
+
+    end function f_amr_col_bytes
+
+    !> Largest Mie-Gruneisen compression over this rank's fine blocks, as a fraction of each phase's mu_max. Level 0 holds only the
+    !! restricted average, so a fine cell past the limit would otherwise go unreported (m_eos clamps mu silently).
+    impure function f_amr_mg_mu_frac_max() result(frac_max)
+
+        real(wp) :: frac_max
+        real(wp) :: frac
+        integer  :: k, loc, i, j, l, fl, fm, fn, fp
+
+        frac_max = 0._wp
+        do k = 1, amr_num_blocks
+            if (.not. amr_owns_all(k)) cycle
+            loc = amr_loc_of(k); fm = amr_slots(k)%m; fn = amr_slots(k)%n; fp = amr_slots(k)%p
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, l, fl, frac]', reduction='[[frac_max]]', reductionOp='[max]')
+            do l = 0, fp
+                do j = 0, fn
+                    do i = 0, fm
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do fl = 1, num_fluids
+                            if (eoss(fl) == eos_mie_gruneisen) then
+                                frac = (real(amr_cons_st(i, j, l, eqn_idx%cont%beg + fl - 1, loc), wp)/max(real(amr_cons_st(i, j, &
+                                        & l, eqn_idx%adv%beg + fl - 1, loc), wp), &
+                                        & sgm_eps)/eos_coeffs(fl)%rho0 - 1._wp)/eos_coeffs(fl)%mu_max
+                                frac_max = max(frac_max, frac)
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end do
+
+    end function f_amr_mg_mu_frac_max
 
 end module m_amr_state

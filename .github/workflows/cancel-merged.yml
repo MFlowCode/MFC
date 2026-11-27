@@ -1,0 +1,32 @@
+name: Cancel Merged PR Runs
+
+# Stops a merged pull request's unfinished runs; the push to master starts its own.
+# pull_request_target gives fork pull requests a token that may cancel. It runs no pull request code.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  actions: write
+
+jobs:
+  cancel:
+    name: Cancel
+    if: github.event.pull_request.merged && github.event.pull_request.head.repo != null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel unfinished runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH:   ${{ github.event.pull_request.head.ref }}
+          HEAD:     ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          # Only pull request events from this head repository and branch: never pushes, so never master's runs.
+          gh api --paginate --method GET "repos/$GITHUB_REPOSITORY/actions/runs" -f branch="$BRANCH" -f per_page=100 \
+              --jq '.workflow_runs[] | select(.status != "completed" and (.event | startswith("pull_request"))
+                    and .head_repository.full_name == env.HEAD and (.id | tostring) != env.GITHUB_RUN_ID) | .id' |
+          while read -r id; do
+              gh run cancel "$id" --repo "$GITHUB_REPOSITORY" < /dev/null || echo "run $id could not be cancelled"
+          done

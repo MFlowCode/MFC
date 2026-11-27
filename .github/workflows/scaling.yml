@@ -1,0 +1,140 @@
+name: 'Scaling'
+
+# Weak and strong scaling of master on Frontier, once a week: 1, 8 and 64 nodes (8, 64 and 512
+# GPUs), a few node-hours. The result is appended to scaling.jsonl in MFlowCode/MFC-ci-data,
+# which docs/dashboard/benchmarks.html draws. A run outside the tolerances of scaling-check.py
+# fails and opens an issue. Only a run of master at the usual sizes is recorded; any other manual
+# run is checked against the history and left out of it.
+on:
+  schedule:
+    - cron: '23 9 * * 0'
+  workflow_dispatch:
+    inputs:
+      nodes:
+        description: 'Node counts, space-separated'
+        default: '1 8 64'
+      accept:
+        description: 'Accept this run as the new baseline (after a change in scaling that is meant to stay)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: scaling
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Scaling | Frontier (AMD) (gpu-omp)
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on:
+      group: phoenix
+      labels: frontier
+    # The 64-node job can wait in the queue for hours.
+    timeout-minutes: 1440
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          clean: false
+
+      - name: Run
+        env:
+          NODES: ${{ inputs.nodes || '1 8 64' }}
+        run: |
+          [[ "$NODES" =~ ^[0-9\ ]+$ ]] || { echo "::error::Node counts must be numbers."; exit 1; }
+          # shellcheck disable=SC2086
+          bash .github/scripts/scaling.sh "$PWD/scaling-logs" $NODES
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: squeue --me -h -o '%i %j' | awk '$2 ~ /^MFC-scaling-/ { print $1 }' | xargs -r scancel
+
+      - name: Archive Logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: scaling-logs
+          path: scaling-logs
+          if-no-files-found: ignore
+          retention-days: 30
+
+  record:
+    name: Record Scaling History
+    needs: run
+    if: always() && github.repository == 'MFlowCode/MFC' && needs.run.result != 'skipped' && needs.run.result != 'cancelled'
+    runs-on: ubuntu-latest
+    env:
+      # The weekly run: master at the usual sizes. Only it is recorded and keeps the issues.
+      WEEKLY: ${{ github.ref == 'refs/heads/master' && (inputs.nodes || '1 8 64') == '1 8 64' }}
+    permissions:
+      contents: read
+      # write: opens an issue when a scaling run fails or cannot be recorded.
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: scaling-logs
+          path: scaling-logs
+
+      - name: Append to history
+        id: record
+        env:
+          DEPLOY_KEY: ${{ secrets.CI_DATA_DEPLOY_KEY }}
+          ACCEPT:     ${{ inputs.accept || false }}
+        run: |
+          python3 .github/scripts/scaling-record.py scaling-logs "$GITHUB_SHA" "$(git show -s --format=%cI "$GITHUB_SHA")" "$(git show -s --format=%s "$GITHUB_SHA")" > new.jsonl
+          if [ "$ACCEPT" = true ]; then jq -c '. + {accept: true}' new.jsonl > accepted.jsonl && mv accepted.jsonl new.jsonl; fi
+          # No history yet is a 404; anything else must not pass for an empty history, which has no baseline.
+          code=$(curl -sL --max-time 60 -o before.jsonl -w '%{http_code}' https://raw.githubusercontent.com/MFlowCode/MFC-ci-data/main/scaling.jsonl) || code=000
+          case "$code" in 200) ;; 404) : > before.jsonl ;; *) echo "::error::Could not read the scaling history (HTTP $code)."; exit 1 ;; esac
+          if [ "$WEEKLY" != true ]; then echo "Not master at the usual sizes: checked, not recorded."; echo "partial=--partial" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # A re-run of this job, or a week in which master did not move: the commit is already there.
+          if grep -qF "\"sha\":\"$GITHUB_SHA\"" before.jsonl && [ "$ACCEPT" != true ]; then echo "$GITHUB_SHA is already recorded."; exit 0; fi
+          .github/scripts/ci-data-append.sh scaling.jsonl new.jsonl "Scaling @ ${GITHUB_SHA::7}"
+
+      # Recorded either way; a regression fails the run and keeps an issue open until a run passes.
+      - name: Check for a regression
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+          RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PARTIAL:  ${{ steps.record.outputs.partial }}
+        run: |
+          title="Scaling regressed on Frontier"
+          rc=0
+          # shellcheck disable=SC2086
+          found=$(python3 .github/scripts/scaling-check.py $PARTIAL new.jsonl before.jsonl) || rc=$?
+          # 1 is a regression; anything else is the check itself failing, which is not one.
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+          # A run that is not recorded says nothing about the weekly run of master: report here, leave the issue.
+          if [ -n "$PARTIAL" ]; then
+            echo "${found:-Within tolerance at the sizes run.}" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit "$rc"
+          fi
+          if [ "$rc" -eq 0 ]; then
+            bash .github/scripts/ci-issue.sh close "$title" "Within tolerance again in $RUN_URL"
+          else
+            echo "$found" | tee -a "$GITHUB_STEP_SUMMARY"
+            bash .github/scripts/ci-issue.sh open "$title" "$(printf 'At %s (%s):\n\n%s\n\nTolerances are in .github/scripts/scaling-check.py; history at https://mflowcode.github.io/dashboard/benchmarks.html#scaling\n' "${GITHUB_SHA::7}" "$RUN_URL" "$found")"
+            echo "regressed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fail on a regression
+        if: steps.check.outputs.regressed == 'true'
+        run: exit 1
+
+      - name: Say so when the scaling run fails
+        if: failure() && steps.check.outputs.regressed != 'true' && env.WEEKLY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+        run: bash .github/scripts/ci-issue.sh open "Weekly scaling run is failing" "No scaling result was recorded by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."
+
+      - name: Clear that once it records again
+        if: (success() || steps.check.outputs.regressed == 'true') && env.WEEKLY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO:     ${{ github.repository }}
+        run: bash .github/scripts/ci-issue.sh close "Weekly scaling run is failing" "Recorded again by ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}."

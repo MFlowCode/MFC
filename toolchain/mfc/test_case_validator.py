@@ -325,7 +325,10 @@ class TestChemistrySubstepping(ConstraintTestCase):
         self.assertAccepts(params)
 
     def test_accepts_igr_without_substepping(self):
-        self.assertAccepts({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0})
+        self.assertAccepts({**CHEMISTRY, **BASE_2D, "igr": "T", "chem_params%reaction_substeps": 0})
+
+    def test_rejects_igr_in_1d(self):
+        self.assertRejects({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0}, "igr requires a 2D or 3D case")
 
 
 class TestChemistryTransportDt(ConstraintTestCase):
@@ -490,6 +493,19 @@ class TestTimeStep(ConstraintTestCase):
         self.assertAccepts(BASE)
 
 
+class TestSurfaceTensionRiemannSolver(ConstraintTestCase):
+    """Only HLLC adds the capillary stress flux; another solver would drop the surface tension silently."""
+
+    MSG = "The surface tension model requires the HLLC Riemann solver"
+    CASE = {**BASE, "num_fluids": 2, "model_eqns": 3, "surface_tension": "T", "sigma": 1.0}
+
+    def test_rejects_hll(self):
+        self.assertRejects({**self.CASE, "riemann_solver": 1}, self.MSG)
+
+    def test_hllc_not_rejected_for_the_solver(self):
+        self.assertNotIn(self.MSG, self.errors_for({**self.CASE, "riemann_solver": 2}))
+
+
 class TestHllMethodTwoGeometry(ConstraintTestCase):
     MSG = "HLL Method 2 is not supported for 3D cylindrical geometry"
 
@@ -533,6 +549,68 @@ class TestAltSoundspeedHlld(ConstraintTestCase):
         self.assertNotIn(self.MSG, self.errors_for({**TWO_FLUID, "riemann_solver": 4}))
 
 
+class TestWenoReFluxWithoutAvg(ConstraintTestCase):
+    """weno_Re_flux without weno_avg grows grid-scale noise (#2435) and misses jumps between cells (#2391): an error."""
+
+    MSG = "weno_Re_flux requires weno_avg = T"
+    VISCOUS = {**BASE, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "weno_Re_flux": "T"}
+
+    def test_rejects_without_weno_avg(self):
+        self.assertRejects(self.VISCOUS, self.MSG)
+
+    def test_rejects_weno_avg_false(self):
+        self.assertRejects({**self.VISCOUS, "weno_avg": "F"}, self.MSG)
+
+    def test_accepts_with_weno_avg(self):
+        self.assertAccepts({**self.VISCOUS, "weno_avg": "T"})
+
+    def test_accepts_without_weno_Re_flux(self):
+        self.assertAccepts({**self.VISCOUS, "weno_Re_flux": "F"})
+
+
+class TestMppLimWarning(unittest.TestCase):
+    """mpp_lim breaks interface pressure equilibrium (#2476): a warning, except where AMR requires it or bubbles use it."""
+
+    MSG = "mpp_lim clips volume fractions"
+
+    def warned(self, params):
+        return any(self.MSG in w for w in CaseValidator(dict(params)).validate("simulation"))
+
+    def test_warns_when_on(self):
+        self.assertTrue(self.warned({**TWO_FLUID, "mpp_lim": "T"}))
+
+    def test_silent_when_off(self):
+        self.assertFalse(self.warned(TWO_FLUID))
+
+    def check_only(self, params):
+        """The rule alone: a full valid AMR or Euler-Euler bubble case needs many unrelated keys."""
+        validator = CaseValidator(dict(params))
+        validator.check_mpp_lim()
+        return any(self.MSG in w for w in validator.warnings)
+
+    def test_silent_with_two_fluid_amr(self):
+        self.assertTrue(self.check_only({**TWO_FLUID, "mpp_lim": "T"}))
+        self.assertFalse(self.check_only({**TWO_FLUID, "mpp_lim": "T", "amr": "T"}))
+
+    def test_silent_with_bubbles_euler(self):
+        self.assertFalse(self.check_only({**TWO_FLUID, "mpp_lim": "T", "bubbles_euler": "T"}))
+
+
+class TestNumLocalIbsMax(ConstraintTestCase):
+    """num_local_ibs_max sizes the per-rank IB arrays and must be positive."""
+
+    MSG = "num_local_ibs_max must be >= 1"
+
+    def test_default_accepted(self):
+        self.assertAccepts({**BASE_2D, **CYLINDER})
+
+    def test_positive_accepted(self):
+        self.assertAccepts({**BASE_2D, **CYLINDER, "num_local_ibs_max": 64})
+
+    def test_non_positive_rejected(self):
+        self.assertRejects({**BASE_2D, **CYLINDER, "num_local_ibs_max": 0}, self.MSG)
+
+
 class TestAmrDefaults(unittest.TestCase):
     """The derived AMR defaults apply only where the validator admits them, and never to a non-AMR case."""
 
@@ -541,10 +619,11 @@ class TestAmrDefaults(unittest.TestCase):
     def test_admissible_amr_case_gets_defaults(self):
         p = dict(self.AMR)
         self.assertTrue(apply_amr_defaults(p))
-        self.assertEqual(p["amr_device_pack"], "T")  # cap 16 <= DEVICE_PACK_MAX_CAP
-        q = {**self.AMR, "amr_max_grid_size": 96}
-        self.assertFalse(apply_amr_defaults(q))  # static block above the cap: nothing to derive
-        self.assertNotIn("amr_device_pack", q)
+        self.assertEqual(p["amr_device_pack"], "T")
+        for cap in (96, 0):  # large or rank-derived blocks get the fused kernels too
+            q = {**self.AMR, "amr_max_grid_size": cap}
+            self.assertTrue(apply_amr_defaults(q))
+            self.assertEqual(q["amr_device_pack"], "T")
         r = {**self.AMR, "amr_device_pack": "F"}
         self.assertTrue(apply_amr_defaults(r))
         self.assertEqual(r["amr_device_pack"], "F")
@@ -561,7 +640,18 @@ class TestAmrDefaults(unittest.TestCase):
         e = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_snap": 0}
         self.assertTrue(apply_amr_defaults(e))
         self.assertEqual(e["amr_snap"], 0)
+        # multi-level: a child's padding is clipped by the parent inset, so snapping could let a front leave its block
+        ml = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_max_level": 2, "amr_max_blocks": 8}
+        self.assertTrue(apply_amr_defaults(ml))
+        self.assertNotIn("amr_snap", ml)
         validate_case_constraints(p, "simulation")
+
+    def test_snap_needs_one_level_under_regrid(self):
+        dyn = {**self.AMR, "amr_regrid_int": 4, "amr_buf": 4, "amr_snap": 2}
+        validate_case_constraints(dyn, "simulation")
+        with self.assertRaises(CaseConstraintError):
+            validate_case_constraints({**dyn, "amr_max_level": 2}, "simulation")
+        validate_case_constraints({**dyn, "amr_max_level": 2, "amr_snap": 0}, "simulation")
 
     def test_unsupported_physics_is_prohibited_under_amr(self):
         for k in ("qbmm", "stretch_x", "cyl_coord", "relax"):
@@ -572,7 +662,21 @@ class TestAmrDefaults(unittest.TestCase):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 4}, "simulation")
-        for bad, msg in (({"amr_tag_var": 5}, "amr_tag_var must be"), ({"amr_tag_var": 3}, "requires amr_tag_abs = T"), ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2")):
+        validate_case_constraints({**self.AMR, "amr_tag_var": 5, "n": 32, "bc_y%beg": -3, "bc_y%end": -3, "amr_block_beg(2)": 10, "amr_block_end(2)": 20}, "simulation")
+        chem = {**self.AMR, "chemistry": "T", "cantera_file": "h2o2.yaml"}
+        validate_case_constraints({**chem, "amr_tag_var": 6}, "simulation")
+        validate_case_constraints({**chem, "amr_tag_var": 7, "amr_tag_species": 2, "amr_tag_abs": "T"}, "simulation")
+        bads = (
+            ({"amr_tag_var": 8}, "amr_tag_var must be"),
+            ({"amr_tag_var": 3}, "requires amr_tag_abs = T"),
+            ({"amr_tag_var": 4, "model_eqns": 3}, "requires model_eqns = 2"),
+            ({"amr_tag_var": 5}, "vanishes in 1D"),
+            ({"amr_tag_var": 6}, "require chemistry"),
+            ({"amr_tag_var": 7, "amr_tag_abs": "T"}, "require chemistry"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7}, "requires amr_tag_abs = T"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "amr_tag_var": 7, "amr_tag_abs": "T", "amr_tag_species": 0}, "amr_tag_species must be >= 1"),
+        )
+        for bad, msg in bads:
             with self.assertRaises(CaseConstraintError) as ctx:
                 validate_case_constraints({**self.AMR, **bad}, "simulation")
             self.assertIn(msg, str(ctx.exception))
@@ -595,7 +699,7 @@ class TestAmrDefaults(unittest.TestCase):
                 self.assertIn("amr", str(ctx.exception))
 
     def test_ib_gates_under_amr(self):
-        """STL (2D and 3D), reacting and lumped surfaces, ib_surface_wrt, ib_heat_wrt, and geometries the containment bbox cannot bound when moving or regridding."""
+        """STL (2D and 3D), reacting and lumped surfaces, ib_surface_wrt and ib_heat_wrt are rejected; an analytic non-box body may regrid."""
         ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
         ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1})
         validate_case_constraints(dict(ib), "simulation")
@@ -605,9 +709,9 @@ class TestAmrDefaults(unittest.TestCase):
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_surface_wrt": "T"}, "ib_surface_wrt"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_heat_wrt": "T"}, "ib_heat_wrt (not yet validated)"),
             ({"patch_ib(1)%thermal_bc": 3, "patch_ib(1)%Twall": 600.0, "patch_ib(1)%rho_solid": 2000.0, "patch_ib(1)%cp_solid": 700.0}, "thermal_bc or surface_reaction"),
-            ({"patch_ib(1)%geometry": 4, "patch_ib(1)%moving_ibm": 1}, "containment bounding box"),
-            ({"patch_ib(1)%geometry": 6, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "containment bounding box"),
         ]
+        # analytic non-box bodies are bounded by their marker-drawing radius, so they may move or regrid
+        validate_case_constraints({**ib, "patch_ib(1)%geometry": 6, "patch_ib(1)%length_x": 0.2, "patch_ib(1)%length_y": 0.1, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "simulation")
         for mods, msg in rejected:
             with self.assertRaises(CaseConstraintError, msg=str(mods)) as ctx:
                 validate_case_constraints({**ib, **mods}, "simulation")
@@ -926,6 +1030,24 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**body, "patch_ib(1)%emissivity": 1.5, "patch_ib(1)%T_rad": 300.0}, "emissivity must be in [0, 1]")
         self.assertAccepts({**body, "patch_ib(1)%emissivity": 0.9, "patch_ib(1)%T_rad": 300.0, "patch_ib(1)%heat_power": 5.0})
 
+    def test_a_wall_column_needs_a_fixed_inert_isothermal_circle_or_sphere(self):
+        col = {
+            **self.case(thermal_bc=1, Twall=300.0, wall_column="T", wall_column_len=1.0e-3),
+            "chemistry": "T",
+            "chem_params%diffusion": "T",
+            "cfl_adap_dt": "T",
+        }
+        self.assertAccepts(col)
+        self.assertRejects({**col, "patch_ib(1)%thermal_bc": 3, "patch_ib(1)%rho_solid": 1.0, "patch_ib(1)%cp_solid": 1.0}, "wall_column requires thermal_bc = 1")
+        self.assertRejects({**col, "patch_ib(1)%surface_reaction": 1, "surface_cantera_file": "s.yaml", "surface_phase": "surf"}, "requires surface_reaction = 0")
+        self.assertRejects({**col, "patch_ib(1)%moving_ibm": 2}, "requires every immersed boundary to be fixed")
+        self.assertRejects({**col, "chem_params%diffusion": "F"}, "requires chemistry = T and chem_params%diffusion = T")
+        self.assertRejects({**col, "chem_params%transport_model": 2}, "requires chem_params%transport_model = 1")
+        self.assertRejects({**col, "cfl_adap_dt": "F"}, "requires cfl_adap_dt or cfl_const_dt")
+        self.assertRejects({**col, "wall_column_dt_frac": 2.0}, "wall_column_dt_frac must be in (0, 1]")
+        self.assertRejects({**col, "wall_column_dt_frac": 0.0}, "wall_column_dt_frac must be in (0, 1]")
+        self.assertRejects({**col, "patch_ib(1)%wall_column_len": -1.0}, "wall_column_len must be >= 0")
+
     def test_the_energy_balance_needs_a_reacting_surface(self):
         self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")
         self.assertAccepts({**self.case(thermal_bc=2, surface_reaction=1), "chemistry": "T", "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
@@ -974,6 +1096,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**self.case(v_blow=1.0), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1, or a no-slip, non-blowing one")
         self.assertRejects({**flux, "patch_ib(1)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
         self.assertRejects({**flux, "hypoelasticity": "T"}, "ib_flux_wall is not supported with hypoelasticity")
+        self.assertRejects({**self.case(), **mech, "amr": "T"}, "ib_flux_wall is not supported with amr")
         second = {**flux, "num_ibs": 2, **{k.replace("patch_ib(1)", "patch_ib(2)"): v for k, v in flux.items() if k.startswith("patch_ib(1)%") and "surface_reaction" not in k}}
         self.assertAccepts(second)
         self.assertRejects({**second, "patch_ib(2)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
@@ -1083,6 +1206,9 @@ class TestSimData(ConstraintTestCase):
 
     def test_rejects_gamma_law(self):
         self.assertRejects({**self.GOOD, "model_eqns": 1}, "sim_data requires model_eqns = 2 or 3")
+
+    def test_rejects_amr(self):
+        self.assertRejects({**self.GOOD, "amr": "T"}, "sim_data is not supported with amr")
 
     def test_not_tripped_when_disabled(self):
         self.assertAccepts({**BASE_2D, "rho_wrt": "T", "sim_data": "F"})

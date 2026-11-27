@@ -25,13 +25,9 @@ module m_constants
     real(wp), parameter :: T_surface_max = 5000._wp
     real(wp), parameter :: T_cond_unset = -huge(1._wp)  !< ghost_point%T_cond of a ghost whose conduction uses its own T
 
-    !> Half-width of the contact-speed ramp, as a fraction of the sound speed, over which the HLLC tangential interface velocity
-    !! blends between the left and right states (ib_smooth_contact)
-    real(wp), parameter :: contact_ramp = 1.e-2_wp
-
     !> Reals per IB in restart_data/ib_state: time, force(3), torque(3), vel(3), angular_vel(3), angles(3), centroid(3), radius,
     !! Twall, ib_mass_relax bank. Twall carries a thermal_bc = 3 body's evolving temperature across a restart; the bank is the
-    !! body's unreturned gas mass (ib_mass_res(1), identical on every rank).
+    !! body's unreturned gas mass (patch_ib%mass_bank, held by the owner).
     integer, parameter :: ib_state_nfields = 22
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
@@ -44,12 +40,26 @@ module m_constants
     integer, parameter  :: num_probes_max = 64      !< Maximum number of flow probes in the simulation
     integer, parameter  :: num_patches_max = 10     !< Maximum number of IC patches
     integer, parameter  :: num_ib_airfoils_max = 5  !< Maximum number of ib_airfoil instances
-    integer, parameter  :: num_stl_models_max = 10
+    !> Immersed-boundary geometry ids (patch_ib%geometry). They differ from the patch_icpp ids (e.g. 4 is the airfoil here and the
+    !! swept line there).
+    integer, parameter :: ib_circle = 2, ib_rectangle = 3, ib_airfoil_2d = 4, ib_model_2d = 5, ib_ellipse = 6
+    integer, parameter :: ib_sphere = 8, ib_cuboid = 9, ib_cylinder = 10, ib_airfoil_3d = 11, ib_model_3d = 12
+    !> Initial-condition patch geometry ids (patch_icpp%geometry)
+    integer, parameter :: icpp_line_segment = 1, icpp_circle = 2, icpp_rectangle = 3, icpp_sweep_line = 4, icpp_ellipse = 5
+    integer, parameter :: icpp_isentropic_vortex = 6  !< retired
+    integer, parameter :: icpp_sphere = 8, icpp_cuboid = 9, icpp_cylinder = 10, icpp_sweep_plane = 11, icpp_ellipsoid = 12
+    integer, parameter :: icpp_2d_modal = 13, icpp_spherical_harmonic = 14, icpp_bubble_pulse = 16, icpp_spiral = 17
+    integer, parameter :: icpp_varcircle = 18, icpp_3d_varcircle = 19, icpp_taylor_green = 20, icpp_model = 21
+    integer, parameter :: icpp_retired(3) = [icpp_isentropic_vortex, 7, 15]
+    !> Geometries whose boundary can be smoothed (smoothen)
+    integer, parameter :: icpp_smoothable(11) = [icpp_circle, icpp_rectangle, icpp_sweep_line, icpp_ellipse, icpp_sphere, &
+                                          & icpp_cuboid, icpp_cylinder, icpp_sweep_plane, icpp_ellipsoid, icpp_2d_modal, &
+                                          & icpp_spherical_harmonic]
+    integer, parameter :: num_stl_models_max = 10
     !> Maximum number of immersed boundary patches (legacy, not used for patch_ib sizing)
     !> Fixed capacity of patch_ib (namelist patches + local particle bed subset after reduction)
-    integer, parameter  :: num_local_ibs_max = 30000           !< Maximum number of immersed boundary patches (patch_ib)
-    integer, parameter  :: max_particles_per_rank = 1000000    !< Sizes the EL particle collision lookup per rank
     integer, parameter  :: num_ib_patches_max_namelist = 810000
+    integer, parameter  :: max_particles_per_rank = 1000000    !< Sizes the EL particle collision lookup per rank
     integer, parameter  :: num_particle_clouds_max = 10        !< Maximum number of particle bed patch specifications
     integer, parameter  :: num_bc_patches_max = 10             !< Maximum number of boundary condition patches
     integer, parameter  :: max_2d_fourier_modes = 10           !< Max Fourier mode index for 2D modal patch (geometry 13)
@@ -59,7 +69,6 @@ module m_constants
     integer, parameter  :: dflt_num_igr_iters = 2              !< number of iterations for IGR elliptic solve
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
-    integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
     real(wp), parameter :: K_ib = 2._wp                        !< AMR block-owner cost per IB cell, relative to a fluid cell
     !> AMR fine-level restart per-block header: region box (6) + amr_block_level (1); the writer and both readers share it.
     integer, parameter :: amr_restart_blk_hdr_ints = 7
@@ -68,6 +77,8 @@ module m_constants
     integer, parameter :: amr_restart_blk_own_ints = 4
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
+    !> Volume fraction below which a phase counts as absent for the capillary time-step limit
+    real(wp), parameter :: capillary_alpha_min = 1.e-3_wp
     !> Spatial support width of acoustic source, used in s_source_spatial
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp
     real(wp), parameter :: dflt_vcfl_dt = 100._wp  !< value of vcfl_dt when viscosity is off for computing adaptive timestep size

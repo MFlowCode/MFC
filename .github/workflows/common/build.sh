@@ -58,13 +58,15 @@ fi
 # Serial amdflang device links exceed the 2 h walltime, so $job_variant lets the caller split them
 # into concurrent jobs that write to disjoint staging directories:
 #   base -> empty case (chemistry=False, eos_state_dependent=False)
-#   chem -> the chemistry variant only
+#   chem -> the chemistry variants only; side by side, chem-h2o2 and chem-carbon split them by mechanism
 #   eos  -> eos_state_dependent=True (Mie-Gruneisen, JWL, Vinet); one slug per target, so any such case builds it
 # Unset builds everything in this job (default for every other cluster).
-variant_cmd() {                                 # <base|chem|eos|all>: sets build_cmd
+variant_cmd() {                                 # <base|chem[-h2o2|-carbon]|eos|all>: sets build_cmd
     case "$1" in
         base) build_cmd=(./mfc.sh build -j 8 $build_opts) ;;
         chem) build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o Chemistry $build_opts) ;;
+        chem-h2o2)   build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o Chemistry h2o2.yaml $build_opts) ;;
+        chem-carbon) build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o Chemistry carbon_gasphase_reduced_gri11.yaml $build_opts) ;;
         eos)  build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o eos=mie_gruneisen $build_opts) ;;
         all)  build_cmd=(./mfc.sh test -v --dry-run -a -j 8 $build_opts) ;;
         *)    echo "ERROR: unknown job_variant '$1'"; exit 1 ;;
@@ -111,17 +113,23 @@ if [ "$preflight_rc" -ne 0 ]; then
     exit "$preflight_rc"
 fi
 
-# --- Variants side by side (Frontier, when the job was not given one variant) ---
+# --- Variants side by side (Frontier and Phoenix, when the job was not given one variant) ---
 # Built one after another, the variants took 67-89 minutes with CCE on GPUs, of a
-# two-hour allocation: a retry after a late failure could not finish. They stage
-# under different slugs and the allocation is a whole node, so they build at the
-# same time here, each with its own retry and log. The g1 partition caps a user
+# two-hour allocation: a retry after a late failure could not finish. On Phoenix they took
+# about 80 minutes of a 3.5 h allocation that also holds the tests. They stage
+# under different slugs, so they build at the same time here, each with its own
+# retry and log. The g1 partition caps a user
 # at 16 nodes, which is why this is not one job per variant. The full build below
 # then runs as a sweep: it finds everything in place and builds whatever a variant
 # missed, so the end state is the same as before.
-if [ -z "${job_variant:-}" ] && { [ "$job_cluster" = "frontier" ] || [ "$job_cluster" = "frontier_amd" ]; }; then
+if [ -z "${job_variant:-}" ] && [[ "$job_cluster" =~ ^(frontier|frontier_amd|phoenix)$ ]]; then
+    # Frontier's login node installed the dependencies already. Here the variants would race to build the same ones.
+    if [ "$job_cluster" = "phoenix" ]; then
+        run_build_step "${log_base}-deps.log" retry_build ./mfc.sh build --deps-only -j 8 $build_opts
+    fi
     variant_pids=()
-    for v in base chem eos; do
+    # Each chemistry mechanism is its own ~16 min simulation build; split, they no longer run back to back.
+    for v in base chem-h2o2 chem-carbon eos; do
         variant_cmd "$v"
         (
             set -o pipefail
@@ -134,7 +142,7 @@ if [ -z "${job_variant:-}" ] && { [ "$job_cluster" = "frontier" ] || [ "$job_clu
         wait "$pid" || variants_rc=1
     done
     if [ "$variants_rc" -ne 0 ]; then
-        echo "ERROR: a build variant failed; see the [base], [chem] and [eos] output above."
+        echo "ERROR: a build variant failed; see the [base], [chem-*] and [eos] output above."
         exit 1
     fi
     variant_cmd all
@@ -146,3 +154,8 @@ fi
 # build did print is the only evidence there is.
 RETRY_VALIDATE_CMD="$validate_cmd" \
     run_build_step "${log_base}.log" retry_build "${build_cmd[@]}"
+
+# Record where the build ran, for test jobs that reuse it (see MFC_GPU_PARTITION in submit-slurm-job.sh).
+if [ "$job_cluster" = "phoenix" ]; then
+    echo "${SLURM_JOB_PARTITION:-}" > .ci-build-partition
+fi

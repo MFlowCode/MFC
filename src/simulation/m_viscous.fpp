@@ -27,8 +27,9 @@ module m_viscous
     use m_constants, only: model_eqns_5eq, recon_type_weno, recon_type_muscl
     use m_hb_function
 
-    private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
-        & s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, s_finalize_viscous_module
+    private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_compute_axisym_viscous_hoop, &
+        & s_initialize_viscous_module, s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, &
+        & s_compact_normal_viscous_gradients, s_finalize_viscous_module, Res_viscous
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -62,7 +63,7 @@ contains
     !> Compute viscous stress tensor near cylindrical axis, avoiding 1/r singularity at y_cb(-1)=0
     !> Inverse Reynolds numbers of the mixture at one cell. Non-Newtonian fluids need the local shear rate, which comes from the
     !! velocity gradients; Newtonian ones reduce to the volume-fraction-weighted harmonic mean.
-    subroutine s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, Re_size_loc1, Re_size_loc2)
+    subroutine s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
 
         $:GPU_ROUTINE(function_name='s_compute_axis_inv_re', parallelism='[seq]', cray_inline=True)
 
@@ -74,7 +75,6 @@ contains
         #:endif
         integer, intent(in)                 :: j, k, l
         real(wp), dimension(2), intent(out) :: Re_visc
-        integer, intent(in)                 :: Re_size_loc1, Re_size_loc2
         real(wp)                            :: gamma_dot_c
         integer                             :: i, q
 
@@ -89,15 +89,15 @@ contains
                         & l) + grad_y_vf(3)%sf(j, k, l)))
                 end if
             #:endif
-            call s_compute_mixture_inv_re(alpha_visc, gamma_dot_c, Res_viscous, Re_visc, Re_size_loc1, Re_size_loc2)
+            call s_compute_mixture_inv_re(alpha_visc, gamma_dot_c, Res_viscous, Re_visc)
         else
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, 2
                 Re_visc(i) = dflt_real
 
-                if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_visc(i) = 0._wp
+                if (Re_size(i) > 0) Re_visc(i) = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
-                do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
+                do q = 1, Re_size(i)
                     Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
                 end do
 
@@ -124,11 +124,9 @@ contains
             real(wp), dimension(num_dims, num_dims) :: tau_Re
         #:endif
 
-        integer :: i, j, k, l, q               !< Generic loop iterator
-        integer :: Re_size_loc1, Re_size_loc2  !< host copies; amdflang reads Re_size stale cross-TU
+        integer :: i, j, k, l, q  !< Generic loop iterator
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous]')
 
@@ -148,7 +146,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -175,8 +173,7 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
-                                                           & Re_size_loc1, Re_size_loc2)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
                             end if
 
                             ! Shear stress near cylindrical axis: includes v/r hoop term
@@ -203,7 +200,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -230,8 +227,7 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
-                                                           & Re_size_loc1, Re_size_loc2)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
                             end if
 
                             tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, &
@@ -252,7 +248,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -279,8 +275,7 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
-                                                           & Re_size_loc1, Re_size_loc2)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
                             end if
 
                             tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(1)
@@ -304,7 +299,7 @@ contains
 
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -331,8 +326,7 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
-                                                           & Re_size_loc1, Re_size_loc2)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
                             end if
 
                             tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(2)
@@ -349,6 +343,59 @@ contains
         #:endif
 
     end subroutine s_compute_viscous_stress_cylindrical_boundary
+
+    !> 2D axisymmetric hoop stress: adds -tau_theta_theta/r to the radial momentum at every cell, with tau_theta_theta = 2 mu u_r/r
+    !! + (mu_b - 2 mu/3) div(u) from cell-centred gradients (3D takes it from theta faces)
+    subroutine s_compute_axisym_viscous_hoop(q_prim_vf, grad_x_vf, grad_y_vf, grad_z_vf, rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(num_dims), intent(in)    :: grad_x_vf, grad_y_vf, grad_z_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        real(wp)                                               :: alpha_visc_sum, ur_r, div_v, tau_tt
+        real(wp), dimension(2)                                 :: Re_visc
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_visc
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_visc
+        #:endif
+        integer :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, alpha_visc_sum, alpha_visc, Re_visc, ur_r, div_v, tau_tt]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        if (bubbles_euler .and. num_fluids == 1) then
+                            alpha_visc(i) = 1._wp - q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
+                        else
+                            alpha_visc(i) = q_prim_vf(eqn_idx%E + i)%sf(j, k, l)
+                        end if
+                    end do
+                    if (mpp_lim) then
+                        alpha_visc_sum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            alpha_visc(i) = min(max(0._wp, alpha_visc(i)), 1._wp)
+                            alpha_visc_sum = alpha_visc_sum + alpha_visc(i)
+                        end do
+                        alpha_visc = alpha_visc/max(alpha_visc_sum, sgm_eps)
+                    end if
+                    call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
+
+                    ur_r = q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/y_cc(k)
+                    div_v = grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, l) + ur_r
+                    tau_tt = 0._wp
+                    if (shear_stress) tau_tt = (2._wp*ur_r - (2._wp/3._wp)*div_v)/Re_visc(1)
+                    if (bulk_stress) tau_tt = tau_tt + div_v/Re_visc(2)
+                    rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - tau_tt/y_cc(k)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_axisym_viscous_hoop
 
     !> Computes viscous terms
     subroutine s_get_viscous(qL_prim_rsx_vf, dqL_prim_dx_n, dqL_prim_dy_n, dqL_prim_dz_n, qL_prim, qR_prim_rsx_vf, dqR_prim_dx_n, &
@@ -1134,7 +1181,8 @@ contains
     !! ib_visc_band cells of a body cell by the compact one of weno_Re_flux = F: the normal difference across the face, and the mean
     !! of the two cells' central tangential differences. Ghost values extend the flow only a layer or two deep (the mirror leaves a
     !! kink at the wall), and the gradient stencil of weno_Re_flux, about five cells wide, carries that into the fluid faces next to
-    !! the wall. The face j+1/2 is read by the viscous flux from dqR(j) and dqL(j+1), so both are set.
+    !! the wall. The face j+1/2 is read by the viscous flux from dqR(j) and dqL(j+1), so both are set. On an AMR fine frame the
+    !! markers (ib_markers_fine) hold the frame's interior only; cells outside it read as fluid (bodies sit inside their blocks).
     subroutine s_compact_ib_viscous_gradients(q_prim_vf, markers, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
 
         type(scalar_field), dimension(sys_size), intent(in)                           :: q_prim_vf
@@ -1159,22 +1207,30 @@ contains
         integer, intent(in)               :: id
         type(scalar_field), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
         integer                           :: j, k, l, a, b, c, jn, kn, ln, ja, kb, lc, wz
+        integer                           :: mlo1, mlo2, mlo3, mhi1, mhi2, mhi3
         logical                           :: near
         real(wp)                          :: g, f1p, f1m, f2p, f2m
 
         ja = merge(1, 0, id == 1); kb = merge(1, 0, id == 2); lc = merge(1, 0, id == 3)
         wz = merge(ib_visc_band, 0, p > 0)
+        ! readable marker cells: the array's bounds, or the installed fine frame's interior (its markers have no ghost layers and
+        ! cells past the frame hold another frame's markers)
+        mlo1 = lbound(markers%sf, 1); mlo2 = lbound(markers%sf, 2); mlo3 = lbound(markers%sf, 3)
+        mhi1 = ubound(markers%sf, 1); mhi2 = ubound(markers%sf, 2); mhi3 = ubound(markers%sf, 3)
+        if (amr_in_fine_advance) then
+            mlo1 = 0; mlo2 = 0; mlo3 = 0; mhi1 = m; mhi2 = n; mhi3 = p
+        end if
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, jn, kn, ln, near, g, f1p, f1m, f2p, f2m]', copyin='[ja, kb, &
-                            & lc, wz]')
+                            & lc, wz, mlo1, mlo2, mlo3, mhi1, mhi2, mhi3]')
         do l = -lc, p
             do k = -kb, n
                 do j = -ja, m
                     jn = j + ja; kn = k + kb; ln = l + lc
                     near = .false.
-                    do c = -wz, wz + lc*min(wz, 1)
-                        do b = -ib_visc_band*min(n, 1), (ib_visc_band + kb)*min(n, 1)
-                            do a = -ib_visc_band, ib_visc_band + ja
+                    do c = max(-wz, mlo3 - l), min(wz + lc*min(wz, 1), mhi3 - l)
+                        do b = max(-ib_visc_band*min(n, 1), mlo2 - k), min((ib_visc_band + kb)*min(n, 1), mhi2 - k)
+                            do a = max(-ib_visc_band, mlo1 - j), min(ib_visc_band + ja, mhi1 - j)
                                 if (markers%sf(j + a, k + b, l + c) /= 0) near = .true.
                             end do
                         end do
@@ -1205,6 +1261,52 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compact_ib_viscous_gradient
+
+    !> weno_Re_flux_compact: set the face-normal velocity gradient (direction id) on every face to the difference across the face.
+    !! The WENO chain (face values, cell gradient, reconstructed gradient, face mean) has zero damping at the checkerboard
+    !! wavenumber, which leaves a no-slip wall's odd-mirror forcing undamped. The face j+1/2 is read by the viscous flux from dqR(j)
+    !! and dqL(j+1), so both are set. Tangential gradients are unchanged.
+    subroutine s_compact_normal_viscous_gradients(q_prim_vf, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
+
+        type(scalar_field), dimension(sys_size), intent(in)                           :: q_prim_vf
+        integer, intent(in)                                                           :: id
+        type(scalar_field), dimension(eqn_idx%mom%beg:eqn_idx%mom%end), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
+        integer                                                                       :: i
+
+        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+            if (id == 1) call s_compact_normal_viscous_gradient(q_prim_vf(i), id, x_cc, dqL_x(i), dqR_x(i))
+            if (id == 2 .and. n > 0) call s_compact_normal_viscous_gradient(q_prim_vf(i), id, y_cc, dqL_y(i), dqR_y(i))
+            if (id == 3 .and. p > 0) call s_compact_normal_viscous_gradient(q_prim_vf(i), id, z_cc, dqL_z(i), dqR_z(i))
+        end do
+
+    end subroutine s_compact_normal_viscous_gradients
+
+    !> One velocity component of s_compact_normal_viscous_gradients; cc holds the cell centres along id.
+    subroutine s_compact_normal_viscous_gradient(q, id, cc, dqL, dqR)
+
+        type(scalar_field), intent(in)               :: q
+        integer, intent(in)                          :: id
+        real(wp), dimension(-buff_size:), intent(in) :: cc
+        type(scalar_field), intent(inout)            :: dqL, dqR
+        integer                                      :: j, k, l, ja, kb, lc, ic
+        real(wp)                                     :: g
+
+        ja = merge(1, 0, id == 1); kb = merge(1, 0, id == 2); lc = merge(1, 0, id == 3)
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ic, g]', copyin='[ja, kb, lc]')
+        do l = -lc, p
+            do k = -kb, n
+                do j = -ja, m
+                    ic = j*ja + k*kb + l*lc
+                    g = (q%sf(j + ja, k + kb, l + lc) - q%sf(j, k, l))/(cc(ic + 1) - cc(ic))
+                    dqR%sf(j, k, l) = g
+                    dqL%sf(j + ja, k + kb, l + lc) = g
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compact_normal_viscous_gradient
 
     !> Finalize the viscous module
     impure subroutine s_finalize_viscous_module()

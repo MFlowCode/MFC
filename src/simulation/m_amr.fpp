@@ -165,7 +165,7 @@ contains
         ! MPI).
         cells = real(product(mbuf_hi - mbuf_lo + 1), wp)
         nfam = 2._wp
-        slot_gib = cells*real(sys_size, wp)*nfam*real(storage_size(1._wp)/8, wp)/1024._wp**3
+        slot_gib = nfam*real(f_amr_col_bytes(), wp)/1024._wp**3
         print '(A,I0,A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x ', nint(nfam), &
             & ' fields = ', cells*real(sys_size, wp)*nfam, ' words (', slot_gib, ' GiB per owned block)'
         print '(A,F9.2,A,I0,A)', ' [amr]   worst case if one rank owned every block: ', slot_gib*real(amr_max_blocks, wp), &

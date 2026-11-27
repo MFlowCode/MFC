@@ -40,7 +40,7 @@ docs/documentation/parameters.md
 # Written by ./mfc.sh test when cases fail and deleted again on a clean run, so a committed copy
 # flips in and out of every working tree depending on the last run's outcome. The pattern above
 # only covers tests/<uuid>/, not tests/ itself.
-/tests/failed_uuids.txt
+/tests/failed_uuids*.txt
 
 # NVIDIA Nsight Compute
 *.nsys-rep
@@ -59,7 +59,7 @@ docs/post_process/readme.md
 docs/api/readme.md
 
 examples/**/IC/*.dat
-examples/**/IC/.cache_key.json
+examples/**/IC/**/.cache_key.json
 examples/*batch/*/
 examples/**/D/*
 examples/**/p*

@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
+"""
+2D Taylor-Green vortex at low Reynolds number (U0 L0 / nu = 1.2e-5) and Mach 3e-4: the velocity decays as exp(-2 nu t / L0^2),
+the kinetic energy as exp(-4 nu t / L0^2) (check_tgv.py).
+"""
+
+import argparse
 import json
 import math
+
+parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT")
+parser.add_argument("-N", type=int, default=200, help="Cells per direction (default: 200)")
+args = parser.parse_args()
 
 gam_a = 1.4
 Mu = 10000  # Define the fluid's dynamic viscosity
@@ -20,8 +31,8 @@ print(
             "x_domain%end": L,
             "y_domain%beg": -L,
             "y_domain%end": L,
-            "m": 199,
-            "n": 199,
+            "m": args.N - 1,
+            "n": args.N - 1,
             "p": 0,
             "dt": 1.0e-08,
             "t_step_start": 0,

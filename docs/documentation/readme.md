@@ -8,6 +8,7 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 - @ref running "Running" - How to run simulations (interactive, batch, GPU)
 - @ref case "Case Files" - Setting up input files
 - @ref testing "Testing" - Running the test suite
+- @ref validation "Validation" - Comparisons with exact solutions and reference data
 
 ## Reference
 
@@ -26,6 +27,7 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 
 - @ref architecture "Code Architecture" - How the source code is organized, data flow, and module map
 - @ref expectedPerformance "Performance" - Optimization and benchmarks
+- @ref ibm "Immersed Boundaries" - Overview of the immersed-boundary options and where each is documented
 - @ref amr "Adaptive Mesh Refinement" - Block-structured AMR: algorithm, physics support, and parameters
 - @ref gpuParallelization "GPU Parallelization" - GPU macro API (developer reference)
 - @ref docker "Containers" - Docker usage

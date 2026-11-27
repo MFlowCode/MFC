@@ -8,3 +8,5 @@ Reference: See Example 4.8.
 
 ### Evolved State  
 <img src="figure1.png" height="MAX_HEIGHT"/>
+
+`mpp_lim` is off: this case runs without it, and it breaks pressure equilibrium at material interfaces (see `mpp_lim` in @ref case).

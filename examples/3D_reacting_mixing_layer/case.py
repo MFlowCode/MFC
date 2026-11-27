@@ -66,7 +66,6 @@ sol = ct.Solution(ctfile)
 cross_coord, x_coord, grid = flamelet_ic.compute_grid_3d(vort_thickness, cross_min, cross_max, points_per_cross, stream_min, stream_max, num_x, span_min, span_max, num_z)
 fluid = flamelet_ic.reference_fluid_properties(sol, temperature_ox, pressure, mole_fraction_ox)
 
-ic_dir = os.path.join(current_dir, "IC")
 # Key the cache on grid size + mode + physics so a cached IC isn't silently reused across
 # a --hot/cold switch or a physical-parameter change that leaves the line count unchanged.
 cache_key = {
@@ -86,6 +85,7 @@ cache_key = {
     "mechanism": flamelet_ic.mechanism_fingerprint(sol),
     "perturb_seed": perturb_seed,
 }
+ic_dir = flamelet_ic.keyed_ic_dir(current_dir, cache_key)
 if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(x_coord) * len(cross_coord), cache_key):
     flamelet_ic.generate_ic_files(
         output_dir=ic_dir,

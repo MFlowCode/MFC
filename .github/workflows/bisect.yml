@@ -1,0 +1,91 @@
+name: 'Cluster Bisect'
+
+# Find the merge that broke a cluster lane on master. Dispatched by the Cluster Master Alert
+# when a lane that passed in its last scheduled run fails with more than one merge since; can
+# also be run by hand. Each step costs one build of the lane plus the failed tests.
+on:
+  workflow_dispatch:
+    inputs:
+      cluster:
+        description: 'Lane cluster'
+        type: choice
+        options: [frontier, frontier_amd, phoenix]
+        required: true
+      interface:
+        description: 'GPU interface'
+        type: choice
+        options: [acc, omp]
+        required: true
+      good:
+        description: 'Last commit known to pass'
+        required: true
+      bad:
+        description: 'Commit known to fail'
+        required: true
+      tests:
+        description: 'Failed test UUIDs, space-separated (empty: bisect the build)'
+        default: ''
+      issue:
+        description: 'Issue number to report on'
+        default: ''
+
+concurrency:
+  group: bisect-${{ inputs.cluster }}-${{ inputs.interface }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bisect:
+    name: "Bisect | ${{ inputs.cluster }} (gpu-${{ inputs.interface }})"
+    if: github.repository == 'MFlowCode/MFC'
+    runs-on:
+      group:  phoenix
+      labels: ${{ inputs.cluster == 'phoenix' && 'gt' || 'frontier' }}
+    timeout-minutes: 1200
+    outputs:
+      message: ${{ steps.bisect.outputs.message }}
+    steps:
+      - name: Clone
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.bad }}
+          fetch-depth: 0
+          clean: false
+
+      - name: Bisect
+        id: bisect
+        env:
+          CLUSTER:   ${{ inputs.cluster }}
+          INTERFACE: ${{ inputs.interface }}
+          GOOD:      ${{ inputs.good }}
+          BAD:       ${{ inputs.bad }}
+          TESTS:     ${{ inputs.tests }}
+        run: bash .github/scripts/cluster-bisect.sh
+
+      - name: Cancel SLURM Jobs
+        if: cancelled()
+        run: |
+          find . -name "*.slurm_job_id" | while read -r f; do
+            scancel "$(cat "$f")" 2>/dev/null || true
+          done
+
+  # Posted from a hosted runner: the cluster runners are not known to have gh.
+  report:
+    name: Report
+    needs: bisect
+    if: always() && inputs.issue != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # No message: the job was cancelled, timed out or died before it could say anything.
+          MESSAGE:  ${{ needs.bisect.outputs.message || format('The bisect of {0} gpu-{1} did not finish ({2}).', inputs.cluster, inputs.interface, needs.bisect.result) }}
+          RUN_URL:  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ISSUE:    ${{ inputs.issue }}
+          REPO:     ${{ github.repository }}
+        run: |
+          gh issue comment "$ISSUE" -R "$REPO" --body "$(printf '%s\n\nRun: %s\n' "$MESSAGE" "$RUN_URL")"

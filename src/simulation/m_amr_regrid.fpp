@@ -21,15 +21,17 @@ module m_amr_regrid
     use m_amr_state, only: amr_band_migrate
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
-    use m_amr_nest, only: s_amr_regrid_nest_children, s_amr_nest_window, f_amr_tag_grad_sf
+    use m_amr_nest, only: s_amr_regrid_nest_children, f_amr_boxes_compatible, f_amr_nested, f_amr_tag_val_sf, f_amr_tag_vort_sf, &
+        & f_amr_tag_ind
     use m_amr_distribution, only: s_amr_sort_by_key
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
         & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
         & s_amr_exchange_coarse_cons_halo, s_amr_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, &
-        & s_amr_l1_fill_exchange, s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, &
-        & s_amr_fill_wave_done, amr_fw_dev
+        & f_amr_rank_tile, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, &
+        & s_amr_setup_ib, s_amr_l1_fill_exchange, s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, &
+        & s_amr_fill_wave_done, amr_fw_dev, amr_nest_seam, s_amr_refresh_lists
+    use m_amr_stage, only: s_amr_fill_levels
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
 
@@ -356,18 +358,34 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_base
         logical, allocatable, intent(inout)                 :: tag_grid(:,:,:)
         integer, intent(out)                                :: sidx(3)
-        integer                                             :: tg_lo(3), tg_hi(3), ci, cj, ck
+        integer                                             :: tg_lo(3), tg_hi(3), ci, cj, ck, h(3)
         real(wp)                                            :: g
+        real(wp), allocatable                               :: r(:,:,:)  !< the tagged variable, one evaluation per cell
 
         sidx = amr_sidx
         tg_lo = merge(merge(1, 0, sidx == 0), 0, amr_dim)
         tg_hi = merge(merge(amr_ext - 1, amr_ext, sidx + amr_ext == [m_glb, n_glb, p_glb]), 0, amr_dim)
         allocate (tag_grid(0:m,0:n,0:p)); tag_grid = .false.
+        h = merge(1, 0, amr_dim)
+        allocate (r(tg_lo(1) - h(1):tg_hi(1) + h(1),tg_lo(2) - h(2):tg_hi(2) + h(2),tg_lo(3) - h(3):tg_hi(3) + h(3)))
+        do ck = lbound(r, 3), ubound(r, 3)
+            do cj = lbound(r, 2), ubound(r, 2)
+                do ci = lbound(r, 1), ubound(r, 1)
+                    if (amr_tag_var /= 5) r(ci, cj, ck) = f_amr_tag_val_sf(q_cons_base, ci, cj, ck)
+                end do
+            end do
+        end do
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
                 do ci = tg_lo(1), tg_hi(1)
-                    ! total density (sum of continuity variables): single-fluid tagger, immune to trace-fluid noise
-                    g = f_amr_tag_grad_sf(q_cons_base, ci, cj, ck)
+                    if (amr_tag_var == 5) then
+                        g = f_amr_tag_vort_sf(q_cons_base, [ci, cj, ck], [ci, cj, ck] - h, [ci, cj, ck] + h)
+                    else
+                        ! jump of the tagged variable, max over the active dimensions
+                        g = f_amr_tag_ind(r(ci + 1, cj, ck), r(ci, cj, ck), r(ci - 1, cj, ck))
+                        if (n_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj + 1, ck), r(ci, cj, ck), r(ci, cj - 1, ck)))
+                        if (p_glb > 0) g = max(g, f_amr_tag_ind(r(ci, cj, ck + 1), r(ci, cj, ck), r(ci, cj, ck - 1)))
+                    end if
                     if (g > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
                     ! acoustic source support stays coarse
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
@@ -415,40 +433,14 @@ contains
 
     end subroutine s_amr_regrid_dormant_seed
 
-    !> True iff two same-level blocks can coexist: disjoint, and either >= 2 empty coarse cells apart or face-adjacent with an exact
-    !! transverse match. Mirrors s_amr_check_seam_topology.
-    pure logical function f_amr_boxes_compatible(alo, ahi, blo, bhi) result(ok)
-
-        integer, intent(in) :: alo(3), ahi(3), blo(3), bhi(3)
-        integer             :: d, t, gap
-        logical             :: tmatch, tover
-
-        ok = .true.
-        if (all(alo <= bhi .and. blo <= ahi)) then; ok = .false.; return; end if
-        do d = 1, 3
-            if (.not. amr_dim(d)) cycle
-            gap = max(blo(d) - ahi(d), alo(d) - bhi(d)) - 1  ! empty cells along d (< 0: overlap)
-            if (gap >= 2 .or. gap < 0) cycle
-            tover = .true.; tmatch = .true.
-            do t = 1, 3
-                if (t == d .or. .not. amr_dim(t)) cycle
-                tover = tover .and. alo(t) <= bhi(t) .and. blo(t) <= ahi(t)
-                tmatch = tmatch .and. alo(t) == blo(t) .and. ahi(t) == bhi(t)
-            end do
-            if (tover .and. .not. (gap == 0 .and. tmatch)) then; ok = .false.; return; end if
-        end do
-
-    end function f_amr_boxes_compatible
-
     !> Hysteresis (amr_snap > 0): a box within amr_snap cells per face of a live same-level block takes that block's box.
-    !! All-or-none: the snapped set must stay disjoint, compatible and singly nested (within amr_cpat_mar), else the fresh boxes
-    !! stand.
+    !! All-or-none: the snapped set must stay disjoint, compatible and properly nested (f_amr_nested), else the fresh boxes stand.
     impure subroutine s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
 
         type(t_box), intent(inout) :: boxes(:)
         integer, intent(in)        :: nboxes, box_level(:)
         type(t_box), allocatable   :: snapped(:)
-        integer                    :: k, kk, ks, npar, nsnap, mlo(3), mhi(3)
+        integer                    :: k, kk, ks, nsnap
         logical                    :: ok
 
         allocate (snapped(nboxes)); snapped(1:nboxes) = boxes(1:nboxes)
@@ -481,19 +473,9 @@ contains
                 end if
             end do
         end do
-        ! a level >= 2 box lies inside exactly one parent box, inset by the nesting margin
         do k = 1, nboxes
             if (.not. ok) exit
-            if (box_level(k) < 2) cycle
-            npar = 0
-            do kk = 1, nboxes
-                if (box_level(kk) /= box_level(k) - 1) cycle
-                if (.not. all(snapped(k)%lo <= snapped(kk)%hi .and. snapped(kk)%lo <= snapped(k)%hi)) cycle
-                npar = npar + 1
-                call s_amr_nest_window(snapped(kk), mlo, mhi)
-                if (any(snapped(k)%lo < mlo) .or. any(snapped(k)%hi > mhi)) ok = .false.
-            end do
-            if (npar /= 1) ok = .false.
+            if (box_level(k) >= 2) ok = f_amr_nested(snapped, nboxes, box_level, k)
         end do
         if (ok) boxes(1:nboxes) = snapped(1:nboxes)
         deallocate (snapped)
@@ -731,7 +713,7 @@ contains
         type(t_box), allocatable, intent(inout) :: boxes(:)
         integer, intent(inout)                  :: nboxes
         type(t_box), allocatable                :: tiled(:)
-        integer                                 :: lo(3), hi(3), k, kk, ntl, capt, pad
+        integer                                 :: lo(3), hi(3), k, kk, ntl, capt, pad, tc(3)
 
         pad = amr_buf
         k = 0
@@ -746,14 +728,16 @@ contains
         nboxes = k
         if (nboxes == 0) return
 
-        ! tile boxes larger than amr_maxc_fit (IB: after carving out body blocks, so a body is never split)
+        ! tile boxes larger than amr_maxc_fit, or smaller until every rank has work (IB: after carving out body blocks, so a body
+        ! is never split)
         allocate (tiled(amr_max_blocks))
         ntl = 0; capt = 0
         if (ib) then
             call s_amr_carve_tile_around_bodies(boxes, nboxes, tiled, ntl, capt)
         else
+            tc = f_amr_rank_tile(boxes, nboxes)
             do kk = 1, nboxes
-                call s_amr_tile_box(boxes(kk)%lo, boxes(kk)%hi, tiled, ntl, amr_max_blocks, capt)
+                call s_amr_tile_box(boxes(kk)%lo, boxes(kk)%hi, tiled, ntl, amr_max_blocks, capt, tc)
             end do
         end if
         if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', amr_max_blocks
@@ -945,7 +929,7 @@ contains
 
         type(t_box), intent(in) :: boxes(:)
         integer, intent(in)     :: nboxes, box_level(:)
-        integer                 :: k, kk, npar
+        integer                 :: k
 
         ! regions and owners first: the migration needs the new owners and s_set_amr_fine_geometry reads amr_block_owner
 
@@ -957,17 +941,12 @@ contains
         ! dirty the seam-pair and overlap-rank caches before the rebuild's gathers consume them
         amr_seam_pairs_dirty = .true.
         amr_mesh_epoch = amr_mesh_epoch + 1
-        ! proper nesting: a level >= 2 block must overlap exactly one parent-level block (f_amr_parent_block takes the first)
         do k = 1, nboxes
             if (box_level(k) < 2) cycle
-            npar = 0
-            do kk = 1, nboxes
-                if (box_level(kk) == box_level(k) - 1 .and. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, boxes(kk)%lo, &
-                    & boxes(kk)%hi)) npar = npar + 1
-            end do
-            if (npar /= 1) call s_mpi_abort('amr multi-level: a level>=2 block overlaps more than one (or no) ' &
-                & // 'parent-level block - a fine tile straddling a parent-tile seam is unsupported (gather/reflux ' &
-                & // 'couple to a single parent); reduce max_grid_size or the refined feature extent')
+            if (.not. f_amr_nested(boxes, nboxes, box_level, &
+                & k)) call s_mpi_abort('amr multi-level: a level>=2 block is not ' &
+                & // 'properly nested: it must lie in one parent-level block, inside its nesting window or on its edge against ' &
+                & // 'a matching same-level block (gather/reflux couple to a single parent)')
         end do
         amr_num_levels = maxval(box_level(1:nboxes))
         call s_amr_assign_block_owners()
@@ -1153,6 +1132,9 @@ contains
             if (lev == 1) then
                 call s_amr_l1_fill_exchange(q_cons_base, .true.)
             else
+                ! a block on its parent's edge prolongs from the parent's ghosts
+                call s_amr_refresh_lists()
+                if (amr_nest_seam) call s_amr_fill_levels(q_cons_base, lev - 1, lev - 1)
                 call s_amr_parent_fill_exchange(lev, .true.)
             end if
             do i = 1, amr_n_my

@@ -26,6 +26,7 @@ module m_data_output
     use m_particles_EL, only: q_particles, lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, &
         & particle_mass, particle_seed, f_p, fqs_fluct, fluid_vel_at_particle, density_at_particle
     use m_constants, only: model_eqns_5eq, precision_single, ib_state_nfields
+    use m_amr_state, only: f_amr_mg_mu_frac_max
 
     implicit none
 
@@ -38,11 +39,12 @@ module m_data_output
 
     !> @name ICFL, VCFL, CCFL, TCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
-    real(wp) :: icfl_max  !< ICFL criterion maximum
-    real(wp) :: vcfl_max  !< VCFL criterion maximum
-    real(wp) :: ccfl_max  !< CCFL criterion maximum
-    real(wp) :: tcfl_max  !< TCFL criterion maximum
-    real(wp) :: Rc_min    !< Rc criterion maximum
+    real(wp)   :: icfl_max         !< ICFL criterion maximum
+    real(wp)   :: vcfl_max         !< VCFL criterion maximum
+    real(wp)   :: ccfl_max         !< CCFL criterion maximum
+    real(wp)   :: tcfl_max         !< TCFL criterion maximum
+    real(wp)   :: Rc_min           !< Rc criterion maximum
+    integer(8) :: rt_clock0 = 0_8  !< system_clock count when run_time.inf was opened
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
@@ -85,6 +87,7 @@ contains
         character(LEN=path_len + name_len) :: file_path                   !< Relative path to a file in the case directory
         character(LEN=8)                   :: file_date                   !< Creation date of the run-time information file
 
+        call system_clock(rt_clock0)
         file_path = trim(case_dir) // '/' // trim(file_name)
 
         open (3, FILE=trim(file_path), form='formatted', STATUS='replace')
@@ -107,23 +110,12 @@ contains
 
         write (3, '(A)') ''; write (3, '(A)') ''
 
-        write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
-
-        if (surface_tension) then
-            write (3, '(13X,A10)', advance="no") trim('CCFL Max')
-        end if
-
-        if (heat_conduction) then
-            write (3, '(13X,A10)', advance="no") trim('TCFL Max')
-        end if
-
-        if (viscous) then
-            write (3, '(13X,A10,13X,A16)', advance="no") trim('VCFL Max'), trim('Rc Min')
-        end if
-
-        if (bubbles_lagrange) then
-            write (3, '(13X,A10)', advance="no") trim('N Bubbles')
-        end if
+        ! Columns two blanks apart; reals to four significant digits (ES10.3), counts exact
+        write (3, '(A9,3(2X,A10))', advance="no") 'Time-step', 'dt', 'Time', 'ICFL Max'
+        if (surface_tension) write (3, '(2X,A10)', advance="no") 'CCFL Max'
+        if (heat_conduction) write (3, '(2X,A10)', advance="no") 'TCFL Max'
+        if (viscous) write (3, '(2X,A10,2X,A10)', advance="no") 'VCFL Max', 'Rc Min'
+        if (bubbles_lagrange) write (3, '(2X,A10)', advance="no") 'N Bubbles'
 
         write (3, *)  ! new line
 
@@ -182,6 +174,7 @@ contains
         real(wp)               :: qv  !< Cell-avg. internal energy reference value
         real(wp)               :: c  !< Cell-avg. sound speed
         real(wp), dimension(2) :: Re  !< Cell-avg. Reynolds numbers
+        real(wp)               :: Dth  !< Cell thermal diffusivity
         integer                :: j, k, l
         real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
         real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
@@ -196,8 +189,6 @@ contains
         logical                :: include_cell  !< Cell is fluid, not ghost/inside an IB
         real(wp), dimension(4) :: stab_max_loc, stab_max_glb  !< Max-reduced criteria (ICFL, VCFL, CCFL, TCFL), packed
         real(wp), dimension(1) :: stab_min_loc, stab_min_glb  !< Min-reduced criteria (Rc), packed
-        !> Host copies; amdflang reads Re_size stale cross-TU
-        integer :: Re_size_loc1, Re_size_loc2
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
@@ -205,13 +196,12 @@ contains
         tcfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         mu_frac_max_loc = 0._wp
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         pw1 = amr_cfl_pow(1); pw2 = amr_cfl_pow(2); pw3 = amr_cfl_pow(3); amr_on = amr
         ! Computing Stability Criteria at Current Time-step
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
-                            & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
-                            & ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]', &
-                            & firstprivate='[Re_size_loc1, Re_size_loc2, pw1, pw2, pw3, amr_on]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, &
+                            & qv, icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, &
+                            & vcfl_max_loc, ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, &
+                            & min]', firstprivate='[pw1, pw2, pw3, amr_on]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -220,7 +210,7 @@ contains
                     if (ib) include_cell = (ib_markers%sf(j, k, l) == 0)
                     if (include_cell) then
                         call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
-                                                  & k, l, Re_size_loc1, Re_size_loc2)
+                                                  & k, l)
 
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
 
@@ -250,7 +240,9 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
-                        call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                        call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)
+                        call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, Dth, j, k, l, icfl, vcfl, Rc, ccfl, &
+                                                         & tcfl)
                         if (amr_on) call s_amr_scale_stability(amr_cfl_rf(j, k, l), pw1, pw2, pw3, icfl, vcfl, Rc, ccfl, tcfl)
 
                         icfl_max_loc = max(icfl_max_loc, icfl)
@@ -284,6 +276,7 @@ contains
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
+        if (amr .and. any_state_dependent_eos) mu_frac_max_loc = max(mu_frac_max_loc, f_amr_mg_mu_frac_max())
         mu_frac_max_glb = mu_frac_max_loc
         if (num_procs > 1) call s_mpi_allreduce_max(mu_frac_max_loc, mu_frac_max_glb)
 
@@ -310,23 +303,11 @@ contains
         call s_mpi_barrier()  ! ensure diagnostic output above is flushed before any rank aborts below
 
         if (proc_rank == 0) then
-            write (3, '(13X,I9,13X,ES10.3,13X,ES10.3,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
-
-            if (surface_tension) then
-                write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
-            end if
-
-            if (heat_conduction) then
-                write (3, '(13X,F10.6)', advance="no") tcfl_max_glb
-            end if
-
-            if (viscous) then
-                write (3, '(13X,F10.6,13X,ES16.6)', advance="no") vcfl_max_glb, Rc_min_glb
-            end if
-
-            if (bubbles_lagrange) then
-                write (3, '(13X,I10)', advance="no") n_el_bubs_glb
-            end if
+            write (3, '(I9,3(2X,ES10.3))', advance="no") t_step, dt, mytime, icfl_max_glb
+            if (surface_tension) write (3, '(2X,ES10.3)', advance="no") ccfl_max_glb
+            if (heat_conduction) write (3, '(2X,ES10.3)', advance="no") tcfl_max_glb
+            if (viscous) write (3, '(2X,ES10.3,2X,ES10.3)', advance="no") vcfl_max_glb, Rc_min_glb
+            if (bubbles_lagrange) write (3, '(2X,I10)', advance="no") n_el_bubs_glb
 
             write (3, *)  ! new line
 
@@ -397,8 +378,7 @@ contains
                         if (ib_markers%sf(j, k, l) /= 0) cycle
                     end if
 
-                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, &
-                                              & l, Re_size(1), Re_size(2))
+                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
 
                     if (any_non_newtonian) then
@@ -413,7 +393,7 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, 0._wp, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
                     if (amr) call s_amr_scale_stability(amr_cfl_rf(j, k, l), amr_cfl_pow(1), amr_cfl_pow(2), amr_cfl_pow(3), &
                         & icfl, vcfl, Rc, ccfl, tcfl)
 
@@ -486,8 +466,7 @@ contains
         ! from a smoothly diverging field, which indicates a genuine physical/numerical instability.
         print '(A)', '  x-neighborhood (dj, rho, pres, vel) around violating cell:'
         do j = max(-buff_size, j_hit - 3), min(m + buff_size, j_hit + 3)
-            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k_hit, &
-                                      & l_hit, Re_size(1), Re_size(2))
+            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k_hit, l_hit)
             print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '    dj=', j - j_hit, ' rho=', rho, ' pres=', pres, ' vel=', vel
         end do
 
@@ -518,7 +497,7 @@ contains
         if (file_exist) call s_delete_directory(trim(t_step_dir))
         call s_create_directory(trim(t_step_dir))
         ! Serial readers (post_process, restart) need bc_type.dat and bc_buffers.dat in every step directory, not just step 0.
-        if (bc_io) call s_write_serial_boundary_condition_files(bc_type, t_step_dir, .false.)
+        if (bc_io) call s_write_serial_boundary_condition_files(bc_type, t_step_dir)
 
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
@@ -1191,7 +1170,7 @@ contains
             write (file_unit) num_local_ibs
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, f_ib_mass_bank(patch_ib(ib_idx)%gbl_patch_id))
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, patch_ib(ib_idx)%mass_bank)
 
                 write (file_unit) patch_ib(ib_idx)%gbl_patch_id
                 write (file_unit) ib_buf
@@ -1218,7 +1197,7 @@ contains
 
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, f_ib_mass_bank(patch_ib(ib_idx)%gbl_patch_id))
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf, patch_ib(ib_idx)%mass_bank)
 
                 ! Global IB index determines position in file
                 disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(ib_state_nfields, MPI_OFFSET_KIND)*WP_MOK
@@ -1249,7 +1228,7 @@ contains
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
 
         do i = 1, num_ibs
-            call s_pack_ib_state(patch_ib(i), mytime, ib_buf, f_ib_mass_bank(patch_ib(i)%gbl_patch_id))
+            call s_pack_ib_state(patch_ib(i), mytime, ib_buf, patch_ib(i)%mass_bank)
 
             write (file_unit) ib_buf
         end do
@@ -1258,8 +1237,8 @@ contains
 
     end subroutine s_write_serial_ib_state
 
-    !> Record every immersed body's force, torque and kinematics (D/ib_forces.dat, ib_force_wrt with ib_state_wrt) and its mass and
-    !! heat exchange (D/ib_heat.dat, ib_heat_wrt) for this step.
+    !> Record every immersed body's force, torque and kinematics (D/ib_forces.dat, ib_force_wrt) and its mass and heat exchange
+    !! (D/ib_heat.dat, ib_heat_wrt) for this step.
     !!
     !! One shared text file per quantity, opened once for the run. Each rank writes only the
     !! bodies it owns, at a byte offset computed from the step and the global body id, so the file
@@ -1284,7 +1263,7 @@ contains
         integer             :: i, ib_idx, n_write, row
         logical             :: wrt_force
 
-        wrt_force = ib_force_wrt .and. ib_state_wrt
+        wrt_force = ib_force_wrt
         if (.not. (wrt_force .or. ib_heat_wrt)) return
         if (mod(t_step, max(ib_force_stride, 1)) /= 0) return
         ! This runs at RK stage 1, before the step's force has been computed, so the row for step N carries the
@@ -1447,9 +1426,6 @@ contains
         integer, intent(in) :: time_step
 
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
-        if (ib_mass_relax > 0) then
-            $:GPU_UPDATE(host='[ib_mass_res]')
-        end if
 
         if (parallel_io) then
             call s_write_parallel_ib_state(time_step)
@@ -1961,18 +1937,20 @@ contains
     !> Write footer with stability criteria extrema and run-time to the information file, then close it
     impure subroutine s_close_run_time_information_file
 
-        real(wp) :: run_time  !< Run-time of the simulation
+        real(wp)   :: run_time  !< Wall time since the file was opened (cpu_time overstates GPU runs)
+        integer(8) :: c1, rate
 
         write (3, '(A)') '    '
         write (3, '(A)') ''
 
-        write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
-        if (surface_tension) write (3, '(A,F9.6)') 'CCFL Max: ', ccfl_max
-        if (heat_conduction) write (3, '(A,F9.6)') 'TCFL Max: ', tcfl_max
-        if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
+        write (3, '(A,ES10.3)') 'ICFL Max: ', icfl_max
+        if (surface_tension) write (3, '(A,ES10.3)') 'CCFL Max: ', ccfl_max
+        if (heat_conduction) write (3, '(A,ES10.3)') 'TCFL Max: ', tcfl_max
+        if (viscous) write (3, '(A,ES10.3)') 'VCFL Max: ', vcfl_max
+        if (viscous) write (3, '(A,ES10.3)') 'Rc Min: ', Rc_min
 
-        call cpu_time(run_time)
+        call system_clock(c1, rate)
+        run_time = real(c1 - rt_clock0, wp)/real(max(rate, 1_8), wp)
 
         write (3, '(A)') ''
         write (3, '(A,I0,A)') 'Run-time: ', int(anint(run_time)), 's'

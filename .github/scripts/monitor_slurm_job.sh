@@ -95,14 +95,11 @@ is_terminal_state() {
   esac
 }
 
-# Optionally bound how long a job may sit un-started in the queue. On the
-# preemptible Phoenix 'embers' QOS a job routinely stays PENDING for hours and
-# needs most of the job-level `timeout-minutes` (1380m) window to backfill onto a
-# free node; that job timeout is the real backstop. Default to 0 (wait
-# indefinitely, up to the job timeout) so ordinary queue pressure does not turn
-# otherwise-healthy jobs into red CI. Set SLURM_MAX_QUEUE_SECONDS>0 to opt into
-# an earlier queue-starvation cutoff where the scheduler is not preemptible.
-: "${SLURM_MAX_QUEUE_SECONDS:=0}"   # 0 = wait indefinitely (job timeout is the backstop)
+# Bound how long a job may sit un-started in the queue: a job that waits holds a CI
+# runner slot. Phoenix ('inferno' QOS) and Frontier normally start within the hour, so
+# three hours pending means the scheduler is starved and a rerun later is the answer.
+# 0 waits indefinitely, up to the job-level `timeout-minutes`.
+: "${SLURM_MAX_QUEUE_SECONDS:=10800}"
 # Reject a non-integer override rather than silently skipping the budget.
 if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
@@ -161,7 +158,7 @@ while [ ! -f "$output_file" ]; do
     RUNNING|COMPLETING)
       unknown_count=0
       # Job is running but output file not yet visible (NFS delay)
-      sleep 2
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
     UNKNOWN)
       unknown_count=$((unknown_count + 1))
@@ -226,7 +223,7 @@ done
 # Give tail a moment to flush the final lines, then stop streaming. Whether it
 # was still alive decides how much needs reprinting below: if it streamed the
 # whole job, printing the file again just doubles every log.
-sleep 2
+sleep "$MFC_MONITOR_POLL_SECONDS"
 streamed_ok=0
 if kill -0 "${tail_pid}" 2>/dev/null; then
   streamed_ok=1

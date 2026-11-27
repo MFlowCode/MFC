@@ -156,8 +156,15 @@ compiler.
 |----------|----------------------|------------------------|
 | gfortran | `-O0 -fcheck=all,no-array-temps` | `-Og -fcheck=bounds,pointer` |
 | Intel ifx | `-Og -check all` | `-Og -check bounds` |
-| NVHPC | `-O0 -C -Mbounds` | `-O1 -Mbounds` |
+| NVHPC | `-O0 -C -Mbounds`, on CPU also `-Ktrap=fp` | `-O1 -Mbounds`, on CPU also `-Ktrap=fp` |
 | Cray ftn | `-O0 -K trap=fp` | `-O1 -K trap=fp` |
+| AMD flang (CPU) | `-O0`, plus `-ffpe-trap=invalid,zero,overflow -finit-local=0xff` where the compiler has them | the same |
+
+The floating-point traps of NVHPC and AMD flang on CPU stop some of the suite's own tests on
+`master` today. They are known and not yet triaged: some may be values computed and then discarded,
+others real bugs. The weekly Runtime Checks workflow lists them in the issues "Runtime checks fail
+with AMD flang on CPU" and "Runtime checks fail with NVHPC on CPU"; if a test of yours traps and is
+listed there, compare with `master` before assuming your change is at fault or innocent.
 
 Both modes define `MFC_DEBUG` and enable debug logging via `@:LOG()`.
 
@@ -186,6 +193,15 @@ When builds fail, isolate the problem by disabling features:
 ./mfc.sh build --single    # Single precision
 ./mfc.sh build --mixed     # Mixed precision
 ```
+
+### Stale Remembered Configuration
+
+`./mfc.sh` stores the last build configuration (MPI, GPU, debug, reldebug, single, and so on) in
+`build/lock.yaml` and reuses it, so a `--debug` or `--single` from an earlier command applies to
+later `build`, `run` and `test` commands that do not repeat the flag. If a run is unexpectedly slow, a
+test tolerance or skip depends on precision, or binaries are rebuilt, check the `Switching from ...`
+line and state the options you want explicitly, for example `--no-debug --no-reldebug --no-single`.
+See [Building MFC](@ref getting-started).
 
 ### Clean Rebuild
 
@@ -272,16 +288,19 @@ To isolate parallel issues, try running with fewer MPI ranks:
 
 ### Running Specific Tests
 
-Run only a specific test by UUID:
+Run only a specific test by UUID (`./mfc.sh test -l` lists them):
 
 ```bash
-./mfc.sh test --only 3D_sphbubcollapse
+./mfc.sh test --only <UUID>
 ```
 
-Run multiple specific tests:
+Run several specific tests by passing several UUIDs, which are ORed:
 ```bash
-./mfc.sh test --only 3D_sphbubcollapse 2D_shockbubble
+./mfc.sh test --only <UUID1> <UUID2>
 ```
+
+Non-UUID terms are labels, and a case must carry all of them, so two unrelated labels select nothing
+(see [Selection and Execution Pitfalls](@ref selection-and-execution-pitfalls)).
 
 ### Serial Test Execution
 
@@ -324,6 +343,16 @@ Possible causes:
 2. **Compiler differences:** Different compilers produce slightly different results
 3. **Precision settings:** Single vs double precision
 4. **Platform differences:** CPU architecture, GPU differences
+
+**GPU test passes with both ranks on one GPU but differs on two:** a device-binding bug, such as
+device data updated before the rank is bound to its GPU. AMD CI can hide it. See
+[Silent-Failure Traps](@ref silent-failure-traps) and test a 2-rank GPU change both ways.
+
+**"Submitting batch file for Interactive failed"** (the name is the queue system, here the interactive
+launcher): the job script that `./mfc.sh run` generated returned a non-zero status. The message gives
+its path; run that script by hand and read its output (`./mfc.sh run ... -v` prints the submit command).
+In CI, a Slurm `TIMEOUT` or a launch failure like this is no result for the PR: see
+[Silent-Failure Traps](@ref silent-failure-traps).
 
 ---
 
@@ -428,6 +457,15 @@ Verify: `mpirun --version`
 
 **Fix:** Build from a checkout with a shorter path.
 
+### `--no-gpu` build still uses NVHPC
+
+**Cause:** CMake takes its compilers from `FC`, `CC` and `CXX`. An NVHPC module that sets `FC=nvfortran` therefore makes every build an NVHPC build; `--no-gpu` only turns off GPU offload.
+
+**Fix:** for a GNU build, name the compilers explicitly (and use an MPI built with them):
+```bash
+CC=gcc CXX=g++ FC=gfortran ./mfc.sh build --no-gpu
+```
+
 ### "Module not found" on HPC
 
 **Cause:** Required modules not loaded.
@@ -492,6 +530,15 @@ Common issues:
 2. Try with fewer ranks: `./mfc.sh run case.py -n 1`
 3. Check for incompatible MPI/compiler combinations
 4. On clusters, ensure you're using the correct MPI for the interconnect
+
+### hcoll initialisation error at start-up with NVHPC's Open MPI
+
+**Symptom:** with the HPC-X Open MPI bundled with NVHPC, a run with more than one rank aborts at start-up with an `hcoll` initialisation error; one rank runs.
+
+**Fix:** disable the hcoll collectives component:
+```bash
+export OMPI_MCA_coll_hcoll_enable=0
+```
 
 ---
 

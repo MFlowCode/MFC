@@ -11,7 +11,7 @@ from ..schema import ParamDef, ParamType
 TARGETS = [("pre", "pre_process"), ("sim", "simulation"), ("post", "post_process")]
 TARGET_FROM_DIR = {full: short for short, full in TARGETS}
 
-_HEADER = "! AUTO-GENERATED - do not edit directly. Regenerate: cmake reconfigure\n!\n"
+_HEADER = "! AUTO-GENERATED - do not edit directly. Regenerated at build time from definitions.py (cmake/ParamsCodegen.cmake)\n!\n"
 _MAX_LINE = 130
 _FIRST_PREFIX = "namelist /user_inputs/ "
 _CONT_PREFIX = "    & "
@@ -40,7 +40,6 @@ SIM_GPU_DECL_VARS = {
     "ib_flux_wall",
     "ib_slip_ccst",
     "ib_ip_interp",
-    "ib_smooth_contact",
     "ib_ip_min_dist",
     "ib_second_order_vel",
     "Re_inv",
@@ -65,6 +64,7 @@ SIM_GPU_DECL_VARS = {
     "down_sample",
     "dt",
     "fd_order",
+    "friction_slip_eps",
     "hll_u_interface",
     "hyper_cleaning",
     "hyper_cleaning_speed",

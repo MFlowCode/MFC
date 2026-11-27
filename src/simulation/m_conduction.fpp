@@ -31,7 +31,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_qp
         type(scalar_field), intent(in)                      :: q_T_sf
         type(int_bounds_info), intent(in)                   :: irx, iry, irz
-        real(wp)                                            :: k_face, dT_dxi, grid_spacing, alpha_face
+        real(wp)                                            :: k_face, dT_dxi, grid_spacing, alpha_face, alpha_sum
         integer                                             :: x, y, z, i
 
         isc1 = irx; isc2 = iry; isc3 = irz
@@ -40,7 +40,7 @@ contains
 
         $:GPU_UPDATE(device='[isc1, isc2, isc3, offsets_c]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_face, dT_dxi, grid_spacing, alpha_face, i]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_face, dT_dxi, grid_spacing, alpha_face, alpha_sum, i]')
         do z = isc3%beg, isc3%end
             do y = isc2%beg, isc2%end
                 do x = isc1%beg, isc1%end
@@ -51,14 +51,16 @@ contains
                         grid_spacing = y_cc(y + 1) - y_cc(y)
                     case (3)
                         grid_spacing = z_cc(z + 1) - z_cc(z)
-                        ! 3D cylindrical z is the azimuth: dz is in radians. The r**2 carries both metric
-                        ! factors of (1/r**2) d2T/dtheta2, since m_rhs divides this flux by dz alone.
-                        if (grid_geometry == 3) grid_spacing = y_cc(y)**2*grid_spacing
+                        ! 3D cylindrical z is the azimuth (dz in radians): the face gradient is (1/r) dT/dtheta; m_rhs
+                        ! supplies the divergence-side 1/r
+                        if (grid_geometry == 3) grid_spacing = y_cc(y)*grid_spacing
                     end select
 
                     ! Volume-fraction-weighted face conductivity. Raw cell-centered alphas over- and
-                    ! undershoot near interfaces, so clamp the face average as the viscous path does.
+                    ! undershoot near interfaces, so clamp the face average and, as the viscous path does,
+                    ! rescale a clamped sum above 1 (3+ fluids) so k_face stays a convex combination.
                     k_face = 0._wp
+                    alpha_sum = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
                         alpha_face = 0.5_wp*(q_prim_qp(eqn_idx%adv%beg + i - 1)%sf(x, y, &
@@ -66,7 +68,9 @@ contains
                                              & z + offsets_c(3)))
                         alpha_face = min(max(alpha_face, 0._wp), 1._wp)
                         k_face = k_face + alpha_face*fluid_k_therm(i)
+                        alpha_sum = alpha_sum + alpha_face
                     end do
+                    k_face = k_face/max(alpha_sum, 1._wp)
 
                     dT_dxi = (q_T_sf%sf(x + offsets_c(1), y + offsets_c(2), z + offsets_c(3)) - q_T_sf%sf(x, y, z))/grid_spacing
 
@@ -88,7 +92,7 @@ contains
         type(scalar_field), intent(in)                           :: q_T_sf
         type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
         type(int_bounds_info), intent(in)                        :: ix, iy, iz
-        real(wp)                                                 :: k_cell, dT_dr, dr_l, dr_r, alpha_cell
+        real(wp)                                                 :: k_cell, dT_dr, dr_l, dr_r, alpha_cell, alpha_sum
         integer                                                  :: j, k, l, i
 
         isc1 = ix; isc2 = iy; isc3 = iz
@@ -109,16 +113,19 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_cell, dT_dr, dr_l, dr_r, alpha_cell, i]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_cell, dT_dr, dr_l, dr_r, alpha_cell, alpha_sum, i]')
         do l = isc3%beg, isc3%end
             do k = isc2%beg + 1, isc2%end - 1
                 do j = isc1%beg, isc1%end
                     k_cell = 0._wp
+                    alpha_sum = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
                         alpha_cell = min(max(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), 0._wp), 1._wp)
                         k_cell = k_cell + alpha_cell*fluid_k_therm(i)
+                        alpha_sum = alpha_sum + alpha_cell
                     end do
+                    k_cell = k_cell/max(alpha_sum, 1._wp)
 
                     ! Distance-weighted central difference. The axisymmetric grid halves the cell at
                     ! r = 0, so the plain form would be only first order over exactly this stencil.

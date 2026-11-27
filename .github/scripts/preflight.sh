@@ -10,9 +10,8 @@
 # Why at the top of the *test* allocation: over 2026-08-18..31, 48 of 58
 # measurable jobs built on one node and tested on another, and in every ECC
 # failure the build node was healthy while the tests landed on a bad one. A
-# probe placed after the build checks the wrong machine. (Phoenix's combined
-# build-and-test allocation avoids the split; Frontier still submits the two
-# separately and lands elsewhere ~90% of the time.)
+# probe placed after the build checks the wrong machine. (The build and the tests
+# are separate submissions and land on different nodes ~90% of the time.)
 #
 # Usage: preflight.sh <cluster> <device>
 #
@@ -151,7 +150,8 @@ run_probe() {
 # reasons -- no input file, no restart data, a missing module -- and none of them
 # say anything about the node. Treating any non-zero status as a fault here would
 # exclude every healthy node in the cluster. 132 is 128+4, a child killed by
-# SIGILL; bash reports signals that way, and mpirun/srun forward it.
+# SIGILL; bash reports signals that way, and mpirun/srun forward it. Some
+# launchers do not pass 132 on, so the "Illegal instruction" text is matched too.
 isa_probe() {
     isa_bin=$(newest_for_device pre_process)
     [ -n "$isa_bin" ] || return 0

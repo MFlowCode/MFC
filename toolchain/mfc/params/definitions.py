@@ -1,7 +1,7 @@
 """
 MFC Parameter Definitions (Compact).
 
-Single file containing all ~3,300 parameter definitions using loops.
+Single file containing all parameter definitions using loops.
 """
 
 import re
@@ -402,10 +402,11 @@ CONSTRAINTS = {
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
     "ib_neighborhood_radius": {"min": 0},
-    "face_bound": {"choices": [0, 1], "value_labels": {0: "off", 1: "positivity bound on face states"}},
-    "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
+    "num_local_ibs_max": {"min": 1},
+    "face_bound": {"choices": [0, 1, 2], "value_labels": {0: "off", 1: "positivity bound on face states", 2: "Zhang-Shu positivity bound on face states, 5- and 6-equation models"}},
+    "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "wall-value ghost fill", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls (default)"}},
     "ib_mass_relax": {"min": -1},
-    "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
+    "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells (default)"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "nb": {"min": 1},
@@ -647,6 +648,7 @@ def _load():
     for n in ["mapped_weno", "wenoz", "teno", "weno_avg", "mp_weno", "null_weights"]:
         _r(n, LOG, {"weno"})
     _r("weno_Re_flux", LOG, {"weno", "viscosity"})
+    _r("weno_Re_flux_compact", LOG, {"weno", "viscosity"})
 
     # Riemann solver
     for n in ["riemann_solver", "wave_speeds", "avg_state", "low_Mach"]:
@@ -707,12 +709,14 @@ def _load():
     _r("num_stl_models", INT, {"ib"})
     _r("num_particle_clouds", INT, {"ib"})
     _r("ib_neighborhood_radius", INT, {"ib"})
+    _r("num_local_ibs_max", INT, {"ib"})
     _r("ib", LOG, {"ib"})
     _r("collision_model", INT, {"ib"})
     _r("collision_temporal_resolution", INT, {"ib"})
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
     _r("coefficient_of_friction", REAL, {"ib"})
+    _r("friction_slip_eps", REAL, {"ib"})
     _r("many_ib_patch_parallelism", LOG, {"ib"})
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
@@ -721,7 +725,7 @@ def _load():
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
     _r("ib_mass_relax", INT, {"ib"})
-    _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
+    _r("wall_column_dt_frac", REAL, {"ib"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
     _r("ib_uncover_fill", LOG, {"ib"})
 
@@ -749,6 +753,7 @@ def _load():
     _r("amr_tag_eps", REAL)
     _r("amr_tag_abs", LOG)
     _r("amr_tag_var", INT)
+    _r("amr_tag_species", INT)
     _r("amr_place_owner", LOG)
     _r("amr_buf", INT)
     _r("amr_snap", INT)
@@ -1081,6 +1086,8 @@ def _load():
         ("emissivity", REAL),
         ("T_rad", REAL),
         ("heat_power", REAL),
+        ("wall_column", LOG),
+        ("wall_column_len", REAL),
         ("v_blow", REAL),
         ("burn_rate_exp", REAL),
         ("burn_rate_pref", REAL),
@@ -1312,7 +1319,7 @@ _init_registry()
 # When adding a new parameter:
 #   1. Add to definitions.py (type, constraints, etc.) — you are here
 #   2. Add the namelist root variable to NAMELIST_VARS with its target set
-#   3. Re-run cmake to regenerate the .fpp files (cmake reconfigure)
+#   3. Rebuild: the .fpp files are regenerated at build time (cmake/ParamsCodegen.cmake)
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 
@@ -1494,6 +1501,11 @@ _nv(_PRE_POST, "num_fluids", "weno_order", "recon_type", "muscl_order", "mhd", "
 _nv(_ALL, "reactive_burn", "rburn")
 _nv(_PRE_SIM, "ib_airfoil")
 _nv(_PRE_SIM, "stl_models", "num_stl_models")
+# Initial condition patch inputs: read by pre_process and simulation, declared
+# everywhere because their defaults and broadcast live in common modules
+_IC_PATCH_INPUTS = ("num_patches", "patch_icpp", "sigV", "dist_type", "rhoRV", "mixlayer_vel_profile", "mixlayer_vel_coef", "files_dir", "file_extension")
+_nv(_PRE_SIM, *_IC_PATCH_INPUTS)
+_decl(_ALL, *_IC_PATCH_INPUTS)
 _nv(
     _SIM,
     "dt",
@@ -1508,6 +1520,7 @@ _nv(
     "mp_weno",
     "weno_avg",
     "weno_Re_flux",
+    "weno_Re_flux_compact",
     "null_weights",
     "muscl_eps",
     "int_comp",
@@ -1572,7 +1585,9 @@ _nv(
     "coefficient_of_restitution",
     "collision_time",
     "coefficient_of_friction",
+    "friction_slip_eps",
     "ib_neighborhood_radius",
+    "num_local_ibs_max",
     "many_ib_patch_parallelism",
     "ib_second_order_vel",
     "ib_ip_min_dist",
@@ -1581,7 +1596,7 @@ _nv(
     "ib_ip_interp",
     "ib_wall_order",
     "ib_mass_relax",
-    "ib_smooth_contact",
+    "wall_column_dt_frac",
     "ib_visc_compact",
     "ib_uncover_fill",
     "tau_star",
@@ -1595,6 +1610,7 @@ _nv(
     "amr_tag_eps",
     "amr_tag_abs",
     "amr_tag_var",
+    "amr_tag_species",
     "amr_place_owner",
     "amr_buf",
     "amr_snap",
@@ -1641,12 +1657,7 @@ _nv(
     "loops_y",
     "loops_z",
     "n_start_old",
-    "num_patches",
-    "patch_icpp",
     "patch_bc",
-    "sigV",
-    "dist_type",
-    "rhoRV",
     "old_grid",
     "old_ic",
     "perturb_flow",
@@ -1655,8 +1666,6 @@ _nv(
     "perturb_sph",
     "perturb_sph_fluid",
     "fluid_rho",
-    "mixlayer_vel_profile",
-    "mixlayer_vel_coef",
     "mixlayer_perturb",
     "mixlayer_perturb_nk",
     "mixlayer_perturb_k0",
@@ -1664,8 +1673,6 @@ _nv(
     "elliptic_smoothing_iters",
     "simplex_perturb",
     "simplex_params",
-    "files_dir",
-    "file_extension",
     "viscous",
 )
 _nv(

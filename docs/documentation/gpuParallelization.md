@@ -49,7 +49,7 @@ Note: Ordering is not guaranteed or stable, so use key-value pairing when using 
 In order to parallelize a loop, simply place two macro calls on either end of the loop:
 
 ```C
-$:$GPU_PARALLEL_LOOP(...)
+$:GPU_PARALLEL_LOOP(...)
    {code}
 $:END_GPU_PARALLEL_LOOP()
 ```
@@ -916,13 +916,21 @@ while the host still registers it. The first launch aborts with
 
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
 hoist it into its own (module) subroutine with the locals passed as arguments. A minimal
-reproducer runs correctly on AFAR 24.3, but this is not yet verified inside MFC.
+reproducer runs correctly on AFAR 24.3. On AFAR 24.4 an MFC kernel inside a `block` (with a
+`block`-local `firstprivate`) is present in the device image and passes its tests, so the rule
+can go once CI no longer uses 24.3.
 
 ## Silent-Failure Traps {#silent-failure-traps}
 
 Every entry here was measured. They share a failure mode: the build stays green and the
 answer is wrong, or one backend diverges from all the others.
 
+- **Push a new value of a `GPU_DECLARE` module variable with `GPU_UPDATE`, never `GPU_ENTER_DATA(copyin=...)`.**
+  A static (non-allocatable) declared variable is always present on the device with an infinite
+  reference count, so on AMD flang `enter data map(to:)` copies nothing and kernels read the old value
+  (often 0). Cray and NVHPC copy anyway, so only AMD is wrong. This was the "amdflang reads `Re_size`
+  stale" bug (ROCm/llvm-project#2890, closed as conformant); `GPU_UPDATE(device=...)` is the fix,
+  and no host copy is needed.
 - **Do not wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops.** `GPU_LOOP` emits empty
   directives on Cray and AMD, so the loop runs serially with no diagnostic. Spatial loops
   always use `GPU_PARALLEL_LOOP` / `END_GPU_PARALLEL_LOOP`.
@@ -966,7 +974,12 @@ answer is wrong, or one backend diverges from all the others.
   4-5x slower: private arrays sized by runtime globals move from registers to scratch (the
   WENO kernel goes from 0 to 400 B of scratch per thread and runs 11x slower; HLLC 4.9x). On
   AFAR 23.2.x it also produced NaNs in CBC, `wave_speeds=2`, IBM, surface tension, QBMM,
-  viscous, and MHD HLLD cases. Removing them needs a benchmark, not just the tests.
+  viscous, and MHD HLLD cases. AFAR 24.4 is no better: on Frontier the `./mfc.sh bench` grind
+  time is 4.5-5.9x worse without the guards in every finite-volume case (IGR, which uses no
+  WENO or Riemann solver, is unchanged). In that build a runtime-sized local array in a
+  kernel is heap-allocated, with a call to the device `malloc` (`__llvm_libc::gpu::allocate`)
+  and `free` per thread per launch: WENO kernels go from 0 to 5-6 such calls, the LF solver
+  from 0 to 8. Removing the guards needs a benchmark, not just the tests.
 - **`#:set MFC_OMP_PRESENT_ALLOCATABLE = True` is a per-file opt-in** (`m_rhs`, `m_weno`,
   `m_riemann_solver_hllc`) that makes the AMD OpenMP kernels assume allocatables are already
   present. A file may opt in only if every array a kernel names is allocated whenever that
@@ -978,6 +991,55 @@ answer is wrong, or one backend diverges from all the others.
   the rest overwrites neighbouring cells, with no error. A leading section (`arr(1:n)`, or a
   fixed trailing index such as `freg(d)%%lo(:,:,:,k)`) is contiguous and safe. Move a sub-box
   with a pack/unpack device kernel instead (`s_amr_pack_unpack_block_st`).
+- **Assign every GPU-private scalar unconditionally before any conditional use.** A private
+  copy is not initialised from the host value (only `firstprivate` is), so a scalar written
+  only under an `if` is undefined on the threads that skip the write. PR #2330 had
+  `if (ib_id > 0) g = ib_id` inside the `GPU_PARALLEL_LOOP` of `s_ib_shell_mass`
+  (`src/simulation/m_ibm.fpp`). On NVHPC 25.5 (A100 and H200, OpenACC and OpenMP) `g` was
+  undefined for cells with `ib_id <= 0`, the shell gas mass sum stayed 0, the `ib_mass_relax`
+  correction was silently inert, and 13 moving-body tests failed on NVIDIA. CPU, Cray and
+  amdflang happened to behave. It was found with debug prints on an A100 and fixed by
+  `g = max(ib_id, 0)`. The same pattern (`i`, `g`, `sh` set only under
+  `if (wc_on(c) == 1)`) turned up in the heat-booking loop of `s_accumulate_ib_face_fluxes`
+  in review of PR #2329 and was hardened. Give each private scalar a safe default, and clamp
+  or guard any array index taken from a marker id that can be `<= 0`. To find candidates, run
+  ``grep -nE 'if \(.*\) [a-z_]+ = ' src/simulation/*.fpp``; it over-matches (about 260 hits on
+  the tree at the time of writing), so each hit inside a GPU loop needs a
+  human check of its context.
+- **A device routine that NVHPC leaves as a call can read a module array stale.**
+  `s_accumulate_ib_mass` (`src/simulation/m_ibm.fpp`) took the face mass flux through
+  `f_ib_face_mass`, which reads the module array `flux_rsx_vf`. NVHPC 25.11 inlined the subroutine
+  into its caller and, in that copy, called `f_ib_face_mass` instead of inlining it (`-Minfo=accel`
+  lists what each kernel inlined). With OpenACC on an A100 the call returned the fluxes of the first
+  RHS evaluation at every step, while `flux_rsx_vf(j, k, l, 1)` in the same kernel read the current
+  ones, so `ib_mass_relax` did nothing for a fixed body without IB output (#2414; NVHPC 25.5 OpenACC
+  the same, OpenMP offload correct). The larger kernel of `s_accumulate_ib_face_fluxes` inlines the
+  same routine and was correct. The fix reads the array in the kernel body.
+- **Pass a named array, never an array expression, to a device routine.** In a `GPU_ROUTINE`
+  called from a kernel, an actual argument such as `wall_loc + d*wall_normal` needs a temporary;
+  NVHPC does not inline the callee ("array reshaping not enabled" in `-Minfo=inline`) and builds
+  the temporary on the device heap at every call. In
+  `s_wall_fill` (`src/simulation/m_ibm.fpp`, `ib_wall_order = 2`) two such calls made the
+  ghost-point kernel of `s_ibm_correct_state` 80 times slower on an A100 (NVHPC 25.11: 58 us to
+  4.6 ms on a 20-particle cloud, +62 % per step), with correct results. Assign the expression to
+  a local array first. Look for the remark in the build's `-Minfo` output, or for one kernel
+  that dominates an `nsys` profile after a small change.
+- **Run `GPU_UPDATE(device=...)` and `GPU_ENTER_DATA` of static module data only after the
+  rank is bound to its GPU.** `s_mpi_initialize` (`src/common/m_mpi_common.fpp`) updated
+  `num_procs` and `proc_rank` on the device before `s_initialize_mpi_domain`
+  (`src/simulation/m_start_up.fpp`) called `acc_set_device_num` / `omp_set_default_device`.
+  The update went to the default device, so a rank bound to another device kept an
+  uninitialised copy and `f_local_rank_owns_location` returned `.true.` on both ranks: a
+  collision force was applied twice and summed. Reproduced on an NVIDIA A100 as a
+  deterministic difference between `-g 0` and `-g 0 2`. AMD CI hides it because each rank sees
+  one GPU and the binding is a no-op. Test a 2-rank GPU change with both ranks on one GPU and
+  on two GPUs. The fix is #2371.
+- **A CI result that looks like a code failure can be the harness.** A Phoenix lane that hits
+  its Slurm time limit, or a launch failure such as `Submitting batch file for Interactive
+  failed`, is no result for the PR: check the job log for `TIMEOUT` before reading it as a code
+  failure. At the time of writing, NVHPC 25.5 and 25.11 differ by 1.8% on chemistry test
+  `124D7972` (issue #2181), so a lane on another compiler version that disagrees with a golden
+  file is not yet evidence of a regression.
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 

@@ -52,7 +52,7 @@ data = {
     "model_eqns": "5eq",
     "alt_soundspeed": "F",
     "mixture_err": "T",
-    "mpp_lim": "T",
+    "mpp_lim": "F",
     "time_stepper": "rk3",
     "recon_type": "muscl",
     "muscl_order": "second_order",

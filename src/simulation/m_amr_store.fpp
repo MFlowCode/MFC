@@ -277,8 +277,7 @@ contains
 
         if (nloc <= amr_st_cap) return
         oldcap = amr_st_cap
-        st_col_bytes = int(mbuf_hi(1) - mbuf_lo(1) + 1, 8)*int(mbuf_hi(2) - mbuf_lo(2) + 1, 8)*int(mbuf_hi(3) - mbuf_lo(3) + 1, &
-                           & 8)*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
+        st_col_bytes = f_amr_col_bytes()
         ! Staging one array on the device peaks at 2*newcap - oldcap extra columns: double when that fits in free device memory,
         ! else grow 1.25x (16-slot cap, +8 floor) and stage through the host if the device copy does not fit either.
         call s_amr_dev_mem(free_b, total_b)
@@ -630,6 +629,7 @@ contains
         end do
         ! every reader of a stale slot has finished by here, which is what makes the renumbering safe
         call s_amr_compact_store()
+        call s_amr_note_level_fill()  ! every layout change (regrid, static multi-level, restart adopt) passes here
         amr_mesh_epoch = amr_mesh_epoch + 1  ! local slot indices may have been renumbered: plans that baked them are stale
 
     end subroutine s_amr_reconcile_slots

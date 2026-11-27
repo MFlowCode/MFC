@@ -360,17 +360,14 @@ contains
         integer                :: k, l, i, i_c, j_c, k_c
         integer                :: my_status, max_status
         real(wp)               :: my_re_p, my_mach_p
-        !> Host copies; amdflang reads Re_size stale cross-TU
-        integer :: Re_size_loc1, Re_size_loc2
 
         call nvtxStartRange("LAGRANGE-PARTICLE-DYNAMICS")
 
         ! Compute Fluid-Particle Forces (drag/pressure/added mass) and convert to particle acceleration
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(private='[i, k, l, cell, s_cell, myMass, myR, myPos, myVel, mySeed, my_fqs_fluct, new_fqs_fluct, &
                             & force_vec, rmass_add, new_seed, myFluidVel, myFluidRho, myPres, qv, pi_inf, gamma, myGamma, &
                             & vel_sum, vel, alpha, alpha_rho, Re, my_mu, pres, rho, i_c, j_c, k_c, c, my_status, my_re_p, &
-                            & my_mach_p]', copyin='[stage]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                            & my_mach_p]', copyin='[stage]')
         do k = 1, n_el_particles_loc
             f_p(k,:) = 0._wp
 
@@ -399,8 +396,7 @@ contains
 
             ! Mixture properties of the host cell (scalar indices: device routine with a seq loop)
             i_c = cell(1); j_c = cell(2); k_c = cell(3)
-            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, i_c, j_c, k_c, &
-                                      & Re_size_loc1, Re_size_loc2)
+            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, i_c, j_c, k_c)
 
             ! Compute mixture sound speed
             call s_compute_speed_of_sound(myPres, myFluidRho, gamma, pi_inf, alpha, c)
@@ -549,11 +545,11 @@ contains
                 do l = 1, num_fluids
                     cv_mix = cv_mix + alpha(l)*cvs(l)/gammas(l)  ! R = cv*(gamma - 1), with gammas = 1/(gamma - 1)
                 end do
-                fluid_temp = (fluid_pres + pi_inf_mix)/(fluid_rho*cv_mix)
                 do l = 1, num_fluids
-                    ! Constant viscosity unless a Sutherland constant is given
+                    ! Constant viscosity unless a Sutherland constant is given; only then is the temperature needed, and cv set
                     mu_f = particle_params%mu_ref(l)
                     if (particle_params%suth(l) > 0._wp) then
+                        fluid_temp = (fluid_pres + pi_inf_mix)/(fluid_rho*cv_mix)
                         mu_f = mu_f*sqrt(fluid_temp/tref)*(1._wp + particle_params%suth(l)/tref)/(1._wp + particle_params%suth(l) &
                                          & /fluid_temp)
                     end if
@@ -1069,8 +1065,11 @@ contains
         real(wp), intent(in) :: flip, offset
         integer              :: image
 
+        ! a source near both faces of a direction gets two images, past the 2*n_sources reserved by the caller
+
+        image = n_el_particles_loc + n_halo_particles + 1
+        if (image > particle_cap) call s_grow_particle_arrays(2*image)
         n_halo_particles = n_halo_particles + 1
-        image = n_el_particles_loc + n_halo_particles
         call s_copy_lag_particle(image, k)
         particle_pos(image, dir,1:2) = flip*particle_pos(image, dir,1:2) + offset
         particle_posPrev(image, dir,1:2) = flip*particle_posPrev(image, dir,1:2) + offset

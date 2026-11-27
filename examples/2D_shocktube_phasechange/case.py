@@ -182,7 +182,7 @@ print(
             "num_patches": 3,
             "model_eqns": args.model_eqns,
             "num_fluids": 3,
-            "mpp_lim": "T",
+            "mpp_lim": "F",
             "mixture_err": "T",
             "relax": "T",
             "relax_model": 6,
