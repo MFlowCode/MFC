@@ -653,8 +653,6 @@ contains
         end do
 
         if (.not. amr_sub_on) call s_split_sources()
-        if (chemistry) call s_report_species_cleanup(t_step)
-        call s_report_chem_stiffness(t_step)
 
         if (amr_sub_on) then
             call s_amr_subcycle_fine(q_cons_ts(1)%vf, q_cons_ts(stor)%vf, rk_coef, q_T_sf, bc_type, pb_ts(1)%sf, rhs_pb, &
@@ -665,6 +663,9 @@ contains
         amr_sub_on = .false.
         if (amr) call s_amr_split_fine(q_T_sf)
         if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
+        ! after the fine substeps, so their counts land on this step
+        if (chemistry) call s_report_species_cleanup(t_step)
+        call s_report_chem_stiffness(t_step)
 
         if (ib) then
             ! Before the handoff: ib_heat and ib_shell are indexed by the patch_ib slots the stages used
