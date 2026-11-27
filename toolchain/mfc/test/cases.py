@@ -6436,6 +6436,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=chem_ib)
         spec.extra_args = ["--", "-j", "4"]
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion", spec))
+        # Isothermal wall with chemistry: the fine ghosts' T_cond carries Twall into the diffusion flux; inert at 400 K, and at 1200 K
+        # with the gas reactions on
+        for tag, tw, rx in (("isothermal", 400.0, "F"), ("isothermal -> reactions", 1200.0, "T")):
+            iso = {"patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": tw, "chem_params%reactions": rx}
+            spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chem_ib, **iso})
+            spec.extra_args = ["--", "-j", "4"]
+            cases.append(define_convergence_case(f"Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion -> {tag}", spec))
         # Mean pressure gradient and heat source past the body: the fine body-force hook zeroes them in the block's own solid cells
         # (the periodic body case alone leaves 9e-9 next to the body, hence tol 1e-7 for mean_dpdx)
         periodic = {f"bc_{d}%{e}": -1 for d in "xy" for e in ("beg", "end")}
