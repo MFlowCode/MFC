@@ -724,6 +724,16 @@ class TestAmrDefaults(unittest.TestCase):
                 validate_case_constraints({**ib, **mods}, "simulation")
             self.assertIn(msg, str(ctx.exception))
 
+    def test_multilevel_moving_ib_under_amr(self):
+        """A moving body at amr_max_level = 2 needs dynamic regrid: the static level-2 block is blind to the body."""
+        ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
+        ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.05})
+        ib.update({"patch_ib(1)%moving_ibm": 1, "amr_max_level": 2, "amr_max_blocks": 16})
+        validate_case_constraints({**ib, "amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2}, "simulation")
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints({**ib, "amr_regrid_int": 0}, "simulation")
+        self.assertIn("requires amr_regrid_int > 0", str(ctx.exception))
+
     def test_non_amr_untouched(self):
         q = dict(BASE)
         self.assertFalse(apply_amr_defaults(q))

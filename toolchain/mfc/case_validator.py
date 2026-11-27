@@ -2413,9 +2413,10 @@ class CaseValidator:
             # gp_surf is sized for the coarse ghost points; fine blocks swap in their own
             for wrt in ("ib_surface_wrt", "ib_heat_wrt"):
                 self.prohibit(self.get(wrt, "F") == "T", f"amr with ib does not support {wrt} (not yet validated)")
+            # the static level-2 block is a fixed inset of block 1, blind to the body; dynamic regrid nests every level over it
             self.prohibit(
-                amr_max_level is not None and amr_max_level > 1 and moving,
-                "multi-level AMR (amr_max_level > 1) with a MOVING immersed body is not yet supported; use a static body",
+                amr_max_level is not None and amr_max_level > 1 and moving and (amr_regrid_int or 0) == 0,
+                "multi-level AMR (amr_max_level > 1) with a moving immersed body requires amr_regrid_int > 0",
             )
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(

@@ -6676,6 +6676,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         two_rank = {"m": 127, "n": 127, "patch_ib(1)%radius": 0.05, "patch_ib(1)%mass": 0.0157}
         two_rank.update({"amr_block_beg(1)": 50, "amr_block_end(1)": 73, "amr_block_beg(2)": 53, "amr_block_end(2)": 76})
         cases.append(define_case_d(stack, "force-driven -> 2 MPI Ranks", {**force_driven, **two_rank}, ppn=2))
+        # Two levels under dynamic regrid (lock-step, np=1): each level's blocks nest over the body and rebuild its markers per stage
+        ml_regrid = {"patch_ib(1)%radius": 0.05, "amr_max_grid_size": 32, "amr_max_level": 2, "amr_max_blocks": 16}
+        ml_regrid.update({"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2})
+        cases.append(define_case_d(stack, "multi-level dynamic regrid", ml_regrid, restart_check=True))
         # Two prescribed-motion bodies: exercises the multi-body fine-IB rebuild for moving bodies
         stack.push(
             "two bodies",
