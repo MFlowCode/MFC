@@ -4335,14 +4335,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # The same reactor with a static block (np=2: across the rank seam): the state is uniform, so level 0 must match the run above
         # to round-off, which holds only if each block reacts before the fold (s_amr_split_fine)
         amr_reactor = {"amr": "T", "amr_block_beg(1)": 8, "amr_block_end(1)": 17, "amr_regrid_int": 0}
-        for ppn, label in ((1, "AMR"), (2, "AMR -> 2 MPI Ranks")):
+        for ppn, label, sub in ((1, "AMR", {}), (2, "AMR -> 2 MPI Ranks", {}), (1, "AMR -> amr_subcycle", {"amr_subcycle": "T"})):
             cases.append(
                 define_case_f(
                     f"1D -> Chemistry -> Perfect Reactor -> Sub-stepped Reactions -> {label}",
                     "examples/nD_perfect_reactor/case.py",
                     ["--ndim", "1"],
                     ppn=ppn,
-                    mods={**common_mods, "chem_params%reaction_substeps": 10, **amr_reactor, **({"amr_max_grid_size": 64} if ppn == 1 else {})},
+                    mods={**common_mods, "chem_params%reaction_substeps": 10, **amr_reactor, **sub, **({"amr_max_grid_size": 64} if ppn == 1 else {})},
                 )
             )
 
@@ -4438,6 +4438,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     override_tol=10 ** (-8),
                 )
             )
+
+        # Subcycled: the blocks substep the reacting front at dt/2 between time-blended coarse ghosts
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Reactive Shocktube AMR -> amr_subcycle",
+                "examples/1D_reactive_shocktube/case.py",
+                [],
+                mods={**amr_chem_mods, "amr_max_grid_size": 64, "amr_subcycle": "T"},
+                override_tol=10 ** (-8),
+            )
+        )
 
         # amr_tag_var = 6: the block starts away from the diaphragm (cell 24) and regrids onto its temperature jump.
         cases.append(
@@ -4944,7 +4955,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("substeps", {"rburn%substeps": 10})
         cases.append(define_case_d(stack, "", {}, ppn=2))
         # the fine block takes the split burn too, before the fold (the field is uniform: level 0 matches the run without a block)
-        cases.append(define_case_d(stack, "AMR", {"amr": "T", "amr_block_beg(1)": 30, "amr_block_end(1)": 69, "amr_regrid_int": 0, "amr_max_grid_size": 64, "mpp_lim": "T"}))
+        burn_amr = {"amr": "T", "amr_block_beg(1)": 30, "amr_block_end(1)": 69, "amr_regrid_int": 0, "amr_max_grid_size": 64, "mpp_lim": "T"}
+        cases.append(define_case_d(stack, "AMR", burn_amr))
+        cases.append(define_case_d(stack, "AMR -> amr_subcycle", {**burn_amr, "amr_subcycle": "T"}))
         stack.pop()
         # Same burn on 2 MPI ranks: the rburn parameters must be broadcast to non-root ranks, or
         # rank 1's half of the domain burns with the sentinel default and diverges. The single-rank
