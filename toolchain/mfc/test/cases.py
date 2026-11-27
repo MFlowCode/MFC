@@ -7100,6 +7100,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "np=2", {"amr_max_grid_size": 32}, ppn=2))
         stack.pop()
 
+        # amr_ref_ratio = 4 on two levels (16 level-2 cells per coarse cell): static at np=1 (restart) and 2, dynamic with every
+        # jump on a coarse face so the fine initial data restricts exactly, and a uniform flow that must stay uniform
+        r4 = {**amr_1d_base, **jump_mid, "m": 255, "dt": 1.0e-4, "amr_ref_ratio": 4, "amr_max_level": 2, "amr_max_blocks": 16, "amr_block_beg(1)": 112, "amr_block_end(1)": 143}
+        stack.push("AMR -> 1D -> ref_ratio 4 two levels", r4)
+        cases.append(define_case_d(stack, "static", {"amr_regrid_int": 0}, restart_check=True))
+        cases.append(define_case_d(stack, "static np=2", {"amr_regrid_int": 0, "amr_max_grid_size": 64}, ppn=2))
+        dyn = {"patch_icpp(1)%x_centroid": 0.0625, "patch_icpp(1)%length_x": 0.125, "patch_icpp(2)%x_centroid": 0.3125, "patch_icpp(2)%length_x": 0.375}
+        dyn.update({"amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 6, "t_step_stop": 12, "t_step_save": 12})
+        cases.append(define_case_d(stack, "dynamic", dyn))
+        cases.append(define_case_d(stack, "dynamic np=2", {**dyn, "amr_max_grid_size": 64}, ppn=2))
+        uni = {f"patch_icpp({i})%{k}": v for i in (1, 2, 3) for k, v in (("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.3))}
+        cases.append(define_case_d(stack, "free stream", {"amr_regrid_int": 0, **uni}))
+        stack.pop()
+
         # amr_tag_var: features with no density jump, which the default density tagger cannot see. Uniform density and
         # pressure in both; the blocks must leave the initial block and follow the feature.
         uniform = {f"patch_icpp({i})%pres": 1.0 for i in (1, 2, 3)}

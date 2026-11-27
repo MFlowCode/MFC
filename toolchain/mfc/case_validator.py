@@ -313,8 +313,9 @@ PHYSICS_DOCS = {
         "category": "Adaptive Mesh Refinement",
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
-            "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_ref_ratio = 2 and "
-            "amr_max_blocks >= 2. Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
+            "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= 2; "
+            "amr_subcycle and amr_prolong = 2 need amr_ref_ratio = 2. "
+            "Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
             "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
             "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
             "and CBC boundaries, and operator-split reaction or burn substeps. Immersed boundaries must be non-STL on a static "
@@ -2351,10 +2352,6 @@ class CaseValidator:
             self.prohibit(self.get("bubbles_lagrange", "F") == "T", "amr_subcycle does not support Lagrangian bubbles")
             moving = [v for k, v in self.params.items() if re.fullmatch(r"(patch_ib|particle_cloud)\(\d+\)%moving_ibm", k)]
             self.prohibit(any(m not in (0, None) for m in moving), "amr_subcycle does not support moving immersed boundaries yet")
-        self.prohibit(
-            amr_ref_ratio is not None and amr_ref_ratio != 2 and amr_max_level is not None and amr_max_level > 1,
-            "amr_ref_ratio /= 2 is only supported at amr_max_level = 1",
-        )
         self.prohibit(
             amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
             "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",
