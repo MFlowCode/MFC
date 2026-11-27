@@ -1003,6 +1003,13 @@ contains
         if (n > 0) dy_min = minval(dy(-buff_size:n + buff_size))
         if (p > 0) dz_min = minval(dz(-buff_size:p + buff_size))
 
+        ! the initial blocks contain each body's box (s_amr_init_first_blocks): an STL box needs the model and its orientation
+        if (ib) then
+            call s_instantiate_STL_models()
+            do i = 1, num_ibs
+                call s_update_ib_rotation_matrix(i)
+            end do
+        end if
         call s_initialize_amr_module()
         call s_initialize_amr_registers(amr_maxc_fit)
         ! restarts restore the saved fine state; otherwise prolong from coarse
@@ -1012,7 +1019,6 @@ contains
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            call s_instantiate_STL_models()
             call s_initialize_ib_airfoils()
             call s_get_neighbor_bounds()
             if (cfl_dt .and. n_start > 0) then

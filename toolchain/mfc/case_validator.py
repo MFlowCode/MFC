@@ -2402,12 +2402,11 @@ class CaseValidator:
             # static/prescribed-motion IB AMR: bodies resolved on a static fine block.
             num_ibs = self.get("num_ibs") or 0
             moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
-            # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds every analytic geometry; an STL body (5, 12) has
-            # no box there, so it needs a static block
-            bbox_geoms = (2, 3, 4, 6, 8, 9, 10, 11)
+            # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds these geometries (STL 5, 12 by the model's box)
+            bbox_geoms = (2, 3, 4, 5, 6, 8, 9, 10, 11, 12)
             self.prohibit(
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
-                "amr with a moving immersed body or dynamic regrid supports analytic geometries only (the block containment bounding box)",
+                "amr with a moving immersed body or dynamic regrid needs a geometry with a block containment bounding box",
             )
             # The isothermal wall without chemistry sets only the ghost state, which each fine block corrects itself. With chemistry only
             # the adiabatic wall is checked on blocks (the fine RHS takes each block's own markers and T_cond); the lumped wall needs

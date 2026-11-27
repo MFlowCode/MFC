@@ -24,8 +24,8 @@ module m_ib_patches
     implicit none
 
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
-        & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities, s_get_ib_bound, s_get_neighborhood_idx, &
-        & s_update_ib_lookup, s_compact_ib_lookup, s_merge_ib_lookup, s_finalize_ib_patches
+        & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities, s_get_ib_bound, s_get_ib_aabb, &
+        & s_get_neighborhood_idx, s_update_ib_lookup, s_compact_ib_lookup, s_merge_ib_lookup, s_finalize_ib_patches
 
     !> lookup arrays for converting global IB indices to local indices
     integer, dimension(num_ib_patches_max_namelist) :: ib_lookup_keys, ib_lookup_vals
@@ -617,6 +617,50 @@ contains
 
     end subroutine s_get_ib_bound
 
+    !> World-space axis-aligned bounding box of an IB patch centred at center: an STL model's local box (shifted by centroid_offset)
+    !! rotated corner by corner, the bounding radius for every other geometry.
+    subroutine s_get_ib_aabb(patch, center, bbox_min, bbox_max)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ib_patch_parameters), intent(in) :: patch
+        real(wp), dimension(3), intent(in)    :: center
+        real(wp), dimension(3), intent(out)   :: bbox_min, bbox_max
+        real(wp), dimension(3)                :: world_corner
+        real(wp), dimension(2)                :: lx, ly, lz
+        real(wp)                              :: bound
+        integer                               :: cx, cy, cz
+
+        if (patch%geometry == ib_model_2d .or. patch%geometry == ib_model_3d) then
+            ! local box extents (min = 1, max = 3 in the third index); a 2D model's corners sit at z = 0
+            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
+            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
+            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
+            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
+            lz = 0._wp
+            if (patch%geometry == ib_model_3d) then
+                lz(1) = stl_bounding_boxes(patch%model_id, 3, 1) + patch%centroid_offset(3)
+                lz(2) = stl_bounding_boxes(patch%model_id, 3, 3) + patch%centroid_offset(3)
+            end if
+            bbox_min = 1e12
+            bbox_max = -1e12
+            do cx = 1, 2
+                do cy = 1, 2
+                    do cz = 1, 2
+                        world_corner = matmul(patch%rotation_matrix, [lx(cx), ly(cy), lz(cz)]) + center
+                        bbox_min = min(bbox_min, world_corner)
+                        bbox_max = max(bbox_max, world_corner)
+                    end do
+                end do
+            end do
+        else
+            call s_get_ib_bound(patch, bound)
+            bbox_min = center - bound
+            bbox_max = center + bound
+        end if
+
+    end subroutine s_get_ib_aabb
+
     subroutine s_get_bounding_indices(patch, center, il, ir, jl, jr, kl, kr)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -624,64 +668,10 @@ contains
         type(ib_patch_parameters), intent(in) :: patch
         real(wp), dimension(3), intent(in)    :: center
         integer, intent(out)                  :: il, ir, jl, jr, kl, kr
-        real(wp), dimension(3)                :: bbox_min, bbox_max, local_corner, world_corner
-        real(wp), dimension(2)                :: lx, ly, lz
-        real(wp)                              :: bound
-        integer                               :: cx, cy, cz
+        real(wp), dimension(3)                :: bbox_min, bbox_max
         logical                               :: outside_domain
 
-        if (patch%geometry == ib_model_2d) then
-            ! STL model geometry
-            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
-            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
-            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
-            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
-
-            bbox_min = 1e12
-            bbox_max = -1e12
-            ! Enumerate all 4 corners of the local bounding box, rotate to world space, track world-space AABB
-            do cx = 1, 2
-                do cy = 1, 2
-                    local_corner = [lx(cx), ly(cy), 0._wp]
-                    world_corner = matmul(patch%rotation_matrix, local_corner) + center
-                    bbox_min(1) = min(bbox_min(1), world_corner(1))
-                    bbox_min(2) = min(bbox_min(2), world_corner(2))
-                    bbox_max(1) = max(bbox_max(1), world_corner(1))
-                    bbox_max(2) = max(bbox_max(2), world_corner(2))
-                end do
-            end do
-        else if (patch%geometry == ib_model_3d) then
-            ! Local-space bounding box extents (min=1, max=2 in the third index)
-            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
-            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
-            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
-            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
-            lz(1) = stl_bounding_boxes(patch%model_id, 3, 1) + patch%centroid_offset(3)
-            lz(2) = stl_bounding_boxes(patch%model_id, 3, 3) + patch%centroid_offset(3)
-
-            bbox_min = 1e12
-            bbox_max = -1e12
-            ! Enumerate all 8 corners of the local bounding box, rotate to world space, track world-space AABB
-            do cx = 1, 2
-                do cy = 1, 2
-                    do cz = 1, 2
-                        local_corner = [lx(cx), ly(cy), lz(cz)]
-                        world_corner = matmul(patch%rotation_matrix, local_corner) + center
-                        bbox_min(1) = min(bbox_min(1), world_corner(1))
-                        bbox_min(2) = min(bbox_min(2), world_corner(2))
-                        bbox_min(3) = min(bbox_min(3), world_corner(3))
-                        bbox_max(1) = max(bbox_max(1), world_corner(1))
-                        bbox_max(2) = max(bbox_max(2), world_corner(2))
-                        bbox_max(3) = max(bbox_max(3), world_corner(3))
-                    end do
-                end do
-            end do
-        else
-            ! All other IBs
-            call s_get_ib_bound(patch, bound)
-            bbox_min = center - bound
-            bbox_max = center + bound
-        end if
+        call s_get_ib_aabb(patch, center, bbox_min, bbox_max)
 
         ! completely skip patches whose bounding box does not overlap this rank's domain
         ! Markers cover the full halo: image-point stencils of ghost points near a rank boundary read markers up to

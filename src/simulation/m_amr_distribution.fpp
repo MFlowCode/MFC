@@ -20,7 +20,7 @@ module m_amr_distribution
     use m_constants, only: K_ib
     use m_mpi_proxy, only: s_mpi_abort
     use m_ibm, only: ib_markers
-    use m_ib_patches, only: s_get_ib_bound
+    use m_ib_patches, only: s_get_ib_bound, s_get_ib_aabb
     use m_amr_state
     use m_phase_timing, only: s_mem_note_level
 
@@ -705,13 +705,13 @@ contains
 
     end subroutine s_amr_rank_interior
 
-    !> Margin-padded global coarse-index bounding box of immersed body i (supported analytic geometries only; aborts on others).
-    !! Reads the body's live centroid and orientation, so a moving body's box tracks it.
+    !> Margin-padded global coarse-index bounding box of immersed body i. Reads the body's live centroid and orientation, so a
+    !! moving body's box tracks it.
     impure subroutine s_amr_body_bbox(i, mrg, blo, bhi)
 
         integer, intent(in)  :: i, mrg
         integer, intent(out) :: blo(3), bhi(3)
-        real(wp)             :: c(3), half(3), bnd
+        real(wp)             :: c(3), half(3), bnd, lo(3), hi(3)
 
         c = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
         select case (patch_ib(i)%geometry)
@@ -727,9 +727,11 @@ contains
         case (4, 6, 11)  ! airfoils, ellipse: the bounding radius the marker drawing trusts (s_get_bounding_indices)
             call s_get_ib_bound(patch_ib(i), bnd)
             half = bnd
+        case (5, 12)  ! STL: the model's rotated box, as the marker drawing bounds it
+            call s_get_ib_aabb(patch_ib(i), c, lo, hi)
+            c = 0.5_wp*(lo + hi); half = 0.5_wp*(hi - lo)
         case default
-            call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
-                             & // 'containment bounding box (STL models are not supported)')
+            call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the containment bounding box')
         end select
         call s_amr_phys_to_cells(c - half, c + half, mrg, blo, bhi)
 

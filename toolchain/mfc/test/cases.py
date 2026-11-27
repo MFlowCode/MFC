@@ -6470,6 +6470,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
         # a non-box body: the containment box is the bounding radius the marker drawing uses (#2241)
         cases.append(define_case_d(stack, "ellipse", {"amr_max_grid_size": 32, "patch_ib(1)%geometry": 6, "patch_ib(1)%length_x": 0.26, "patch_ib(1)%length_y": 0.14}))
+        # an STL body: the containment box is the model's rotated box
+        cases.append(define_case_d(stack, "stl", {"amr_max_grid_size": 32, **stl}))
         # quartic prolongation next to a body: the admissibility fallback to limited linear guards the fills
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
         # The only distributed AMR+IB coverage: at ppn=1 the level-1 tag path and per-level (index, parent) gather are skipped.
@@ -6710,6 +6712,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         ml_regrid = {"patch_ib(1)%radius": 0.05, "amr_max_grid_size": 32, "amr_max_level": 2, "amr_max_blocks": 16}
         ml_regrid.update({"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2})
         cases.append(define_case_d(stack, "multi-level dynamic regrid", ml_regrid, restart_check=True))
+        # A translating STL body under dynamic regrid: the blocks follow the model's box (centroid_offset from the coarse markers)
+        stl_regrid = {"amr_max_grid_size": 32, "amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2}
+        cases.append(define_case_d(stack, "stl -> dynamic regrid", {**stl, **stl_regrid}))
         # Two prescribed-motion bodies: exercises the multi-body fine-IB rebuild for moving bodies
         stack.push(
             "two bodies",

@@ -705,20 +705,22 @@ class TestAmrDefaults(unittest.TestCase):
                 self.assertIn("amr", str(ctx.exception))
 
     def test_ib_gates_under_amr(self):
-        """STL that moves or regrids, reacting, chemistry-thermal and lumped surfaces, ib_surface_wrt and ib_heat_wrt are rejected;
-        STL on a static block, an analytic non-box body that regrids and the isothermal wall without chemistry are allowed."""
+        """Reacting, chemistry-thermal and lumped surfaces, ib_surface_wrt and ib_heat_wrt are rejected; STL bodies (static, moving
+        or regridded), an analytic non-box body that regrids and the isothermal wall without chemistry are allowed."""
         ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
         ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1})
         validate_case_constraints(dict(ib), "simulation")
         rejected = [
-            ({"patch_ib(1)%geometry": 5, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "analytic geometries only"),
-            ({"patch_ib(1)%geometry": 5, "patch_ib(1)%moving_ibm": 1}, "analytic geometries only"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0}, "thermal_bc = 1 only without chemistry"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_surface_wrt": "T"}, "ib_surface_wrt"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_heat_wrt": "T"}, "ib_heat_wrt (not yet validated)"),
             ({"patch_ib(1)%thermal_bc": 3, "patch_ib(1)%Twall": 600.0, "patch_ib(1)%rho_solid": 2000.0, "patch_ib(1)%cp_solid": 700.0}, "thermal_bc = 1 only without chemistry"),
         ]
-        validate_case_constraints({**ib, "patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1}, "simulation")
+        stl = {**ib, "patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1}
+        validate_case_constraints(stl, "simulation")
+        # STL bodies are bounded by the model's box, so they may move or regrid too
+        validate_case_constraints({**stl, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "simulation")
+        validate_case_constraints({**stl, "patch_ib(1)%moving_ibm": 1}, "simulation")
         validate_case_constraints({**ib, "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1.5, "fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0}, "simulation")
         # analytic non-box bodies are bounded by their marker-drawing radius, so they may move or regrid
         validate_case_constraints({**ib, "patch_ib(1)%geometry": 6, "patch_ib(1)%length_x": 0.2, "patch_ib(1)%length_y": 0.1, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "simulation")
