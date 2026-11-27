@@ -8,8 +8,8 @@
 !! bounded ghost-state blend. Takes no ghost-point arguments; m_ibm couples it to the ghost points.
 module m_ib_surface_chem
 
-    use m_global_parameters
-    use m_constants
+    use m_precision_select, only: wp
+    use m_constants, only: T_surface_min, T_surface_max
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_thermal_conductivity_mixavg, &
         & get_species_mass_diffusivities_mixavg
     use m_surface_thermochem, only: get_surface_net_production_rates, get_surface_reaction_heat_flux
