@@ -21,7 +21,7 @@ module m_rhs
         & recon_type_muscl, coupling_two_way
     use m_muscl
     use m_riemann_solvers
-    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf
+    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf, flux_axis_vf, axis_face_split, s_split_axis_flux
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
@@ -779,9 +779,11 @@ contains
                     ! refluxing sees the total advection+diffusion flux
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
+                        if (id == 2 .and. viscous) call s_split_axis_flux(-1._wp)
                         call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
                                                                 & ib_markers, ib_wall_src(ibw_a), merge(merge(2, 1, &
                                                                 & ib_flux_wall), 0, ib))
+                        if (id == 2 .and. viscous) call s_split_axis_flux(1._wp)
                         call nvtxEndRange
                     end if
 
@@ -2044,6 +2046,22 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
 
+                ! Face form of the split-off axis flux, divergence and geometric term (the r = 0 face has no area)
+                if (axis_face_split) then
+                    $:GPU_PARALLEL_LOOP(private='[i, j, l]', collapse=2)
+                    do l = 0, p
+                        do j = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%mom%beg, eqn_idx%E
+                                rhs_vf(i)%sf(j, 0, l) = rhs_vf(i)%sf(j, 0, l) - (1._wp/dy(0) + 5.e-1_wp/y_cc(0))*flux_axis_vf(j, &
+                                       & l, i)
+                                flux_axis_vf(j, l, i) = 0._wp
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                 do l = 0, p
                     do k = 1, n
@@ -2059,8 +2077,8 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
 
                 ! Species diffusion uses the face form down to the axis cell: its r = 0 face flux cancels against the geometric
-                ! source below. Without viscosity the axis cell's energy row takes the same form; with viscosity it takes only the
-                ! cell-centred viscous stress, so the diffusive energy flux through face 0 is missing there (#2513).
+                ! source below. Without viscosity the axis cell's energy row takes the same form; with viscosity its diffusive
+                ! energy flux comes through flux_axis_vf above.
                 if (chem_params%diffusion) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
                     do l = 0, p

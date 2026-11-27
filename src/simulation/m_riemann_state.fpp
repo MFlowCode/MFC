@@ -11,7 +11,7 @@ module m_riemann_state
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: verysmall, sgm_eps
+    use m_constants, only: verysmall, sgm_eps, BC_REFLECTIVE, BC_AXIS
     use m_hb_function
 
     implicit none
@@ -29,6 +29,13 @@ module m_riemann_state
     !> @{
     real(wp), allocatable, dimension(:,:,:,:) :: flux_gsrc_rsx_vf
     $:GPU_DECLARE(create='[flux_gsrc_rsx_vf]')
+
+    !> Share of the r = y_cb(0) face source flux (mom..E) that the cylindrical axis cell takes in face form beside its cell-centred
+    !! viscous and conduction stress: 3D capillary and, with viscosity, species diffusion. Bracketed by s_split_axis_flux, consumed
+    !! and zeroed by m_rhs.
+    logical                                 :: axis_face_split
+    real(wp), allocatable, dimension(:,:,:) :: flux_axis_vf
+    $:GPU_DECLARE(create='[flux_axis_vf]')
 
     real(wp), allocatable, dimension(:,:,:,:) :: nc_iface_vel_rsx_vf
     $:GPU_DECLARE(create='[nc_iface_vel_rsx_vf]')
@@ -616,6 +623,28 @@ contains
         ! END: Population of Buffers in z-direction
 
     end subroutine s_populate_riemann_states_variables_buffers
+
+    !> Add sgn times the r-face 0 source flux to flux_axis_vf on a rank holding the cylindrical axis. Calls with sgn = -1 and +1
+    !! around a flux contribution isolate it.
+    subroutine s_split_axis_flux(sgn)
+
+        real(wp), intent(in) :: sgn
+        integer              :: i, j, l
+
+        if (.not. axis_face_split) return
+        if (bc_y%beg /= BC_REFLECTIVE .and. bc_y%beg /= BC_AXIS) return
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, l]')
+        do i = eqn_idx%mom%beg, eqn_idx%E
+            do l = 0, p
+                do j = 0, m
+                    flux_axis_vf(j, l, i) = flux_axis_vf(j, l, i) + sgn*flux_src_rsx_vf(j, 0, l, i)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_split_axis_flux
 
     !> Set up the chosen Riemann solver algorithm for the current direction
     subroutine s_initialize_riemann_solver(norm_dir)
