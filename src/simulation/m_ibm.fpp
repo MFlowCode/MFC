@@ -2578,8 +2578,8 @@ contains
         gp_layers_z = gp_layers
         if (p == 0) gp_layers_z = 0
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp]', copy='[num_gps_local]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', copyin='[ib_markers%sf]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp]', copy='[num_gps_local]', firstprivate='[gp_layers_z]', &
+                            & copyin='[ib_markers%sf]', collapse=3)
         do i = 0, m
             do j = 0, n
                 do k = 0, p
@@ -2625,8 +2625,8 @@ contains
         if (p == 0) gp_layers_z = 0
         slab_n = m
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, c]', copyin='[ib_markers%sf]', firstprivate='[gp_layers, &
-                            & gp_layers_z]', present='[gp_col]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, c]', copyin='[ib_markers%sf]', firstprivate='[gp_layers_z]', &
+                            & present='[gp_col]', collapse=2)
         do i = 0, m
             do j = 0, n
                 c = 0
@@ -2676,8 +2676,8 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(private='[i, j, k, ii, jj, kk, is_gp, c, patch_id, encoded_patch_id, neighborhood_patch_id, xp, yp, &
-                            & zp]', copyin='[ib_markers%sf, glb_bounds]', firstprivate='[gp_layers, gp_layers_z]', &
-                            & reduction='[[min_id]]', reductionOp='[min]', present='[ghost_points, gp_slab, gp_col]', collapse=2)
+                            & zp]', copyin='[ib_markers%sf, glb_bounds]', firstprivate='[gp_layers_z]', reduction='[[min_id]]', &
+                            & reductionOp='[min]', present='[ghost_points, gp_slab, gp_col]', collapse=2)
         do i = 0, m
             do j = 0, n
                 c = gp_slab(i) + gp_col(i, j)
