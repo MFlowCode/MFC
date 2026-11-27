@@ -108,22 +108,14 @@ contains
     subroutine s_initialize_collisions_module()
 
         real(wp) :: e
-        integer  :: max_collisions
 
         e = coefficient_of_restitution
         damping_parameter = -2._wp*log(e)/collision_time
         spring_stiffness = (pi**2 + log(e)**2)/(collision_time**2)
         $:GPU_UPDATE(device='[damping_parameter, spring_stiffness]')
 
-        ! one lookup sized for the larger of the IB and EL pair counts; EL allows 12 contacts per particle (3D close packing)
-        max_collisions = 0
-        if (ib) max_collisions = num_local_ibs_max*27*8
-        if (particles_lagrange) max_collisions = max(max_collisions, 12*min(particle_params%nparticles_glb, max_particles_per_rank))
-        if (max_collisions > 0) then
-            @:ALLOCATE(collision_lookup(max_collisions, 4))
-            collision_lookup = 0
-            $:GPU_UPDATE(device='[collision_lookup]')
-        end if
+        ! particles are loaded after this, so the EL part of the lookup grows on the first s_apply_EL_collisions
+        call s_resize_collision_lookup(0)
 
         if (ib) then
             @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
@@ -137,6 +129,25 @@ contains
         $:GPU_UPDATE(device='[ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end, ib_bc_z%beg, ib_bc_z%end]')
 
     end subroutine s_initialize_collisions_module
+
+    !> Make collision_lookup hold the IB pair bound (when ib) and twice num_pairs EL pairs; it only grows. Contents are rebuilt by
+    !! every detection, so they are not kept.
+    subroutine s_resize_collision_lookup(num_pairs)
+
+        integer, intent(in) :: num_pairs
+        integer             :: capacity
+
+        capacity = max(2*num_pairs, 1)
+        if (ib) capacity = max(capacity, num_local_ibs_max*27*8)
+        if (allocated(collision_lookup)) then
+            if (size(collision_lookup, 1) >= capacity) return
+            @:DEALLOCATE(collision_lookup)
+        end if
+        @:ALLOCATE(collision_lookup(capacity, 4))
+        collision_lookup = 0
+        $:GPU_UPDATE(device='[collision_lookup]')
+
+    end subroutine s_resize_collision_lookup
 
     !> Size the pair bitset for num_bodies IBs, doubled so a growing body count does not reallocate every step (empty on exit)
     subroutine s_resize_pair_bits(num_bodies)
@@ -306,6 +317,9 @@ contains
 
         if (collision_model == 0) return
 
+        ! room for 12 contacts per owned particle (3D close packing), sized from the local count
+        if (12*num_particles > size(collision_lookup, 1)) call s_resize_collision_lookup(12*num_particles)
+
         ! apply wall collisions; one thread per particle, so no atomics
         max_overlap = 0._wp
         $:GPU_PARALLEL_LOOP(private='[i, l, pos, vel, wall_overlaps, force]', reduction='[[max_overlap]]', reductionOp='[max]')
@@ -331,6 +345,11 @@ contains
 
         ! naive all-to-all search; every pair in the lookup overlaps
         call s_detect_el_collisions(num_particles, num_halo, positions, radii, num_considered_collisions)
+        if (num_considered_collisions > size(collision_lookup, 1)) then
+            ! more contacts than reserved (e.g. deep overlaps or unequal radii): grow to the count found and detect again
+            call s_resize_collision_lookup(num_considered_collisions)
+            call s_detect_el_collisions(num_particles, num_halo, positions, radii, num_considered_collisions)
+        end if
 
         ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
         collisions_active = collisions_active .or. any_wall_collision .or. (num_considered_collisions > 0)
@@ -623,7 +642,7 @@ contains
     end subroutine s_clear_pair_bits
 
     !> Naive O(N^2) search pairing each owned EL particle i with every later owned particle or halo copy j; appends every
-    !! overlapping pair to collision_lookup
+    !! overlapping pair to collision_lookup. Returns the full count, which exceeds the lookup size when pairs were dropped.
     subroutine s_detect_el_collisions(num_particles, num_halo, positions, radii, num_considered_collisions)
 
         integer, intent(in)                    :: num_particles, num_halo
@@ -661,8 +680,6 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        @:PROHIBIT(num_found > max_pairs, &
-                   & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
         num_considered_collisions = num_found
 
     end subroutine s_detect_el_collisions
@@ -729,7 +746,7 @@ contains
 
     subroutine s_finalize_collisions_module()
 
-        if (particles_lagrange .or. ib) then
+        if (allocated(collision_lookup)) then
             @:DEALLOCATE(collision_lookup)
         end if
         if (ib) then
