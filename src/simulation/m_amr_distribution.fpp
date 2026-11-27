@@ -715,10 +715,10 @@ contains
 
         c = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
         select case (patch_ib(i)%geometry)
-        case (2, 8)  ! circle, sphere
+        case (ib_circle, ib_sphere)
             half = patch_ib(i)%radius
-        case (3, 9, 10)  ! rectangle, box, cylinder (axis x): body-frame half-extents, rotated by the body's angles
-            if (patch_ib(i)%geometry == 10) then
+        case (ib_rectangle, ib_cuboid, ib_cylinder)  ! cylinder axis x: body-frame half-extents, rotated by the body's angles
+            if (patch_ib(i)%geometry == ib_cylinder) then
                 half = [0.5_wp*patch_ib(i)%length_x, patch_ib(i)%radius, patch_ib(i)%radius]
             else
                 half = 0.5_wp*[patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]

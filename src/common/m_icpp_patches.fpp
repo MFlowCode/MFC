@@ -59,7 +59,7 @@ contains
         ! Load STL/OBJ models once into the shared flat arrays if any patch is an STL/OBJ model (geometry 21)
 
         do i = 1, num_patches
-            if (patch_icpp(i)%geometry == 21) then
+            if (patch_icpp(i)%geometry == icpp_model) then
                 call s_instantiate_STL_models()
                 exit
             end if
@@ -75,28 +75,28 @@ contains
                 !> ICPP Patches
                 !> @{
                 ! Spherical patch
-                if (patch_icpp(i)%geometry == 8) then
+                if (patch_icpp(i)%geometry == icpp_sphere) then
                     call s_icpp_sphere(i, patch_id_fp, q_prim_vf, g)
                     ! Cuboidal patch
-                else if (patch_icpp(i)%geometry == 9) then
+                else if (patch_icpp(i)%geometry == icpp_cuboid) then
                     call s_icpp_cuboid(i, patch_id_fp, q_prim_vf, g)
                     ! Cylindrical patch
-                else if (patch_icpp(i)%geometry == 10) then
+                else if (patch_icpp(i)%geometry == icpp_cylinder) then
                     call s_icpp_cylinder(i, patch_id_fp, q_prim_vf, g)
                     ! Swept plane patch
-                else if (patch_icpp(i)%geometry == 11) then
+                else if (patch_icpp(i)%geometry == icpp_sweep_plane) then
                     call s_icpp_sweep_plane(i, patch_id_fp, q_prim_vf, g)
                     ! Ellipsoidal patch
-                else if (patch_icpp(i)%geometry == 12) then
+                else if (patch_icpp(i)%geometry == icpp_ellipsoid) then
                     call s_icpp_ellipsoid(i, patch_id_fp, q_prim_vf, g)
                     ! 3D spherical harmonic patch
-                else if (patch_icpp(i)%geometry == 14) then
+                else if (patch_icpp(i)%geometry == icpp_spherical_harmonic) then
                     call s_icpp_3d_spherical_harmonic(i, patch_id_fp, q_prim_vf, g)
                     ! 3D Modified circular patch
-                else if (patch_icpp(i)%geometry == 19) then
+                else if (patch_icpp(i)%geometry == icpp_3d_varcircle) then
                     call s_icpp_3dvarcircle(i, patch_id_fp, q_prim_vf, g)
                     ! 3D STL patch
-                else if (patch_icpp(i)%geometry == 21) then
+                else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
                 end if
             end do
@@ -112,35 +112,35 @@ contains
                 !> ICPP Patches
                 !> @{
                 ! Circular patch
-                if (patch_icpp(i)%geometry == 2) then
+                if (patch_icpp(i)%geometry == icpp_circle) then
                     call s_icpp_circle(i, patch_id_fp, q_prim_vf, g)
                     ! Rectangular patch
-                else if (patch_icpp(i)%geometry == 3) then
+                else if (patch_icpp(i)%geometry == icpp_rectangle) then
                     call s_icpp_rectangle(i, patch_id_fp, q_prim_vf, g)
                     ! Swept line patch
-                else if (patch_icpp(i)%geometry == 4) then
+                else if (patch_icpp(i)%geometry == icpp_sweep_line) then
                     call s_icpp_sweep_line(i, patch_id_fp, q_prim_vf, g)
                     ! Elliptical patch
-                else if (patch_icpp(i)%geometry == 5) then
+                else if (patch_icpp(i)%geometry == icpp_ellipse) then
                     call s_icpp_ellipse(i, patch_id_fp, q_prim_vf, g)
                     ! Unimplemented patch (formerly isentropic vortex)
-                else if (patch_icpp(i)%geometry == 6) then
+                else if (patch_icpp(i)%geometry == icpp_isentropic_vortex) then
                     call s_mpi_abort('This used to be the isentropic vortex patch, ' &
                                      & // 'which no longer exists. See Examples. Exiting.')
                     ! 2D modal (Fourier) patch
-                else if (patch_icpp(i)%geometry == 13) then
+                else if (patch_icpp(i)%geometry == icpp_2d_modal) then
                     call s_icpp_2d_modal(i, patch_id_fp, q_prim_vf, g)
                     ! Spiral patch
-                else if (patch_icpp(i)%geometry == 17) then
+                else if (patch_icpp(i)%geometry == icpp_spiral) then
                     call s_icpp_spiral(i, patch_id_fp, q_prim_vf, g)
                     ! Modified circular patch
-                else if (patch_icpp(i)%geometry == 18) then
+                else if (patch_icpp(i)%geometry == icpp_varcircle) then
                     call s_icpp_varcircle(i, patch_id_fp, q_prim_vf, g)
                     ! TaylorGreen vortex patch
-                else if (patch_icpp(i)%geometry == 20) then
+                else if (patch_icpp(i)%geometry == icpp_taylor_green) then
                     call s_icpp_2D_TaylorGreen_vortex(i, patch_id_fp, q_prim_vf, g)
                     ! STL patch
-                else if (patch_icpp(i)%geometry == 21) then
+                else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
                 end if
                 !> @}
@@ -154,10 +154,10 @@ contains
                 end if
 
                 ! Line segment patch
-                if (patch_icpp(i)%geometry == 1) then
+                if (patch_icpp(i)%geometry == icpp_line_segment) then
                     call s_icpp_line_segment(i, patch_id_fp, q_prim_vf, g)
                     ! 1d analytical
-                else if (patch_icpp(i)%geometry == 16) then
+                else if (patch_icpp(i)%geometry == icpp_bubble_pulse) then
                     call s_icpp_1d_bubble_pulse(i, patch_id_fp, q_prim_vf, g)
                 end if
             end do

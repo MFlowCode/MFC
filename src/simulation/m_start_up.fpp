@@ -1499,7 +1499,7 @@ contains
             idx_in_cloud = idx_in_cloud - particle_cloud(cloud_idx)%num_particles
         end do
 
-        ib_patch%geometry = merge(2, 8, num_dims < 3)
+        ib_patch%geometry = merge(ib_circle, ib_sphere, num_dims < 3)
         ib_patch%step_x_centroid = 0._wp
         ib_patch%step_y_centroid = 0._wp
         ib_patch%step_z_centroid = 0._wp
@@ -1893,8 +1893,9 @@ contains
 
     subroutine s_get_neighbor_bounds()
 
-        real(wp) :: beg_val, end_val, recv_val, bound, max_ib_bound, local_rank_width, min_rank_width
-        integer  :: k, send_neighbor, recv_neighbor, ierr, temporary_radius
+        real(wp)           :: beg_val, end_val, recv_val, bound, max_ib_bound, min_rank_width
+        integer            :: k, send_neighbor, recv_neighbor, ierr, hops_auto, hops_min
+        character(len=256) :: radius_msg
 
         ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
 
@@ -1906,34 +1907,39 @@ contains
         neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
-        ! perform setup if we are doing automatic radius checking
+        ! Hops the largest body needs in each decomposed direction: its half-extent over that direction's thinnest rank (a
+        ! direction with one rank never hops). The radius is a count of rank hops, so the hop that needs the most is the one
+        ! across the thinnest rank. The automatic choice adds a 1.1 margin; a radius from the case file must reach the bare count,
+        ! or a rank the body covers drops it and silently runs without it.
+        max_ib_bound = -1._wp
+        do k = 1, num_ibs
+            call s_get_ib_bound(patch_ib(k), bound)
+            max_ib_bound = max(max_ib_bound, bound)
+        end do
+        do k = 1, num_particle_clouds
+            max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
+        end do
+
+        hops_auto = 1
+        hops_min = 1
+        #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
+            if (num_dims >= ${ID}$) then
+                call s_mpi_allreduce_min(abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)), min_rank_width)
+                if (num_procs_${X}$ > 1 .and. max_ib_bound > 0._wp) then
+                    hops_auto = max(hops_auto, ceiling(1.1_wp*max_ib_bound/min_rank_width))
+                    hops_min = max(hops_min, ceiling(max_ib_bound/min_rank_width))
+                end if
+            end if
+        #:endfor
+
         if (ib_neighborhood_radius < 1) then
-            ib_neighborhood_radius = 0  ! ensure we are starting with 0 neighborhood radius
-
-            ! determine the maximum length of space that needs to be contained by the neighborhood
-            max_ib_bound = -1._wp
-            do k = 1, num_ibs
-                call s_get_ib_bound(patch_ib(k), bound)
-                max_ib_bound = max(max_ib_bound, bound)
-            end do
-            do k = 1, num_particle_clouds
-                max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
-            end do
-
-            ! Narrowest rank extent, over every direction as well as every rank. The radius is a count of rank
-            ! hops, so the distance one hop covers is the extent of the rank it steps over, and the direction
-            ! needing the most hops to span the body is the one whose ranks are thinnest. Reducing over each
-            ! rank's widest extent first reports the wrong number whenever ranks are anisotropic, which is the
-            ! norm on a stretched grid or an elongated domain.
-            local_rank_width = huge(0._wp)
-            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
-                if (num_dims >= ${ID}$) local_rank_width = min(local_rank_width, abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)))
-            #:endfor
-            call s_mpi_allreduce_min(local_rank_width, min_rank_width)
-
-            ! approximate the size of the neighborhood with a local 1.1x fudge factor for safety, lower bound of 1
-            ib_neighborhood_radius = max(1, ceiling(1.1_wp*max_ib_bound/(min_rank_width)))
+            ib_neighborhood_radius = hops_auto
             if (proc_rank == 0) print *, "Automatic choice of ib_neighborhood_radius selected: ", ib_neighborhood_radius
+        else if (ib_neighborhood_radius < hops_min) then
+            write (radius_msg, '(A,I0,A,I0,A)') 'ib_neighborhood_radius = ', ib_neighborhood_radius, &
+                   & ' is too small: the largest immersed body spans ', hops_min, &
+                   & ' rank hops in a decomposed direction. Raise it, or leave it at 0 to choose it automatically.'
+            call s_mpi_abort(trim(radius_msg))
         end if
 
         ! For each direction, propagate the left/right boundary edges outward ib_neighborhood_radius hops. After k rounds: beg_val =
