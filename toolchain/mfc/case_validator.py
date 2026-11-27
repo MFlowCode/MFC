@@ -1548,6 +1548,11 @@ class CaseValidator:
         self.prohibit(sigma is not None and not surface_tension, "sigma is set but surface_tension is not enabled")
         self.prohibit(surface_tension and model_eqns not in [2, 3], "The surface tension model requires model_eqns = 2 or model_eqns = 3")
         self.prohibit(surface_tension and num_fluids != 2, "The surface tension model requires num_fluids = 2")
+        riemann_solver = self.get("riemann_solver")
+        self.prohibit(
+            surface_tension and riemann_solver is not None and riemann_solver != 2,
+            "The surface tension model requires the HLLC Riemann solver (riemann_solver = 2): only it adds the capillary stress flux",
+        )
 
     def check_mhd(self):
         """Checks constraints on MHD parameters"""

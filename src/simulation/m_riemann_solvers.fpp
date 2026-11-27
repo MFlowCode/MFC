@@ -113,6 +113,20 @@ contains
         end if
         @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, src_lo:sys_size))
 
+        axis_face_split = cyl_coord .and. ((surface_tension .and. p > 0) .or. (chem_params%diffusion .and. viscous))
+        if (axis_face_split) then
+            @:ALLOCATE(flux_axis_vf(0:m, 0:p, eqn_idx%mom%beg:eqn_idx%E))
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do i = eqn_idx%mom%beg, eqn_idx%E
+                do l = 0, p
+                    do j = 0, m
+                        flux_axis_vf(j, l, i) = 0._wp
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
         ! Geometric source flux exists only on cyl_coord paths (grid_geometry == 3 implies cyl_coord);
         ! zeroed because solvers write only the components they touch while m_rhs reads the whole band.
         if (cyl_coord) then
@@ -188,6 +202,9 @@ contains
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
+        if (axis_face_split) then
+            @:DEALLOCATE(flux_axis_vf)
+        end if
         @:DEALLOCATE(Gs_rs)
         if (use_nc_iface_vel) then
             @:DEALLOCATE(nc_iface_vel_rsx_vf)

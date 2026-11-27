@@ -1179,6 +1179,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # Uniform volume fractions isolate the azimuthal terms from each solver's mixture handling.
         uniform_mixture = {f"patch_icpp({i})%{q}({f})": v for i in range(1, 5) for f in (1, 2) for q, v in (("alpha", 0.5), ("alpha_rho", 0.25))}
+        # Capillary stress (#2513): the wedge's interface has theta faces and crosses the axis ring
+        capillary = {"model_eqns": 2, "riemann_solver": 2, "surface_tension": "T", "sigma": 1.0e-3, **{f"patch_icpp({i})%cf_val": int(i == 4) for i in range(1, 5)}}
+        cases.append(define_case_d(stack, "capillary=T", {**theta_wedge, **uniform_mixture, **capillary}))
         stack.push("Azimuthal", {**theta_wedge, **uniform_mixture, "patch_icpp(4)%pres": 1.0, **{f"patch_icpp({i})%vel(3)": 0.1 for i in range(1, 5)}})
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
         cases.append(define_case_d(stack, "HLLC", {"riemann_solver": 2}))
@@ -1418,6 +1421,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact", {**geom, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "T"}))
                 # the opt-out: the WENO viscous gradient next to the body, the path every weno_Re_flux IB run took before the default
                 cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact=F", {**geom, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "F"}))
+                if len(dimInfo[0]) == 2:
+                    # without either compact gradient the WENO chain reads 2*weno_polyn + 2 solid layers, all filled (#2041):
+                    # both opted out, and axisymmetric (where neither applies), the body off the axis
+                    wide = {**geom, "weno_Re_flux": "T", "weno_avg": "T"}
+                    cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact=F weno_Re_flux_compact=F", {**wide, "ib_visc_compact": "F", "weno_Re_flux_compact": "F"}))
+                    cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> axisymmetric", {**wide, "cyl_coord": "T", "y_domain%beg": 0.0, "bc_y%beg": -2}))
 
             stack.pop()
 
@@ -4788,6 +4797,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "2D Axisymmetric", cyl_2d, override_tol=10 ** (-10)))
         cases.append(define_case_d(stack, "3D Cylindrical", cyl_3d, override_tol=10 ** (-10)))
         cases.append(define_case_d(stack, "3D Cylindrical -> Unity Lewis", {**cyl_3d, "chem_params%transport_model": 2}, override_tol=10 ** (-10)))
+        # With viscosity the axis cell's energy takes the species-diffusion face flux beside the cell-centred stress (#2513); the
+        # H2-rich block fills the axis ring only
+        visc = {"viscous": "T", "fluid_pp(1)%Re(1)": 5.0e4, "patch_icpp(2)%y_centroid": 0.0, "patch_icpp(2)%length_y": 0.06e-3}
+        cases.append(define_case_d(stack, "2D Axisymmetric -> Viscous", {**cyl_2d, **visc, "m": 25, "n": 25}, override_tol=10 ** (-10)))
+        cases.append(define_case_d(stack, "3D Cylindrical -> Viscous", {**cyl_3d, **visc, "patch_icpp(2)%z_centroid": 0.0, "patch_icpp(2)%length_z": 0.06e-3}, override_tol=10 ** (-10)))
         stack.pop()
 
     foreach_dimension()

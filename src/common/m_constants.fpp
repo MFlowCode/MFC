@@ -68,7 +68,6 @@ module m_constants
     integer, parameter  :: dflt_num_igr_iters = 2              !< number of iterations for IGR elliptic solve
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
-    integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
     real(wp), parameter :: K_ib = 2._wp                        !< AMR block-owner cost per IB cell, relative to a fluid cell
     !> AMR fine-level restart per-block header: region box (6) + amr_block_level (1); the writer and both readers share it.
     integer, parameter :: amr_restart_blk_hdr_ints = 7

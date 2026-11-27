@@ -211,7 +211,8 @@ module m_global_parameters
     $:GPU_DECLARE(create='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
     integer :: buff_size  !< Number of ghost cells for boundary condition storage
-    $:GPU_DECLARE(create='[buff_size]')
+    integer :: gp_layers  !< Depth of the solid shell the IBM fills with ghost points
+    $:GPU_DECLARE(create='[buff_size, gp_layers]')
 
     ! shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices: in m_global_parameters_common
 
@@ -1089,6 +1090,12 @@ contains
         ! ib_visc_compact (default T) applies to Cartesian viscous weno_Re_flux runs with a body: the wide WENO gradient would read
         ! solid cells past the filled ghost layers, which hold the frozen wall velocity, not the ghost fill (#2041)
         ib_visc_compact = ib_visc_compact .and. ib .and. viscous .and. weno_Re_flux .and. .not. cyl_coord
+        ! Without it and without weno_Re_flux_compact (cylindrical, or both opted out) the WENO-chain face-normal viscous gradient
+        ! reads 2*weno_polyn + 2 cells into the solid: fill them all
+        gp_layers = 3
+        if (ib .and. viscous .and. weno_Re_flux .and. .not. (ib_visc_compact .or. weno_Re_flux_compact)) then
+            gp_layers = max(gp_layers, 2*weno_polyn + 2)
+        end if
         call s_set_visc_dt_cap()
 
         ! Herschel-Bulkley non-Newtonian viscosity: gather per-fluid parameters into device arrays
@@ -1169,7 +1176,7 @@ contains
         end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+                                           & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number, gp_layers)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Allocation bounds: the coarse subdomain, widened to hold a refined block when amr_max_grid_size pins one larger than it.
@@ -1230,7 +1237,7 @@ contains
         use_nc_iface_vel = hypo_nc_mode == hypo_nc_mode_interface .or. (hypo_nc_mode == hypo_nc_mode_dual_pass &
             & .and. grid_geometry == 2) .or. (adv_src_mode == adv_src_mode_alpha_iface .and. alt_soundspeed)
 
-        $:GPU_UPDATE(device='[sys_size, buff_size, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
+        $:GPU_UPDATE(device='[sys_size, buff_size, gp_layers, eqn_idx, adv_n, adap_dt, pi_fac, adap_dt_tol, adap_dt_max_iters]')
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
