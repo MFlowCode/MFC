@@ -2345,8 +2345,12 @@ class CaseValidator:
         if self.get("amr_subcycle", "F") == "T":
             self.prohibit(time_stepper == 1, "amr_subcycle requires time_stepper = 2 or 3 (RK1 keeps no step-start state)")
             self.prohibit(igr, "amr_subcycle does not support IGR")
-            moving = [v for k, v in self.params.items() if re.fullmatch(r"(patch_ib|particle_cloud)\(\d+\)%moving_ibm", k)]
-            self.prohibit(any(m not in (0, None) for m in moving), "amr_subcycle does not support moving immersed boundaries yet")
+            # prescribed motion: each fine stage sets the bodies' pose at its own time; a force-driven body needs the fine faces'
+            # force at the coarse stage, which a subcycled level computes only after the coarse step
+            moving = [v for k, v in self.params.items() if re.fullmatch(r"patch_ib\(\d+\)%moving_ibm", k)]
+            self.prohibit(any(m not in (0, 1, None) for m in moving), "amr_subcycle supports prescribed-motion bodies only (moving_ibm = 1)")
+            clouds = [v for k, v in self.params.items() if re.fullmatch(r"particle_cloud\(\d+\)%moving_ibm", k)]
+            self.prohibit(any(m not in (0, None) for m in clouds), "amr_subcycle does not support moving particle clouds")
         self.prohibit(
             amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
             "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",

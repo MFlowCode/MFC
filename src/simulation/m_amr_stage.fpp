@@ -20,6 +20,7 @@ module m_amr_stage
     use m_variables_conversion, only: s_convert_primitive_to_conservative_variables
     use m_mpi_common, only: s_mpi_allreduce_sum
     use m_amr
+    use m_amr_advance, only: s_amr_fine_stage_ib, s_amr_ib_pose_begin, s_amr_ib_pose
 
     implicit none
 
@@ -99,11 +100,13 @@ contains
         call s_amr_pc_gather(q_old, 0)
         call s_amr_pc_gather(q_new, 1)
         dt0 = dt
+        call s_amr_ib_pose_begin(t_step)
         call s_amr_subcycle_level(1, 0._wp, 1._wp, dt0/real(amr_ref_ratio, wp), q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, &
                                   & mv_in, rhs_mv, t_step)
         amr_adv_level = 0
         dt = dt0
         $:GPU_UPDATE(device='[dt]')
+        call s_amr_ib_pose(1._wp)
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()
         call s_amr_apply_reflux(q_new, q_old)  ! alpha for the source correction: step start (exact for uniform alpha)
@@ -141,7 +144,11 @@ contains
                 t_rhs = f_step_time(th0 + fs*dth*(real(k, wp) + amr_rk_c(s)), t_step, rr*dtl/dth)
                 $:GPU_UPDATE(device='[t_rhs]')
                 call s_amr_fill_sub(lev, q_new, fs*(real(k, wp) + amr_rk_c(s)), th0, dth)
+                call s_amr_ib_pose(th0 + fs*dth*(real(k, wp) + amr_rk_c(s)))
                 call s_amr_fine_stage_advance_batched(s, coefs(s,:), bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+                ! moving bodies: the rebuild and correction the stage left waiting, at the pose of the state it produced
+                call s_amr_ib_pose(th0 + fs*dth*(real(k, wp) + merge(1._wp, amr_rk_c(min(s + 1, ns)), s == ns)))
+                call s_amr_fine_stage_ib(pb_in, mv_in)
             end do
             if (lev >= amr_max_level) cycle
             call s_amr_fill_sub(lev, q_new, fs*real(k + 1, wp), th0, dth)

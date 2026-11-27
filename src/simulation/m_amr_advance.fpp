@@ -20,7 +20,7 @@ module m_amr_advance
     use m_ibm, only: s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, s_ibm_load_fine_markers, &
         & s_update_mib, s_ibm_reset_fine_park, moving_immersed_boundary_flag, num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, &
         & s_ibm_check_bodies_on_one_rank, s_ibm_pack_fine_tcond, s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, &
-        & s_read_tcond_box
+        & s_read_tcond_box, s_prescribed_kinematics, s_update_ib_rotation_matrices
     use m_amr_state
     use m_amr_distribution
     use m_amr_store
@@ -31,7 +31,13 @@ module m_amr_advance
     implicit none
 
     private
-    public :: s_amr_fine_stage_advance_batched, s_amr_setup_ib, s_amr_fine_stage_ib, s_amr_ib_tcond_restart
+    public :: s_amr_fine_stage_advance_batched, s_amr_setup_ib, s_amr_fine_stage_ib, s_amr_ib_tcond_restart, s_amr_ib_pose_begin, &
+        & s_amr_ib_pose
+
+    !> Subcycling with prescribed motion: the bodies' step-end pose (host), and the coarse step's t_step and dt
+    type(ib_patch_parameters), allocatable :: ib_end(:)
+    integer                                :: ib_t_step
+    real(wp)                               :: ib_dt0
 
 contains
 
@@ -478,6 +484,46 @@ contains
         call s_amr_select_slot(1)  ! the next stage's coarse RHS captures creg into slot 1
 
     end subroutine s_amr_fine_stage_ib
+
+    !> Subcycling: keep the bodies' step-end pose (the coarse step has moved them) for s_amr_ib_pose.
+    impure subroutine s_amr_ib_pose_begin(t_step)
+
+        integer, intent(in) :: t_step
+
+        if (.not. (ib .and. moving_immersed_boundary_flag)) return
+        ib_end = patch_ib(1:num_ibs)
+        ib_t_step = t_step; ib_dt0 = dt
+
+    end subroutine s_amr_ib_pose_begin
+
+    !> Subcycling: set each prescribed-motion body (moving_ibm = 1) to its pose at the fraction th of the coarse step: its
+    !! kinematics at that time, else the linear blend of the step-start (step_*) and step-end poses; th = 1 is the end pose.
+    impure subroutine s_amr_ib_pose(th)
+
+        real(wp), intent(in) :: th
+        integer              :: i
+
+        if (.not. (ib .and. moving_immersed_boundary_flag)) return
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 1) cycle
+            if (th >= 1._wp) then
+                patch_ib(i) = ib_end(i)
+            else if (patch_ib(i)%kin_model > 0) then
+                call s_prescribed_kinematics(i, f_step_time(th, ib_t_step, ib_dt0))
+            else
+                patch_ib(i)%x_centroid = (1._wp - th)*patch_ib(i)%step_x_centroid + th*ib_end(i)%x_centroid
+                patch_ib(i)%y_centroid = (1._wp - th)*patch_ib(i)%step_y_centroid + th*ib_end(i)%y_centroid
+                patch_ib(i)%z_centroid = (1._wp - th)*patch_ib(i)%step_z_centroid + th*ib_end(i)%z_centroid
+                patch_ib(i)%angles = (1._wp - th)*patch_ib(i)%step_angles + th*ib_end(i)%angles
+                patch_ib(i)%vel = (1._wp - th)*patch_ib(i)%step_vel + th*ib_end(i)%vel
+                patch_ib(i)%angular_vel = (1._wp - th)*patch_ib(i)%step_angular_vel + th*ib_end(i)%angular_vel
+            end if
+        end do
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        call s_update_ib_rotation_matrices(num_ibs)
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
+    end subroutine s_amr_ib_pose
 
     !> The batch's slab layout: members stacked along the last active dim, stride amr_bat_w.
     impure subroutine s_amr_bat_layout()

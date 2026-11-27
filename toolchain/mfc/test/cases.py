@@ -6724,6 +6724,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Force-driven (moving_ibm = 2): the body decelerates on that force, so its velocity in D/ib_forces.dat guards the same path
         force_driven = {"patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.0628, "ib_state_wrt": "T", "ib_force_wrt": "T"}
         cases.append(define_case_d(stack, "force-driven", force_driven))
+        # subcycled: each fine stage moves the body to its own time before the fine IB rebuild
+        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
         # The same on two ranks: the block is owned whole by one rank and spans the rank boundary, so it has to fit in half a
         # subdomain (hence the finer grid and smaller body)
         two_rank = {"m": 127, "n": 127, "patch_ib(1)%radius": 0.05, "patch_ib(1)%mass": 0.0157}
