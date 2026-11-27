@@ -135,7 +135,7 @@ DESCRIPTIONS = {
     "amr_device_pack": "Pack/unpack the per-stage coarse-patch gather (F1/F2) as ONE fused device kernel per family per stage over the plan's flat transfer list, not one launch per transfer",
     "amr_max_blocks": "Number of fixed refined-block slots preallocated for multi-block AMR (each sized max-block; N slots ~ N x device memory)",
     "amr_max_grid_size": "Absolute cap on a refined block's coarse-cell extent per dim; 0 (default): half the rank subdomain, tiled at regrid (down to 16) to one block per rank",
-    "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Multi-level (>= 2) supported: static (amr_regrid_int=0) up to 2, dynamic regrid (>0) deeper",
+    "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Static (amr_regrid_int=0): one block per level, any depth (2 with ib); dynamic regrid (>0): any depth",
     "amr_cluster_eff": "Berger-Rigoutsos min tag efficiency (tagged/total) a clustered block box must reach before splitting stops (0 < eff <= 1)",
     "amr_blocking_factor": "Minimum block-box extent in coarse cells the Berger-Rigoutsos bisection may produce; stops over-generation (>= 1, default 1 = none)",
     "amr_ref_ratio": "AMR refinement ratio between coarse and fine levels (2 or 4; default 2; 4 needs amr_prolong = 1)",
