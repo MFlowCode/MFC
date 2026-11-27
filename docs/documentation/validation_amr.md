@@ -172,7 +172,7 @@ Peak shell-averaged density over \f$\rho_0\f$ at t = 0.16: 3.25 (uniform 96³), 
 Limits:
 - **Early times.** The energy sits in a finite sphere (0.04, 3-13 cells) with a staircase surface, which shifts the virtual origin; the first save (t = 0.02, R = 5.4 r0) carries that and the startup transient. The patch stair-step loses 0.9 % of the energy at 96³/192³ and 0.5 % at 384³; the reference uses the measured energy.
 - **Counter-pressure.** \f$p_0 = 10^{-3}\f$ leaves the shock at Mach 33 at the end (\f$\dot R = 0.4 R/t\f$ against \f$c_0 = \sqrt{\gamma p_0/\rho_0}\f$); the strong-shock solution ignores \f$p_0\f$ (an effect of order \f$1/M^2\f$, about 0.1 %, not separated from the discretization error here).
-- **Scheme.** WENO5 with `mp_weno = T` went NaN next to the blast at t = 0.004 on a uniform 256³ octant (no AMR), so the check uses MUSCL with minmod. An octant with symmetry walls cannot be refined at the walls (a block must lie `buff_size` cells inside the domain), so the whole sphere is simulated.
+- **Scheme.** On a uniform 256³ octant (no AMR), WENO5 with `mp_weno = T` goes NaN at t = 0.0024, at the collapsing centre in the reflective corner: WENO5 has no positivity safeguard there (#2502, as in #2469). With `face_bound = 1` or `2` (see [Positivity](validation_positivity.md)) the same run reaches t = 0.02. The check uses MUSCL with minmod. An octant with symmetry walls cannot be refined at the walls (a block must lie `buff_size` cells inside the domain), so the whole sphere is simulated.
 - Save times come from `run_time.inf`, which has four significant digits (0.04 % in R).
 - Only the radius and the peak density are checked; the interior profiles are not compared.
 

@@ -592,7 +592,8 @@ contains
                 fill(nb) = product(merge(real((amr_region_hi_all(:,k) - amr_region_lo_all(:,k) + 1)*amr_ref_ratio**lev, &
                      & wp)/real(mbuf_hi - mbuf_lo + 1, wp), 1._wp, amr_dim))
             end do
-            if (nb > 0) call s_mem_note_level(lev, nint(maxval(rc)), fill(1:nb), 2_8*f_amr_col_bytes())
+            if (nb > 0) call s_mem_note_level(lev, nint(maxval(rc)), fill(1:nb), 2_8*f_amr_col_bytes(), &
+                & 1._wp - product(merge(real(max_f + 1, wp), 1._wp, amr_dim))/product(real(mbuf_hi - mbuf_lo + 1, wp)))
         end do
 
     end subroutine s_amr_note_level_fill

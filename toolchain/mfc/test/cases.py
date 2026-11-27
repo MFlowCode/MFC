@@ -6069,6 +6069,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "stiffened gas at a static block face", stiff))
         # the subcycled state reflux takes alpha from the step-start state
         cases.append(define_case_d(stack, "stiffened gas at a static block face -> subcycle", {**stiff, "amr_subcycle": "T"}))
+        # HLL Method 1: the source is u*(alpha*_l - alpha*_r)/dx with the interface alphas, which the registers carry per fluid
+        cases.append(define_case_d(stack, "stiffened gas at a static block face -> HLL", {**stiff, "riemann_solver": 1}))
         stack.pop()
 
         # hypoelasticity: 1D hypoelastic shock config on a static 2:1 block; the fine swap recomputes the
@@ -6734,6 +6736,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(2)": 8,
             "amr_block_end(2)": 23,
         }
+        # a two-fluid shear layer (u = +0.5 below y = 0.5, -0.5 above; uniform alpha and p) across the static block's x-faces, so
+        # the face velocity varies along them: the reflux corrects the alt_soundspeed K*div(u) term and the 6-equation internal
+        # energies' alpha_k*p*div(u) with the volume fractions' alpha*div(u)
+        shear = {k: v for k, v in amr_2d_base.items() if not k.startswith("patch_icpp(3)")}
+        shear.update({"num_patches": 2, "num_fluids": 2, "mpp_lim": "T", "amr_regrid_int": 0})
+        shear.update({"fluid_pp(2)%gamma": 1.0 / 3.4, "fluid_pp(2)%pi_inf": 4.4 * 2.0 / 3.4, "fluid_pp(2)%cv": 0.0, "fluid_pp(2)%qv": 0.0, "fluid_pp(2)%qvp": 0.0})
+        # the jump at y = 0.51 sits inside coarse cell 16, whose center takes the upper value while its two fine cells take one
+        # each, so the fine faces' velocity average differs from the coarse face's from the first step (an aligned jump stays
+        # steady with no difference at all)
+        for i, (yc, ly, u) in enumerate(((0.255, 0.51, 0.5), (0.755, 0.49, -0.5)), start=1):
+            shear.update({f"patch_icpp({i})%x_centroid": 0.5, f"patch_icpp({i})%length_x": 1.0, f"patch_icpp({i})%y_centroid": yc, f"patch_icpp({i})%length_y": ly})
+            shear.update({f"patch_icpp({i})%vel(1)": u, f"patch_icpp({i})%vel(2)": 0.0, f"patch_icpp({i})%pres": 1.0})
+            shear.update({f"patch_icpp({i})%alpha_rho(1)": 0.5, f"patch_icpp({i})%alpha_rho(2)": 0.25, f"patch_icpp({i})%alpha(1)": 0.5, f"patch_icpp({i})%alpha(2)": 0.5})
+        stack.push("AMR -> 2D -> two-fluid shear layer", shear)
+        cases.append(define_case_d(stack, "alt_soundspeed", {"alt_soundspeed": "T"}))
+        cases.append(define_case_d(stack, "6eq", {"model_eqns": 3}))
+        stack.pop()
+
         stack.push(
             "AMR -> 2D -> multi-level static np=2",
             {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16},
@@ -7079,6 +7099,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # each joined pair's parents on one rank)
         turned = {f"patch_icpp({i})%{k}": v for i, yc, ly in ((1, 0.15, 0.3), (2, 0.5, 0.4), (3, 0.85, 0.3)) for k, v in (("x_centroid", 0.5), ("length_x", 1.0), ("y_centroid", yc), ("length_y", ly))}
         cases.append(define_case_d(stack, "features along x -> 2 MPI Ranks", turned, ppn=2))
+        stack.pop()
+        # A disc crossing the level-1 seam y = 28|29 near its top: the level-2 boxes on the two sides join across it, so level 2
+        # covers y = 13..44 without the unrefined strip of 2*amr_cpat_mar coarse cells (#2312)
+        disc = {k: v for k, v in seam_2d.items() if not (k.startswith("patch_icpp(3)") or k.startswith("patch_icpp(2)%length"))}
+        disc.update({"num_patches": 2, "patch_icpp(1)%x_centroid": 0.5, "patch_icpp(1)%length_x": 1.0})
+        disc.update({"patch_icpp(2)%geometry": 2, "patch_icpp(2)%x_centroid": 0.5, "patch_icpp(2)%y_centroid": 0.45, "patch_icpp(2)%radius": 0.15, "patch_icpp(2)%alter_patch(1)": "T"})
+        stack.push("AMR -> 2D -> multi-level seam -> oblique disc", disc)
+        cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
         # Validation examples at small sizes (docs/documentation/validation_amr.md): Sod with two levels following the shock and the

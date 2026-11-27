@@ -58,9 +58,9 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   volume fraction's flux pairs with an \f$\alpha\,\nabla\cdot u\f$ source on the same faces, so the registers also hold
   the face velocity and the volume fractions' reflux corrects both: uniform \f$\alpha\f$ stays uniform, and a material
   interface on a block face keeps pressure and velocity equilibrium (HLLC, HLL with `hll_u_interface` and LF, with two or
-  more fluids). Not corrected: the `alt_soundspeed` \f$K\,\nabla\cdot u\f$ term, HLL Method 1 (its flux alone is refluxed),
-  and the 6-equation internal energies' \f$\alpha_k p\,\nabla\cdot u\f$. Each covered coarse cell is then set to the average
-  of its fine children.
+  more fluids). The same correction covers the `alt_soundspeed` \f$K\,\nabla\cdot u\f$ term, the 6-equation internal
+  energies' \f$\alpha_k p\,\nabla\cdot u\f$, and HLL Method 1, whose per-fluid interface volume fractions the registers
+  also hold. Each covered coarse cell is then set to the average of its fine children.
 
 ## Conservation and accuracy {#amr-conservation}
 
@@ -90,7 +90,7 @@ the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, ad
 registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies). Every block's store column is
 sized to the block size cap (`amr_max_grid_size`, or the rank-derived cap) plus ghost layers, so it also prints that column's
 size and, per level, the most blocks any rank held over the run, their store, and how much of its column (ghost layers
-included, so below 1 even at the cap) a block's interior fills (min, mean, max).
+included, so below 1 even at the cap) a block's interior fills (min, mean, max). Each level's row also splits its store into the ghost-layer part and gives its flux registers (one register slot per block), and GPU builds add one line with the device and host totals: every group but the IB marker copies is device-resident and keeps a host mirror.
 
 ## Supported physics {#amr-physics}
 
@@ -222,7 +222,8 @@ comparable (forces on coarse faces only).
   only grow); a missing fine-level file aborts the restart.
 - **Nesting.** A level-2 or deeper block lies inside one block of the level above; regrid builds each block's children
   inside it, a few coarse cells from its edge. Where a feature crosses the seam between two parent blocks, the children
-  on the two sides are joined across it when their extents along it are equal (a feature that crosses it squarely):
+  on the two sides are joined across it when their extents along it are equal (the tag buffer usually makes them so,
+  also for a disc crossing the seam off its centre):
   each is extended to the seam, or, where that would exceed its level's size cap, the gap is filled by a thin block of
   its own. Otherwise a strip that wide on each side of the seam stays at the parent's resolution; so does every seam with
   immersed boundaries, or with `amr_prolong = 2` on a scheme with fewer

@@ -17,7 +17,7 @@ module m_phase_timing
     public :: s_phase_tic, s_phase_toc, s_phase_step_tic, s_phase_step_toc, s_phase_report, PH_HALO, PH_GATHER, PH_GFILL, &
         & PH_SEAM, PH_RHS, PH_RK, PH_REFLUX, PH_REGRID, PH_COARSE, PH_SWAP, PH_RESTR, PH_LERP, PH_RG_HALO, PH_RG_TAG, PH_RG_CLUS, &
         & PH_RG_OWN, PH_RG_MIG, PH_RG_BUILD, PH_RG_REC, s_mem_note, s_mem_note_fields, MEM_STORE, MEM_SCRATCH, MEM_PATCH, &
-        & MEM_REG, MEM_IB, MEM_IBHOST, s_mem_note_level, s_mem_reset_levels
+        & MEM_REG, MEM_IB, MEM_IBHOST, s_mem_note_level, s_mem_reset_levels, s_mem_note_reg_slot
 
     integer, parameter          :: PH_HALO = 1       !< coarse cons halo exchange (once per stage)
     integer, parameter          :: PH_GATHER = 2     !< fill waves: coarse-patch gather into every block
@@ -65,6 +65,8 @@ module m_phase_timing
     integer, allocatable  :: mem_lev_hw(:)
     real(wp), allocatable :: mem_fill_min(:), mem_fill_max(:), mem_fill_sum(:), mem_fill_n(:)
     real(wp)              :: mem_col_mib = 0._wp
+    !> Ghost-layer share of one store column (s_mem_note_level) and one block's flux-register slot (s_mem_note_reg_slot).
+    real(wp) :: mem_ghost_frac = 0._wp, mem_reg_slot_mib = 0._wp
 
 contains
 
@@ -147,15 +149,22 @@ contains
         do i = 1, MEM_N + 1
             print '(A,A8,2F12.1)', '[amr-mem] ', MEM_NAME(i), msum(i)/real(num_procs, wp), mmax(i)
         end do
+#ifdef MFC_GPU
+        ! every group but the IB marker copies is device-resident and keeps a host mirror
+        print '(A,F12.1,A,F12.1,A)', '[amr-mem] device ', (msum(MEM_N + 1) - msum(MEM_IBHOST))/real(num_procs, wp), &
+            & ' MiB mean per rank; host ', msum(MEM_N + 1)/real(num_procs, wp), ' MiB (device arrays keep a host mirror)'
+#endif
         print '(A,F8.2,A)', '[amr-mem] solver work arrays are allocated ', &
             & product(real(idwbuff_alloc%end - idwbuff_alloc%beg + 1, wp))/product(real(idwbuff%end - idwbuff%beg + 1, wp)), &
             & 'x the coarse extent (largest block or batch slab)'
         if (.not. allocated(mem_lev_hw)) return
         print '(A,F10.2,A)', '[amr-mem] per block ', mem_col_mib, ' MiB of store (every block is sized to the size cap)'
-        print '(A)', '[amr-mem] level  blocks/rank  store MiB   fill min    mean     max  (busiest rank, high-water over regrids)'
+        print '(A)', &
+            & '[amr-mem] level  blocks/rank  store MiB  ghost MiB  regs MiB   fill min    mean     max  (busiest rank, high-water over regrids)'
         do i = 1, size(mem_lev_hw)
             if (mem_fill_n(i) <= 0._wp) cycle
-            print '(A,I5,I13,F11.1,3F9.3)', '[amr-mem] ', i, mem_lev_hw(i), mem_lev_hw(i)*mem_col_mib, mem_fill_min(i), &
+            print '(A,I5,I13,3F11.3,3F9.3)', '[amr-mem] ', i, mem_lev_hw(i), mem_lev_hw(i)*mem_col_mib, &
+                & mem_lev_hw(i)*mem_col_mib*mem_ghost_frac, mem_lev_hw(i)*mem_reg_slot_mib, mem_fill_min(i), &
                 & mem_fill_sum(i)/mem_fill_n(i), mem_fill_max(i)
         end do
 
@@ -163,10 +172,10 @@ contains
 
     !> Note one regrid's level lev for the per-level table: nmax blocks on the busiest rank, fill(:) the column share of each
     !! block's interior, col_bytes one block's store column.
-    impure subroutine s_mem_note_level(lev, nmax, fill, col_bytes)
+    impure subroutine s_mem_note_level(lev, nmax, fill, col_bytes, ghost_frac)
 
         integer, intent(in)         :: lev, nmax
-        real(wp), intent(in)        :: fill(:)
+        real(wp), intent(in)        :: fill(:), ghost_frac
         integer(kind=8), intent(in) :: col_bytes
 
         if (.not. allocated(mem_lev_hw)) then
@@ -174,13 +183,22 @@ contains
                       & mem_fill_sum(amr_max_level), mem_fill_n(amr_max_level))
             mem_lev_hw = 0; mem_fill_min = huge(1._wp); mem_fill_max = 0._wp; mem_fill_sum = 0._wp; mem_fill_n = 0._wp
         end if
-        mem_col_mib = real(col_bytes, wp)/1024._wp**2
+        mem_col_mib = real(col_bytes, wp)/1024._wp**2; mem_ghost_frac = ghost_frac
         mem_lev_hw(lev) = max(mem_lev_hw(lev), nmax)
         if (size(fill) == 0) return
         mem_fill_min(lev) = min(mem_fill_min(lev), minval(fill)); mem_fill_max(lev) = max(mem_fill_max(lev), maxval(fill))
         mem_fill_sum(lev) = mem_fill_sum(lev) + sum(fill); mem_fill_n(lev) = mem_fill_n(lev) + real(size(fill), wp)
 
     end subroutine s_mem_note_level
+
+    !> One block's flux-register slot (every direction, coarse and fine sides), for the per-level table.
+    impure subroutine s_mem_note_reg_slot(bytes)
+
+        integer(kind=8), intent(in) :: bytes
+
+        mem_reg_slot_mib = real(bytes, wp)/1024._wp**2
+
+    end subroutine s_mem_note_reg_slot
 
     !> Forget the per-level notes so far (a restart replaces the initial layout before the first step).
     impure subroutine s_mem_reset_levels()
