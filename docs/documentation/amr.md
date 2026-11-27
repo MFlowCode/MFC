@@ -107,6 +107,7 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
+| Mean pressure gradient and bulk-flux / bulk-temperature controllers (`mean_dpdx`, `mean_mflux`, `mean_qdot`, `mean_temp`) | Supported without `ib` and `mean_temp_wall`; the controllers measure level 0 after the fold (exact for the mass flux, second order for the temperature) and apply one uniform source on every level |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
 | Synthetic turbulence forcing | Supported; evaluated on each block's own grid |

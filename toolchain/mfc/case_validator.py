@@ -332,7 +332,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "mean_dpdx(i) or mean_mflux(i) requires direction i to be active and periodic on both ends, in Cartesian "
             "coordinates. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable range of the controller; "
-            "a gain without a target is rejected."
+            "a gain without a target is rejected. With amr: no ib."
         ),
     },
     "check_mean_temperature_source": {
@@ -343,7 +343,8 @@ PHYSICS_DOCS = {
             "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, periodic x, and periodic or wall (-15, -16) "
             "boundaries in y and z. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain without a target is "
             "rejected. mean_temp_wall (positive) requires a mean_temp target and Newtonian fluids; with it the viscous "
-            "dissipation is removed from the energy equation (the thermally developed state excludes it)."
+            "dissipation is removed from the energy equation (the thermally developed state excludes it). With amr: no ib "
+            "and no mean_temp_wall."
         ),
     },
     "check_synthetic_turbulence": {
@@ -1840,8 +1841,8 @@ class CaseValidator:
                 f"mean_dpdx({i})/mean_mflux({i}) require periodic bc_{d} (-1) on both ends",
             )
             self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
-            # The controller averages the coarse grid only; unchecked against refined blocks.
-            self.prohibit(self.get("amr", "F") == "T", "mean_dpdx/mean_mflux have not been validated with amr")
+            # The fine-block source would test the coarse IB markers at block indices
+            self.prohibit(self.get("amr", "F") == "T" and self.get("ib", "F") == "T", "mean_dpdx/mean_mflux with amr do not support ib")
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
 
     def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
@@ -1865,8 +1866,10 @@ class CaseValidator:
             return
         self.prohibit(self.get("chemistry", "F") != "T", "mean_qdot/mean_temp require chemistry")
         self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
-        # As for mean_dpdx: the controller averages the coarse grid only
-        self.prohibit(self.get("amr", "F") == "T", "mean_qdot/mean_temp have not been validated with amr")
+        # As for mean_dpdx; mean_temp_wall's terms are built on the coarse grid and need q_T_sf, which the fine hook does not get
+        amr = self.get("amr", "F") == "T"
+        self.prohibit(amr and self.get("ib", "F") == "T", "mean_qdot/mean_temp with amr do not support ib")
+        self.prohibit(amr and wall is not None, "mean_temp_wall does not support amr")
         dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
         for d, active in dims:
             # x is the streamwise (mixing-cup) direction; walls may bound the others

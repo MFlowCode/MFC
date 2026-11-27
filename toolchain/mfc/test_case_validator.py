@@ -206,8 +206,8 @@ class TestMeanPressureGradient(ConstraintTestCase):
     def test_accepts_ib(self):
         self.assertAccepts({**BASE, **CYLINDER, "mean_dpdx(1)": -1.0})
 
-    def test_rejects_amr(self):
-        self.assertRejects({**BASE, "amr": "T", "mean_dpdx(1)": -1.0}, "have not been validated with amr")
+    def test_rejects_amr_with_ib(self):
+        self.assertRejects({**BASE, **CYLINDER, "amr": "T", "mean_dpdx(1)": -1.0}, "mean_dpdx/mean_mflux with amr do not support ib")
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**BASE, "mean_mflux(1)": 1.0}, "mean_dpdx_gain must be set")
@@ -256,8 +256,11 @@ class TestMeanTemperatureSource(ConstraintTestCase):
     def test_accepts_ib(self):
         self.assertAccepts({**self.PERIODIC, **CYLINDER, "mean_qdot": 1.0e6})
 
-    def test_rejects_amr(self):
-        self.assertRejects({**self.PERIODIC, "amr": "T", "mean_qdot": 1.0e6}, "mean_qdot/mean_temp have not been validated with amr")
+    def test_rejects_amr_with_ib(self):
+        self.assertRejects({**self.PERIODIC, **CYLINDER, "amr": "T", "mean_qdot": 1.0e6}, "mean_qdot/mean_temp with amr do not support ib")
+
+    def test_rejects_amr_with_wall(self):
+        self.assertRejects({**self.WALL_CHANNEL, "amr": "T"}, "mean_temp_wall does not support amr")
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")

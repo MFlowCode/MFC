@@ -2607,6 +2607,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 {"bc_x%beg": -1, "bc_x%end": -1, "bc_y%beg": -1, "bc_y%end": -1, "mean_dpdx(1)": -0.5, "mean_mflux(2)": 0.05, "mean_dpdx_gain": 0.5},
             )
             cases.append(define_case_d(stack, "", {}))
+            # the controller measures level 0 after the fold; every level gets the same uniform source
+            amr_mpg = {"amr": "T", **amr_block, "amr_regrid_int": 0, "amr_max_grid_size": 64}
+            cases.append(define_case_d(stack, "AMR", amr_mpg))
+            cases.append(define_case_d(stack, "AMR -> amr_subcycle", {**amr_mpg, "amr_subcycle": "T"}))
             stack.pop()
 
     def alter_synthetic_turbulence(dimInfo):
@@ -4399,6 +4403,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
         for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
             cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
+        # A static block over the uniform reactor: level 0 must match the run above to round-off
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Perfect Reactor -> Thermostat -> Temperature Controller -> AMR",
+                "examples/nD_perfect_reactor/case.py",
+                ["--ndim", "1"],
+                mods={**common_mods, "mean_temp": 1250.0, "mean_temp_gain": 0.5, "amr": "T", "amr_block_beg(1)": 8, "amr_block_end(1)": 17, "amr_regrid_int": 0, "amr_max_grid_size": 64},
+            )
+        )
 
         # Chemistry AMR: reactive H2/O2/AR shocktube, static 2:1 block; ppn=2 puts the block across the rank seam,
         # which needs the temperature-ghost exchange for the fine cons->prim Newton guess.
