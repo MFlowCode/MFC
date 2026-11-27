@@ -2344,7 +2344,6 @@ class CaseValidator:
         self.prohibit(self.get("amr_prolong", 1) == 2 and amr_ref_ratio not in (None, 2), "amr_prolong = 2 requires amr_ref_ratio = 2")
         if self.get("amr_subcycle", "F") == "T":
             self.prohibit(time_stepper == 1, "amr_subcycle requires time_stepper = 2 or 3 (RK1 keeps no step-start state)")
-            self.prohibit(igr, "amr_subcycle does not support IGR")
             # prescribed motion: each fine stage sets the bodies' pose at its own time; a force-driven body needs the fine faces'
             # force at the coarse stage, which a subcycled level computes only after the coarse step
             moving = [v for k, v in self.params.items() if re.fullmatch(r"patch_ib\(\d+\)%moving_ibm", k)]

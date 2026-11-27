@@ -19,6 +19,7 @@ module m_amr_stage
     use m_assign_variables, only: s_initialize_assign_variables_module
     use m_variables_conversion, only: s_convert_primitive_to_conservative_variables
     use m_mpi_common, only: s_mpi_allreduce_sum
+    use m_igr, only: jac
     use m_amr
     use m_amr_advance, only: s_amr_fine_stage_ib, s_amr_ib_pose_begin, s_amr_ib_pose
 
@@ -26,13 +27,16 @@ module m_amr_stage
 
     private
     public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine, s_amr_split_fine, &
-        & s_amr_apply_ic_patches, s_amr_fill_levels
+        & s_amr_apply_ic_patches, s_amr_fill_levels, s_amr_igr_keep_sigma
 
     !> cell-local end-of-step operators of s_amr_fine_cell_op
     integer, parameter :: fine_op_relax = 1, fine_op_burn = 2, fine_op_chem = 3
 
     !> Whether patch_icpp was compared with the level-0 initial data, and reproduces it
     logical :: ic_checked = .false., ic_from_patches = .false.
+
+    !> Subcycled IGR: the coarse sigma (jac) solved at stage times 0 and 1 (stages 1 and 2), and at the step end
+    real(wp), allocatable :: amr_sig(:,:,:,:)
 
 contains
 
@@ -101,12 +105,14 @@ contains
         call s_amr_pc_gather(q_new, 1)
         dt0 = dt
         call s_amr_ib_pose_begin(t_step)
+        call s_amr_igr_sigma(2, 0._wp)
         call s_amr_subcycle_level(1, 0._wp, 1._wp, dt0/real(amr_ref_ratio, wp), q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, &
                                   & mv_in, rhs_mv, t_step)
         amr_adv_level = 0
         dt = dt0
         $:GPU_UPDATE(device='[dt]')
         call s_amr_ib_pose(1._wp)
+        call s_amr_igr_sigma(-2, 0._wp)
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()
         call s_amr_apply_reflux(q_new, q_old)  ! alpha for the source correction: step start (exact for uniform alpha)
@@ -172,6 +178,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_new
         real(wp), intent(in)                                   :: th, th0, dth
 
+        call s_amr_igr_sigma(-1, th0 + dth*th)  ! the fine sigma seeds read the coarse sigma at this time
         if (lev == 1) then
             call s_amr_fill_levels(q_new, 1, 1, th0 + dth*th)
         else
@@ -289,6 +296,51 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_pc_copy
+
+    !> Subcycled IGR, after level 0's stage s RHS: keep its sigma at stage times 0 (s = 1) and 1 (s = 2).
+    impure subroutine s_amr_igr_keep_sigma(s)
+
+        integer, intent(in) :: s
+
+        if (s > 2) return
+        call s_amr_igr_sigma(s - 1, 0._wp)
+
+    end subroutine s_amr_igr_keep_sigma
+
+    !> The coarse sigma jac against amr_sig over the buffered coarse range: t >= 0 keeps jac as slot t (t = 0 sizes amr_sig); t = -1
+    !! sets jac = (1 - theta)*slot 0 + theta*slot 1; t = -2 restores jac from slot 2 (the step end).
+    impure subroutine s_amr_igr_sigma(t, theta)
+
+        integer, intent(in)  :: t
+        real(wp), intent(in) :: theta
+        integer              :: j, k, l, b1, e1, b2, e2, b3, e3
+        real(wp)             :: th
+
+        if (.not. (amr .and. igr .and. amr_subcycle)) return
+        b1 = idwbuff(1)%beg; e1 = idwbuff(1)%end
+        b2 = idwbuff(2)%beg; e2 = idwbuff(2)%end
+        b3 = idwbuff(3)%beg; e3 = idwbuff(3)%end
+        if (t == 0 .and. .not. allocated(amr_sig)) then
+            @:ALLOCATE(amr_sig(b1:e1, b2:e2, b3:e3, 0:2))
+        end if
+        th = theta
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', copyin='[t, th]')
+        do l = b3, e3
+            do k = b2, e2
+                do j = b1, e1
+                    if (t >= 0) then
+                        amr_sig(j, k, l, t) = jac(j, k, l)
+                    else if (t == -1) then
+                        jac(j, k, l) = (1._wp - th)*amr_sig(j, k, l, 0) + th*amr_sig(j, k, l, 1)
+                    else
+                        jac(j, k, l) = amr_sig(j, k, l, 2)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_igr_sigma
 
     !> End of step: fold the fine solution into the level-0 covered cells (the only deliberate level-0 write) and Berger-Colella
     !! state-reflux each level>=2 block into its parent. Bottom-up (per-level waves), so covered cells hold the finest data.

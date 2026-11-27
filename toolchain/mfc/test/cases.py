@@ -590,6 +590,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, "", {}))
                 cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
                 cases.append(define_case_d(stack, "igr_pres_lim", {"igr_pres_lim": "T"}))
+                # subcycled: the fine substeps seed from the coarse sigma blended between stage times 0 and 1
+                cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
                 stack.pop()
 
             stack.pop()

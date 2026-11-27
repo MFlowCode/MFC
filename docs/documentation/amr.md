@@ -115,7 +115,7 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
 | Mean pressure gradient and bulk-flux / bulk-temperature controllers (`mean_dpdx`, `mean_mflux`, `mean_qdot`, `mean_temp`) | Supported without `mean_temp_wall`; each block zeroes the sources in its own solid cells; the controllers measure level 0 after the fold (exact for the mass flux, second order for the temperature) and apply one uniform source on every level |
 | MHD / RMHD | 1D only |
-| IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
+| IGR | Single-rank, lock-step or subcycled (the fine sigma seed blends the coarse sigma of stage times 0 and 1); coarse/fine conservation is truncation-order |
 | Synthetic turbulence forcing | Supported; evaluated on each block's own grid |
 | Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
 | Condensed-phase burn (`reactive_burn`) | Supported; with `rburn%%substeps > 0` each block takes the split burn at the end of the step, before the fold |
