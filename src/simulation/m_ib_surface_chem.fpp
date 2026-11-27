@@ -18,6 +18,11 @@ module m_ib_surface_chem
 
     private; public :: s_solve_surface, s_blend_ghost_temperature, s_blend_ghost_species
 
+    ! The species Jacobian is a forward difference, so the Newton update carries O(sqrt(epsilon)) noise and the iteration turns
+    ! linear near the root. Cantera's solveSP runs the same 1e-7 forward-difference step against a 1e-4 relative tolerance;
+    ! 1e-6 here stays well inside that. energy_tol is relative to the reaction heat max(|q|, 1).
+    real(wp), parameter :: species_tol = 1.e-6_wp, energy_tol = 1.e-6_wp
+
 contains
 
     !> Species flux residual at a heterogeneous reacting surface.
@@ -65,14 +70,14 @@ contains
 
     !> Surface energy residual: gas-side conduction balances heterogeneous reaction heat. Radiation and solid-side conduction are
     !! omitted.
-    subroutine s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+    subroutine s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy, q_rxn)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(in)  :: pres, T_IP, T_s, d
         real(wp), intent(in)  :: Ys_s(num_species)
-        real(wp), intent(out) :: R_energy
-        real(wp)              :: mw_s, rho_s, k_s, q_rxn
+        real(wp), intent(out) :: R_energy, q_rxn
+        real(wp)              :: mw_s, rho_s, k_s
 
         call get_mixture_molecular_weight(Ys_s, mw_s)
         rho_s = pres*mw_s/(gas_constant*T_s)
@@ -84,33 +89,25 @@ contains
 
     end subroutine s_surface_energy_residual
 
-    !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved. k_bath selects which species
-    !! balance the sum constraint displaces; see s_solve_surface for why it must be the most abundant one.
-    subroutine s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
-                                  & energy_scale, R, R_species, omega_s, mdot_s)
+    !> Scaled Newton residual of the species balances at fixed T_s. k_bath selects which species balance the sum constraint
+    !! displaces; see s_pick_bath_species for why it must be the most abundant one.
+    subroutine s_surface_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, k_bath, flux_scale, R, omega_s, mdot_s)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in)  :: pres, T_IP, T_s, d, flux_scale, energy_scale
+        real(wp), intent(in)  :: pres, T_s, d, flux_scale
         real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
         integer, intent(in)   :: k_bath
-        logical, intent(in)   :: solve_temperature
-        real(wp), intent(out) :: R(num_species + 1), R_species(num_species), omega_s(num_species), mdot_s
-        real(wp)              :: R_energy
+        real(wp), intent(out) :: R(num_species), omega_s(num_species), mdot_s
+        real(wp)              :: R_species(num_species)
         integer               :: k
 
         call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
 
-        R = 0._wp
         do k = 1, num_species
             R(k) = R_species(k)/flux_scale
         end do
         R(k_bath) = sum(Ys_s) - 1._wp
-
-        if (solve_temperature) then
-            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
-            R(num_species + 1) = R_energy/energy_scale
-        end if
 
     end subroutine s_surface_residual
 
@@ -221,7 +218,7 @@ contains
 
     end subroutine s_pick_bath_species
 
-    !> Newton solve for a reacting surface. thermal_bc=0: zero-normal-gradient T; 1: prescribed T; 2: energy balance.
+    !> Solve for a reacting surface. thermal_bc=0: zero-normal-gradient T; 1: prescribed T; 2: energy balance.
     subroutine s_solve_surface(pres, T_IP, T_wall, d, Ys_IP, W_species, thermal_bc, Ys_s, T_s, mdot_s, converged)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -231,104 +228,88 @@ contains
         integer, intent(in)   :: thermal_bc
         real(wp), intent(out) :: Ys_s(num_species), T_s, mdot_s
         logical, intent(out)  :: converged
-        integer, parameter    :: max_iter = 30, max_backtrack = 20
-        real(wp), parameter   :: fd_eps_Y = 1.e-7_wp, fd_eps_T = 1.e-6_wp
-        ! The Jacobian is a forward difference, so the Newton update carries O(sqrt(epsilon)) noise and the iteration turns
-        ! linear near the root. The residual itself is evaluated exactly, so a tighter tolerance is not unreachable, but it is
-        ! reached by stalling rather than converging -- which the caller then reports as a failed surface. Cantera's solveSP
-        ! runs the same 1e-7 forward-difference step against a 1e-4 relative tolerance; 1e-6 here stays well inside that.
-        real(wp), parameter :: tol = 1.e-6_wp
-        real(wp), parameter :: Y_tol = 100._wp*epsilon(1._wp)
-        real(wp)            :: A(num_species + 1, num_species + 1), rhs(num_species + 1), delta(num_species + 1)
-        real(wp)            :: R(num_species + 1), R_pert(num_species + 1), R_trial(num_species + 1)
-        real(wp)            :: R_species(num_species), R_species_pert(num_species), R_species_trial(num_species)
-        real(wp)            :: omega_s(num_species), omega_pert(num_species), omega_trial(num_species)
-        real(wp)            :: Ys_pert(num_species), Ys_trial(num_species)
-        real(wp)            :: mdot_pert, mdot_trial, T_pert, T_trial
-        real(wp)            :: flux_scale, energy_scale, R_energy, dx, lambda, norm_R, norm_trial
-        logical             :: solve_temperature, linear_success, accepted
-        integer             :: nsolve, iter, j, iback, k_bath, k_bath_prev
+        real(wp)              :: omega_s(num_species)
 
         converged = .false.
         Ys_s = Ys_IP
+        mdot_s = 0._wp
 
         select case (thermal_bc)
         case (0)
             T_s = T_IP
-            solve_temperature = .false.
         case (1)
             T_s = T_wall
-            solve_temperature = .false.
         case (2)
-            T_s = min(max(T_IP, T_surface_min), T_surface_max)
-            solve_temperature = .true.
+            call s_solve_surface_energy(pres, T_IP, d, Ys_IP, W_species, Ys_s, T_s, mdot_s, converged)
+            return
         case default
             T_s = T_IP
-            omega_s = 0._wp
-            mdot_s = 0._wp
             return
         end select
 
-        nsolve = num_species + merge(1, 0, solve_temperature)
+        call s_solve_surface_species(pres, T_s, d, Ys_IP, W_species, species_tol, Ys_s, omega_s, mdot_s, converged)
+
+    end subroutine s_solve_surface
+
+    !> Damped Newton solve of the species flux balances at a fixed surface temperature, from the initial guess in Ys_s. The residual
+    !! is scaled by its value at the image-point composition, so a warm start does not tighten the tolerance. It iterates to tol,
+    !! and a stall (no descent step, singular Jacobian or max_iter) still counts as converged below species_tol.
+    subroutine s_solve_surface_species(pres, T_s, d, Ys_IP, W_species, tol, Ys_s, omega_s, mdot_s, converged)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)    :: pres, T_s, d, tol
+        real(wp), intent(in)    :: Ys_IP(num_species), W_species(num_species)
+        real(wp), intent(inout) :: Ys_s(num_species)
+        real(wp), intent(out)   :: omega_s(num_species), mdot_s
+        logical, intent(out)    :: converged
+        integer, parameter      :: max_iter = 30, max_backtrack = 20
+        real(wp), parameter     :: fd_eps_Y = 1.e-7_wp
+        real(wp), parameter     :: Y_tol = 100._wp*epsilon(1._wp)
+        real(wp)                :: A(num_species, num_species), rhs(num_species), delta(num_species)
+        real(wp)                :: R(num_species), R_pert(num_species), R_trial(num_species), R_species(num_species)
+        real(wp)                :: omega_pert(num_species), omega_trial(num_species)
+        real(wp)                :: Ys_pert(num_species), Ys_trial(num_species)
+        real(wp)                :: mdot_pert, mdot_trial, flux_scale, dx, lambda, norm_R, norm_trial
+        logical                 :: linear_success, accepted
+        integer                 :: iter, j, iback, k_bath, k_bath_prev
+
+        converged = .false.
+
+        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_IP, W_species, R_species, omega_s, mdot_s)
+        flux_scale = max(maxval(abs(R_species)), 1.e-12_wp)
 
         call s_pick_bath_species(Ys_s, k_bath)
-
-        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
-        flux_scale = max(maxval(abs(R_species)), 1.e-12_wp)
-        energy_scale = 1._wp
-        if (solve_temperature) then
-            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
-            energy_scale = max(abs(R_energy), 1._wp)
-        end if
-
-        call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, energy_scale, &
-                                & R, R_species, omega_s, mdot_s)
-        norm_R = maxval(abs(R(1:nsolve)))
+        call s_surface_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, k_bath, flux_scale, R, omega_s, mdot_s)
+        norm_R = maxval(abs(R))
         if (norm_R < tol) then
             converged = .true.
             return
         end if
+        ! The rates are not evaluated outside the surface temperature range
+        if (T_s < T_surface_min .or. T_s > T_surface_max) return
 
         do iter = 1, max_iter
             do j = 1, num_species
                 Ys_pert = Ys_s
-                T_pert = T_s
                 dx = fd_eps_Y*max(abs(Ys_s(j)), 1._wp)
                 if (Ys_s(j) + dx > 1._wp) dx = -dx
                 Ys_pert(j) = Ys_pert(j) + dx
 
-                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
-                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
-                A(1:nsolve,j) = (R_pert(1:nsolve) - R(1:nsolve))/dx
+                call s_surface_residual(pres, T_s, d, Ys_IP, Ys_pert, W_species, k_bath, flux_scale, R_pert, omega_pert, mdot_pert)
+                A(:,j) = (R_pert - R)/dx
             end do
 
-            if (solve_temperature) then
-                Ys_pert = Ys_s
-                dx = fd_eps_T*max(abs(T_s), 1._wp)
-                T_pert = T_s + dx
-                if (T_pert > T_surface_max) then
-                    dx = -dx
-                    T_pert = T_s + dx
-                end if
-
-                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
-                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
-                A(1:nsolve,nsolve) = (R_pert(1:nsolve) - R(1:nsolve))/dx
-            end if
-
-            rhs(1:nsolve) = -R(1:nsolve)
-            call s_solve_surface_linear_system(A, rhs, delta, nsolve, linear_success)
-            if (.not. linear_success) return
+            rhs = -R
+            call s_solve_surface_linear_system(A, rhs, delta, linear_success)
+            if (.not. linear_success) exit
 
             lambda = 1._wp
             accepted = .false.
             do iback = 1, max_backtrack
-                Ys_trial = Ys_s + lambda*delta(1:num_species)
-                T_trial = T_s
-                if (solve_temperature) T_trial = T_s + lambda*delta(nsolve)
+                Ys_trial = Ys_s + lambda*delta
 
-                if (minval(Ys_trial) < -Y_tol .or. maxval(Ys_trial) > 1._wp + Y_tol .or. T_trial < T_surface_min &
-                    & .or. T_trial > T_surface_max) then
+                if (minval(Ys_trial) < -Y_tol .or. maxval(Ys_trial) > 1._wp + Y_tol) then
                     lambda = 0.5_wp*lambda
                     cycle
                 end if
@@ -336,9 +317,9 @@ contains
                 where (Ys_trial < 0._wp) Ys_trial = 0._wp
                 where (Ys_trial > 1._wp) Ys_trial = 1._wp
 
-                call s_surface_residual(pres, T_IP, T_trial, d, Ys_IP, Ys_trial, W_species, k_bath, solve_temperature, &
-                                        & flux_scale, energy_scale, R_trial, R_species_trial, omega_trial, mdot_trial)
-                norm_trial = maxval(abs(R_trial(1:nsolve)))
+                call s_surface_residual(pres, T_s, d, Ys_IP, Ys_trial, W_species, k_bath, flux_scale, R_trial, omega_trial, &
+                                        & mdot_trial)
+                norm_trial = maxval(abs(R_trial))
                 if (norm_trial < norm_R) then
                     accepted = .true.
                     exit
@@ -346,12 +327,10 @@ contains
                 lambda = 0.5_wp*lambda
             end do
 
-            if (.not. accepted) return
+            if (.not. accepted) exit
 
             Ys_s = Ys_trial
-            T_s = T_trial
             R = R_trial
-            R_species = R_species_trial
             omega_s = omega_trial
             mdot_s = mdot_trial
             norm_R = norm_trial
@@ -361,9 +340,8 @@ contains
             k_bath_prev = k_bath
             call s_pick_bath_species(Ys_s, k_bath)
             if (k_bath /= k_bath_prev) then
-                call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
-                                        & energy_scale, R, R_species, omega_s, mdot_s)
-                norm_R = maxval(abs(R(1:nsolve)))
+                call s_surface_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, k_bath, flux_scale, R, omega_s, mdot_s)
+                norm_R = maxval(abs(R))
             end if
 
             if (norm_R < tol) then
@@ -372,28 +350,179 @@ contains
             end if
         end do
 
-    end subroutine s_solve_surface
+        converged = norm_R < species_tol
 
-    !> Small dense linear solve with partial pivoting for the local surface Newton system.
-    subroutine s_solve_surface_linear_system(A, b, x, nsolve, success)
+    end subroutine s_solve_surface_species
+
+    !> Energy balance F(T_s) = k (T_s - T_IP)/d - q(T_s) = 0 for thermal_bc = 2, with the species balance solved at each T_s.
+    !!
+    !! F(T_s) can have up to three roots. For burning carbon these are the kinetic root near T_IP, an unstable middle root, and
+    !! the diffusion-limited root far above the gas. The root returned is the first sign change of F met when walking from T_IP
+    !! in the direction of -F(T_IP). It is the steady state that a zero-heat-capacity wall starting at the gas temperature
+    !! relaxes to (dT_s/dt ~ -F), so it is always a stable root. It is the kinetic root while one exists, and the
+    !! diffusion-limited root once the surface has ignited. It needs no state from earlier steps. Surface thermal history and
+    !! extinction hysteresis are thermal_bc = 3's job. A coupled Newton in (Y, T_s) cannot be used here: after ignition
+    !! dF/dT_s < 0 at T_IP, so its T_s step points away from the root, and a line search on max|R| rejects every step toward
+    !! it, because |F| has to grow before it falls.
+    !!
+    !! The walk takes steps of at most step_frac*T_s, shortened to twice the secant estimate of the root so that the steps
+    !! close in on it. Once F changes sign, Illinois regula falsi finishes, with a bisection step whenever two steps in a row
+    !! fail to halve the bracket. A kinetic root closer than one step to its unstable partner, that is within ~5% of the
+    !! ignition turning point, can be stepped over. No root before T_surface_min or T_surface_max is reported as not
+    !! converged.
+    subroutine s_solve_surface_energy(pres, T_IP, d, Ys_IP, W_species, Ys_s, T_s, mdot_s, converged)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)     :: nsolve
-        real(wp), intent(inout) :: A(num_species + 1, num_species + 1)
-        real(wp), intent(inout) :: b(num_species + 1)
-        real(wp), intent(out)   :: x(num_species + 1)
+        real(wp), intent(in)  :: pres, T_IP, d
+        real(wp), intent(in)  :: Ys_IP(num_species), W_species(num_species)
+        real(wp), intent(out) :: Ys_s(num_species), T_s, mdot_s
+        logical, intent(out)  :: converged
+        integer, parameter    :: max_walk = 100, max_bracket = 60
+        real(wp), parameter   :: step_frac = 0.05_wp
+        real(wp)              :: Ys_b(num_species), Ys_c(num_species)
+        real(wp)              :: T_a, F_a, T_b, F_b, T_c, F_c, T_p, F_p, mdot_b, mdot_c, scale_c, dir, step, dT_secant, width
+        logical               :: ok, bracketed
+        integer               :: n, nslow
+
+        converged = .false.
+
+        ! Start: T_a = T_IP, clamped into [T_surface_min, T_surface_max]
+        T_a = min(max(T_IP, T_surface_min), T_surface_max)
+        Ys_s = Ys_IP
+        call s_surface_energy_state(pres, T_IP, T_a, d, Ys_IP, W_species, Ys_s, F_a, scale_c, mdot_s, ok)
+        T_s = T_a
+        if (.not. ok) return
+        if (abs(F_a) < energy_tol*scale_c) then
+            converged = .true.
+            return
+        end if
+
+        ! Walk from T_IP until F changes sign
+        dir = merge(1._wp, -1._wp, F_a < 0._wp)
+        T_p = T_a
+        F_p = F_a
+        Ys_b = Ys_s
+        bracketed = .false.
+        do n = 1, max_walk
+            step = step_frac*T_a
+            if (F_a /= F_p) then
+                dT_secant = -F_a*(T_a - T_p)/(F_a - F_p)
+                if (dT_secant*dir > 0._wp) step = min(step, 2._wp*abs(dT_secant))
+            end if
+            T_b = min(max(T_a + dir*step, T_surface_min), T_surface_max)
+            call s_surface_energy_state(pres, T_IP, T_b, d, Ys_IP, W_species, Ys_b, F_b, scale_c, mdot_b, ok)
+            if (.not. ok) return
+            if (abs(F_b) < energy_tol*scale_c) then
+                call s_accept_surface(T_b, Ys_b, mdot_b, T_s, Ys_s, mdot_s, converged)
+                return
+            end if
+            if ((F_b < 0._wp) .neqv. (F_a < 0._wp)) then
+                bracketed = .true.
+                exit
+            end if
+            if (T_b == T_surface_min .or. T_b == T_surface_max) return
+            T_p = T_a
+            F_p = F_a
+            T_a = T_b
+            F_a = F_b
+        end do
+        if (.not. bracketed) return
+
+        ! Illinois regula falsi on [T_a, T_b], whose ends keep opposite signs
+        nslow = 0
+        width = abs(T_b - T_a)
+        Ys_c = Ys_b
+        do n = 1, max_bracket
+            if (nslow < 2) then
+                T_c = T_b - F_b*(T_b - T_a)/(F_b - F_a)
+            else
+                T_c = 0.5_wp*(T_a + T_b)
+            end if
+            call s_surface_energy_state(pres, T_IP, T_c, d, Ys_IP, W_species, Ys_c, F_c, scale_c, mdot_c, ok)
+            if (.not. ok) return
+            if (abs(F_c) < energy_tol*scale_c) then
+                call s_accept_surface(T_c, Ys_c, mdot_c, T_s, Ys_s, mdot_s, converged)
+                return
+            end if
+            if ((F_c < 0._wp) .eqv. (F_b < 0._wp)) then
+                F_a = 0.5_wp*F_a
+            else
+                T_a = T_b
+                F_a = F_b
+            end if
+            T_b = T_c
+            F_b = F_c
+            nslow = merge(nslow + 1, 0, abs(T_b - T_a) > 0.5_wp*width)
+            width = abs(T_b - T_a)
+            if (width <= 100._wp*epsilon(1._wp)*T_b) then
+                call s_accept_surface(T_c, Ys_c, mdot_c, T_s, Ys_s, mdot_s, converged)
+                return
+            end if
+        end do
+
+    end subroutine s_solve_surface_energy
+
+    !> Species solve at T_s (warm-started from Ys_s) and the energy residual F there, with its scale max(|q|, 1).
+    subroutine s_surface_energy_state(pres, T_IP, T_s, d, Ys_IP, W_species, Ys_s, F, F_scale, mdot_s, ok)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)    :: pres, T_IP, T_s, d
+        real(wp), intent(in)    :: Ys_IP(num_species), W_species(num_species)
+        real(wp), intent(inout) :: Ys_s(num_species)
+        real(wp), intent(out)   :: F, F_scale, mdot_s
+        logical, intent(out)    :: ok
+        ! F inherits the species solve's error as noise of about tol*flux_scale/(diffusive flux). At a hot surface the
+        ! image-point scale is ~1e4 times the diffusive flux, so species_tol would leave F with 1e-5 noise and stall the root
+        ! solve. The species residual is cheap to drive further, to where its own roundoff stops it.
+        real(wp), parameter :: nested_tol = 1.e-12_wp
+        real(wp)            :: omega_s(num_species), q_rxn
+
+        call s_solve_surface_species(pres, T_s, d, Ys_IP, W_species, nested_tol, Ys_s, omega_s, mdot_s, ok)
+        F = 0._wp
+        F_scale = 1._wp
+        if (.not. ok) return
+        call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, F, q_rxn)
+        F_scale = max(abs(q_rxn), 1._wp)
+
+    end subroutine s_surface_energy_state
+
+    !> Copy an accepted energy-balance state to the outputs.
+    subroutine s_accept_surface(T, Ys, mdot, T_s, Ys_s, mdot_s, converged)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: T, Ys(num_species), mdot
+        real(wp), intent(out) :: T_s, Ys_s(num_species), mdot_s
+        logical, intent(out)  :: converged
+
+        T_s = T
+        Ys_s = Ys
+        mdot_s = mdot
+        converged = .true.
+
+    end subroutine s_accept_surface
+
+    !> Small dense linear solve with partial pivoting for the local surface Newton system.
+    subroutine s_solve_surface_linear_system(A, b, x, success)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(inout) :: A(num_species, num_species)
+        real(wp), intent(inout) :: b(num_species)
+        real(wp), intent(out)   :: x(num_species)
         logical, intent(out)    :: success
-        real(wp)                :: factor, pivot_value, tmp, row_tmp(num_species + 1)
+        real(wp)                :: factor, pivot_value, tmp, row_tmp(num_species)
         integer                 :: i, j, k, pivot
 
         success = .true.
         x = 0._wp
 
-        do k = 1, nsolve - 1
+        do k = 1, num_species - 1
             pivot = k
             pivot_value = abs(A(k, k))
-            do i = k + 1, nsolve
+            do i = k + 1, num_species
                 if (abs(A(i, k)) > pivot_value) then
                     pivot = i
                     pivot_value = abs(A(i, k))
@@ -405,33 +534,33 @@ contains
             end if
 
             if (pivot /= k) then
-                row_tmp(1:nsolve) = A(k,1:nsolve)
-                A(k,1:nsolve) = A(pivot,1:nsolve)
-                A(pivot,1:nsolve) = row_tmp(1:nsolve)
+                row_tmp(1:num_species) = A(k,1:num_species)
+                A(k,1:num_species) = A(pivot,1:num_species)
+                A(pivot,1:num_species) = row_tmp(1:num_species)
                 tmp = b(k)
                 b(k) = b(pivot)
                 b(pivot) = tmp
             end if
 
-            do i = k + 1, nsolve
+            do i = k + 1, num_species
                 factor = A(i, k)/A(k, k)
                 A(i, k) = 0._wp
-                do j = k + 1, nsolve
+                do j = k + 1, num_species
                     A(i, j) = A(i, j) - factor*A(k, j)
                 end do
                 b(i) = b(i) - factor*b(k)
             end do
         end do
 
-        if (abs(A(nsolve, nsolve)) <= epsilon(1._wp)) then
+        if (abs(A(num_species, num_species)) <= epsilon(1._wp)) then
             success = .false.
             return
         end if
 
-        x(nsolve) = b(nsolve)/A(nsolve, nsolve)
-        do i = nsolve - 1, 1, -1
+        x(num_species) = b(num_species)/A(num_species, num_species)
+        do i = num_species - 1, 1, -1
             tmp = b(i)
-            do j = i + 1, nsolve
+            do j = i + 1, num_species
                 tmp = tmp - A(i, j)*x(j)
             end do
             if (abs(A(i, i)) <= epsilon(1._wp)) then

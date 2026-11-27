@@ -1844,7 +1844,7 @@ contains
         call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
         if (proc_rank == 0) then
             if (n_not_converged_glb > 0) then
-                print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', &
+                print '(A,I0,A)', ' Immersed-boundary surface chemistry: the surface solve did not converge at ', &
                     & n_not_converged_glb, &
                     & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, ' &
                     & // 'zero temperature gradient for thermal_bc = 2).'

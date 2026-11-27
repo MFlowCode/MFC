@@ -40,8 +40,8 @@ end program
 PRES, D = ct.one_atm, 1.0e-4  # 1 atm, a 0.1 mm image-point distance
 
 
-def run(tmp_path, gas, surface, lines):
-    """Compile m_thermochem, m_surface_thermochem, m_constants and m_ib_surface_chem with DRIVER and feed it lines."""
+def build(tmp_path, gas, surface):
+    """Compile m_thermochem, m_surface_thermochem, m_constants and m_ib_surface_chem with DRIVER."""
     (tmp_path / "generated_constants.fpp").write_text(generate_constants_fpp())
     parts = [
         fypp(tmp_path, "m_surface_thermochem", generate_surface_fortran(gas, surface)),
@@ -49,13 +49,20 @@ def run(tmp_path, gas, surface, lines):
         fypp(tmp_path, "m_ib_surface_chem", (ROOT / "src/simulation/m_ib_surface_chem.fpp").read_text()),
     ]
     driver = "".join(p.read_text() for p in parts) + DRIVER
-    executable = compile_kernel(tmp_path, gas, source=generate_fortran(gas), driver_source=driver)
+    return compile_kernel(tmp_path, gas, source=generate_fortran(gas), driver_source=driver)
+
+
+def feed(executable, lines):
     out = subprocess.run([str(executable)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True).stdout
     return [np.fromstring(line, sep=" ") for line in out.splitlines()]
 
 
-def solve_line(t_ip, t_wall, bc, y_ip):
-    return f"1\n{PRES} {t_ip} {t_wall} {D} {bc} " + " ".join(map(str, y_ip))
+def run(tmp_path, gas, surface, lines):
+    return feed(build(tmp_path, gas, surface), lines)
+
+
+def solve_line(t_ip, t_wall, bc, y_ip, d=D):
+    return f"1\n{PRES} {t_ip} {t_wall} {d} {bc} " + " ".join(map(str, y_ip))
 
 
 def gas_state(gas, t, x):
@@ -63,7 +70,7 @@ def gas_state(gas, t, x):
     return gas.Y.copy()
 
 
-def flux_residual(gas, surface, t_ip, y_ip, t_s, y_s):
+def flux_residual(gas, surface, t_ip, y_ip, t_s, y_s, d=D):
     """The species flux balance of s_surface_species_residual and the energy balance, evaluated with Cantera, and their scales."""
     w = gas.molecular_weights
     gas.TPY = t_s, PRES, y_s
@@ -72,10 +79,10 @@ def flux_residual(gas, surface, t_ip, y_ip, t_s, y_s):
     gas.TPY = t_ip, PRES, y_ip
     rate = cantera_reference(surface, t_s, PRES, y_s)
     omega, q = rate[:-1], rate[-1]
-    bg = rho * diff * w / mw * (gas.X - x_s) / D
+    bg = rho * diff * w / mw * (gas.X - x_s) / d
     mdot = w @ omega
     species = -bg + y_s * (bg.sum() + mdot) - w * omega
-    return species, np.max(np.abs(w * omega)), k_s * (t_s - t_ip) / D - q, abs(q), mdot
+    return species, np.max(np.abs(w * omega)), k_s * (t_s - t_ip) / d - q, abs(q), mdot
 
 
 @pytest.fixture(scope="module")
@@ -137,3 +144,63 @@ def test_ghost_blend_stays_physical(tmp_path, carbon):
         assert t_lo <= t_g <= t_hi
         assert np.all(y_g >= 0)
         assert y_g.sum() == pytest.approx(y_s.sum(), abs=1e-14)
+
+
+AIR, MOIST, GASIFYING = "O2:1,N2:3.76", "O2:1,N2:3.76,H2O:0.3", "CO2:1,H2O:1,N2:3"
+# (gas, d, T_IP, T_s or None where no root lies below T_surface_max). The air rows are the issue #1892 table; before the
+# bracketed solve every row with T_s > 1600 K failed. The kinetic root (T_s near T_IP) is taken where it exists, the
+# diffusion-limited one once the surface has ignited; the CO2/H2O rows gasify endothermically, so T_s < T_IP.
+ENERGY_CASES = [
+    *[
+        (AIR, d, t, ts)
+        for d, row in [(1e-5, [1000.07, 1201.99, 1594.54, 3362.71]), (1e-4, [1000.74, 1227.16, 2862.12, 3422.05]), (1e-3, [1008.51, 2550.63, 2875.80, 3427.78])]
+        for t, ts in zip([1000.0, 1200.0, 1500.0, 2000.0], row)
+    ],
+    (MOIST, 1e-4, 1500.0, 2446.19),
+    (GASIFYING, 1e-4, 2000.0, 1789.57),
+    (GASIFYING, 1e-3, 1500.0, 1447.46),
+    ("O2:1", 1e-4, 2000.0, None),  # pure O2: the diffusion-limited surface would sit above T_surface_max
+]
+T_SURFACE_MAX = 5000.0
+N_WALK = 25
+
+
+@pytest.fixture(scope="module")
+def energy_solves(tmp_path_factory, carbon):
+    """thermal_bc = 2 over ENERGY_CASES, then thermal_bc = 1 (species only) at N_WALK temperatures between T_IP and the
+    returned T_s (T_surface_max where none), from one compile."""
+    gas, surface = carbon
+    executable = build(tmp_path_factory.mktemp("energy"), gas, surface)
+    y_ips = [gas_state(gas, t, x) for x, _, t, _ in ENERGY_CASES]
+    rows = feed(executable, [solve_line(t, 0.0, 2, y, d) for (_, d, t, _), y in zip(ENERGY_CASES, y_ips)])
+    walks = [np.linspace(t, row[1] if row[0] == 1 else T_SURFACE_MAX, N_WALK, endpoint=False) for (_, _, t, _), row in zip(ENERGY_CASES, rows)]
+    lines = [solve_line(t, tw, 1, y, d) for (_, d, t, _), y, walk in zip(ENERGY_CASES, y_ips, walks) for tw in walk]
+    walk_rows = np.array(feed(executable, lines)).reshape(len(ENERGY_CASES), N_WALK, -1)
+    return y_ips, rows, walks, walk_rows
+
+
+@pytest.mark.parametrize("case", range(len(ENERGY_CASES)), ids=[f"{x}-d{d:g}-{t:g}K" for x, d, t, _ in ENERGY_CASES])
+def test_energy_balance_takes_the_first_root_from_the_gas(carbon, energy_solves, case):
+    """thermal_bc = 2 converges wherever the energy balance has a root below T_surface_max and reports no convergence where
+    it has none. The returned state closes the species and energy balances computed by Cantera. It is the first root met
+    walking from T_IP: Cantera's energy residual keeps the sign it has at T_IP everywhere between T_IP and T_s (or up to
+    T_surface_max when none is reported)."""
+    gas, surface = carbon
+    x, d, t_ip, t_expected = ENERGY_CASES[case]
+    y_ips, rows, walks, walk_rows = energy_solves
+    y_ip, row = y_ips[case], rows[case]
+    assert row[0] == (0 if t_expected is None else 1)
+    signs = []
+    for tw, wrow in zip(walks[case], walk_rows[case]):
+        assert wrow[0] == 1, f"species solve at T_s = {tw} did not converge"
+        signs.append(np.sign(flux_residual(gas, surface, t_ip, y_ip, tw, wrow[3:], d)[2]))
+    assert len(set(signs)) == 1, "the energy residual changes sign between T_IP and T_s: an earlier root was skipped"
+    if t_expected is None:
+        return
+    t_s, mdot, y_s = row[1], row[2], row[3:]
+    assert t_s == pytest.approx(t_expected, abs=0.01)
+    assert np.all(y_s >= 0) and abs(y_s.sum() - 1) < 1e-6
+    species, scale, energy, q_scale, mdot_ct = flux_residual(gas, surface, t_ip, y_ip, t_s, y_s, d)
+    assert np.max(np.abs(species)) < 1e-5 * scale
+    assert abs(energy) < 1e-5 * max(q_scale, 1.0)
+    assert mdot == pytest.approx(mdot_ct, rel=1e-10)
