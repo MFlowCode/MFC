@@ -724,7 +724,7 @@ contains
                 half = 0.5_wp*[patch_ib(i)%length_x, patch_ib(i)%length_y, patch_ib(i)%length_z]
             end if
             half = matmul(abs(patch_ib(i)%rotation_matrix), half)
-        case (4, 6, 11)  ! airfoils, ellipse: the bounding radius the marker drawing trusts (s_get_bounding_indices)
+        case (ib_airfoil_2d, ib_ellipse, ib_airfoil_3d, ib_ellipsoid)  ! the bounding radius s_get_bounding_indices trusts
             call s_get_ib_bound(patch_ib(i), bnd)
             half = bnd
         case default

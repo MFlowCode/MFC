@@ -64,6 +64,11 @@ contains
                 exit
             end if
         end do
+        do i = 1, num_patches
+            if (patch_icpp(i)%geometry == icpp_airfoil) then
+                call s_build_airfoil_grid(patch_icpp(i)%airfoil_id, min(g%dx_min, g%dy_min))
+            end if
+        end do
         !  3D Patch Geometries
 
         if (g%p > 0) then
@@ -98,6 +103,8 @@ contains
                     ! 3D STL patch
                 else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
+                else if (patch_icpp(i)%geometry == icpp_airfoil) then
+                    call s_icpp_airfoil(i, patch_id_fp, q_prim_vf, g)
                 end if
             end do
             !> @}
@@ -142,6 +149,8 @@ contains
                     ! STL patch
                 else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
+                else if (patch_icpp(i)%geometry == icpp_airfoil) then
+                    call s_icpp_airfoil(i, patch_id_fp, q_prim_vf, g)
                 end if
                 !> @}
             end do
@@ -579,8 +588,8 @@ contains
                                    & - z_centroid)/c)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((((g%x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c)**2 <= 1._wp &
-                        & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
+                    if ((f_is_inside_ellipsoid(g%x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, [2._wp*a, &
+                        & 2._wp*b, 2._wp*c]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -1316,6 +1325,51 @@ contains
         end do; end do; end do
 
     end subroutine s_icpp_model
+
+    !> NACA 4-digit airfoil ib_airfoil(airfoil_id), the shape of the airfoil immersed boundary (geometry 4 and 11), unrotated: the
+    !! leading edge at the centroid, the chord along +x and, in 3D, the span length_z centred on z_centroid. No smoothing.
+    subroutine s_icpp_airfoil(patch_id, patch_id_fp, q_prim_vf, g)
+
+        integer, intent(in)       :: patch_id
+        type(ic_grid), intent(in) :: g
+
+#ifdef MFC_MIXED_PRECISION
+        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+#else
+        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+#endif
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer                                                  :: i, j, k
+
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
+        z_centroid = 0._wp
+        if (g%p > 0) z_centroid = patch_icpp(patch_id)%z_centroid
+        eta = 1._wp
+
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
+                    cart_y = g%y_cc(j)
+                    cart_z = 0._wp
+                    if (g%p > 0) then
+                        cart_z = g%z_cc(k)
+                        if (grid_geometry == 3) call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
+                    end if
+                    if (f_is_inside_airfoil(g%x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, &
+                        & patch_icpp(patch_id)%length_z, &
+                        & patch_icpp(patch_id)%airfoil_id) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
+
+                        @:analytical()
+
+                        patch_id_fp(i, j, k) = patch_id
+                    end if
+                end do
+            end do
+        end do
+
+    end subroutine s_icpp_airfoil
 
     !> Convert cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)

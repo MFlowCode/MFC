@@ -1386,6 +1386,16 @@ class CaseValidator:
                     )
             elif model_id is not None and model_id > 0:
                 self.prohibit(True, f"patch_icpp({i})%model_id is set but geometry ({geometry}) is not an STL model (21)")
+            airfoil_id = self.get(f"patch_icpp({i})%airfoil_id", None)
+            if geometry == 22:
+                self.prohibit(
+                    airfoil_id is None or not 1 <= airfoil_id <= num_ib_airfoils_max,
+                    f"patch_icpp({i})%airfoil_id must be in [1, {num_ib_airfoils_max}] for airfoil geometry (22)",
+                )
+                # The airfoil surface is built from the base grid once; an AMR level re-applying the patch would not have it
+                self.prohibit(self.get("amr", "F") == "T", f"patch_icpp({i})%geometry = 22 (airfoil) is not supported with amr")
+            elif airfoil_id is not None and airfoil_id > 0:
+                self.prohibit(True, f"patch_icpp({i})%airfoil_id is set but geometry ({geometry}) is not an airfoil (22)")
 
     def _eos_coefficient_args(self, i, family):
         """Fluid i's arguments to family.coefficients_fn, after rho, in registry order. An optional
@@ -2411,7 +2421,7 @@ class CaseValidator:
             self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
             moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
             # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds every analytic geometry (STL is rejected above)
-            bbox_geoms = (2, 3, 4, 6, 8, 9, 10, 11)
+            bbox_geoms = (2, 3, 4, 6, 8, 9, 10, 11, 13)
             self.prohibit(
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
                 "amr with a moving immersed body or dynamic regrid supports analytic geometries only (the block containment bounding box)",

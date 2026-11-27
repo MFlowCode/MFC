@@ -85,9 +85,11 @@ contains
                     call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_check_model_geometry(i)
+                else if (patch_icpp(i)%geometry == icpp_airfoil) then
+                    call s_check_airfoil_patch_geometry(i)
                 else
                     call s_prohibit_abort("Invalid patch geometry number", &
-                                          & "patch_icpp(" // trim(iStr) // ")%geometry " // "must be between 1 and 21")
+                                          & "patch_icpp(" // trim(iStr) // ")%geometry " // "must be between 1 and 22")
                 end if
             else
                 @:PROHIBIT(patch_icpp(i)%geometry /= dflt_int, &
@@ -424,6 +426,27 @@ contains
         @:PROHIBIT(patch_icpp(patch_id)%radii(3) <= 0._wp, "Ellipsoid patch "//trim(iStr)//": radii(3) must be greater than zero")
 
     end subroutine s_check_ellipsoid_patch_geometry
+
+    !> Check the NACA airfoil patch input: a valid ib_airfoil entry, the leading-edge position and, in 3D, the span
+    impure subroutine s_check_airfoil_patch_geometry(patch_id)
+
+        integer, intent(in) :: patch_id
+        integer             :: aid
+
+        call s_int_to_str(patch_id, iStr)
+        aid = patch_icpp(patch_id)%airfoil_id
+
+        @:PROHIBIT(n == 0, "Airfoil patch "//trim(iStr)//": n must be greater than zero")
+        @:PROHIBIT(aid <= 0 .or. aid > num_ib_airfoils_max, "Airfoil patch "//trim(iStr)//": airfoil_id must be in [1, 5]")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Airfoil patch "//trim(iStr)//": x_centroid must be set")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Airfoil patch "//trim(iStr)//": y_centroid must be set")
+        if (aid <= 0 .or. aid > num_ib_airfoils_max) return
+        @:PROHIBIT(ib_airfoil(aid)%c <= 0._wp .or. ib_airfoil(aid)%p <= 0._wp .or. ib_airfoil(aid)%t <= 0._wp &
+                   & .or. ib_airfoil(aid)%m <= 0._wp, "Airfoil patch "//trim(iStr)//": ib_airfoil c, p, t and m must be set")
+        @:PROHIBIT(p > 0 .and. (f_is_default(patch_icpp(patch_id)%z_centroid) .or. patch_icpp(patch_id)%length_z <= 0._wp), &
+                   & "Airfoil patch "//trim(iStr)//": z_centroid and length_z must be set in 3D")
+
+    end subroutine s_check_airfoil_patch_geometry
 
     !> Verify that inactive patch geometry parameters remain at defaults
     impure subroutine s_check_inactive_patch_geometry(patch_id)

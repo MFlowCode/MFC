@@ -190,6 +190,7 @@ MPI topology is automatically optimized to maximize the parallel efficiency for 
 | `hcid` *             | Integer | N/A                   | Hard coded patch id                                          |
 | `cf_val` *           | Real    | Supported             | Surface tension color function value                         |
 | `model_id`           | Integer | Not Supported         | Index into the `stl_models` array (geometry 21)              |
+| `airfoil_id`         | Integer | Not Supported         | Index into the `ib_airfoil` array (geometry 22)              |
 | `sph_har_coeff(l,m)` | Real    | Not Supported         | Spherical-harmonic surface coefficient (geometry 14)         |
 | `r0` *               | Real    | Not Supported         | Euler-Euler bubbles: initial radius, as a multiple `r0/bub_pp%%R0ref` of each bin's equilibrium radius |
 | `v0` *               | Real    | Not Supported         | Euler-Euler bubbles: initial bubble-wall velocity (the mean, with QBMM) |
@@ -351,6 +352,8 @@ These physical parameters must be consistent with fluid material's parameters de
 - `sph_har_coeff(l,m)` (geometry 14, 3D, pre-process) shapes the patch surface as \f$r(\theta,\phi) = R + \sum_{l,m} c_{lm} Y_{lm}(\theta,\phi)\f$, with \f$R\f$ the patch `radius`, \f$\theta\f$ and \f$\phi\f$ the polar and azimuthal angles about the centroid (polar axis along \f$z\f$), and \f$Y_{lm}\f$ the orthonormal real spherical harmonics (\f$\cos(m\phi)\f$ for \f$m > 0\f$, \f$\sin(|m|\phi)\f$ for \f$m < 0\f$). Degrees run `l = 0..5` and orders `m = -l..l`; unset coefficients are 0, giving a sphere. A cell is inside when its distance from the centroid is at most \f$r(\theta,\phi)\f$.
 
 - `model_id` selects the STL/OBJ model for a geometry-21 patch by indexing into the `stl_models` array. The model file, scaling, and translation, and the inside/outside threshold, are configured on that `stl_models` entry (see the `stl_models` section below); a cell is marked inside the model using a winding-number test.
+
+- `airfoil_id` selects the NACA airfoil for a geometry-22 patch by indexing into the `ib_airfoil` array, the same parameters an airfoil immersed boundary (geometry 4 or 11) reads. The patch is unrotated: the leading edge is at `[x,y]_centroid`, the chord runs along +x and, in 3D, the span `length_z` is centred on `z_centroid`. Not supported with `amr`.
 
 #### Elliptic Smoothing
 
@@ -1733,6 +1736,7 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `epsilon` (thickness) |
 | 20   | 2D Taylor-Green Vortex  | 2     | N      | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
 | 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model_id`. |
+| 22   | NACA airfoil            | 2 & 3 | N      | Requires `[x,y]_centroid` (leading edge) and `airfoil_id`; in 3D also `z_centroid` and `length_z` (span). The shape of IB geometry 4 and 11, unrotated. |
 
 The patch types supported by the MFC are listed in table [Patch Types](#patch-types).
 This includes types exclusive to one-, two-, and three-dimensional problems.
@@ -1759,9 +1763,14 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 | 2    | 2D Circle          | 2      |                                                   |
 | 3    | 2D Rectangle       | 2      |                                                   |
 | 4    | 2D Airfoil         | 2      |                                                   |
+| 5    | 2D Model (STL/OBJ) | 2      | Requires `model_id`.                              |
+| 6    | 2D Ellipse         | 2      | `length_[x,y]` are the full axes.                 |
 | 8    | 3D Sphere          | 3      |                                                   |
+| 9    | 3D Cuboid          | 3      |                                                   |
 | 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder, whose axis is x; use `angles` for other orientations. |
 | 11   | 3D Airfoil         | 3      |                                                   |
+| 12   | 3D Model (STL/OBJ) | 3      | Requires `model_id`.                              |
+| 13   | 3D Ellipsoid       | 3      | `length_[x,y,z]` are the full axes; orient it with `angles`. The moment of inertia of a moving ellipsoid is summed over its cells. |
 
 ### Acoustic Supports {#acoustic-supports}
 
