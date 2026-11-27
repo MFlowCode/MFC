@@ -85,7 +85,7 @@ print(
             "collision_model": 1,
             "coefficient_of_restitution": 0.9,
             "collision_time": collision_time,
-            "ib_coefficient_of_friction": 0.1,
+            "coefficient_of_friction": 0.1,
             # Particle bed: 20 free-floating circles placed randomly in region
             "num_particle_clouds": 1,
             "particle_cloud(1)%x_centroid": bed_x,

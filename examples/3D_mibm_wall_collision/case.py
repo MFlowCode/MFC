@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser(prog="3D_mibm_wall_collision")
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC toolchain state.")
 parser.add_argument("--angle", type=float, default=0.0, help="Impact angle from the wall normal [deg].")
 parser.add_argument("--e", type=float, default=0.8, help="coefficient_of_restitution.")
-parser.add_argument("--mu", type=float, default=0.0, help="ib_coefficient_of_friction.")
+parser.add_argument("--mu", type=float, default=0.0, help="coefficient_of_friction.")
 parser.add_argument("--speed", type=float, default=3.9, help="Impact speed [m/s].")
 parser.add_argument("--cells", type=int, default=16, help="Cells per direction.")
 parser.add_argument("--steps-per-collision", type=float, default=20.0, help="collision_time / dt.")
@@ -111,7 +111,7 @@ case = {
     "patch_ib(1)%vel(2)": -args.speed * math.cos(theta),
     "patch_ib(1)%moving_ibm": 2,
     "collision_model": 1,
-    "ib_coefficient_of_friction": args.mu,
+    "coefficient_of_friction": args.mu,
     "collision_time": collision_time,
     "coefficient_of_restitution": args.e,
     "fluid_pp(1)%gamma": 1.0 / (gam - 1.0),

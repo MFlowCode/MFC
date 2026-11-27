@@ -47,7 +47,7 @@ Limits: only constant acceleration is checked. For a prescribed body (`moving_ib
 | :--- | :--- |
 | Body | sphere, R = 5 m, mass 1e6 (gas force negligible), impact speed 3.9 m/s |
 | Wall | `y = 0`, `bc_y%%beg = -15`; other boundaries extrapolation |
-| Model | `collision_model = 1`, `collision_time` = N\f$\Delta t\f$, \f$\Delta t\f$ = 5e-6 s, `coefficient_of_restitution` e, `ib_coefficient_of_friction` \f$\mu\f$ |
+| Model | `collision_model = 1`, `collision_time` = N\f$\Delta t\f$, \f$\Delta t\f$ = 5e-6 s, `coefficient_of_restitution` e, `coefficient_of_friction` \f$\mu\f$ |
 | Numerics | first-order reconstruction, HLLC, SSP-RK3, fixed \f$\Delta t\f$, 16³ cells, air at 1e5 Pa (the gas plays no role) |
 | Reference | rigid-body impact of a sphere on a fixed wall with Coulomb friction and no tangential elasticity (\cite Maw1976): \f$v_n' = -e v_n\f$; sliding throughout (\f$\tan\theta \ge 3.5\mu(1+e)\f$): \f$v_t' = v_t - \mu(1+e)|v_n|\f$; sticking (\f$\tan\theta < 3.5\mu(1+e)\f$): \f$v_t' = \frac{5}{7}v_t\f$. Setup after \cite DiMaio2004 |
 | Measured | \f$e_n = -v_y^\text{out}/v_y^\text{in}\f$ and \f$v_x^\text{out}\f$ from the last `ib_state` record, by `check_collision.py` |

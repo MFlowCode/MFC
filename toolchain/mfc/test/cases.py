@@ -6,7 +6,7 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import BASE_CFG, PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .case import BASE_CFG, PARTICLE_COLLISION_TEST_COUNT, PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
 from .convergence import ConvergenceSpec, run_amp_sweep, run_amr_check, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1, run_transpose_check
 
 # Fractions of a cell that move a body off the grid's faces, centre lines and mirror lines: a body placed on one makes
@@ -1909,7 +1909,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "collision_model": 1,
                     "coefficient_of_restitution": 0.9,
                     "collision_time": 0.8,
-                    "ib_coefficient_of_friction": mu,
+                    "coefficient_of_friction": mu,
                     "ib_friction_slip_eps": eps,
                     **{
                         f"patch_ib({i})%{k}": v
@@ -3068,6 +3068,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Particles pressed against two walls: wall ghost-cell deposits, the wall clamp, and cells at the void limit
             wall_layer = {"particle_params%nparticles_glb": PARTICLE_WALL_TEST_COUNT, "particle_params%valmaxvoid": 0.1}
             cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box", "Wall Layer"], {**uniform, **walls, **wall_layer}))
+            # Contacts with periodic x and a reflective y wall: a head-on pair on the rank face, a pair across the periodic
+            # seam and a wall bounce, with the halo, periodic images and mirror images each on one or two ranks
+            four_way = {
+                "particle_params%coupling": "four_way",
+                "particle_params%nparticles_glb": PARTICLE_COLLISION_TEST_COUNT,
+                "collision_model": 1,
+                "coefficient_of_restitution": 0.8,
+                "collision_time": 0.01,
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -2,
+                "bc_y%end": -2,
+            }
+            cases.append(define_case_d(stack, "Four-way Coupling", four_way))
+            cases.append(define_case_d(stack, ["Four-way Coupling", "2 MPI Ranks"], four_way, ppn=2))
 
         stack.pop()
 
@@ -4148,6 +4163,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_axisym_hypo_hlld",  # acoustic demo case, not a regression test
                 "2D_lagrange_rising_bubble",
                 "2D_lagrange_in_crossflow",
+                "2D_particle_periodic_collision",  # contact starts at step ~507; verified by its analyze.py instead
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
                 # by a large mu_max: even on the downsized grid the step count to reach t_stop
                 # is too large for the CI smoke suite. The faster NN examples remain tested.

@@ -154,7 +154,7 @@ case_dict = {
     "fluid_pp(1)%eos": "ideal_gas",
     "fluid_pp(1)%Re(1)": 1.0 / mu,
     "collision_model": 1,  # soft-sphere collision model
-    "ib_coefficient_of_friction": 0.1,
+    "coefficient_of_friction": 0.1,
     "collision_time": 20.0 * dt,
     "coefficient_of_restitution": 0.9,  # almost perfectly elastic
 }

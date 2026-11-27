@@ -418,7 +418,7 @@ The measured accuracy of the wall value and wall-normal gradient, and which opti
 | `collision_model`     | Integer    | Integer to select the collision model being used for IB collisions. |
 | `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
 | `collision_temporal_resolution`     | Integer    | Minimum number of adaptive time steps used to resolve each collision |
-| `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
+| `coefficient_of_friction`        | Real    | Coefficient of friction used in collisions |
 | `ib_friction_slip_eps`     | Real    | Slip speed below which collision friction ramps to zero (0 = off) |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
@@ -499,9 +499,9 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `collision_temporal_resolution` restricts the adaptive time step (`cfl_adap_dt`) to at most `collision_time / collision_temporal_resolution` while any collision is occurring, so that each collision is resolved with at least that many time steps. Pairing it with `ramp_ratio` limits how quickly the time step grows back once the collision ends.
 
-- `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
+- `coefficient_of_friction` is the coefficient of friction used in collisions. It defaults to 0 (frictionless).
 
-- `ib_friction_slip_eps` regularises the collision friction direction. The Coulomb force is \f$-\mu |F_n|\, v_t/|v_t|\f$ with \f$v_t\f$ the tangential slip velocity of the contact, and a roundoff-sized \f$v_t\f$ then produces a full-magnitude force in an arbitrary direction, so contacts split across MPI ranks (where the body order and summation order differ) disagree with the single-rank result. With `ib_friction_slip_eps` \f$= \epsilon > 0\f$ the force becomes \f$-\mu |F_n|\, v_t/\max(|v_t|, \epsilon_{\rm eff})\f$: the Coulomb force for \f$|v_t| \ge \epsilon_{\rm eff}\f$ and a linear ramp to zero below it. The width is floored at the stick limit, \f$\epsilon_{\rm eff} = \max(\epsilon, \mu |F_n|\,\Delta t/m_t)\f$, where \f$m_t\f$ is the effective tangential mass of the contact (translation plus rotation of the bodies involved). Below the floor the ramp is the stick force \f$m_t v_t/\Delta t\f$, which cannot overshoot, so a value that is too small is raised to the floor instead of making the contact chatter; \f$\epsilon\f$ mainly sets the smoothing width at larger \f$|v_t|\f$. A good value is about \f$10^{-3}\f$ to \f$10^{-2}\f$ of the impact speed. In single precision it must stay well above the roundoff of the body velocities. The default 0 keeps the previous behaviour exactly (the floor is not applied); the parameter requires `collision_model > 0`.
+- `ib_friction_slip_eps` regularises the collision friction direction. The Coulomb force is \f$-\mu |F_n|\, v_t/|v_t|\f$ with \f$v_t\f$ the tangential slip velocity of the contact, and a roundoff-sized \f$v_t\f$ then produces a full-magnitude force in an arbitrary direction, so contacts split across MPI ranks (where the body order and summation order differ) disagree with the single-rank result. With `ib_friction_slip_eps` \f$= \epsilon > 0\f$ the force becomes \f$-\mu |F_n|\, v_t/\max(|v_t|, \epsilon_{\rm eff})\f$: the Coulomb force for \f$|v_t| \ge \epsilon_{\rm eff}\f$ and a linear ramp to zero below it. The width is floored at the stick limit, \f$\epsilon_{\rm eff} = \max(\epsilon, \mu |F_n|\,\Delta t/m_t)\f$, where \f$m_t\f$ is the effective tangential mass of the contact (translation plus rotation of the bodies involved). Below the floor the ramp is the stick force \f$m_t v_t/\Delta t\f$, which cannot overshoot, so a value that is too small is raised to the floor instead of making the contact chatter; \f$\epsilon\f$ mainly sets the smoothing width at larger \f$|v_t|\f$. A good value is about \f$10^{-3}\f$ to \f$10^{-2}\f$ of the impact speed. In single precision it must stay well above the roundoff of the body velocities. The default 0 keeps the previous behaviour exactly (the floor is not applied); the parameter requires `collision_model > 0`. It also applies to four-way Euler-Lagrange particle contacts (`particle_params%%coupling = four_way`), where \f$m_t\f$ is the particle mass.
 
 - `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept and replaces the interpolation scheme with a bilinear weight interpolation.
 
@@ -1318,8 +1318,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - The restart file keeps each particle's `qs_fluct_force` state and random seed, so a restarted run continues the same random sequence. `added_mass_force` uses the fluid acceleration from the previous Runge-Kutta stage, which is not saved, so the first stage after a restart uses zero fluid acceleration. With `added_mass_force = 1` a restarted run therefore differs slightly from an uninterrupted one (about 5e-5 relative in the particle velocities over the next 10 steps of the regression case); without the added-mass force, restarts reproduce the uninterrupted run to round-off. This can be fixed in the future if necessary, but at the restart state of the runs of interest, the added-mass should be small to negligible since the shock would have already gone over the particles.
 
 - Combinations not supported yet with `particles_lagrange`:
-  - inter-particle collisions
-  - periodic and reflective (symmetry) boundaries
   - `bubbles_lagrange` and `bubbles_euler`
   - `ib`
   - `igr`
