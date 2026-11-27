@@ -1125,9 +1125,18 @@ contains
             if (weno_Re_flux_compact) call s_compact_normal_viscous_gradients(q_prim_qp%vf, id, &
                 & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
                 & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
-            if (ib_visc_compact) call s_compact_ib_viscous_gradients(q_prim_qp%vf, ib_markers, id, &
-                & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
-                & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
+            ! a fine block (or batched slab) tests its own markers ib_markers_fine, not the coarse ib_markers
+            if (ib_visc_compact .and. amr_in_fine_advance) then
+                call s_compact_ib_viscous_gradients(q_prim_qp%vf, ib_markers_fine, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), &
+                                                    & dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                                                    & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), &
+                                                    & dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
+            else if (ib_visc_compact) then
+                call s_compact_ib_viscous_gradients(q_prim_qp%vf, ib_markers, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), &
+                                                    & dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                                                    & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), &
+                                                    & dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
+            end if
         end if
 
         if (particles_lagrange) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)

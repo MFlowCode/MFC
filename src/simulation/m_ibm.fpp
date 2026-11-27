@@ -4779,18 +4779,28 @@ contains
         fine_gps_cap = int(mkr_hi(1) - mkr_lo(1) + 1, 8)*int(mkr_hi(2) - mkr_lo(2) + 1, 8)*int(max(mkr_hi(3) - mkr_lo(3) + 1, 1), 8)
 
         ! Extra slot (nslots+1) parks the coarse markers during a fine swap (see ib_coarse_slot). markers%sf is host-only park
-        ! storage; fine ghost-point lists park on-device in gp_park.
+        ! storage, allocated on a slot's first swap (s_ibm_fine_markers_ensure); fine ghost-point lists park on-device in gp_park.
         ib_coarse_slot = nslots + 1
         allocate (ib_fine(1:ib_coarse_slot))
         do islot = 1, ib_coarse_slot
-            allocate (ib_fine(islot)%markers%sf(mkr_lo(1):mkr_hi(1),mkr_lo(2):mkr_hi(2),mkr_lo(3):mkr_hi(3)))
-            ib_fine(islot)%markers%sf = 0
             ib_fine(islot)%num_gps = 0
             ib_fine(islot)%off = 0_8
             ib_fine(islot)%cap = 0_8
         end do
 
     end subroutine s_ibm_alloc_fine
+
+    !> Allocate slot islot's host marker copy (zeroed) on first use: a copy per possible slot would be amr_max_blocks + 1 full
+    !! deepest-level fields per rank, nearly all unused (#2219).
+    impure subroutine s_ibm_fine_markers_ensure(islot)
+
+        integer, intent(in) :: islot
+
+        if (associated(ib_fine(islot)%markers%sf)) return
+        allocate (ib_fine(islot)%markers%sf(mkr_lo(1):mkr_hi(1),mkr_lo(2):mkr_hi(2),mkr_lo(3):mkr_hi(3)))
+        ib_fine(islot)%markers%sf = 0
+
+    end subroutine s_ibm_fine_markers_ensure
 
     !> Note the fine IB state's memory for the end-of-run AMR table.
     impure subroutine s_ibm_note_fine_memory()
@@ -4800,6 +4810,7 @@ contains
         if (.not. allocated(ib_fine)) return
         call s_mem_note(MEM_IB, storage_size(gp_park, kind=8)/8_8*size(gp_park, kind=8))
         do islot = 1, ib_coarse_slot
+            if (.not. associated(ib_fine(islot)%markers%sf)) cycle
             call s_mem_note(MEM_IBHOST, storage_size(ib_fine(islot)%markers%sf, kind=8)/8_8*size(ib_fine(islot)%markers%sf, kind=8))
         end do
 
@@ -4883,6 +4894,7 @@ contains
 
         ib_markers_fine%sf(0:m,0:n,0:p) = 0
         do ibm = 1, nb
+            if (.not. associated(ib_fine(slots(ibm))%markers%sf)) cycle  ! never swapped in: no body markers
             o = 0; o(sd) = (ibm - 1)*w
             ib_markers_fine%sf(o(1):o(1) + mext(1, ibm),o(2):o(2) + mext(2, ibm),o(3):o(3) + mext(3, &
                                & ibm)) = ib_fine(slots(ibm))%markers%sf(0:mext(1, ibm),0:mext(2, ibm),0:mext(3, ibm))
@@ -4904,6 +4916,8 @@ contains
         ! host copy; on the correct/moving path copy this slot's fine markers in and push. On the setup path s_ibm_setup_fine
         ! rebuilds them in place.
 
+        call s_ibm_fine_markers_ensure(ib_coarse_slot)
+        call s_ibm_fine_markers_ensure(islot)
         $:GPU_UPDATE(host='[ib_markers%sf]')
         ib_fine(ib_coarse_slot)%markers%sf = ib_markers%sf
         if (gps_on_device) then
@@ -4949,6 +4963,7 @@ contains
         ! Mirror s_ibm_swap_to_fine: save this slot's fine markers to its host store, copy the parked coarse markers back to the
         ! device ib_markers, and restore the ghost-point lists between gp_park and ghost_points on-device.
 
+        call s_ibm_fine_markers_ensure(islot)
         $:GPU_UPDATE(host='[ib_markers%sf]')
         ib_fine(islot)%markers%sf = ib_markers%sf
         ib_markers%sf = ib_fine(ib_coarse_slot)%markers%sf

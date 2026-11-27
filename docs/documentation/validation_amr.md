@@ -196,7 +196,7 @@ A static AMR block over a body and its near wake must give the drag and shedding
 | :--- | :--- |
 | Body | 2D cylinder, D = 1, no slip, fixed (`patch_ib` geometry 2) |
 | Flow | ideal gas, \f$\gamma\f$ = 1.4, U = 0.2, c = 1 (M = 0.2), Re = 100; a transverse-velocity patch (0.2 U, 2 D x 1 D) behind the body seeds shedding |
-| Domain | [-12 D, 24 D] x [-16 D, 16 D] (3.1 % blockage); Dirichlet inflow (`-17`), extrapolation elsewhere (`-3`; AMR rejects characteristic boundaries) |
+| Domain | [-12 D, 24 D] x [-16 D, 16 D] (3.1 % blockage); Dirichlet inflow (`-17`), extrapolation elsewhere (`-3`) |
 | Grids | uniform 16 and 32 cells/D; AMR: 16 cells/D base and one static 2:1 block over -1.5 D <= x <= 6 D, \|y\| <= 2.5 D (3.3 % of the 32 cells/D grid), lock-step and `amr_subcycle` |
 | Numerics | WENO5-M with `mp_weno`, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 2`, fixed \f$\Delta t\f$ at CFL 0.38 on the finest cells (level-0 cells when subcycled), to t = 650 (130 D/U) |
 | Reference | Henderson \cite Henderson1995 (Cd 1.35), Park et al. \cite Park1998 (Cd 1.33, St 0.165), Williamson's fit \cite Williamson1989 (St 0.1643); all incompressible and unconfined |
