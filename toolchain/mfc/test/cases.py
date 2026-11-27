@@ -6406,6 +6406,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "isothermal", {"amr_max_grid_size": 32, **isothermal}))
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chk_ib, **isothermal})
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> isothermal", spec))
+        # Inert H2/air species and heat diffusion across x = L/2 (300 K air | 500 K H2/N2, same pressure) past the body: the fine
+        # frames read the fine markers and the blocks' own ghost conduction temperatures (the coarse ones gave 6e-6 in the core)
+        chem_ib = {k: v for k, v in chk_ib.items() if not k.startswith("patch_icpp")}
+        chem_ib.update({"x_domain%end": 1.0e-2, "y_domain%end": 1.0e-2, "dt": 1.0e-8, "num_patches": 2, "patch_ib(1)%x_centroid": 5.0e-3})
+        chem_ib.update({"patch_ib(1)%y_centroid": 5.0e-3, "patch_ib(1)%radius": 1.0e-3, "chemistry": "T", "cantera_file": "h2o2.yaml"})
+        chem_ib.update({"chem_params%diffusion": "T", "chem_params%reactions": "F", "chem_params%transport_model": 1})
+        for i, (xc, lx, rho, ys) in enumerate(((5.0e-3, 1.0e-2, 1.17197, {4: 0.232909, 10: 0.767091}), (2.5e-3, 5.0e-3, 0.492694, {1: 0.029919, 10: 0.970081})), 1):
+            chem_ib.update({f"patch_icpp({i})%{k}": v for k, v in (("geometry", 3), ("x_centroid", xc), ("y_centroid", 5.0e-3), ("length_x", lx), ("length_y", 1.0e-2))})
+            chem_ib.update({f"patch_icpp({i})%{k}": v for k, v in (("vel(1)", 0.0), ("vel(2)", 0.0), ("pres", 101325.0), ("alpha_rho(1)", rho), ("alpha(1)", 1.0))})
+            chem_ib.update({f"patch_icpp({i})%Y({s})": y for s, y in ys.items()})
+        chem_ib["patch_icpp(2)%alter_patch(1)"] = "T"
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=chem_ib)
+        spec.extra_args = ["--", "-j", "4"]
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion", spec))
         # STL body on the static block: Circle_IBM.stl (0.1 across) scaled to the same radius-0.1 disc, drawn on the fine cells
         stl = {"patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1, "stl_models(1)%model_threshold": 0.95}
         stl["stl_models(1)%model_filepath"] = os.path.join(common.MFC_EXAMPLE_DIRPATH, "2D_ibm_stl_test", "Circle_IBM.stl")

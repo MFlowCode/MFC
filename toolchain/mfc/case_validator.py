@@ -2402,8 +2402,9 @@ class CaseValidator:
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
                 "amr with a moving immersed body or dynamic regrid supports analytic geometries only (the block containment bounding box)",
             )
-            # The isothermal wall without chemistry sets only the ghost state, which each fine block corrects itself. With chemistry the
-            # fine RHS would apply the coarse ghosts' conduction temperature (T_cond) and markers; the lumped wall needs per-block records.
+            # The isothermal wall without chemistry sets only the ghost state, which each fine block corrects itself. With chemistry only
+            # the adiabatic wall is checked on blocks (the fine RHS takes each block's own markers and T_cond); the lumped wall needs
+            # per-block records.
             chem = self.get("chemistry", "F") == "T"
             tbc = [self.get(f"patch_ib({i})%thermal_bc") or 0 for i in range(1, num_ibs + 1)]
             self.prohibit(

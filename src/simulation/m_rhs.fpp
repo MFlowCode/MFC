@@ -786,9 +786,16 @@ contains
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
                         if (id == 2 .and. viscous) call s_split_axis_flux(-1._wp)
-                        call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
-                                                                & ib_markers, ib_wall_src(ibw_a), merge(merge(2, 1, &
-                                                                & ib_flux_wall), 0, ib))
+                        ! a fine block (or batched slab) reads its own markers ib_markers_fine, not the coarse ib_markers
+                        if (amr_in_fine_advance) then
+                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
+                                                                    & ib_markers_fine, ib_wall_src(ibw_a), merge(merge(2, 1, &
+                                                                    & ib_flux_wall), 0, ib))
+                        else
+                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
+                                                                    & ib_markers, ib_wall_src(ibw_a), merge(merge(2, 1, &
+                                                                    & ib_flux_wall), 0, ib))
+                        end if
                         if (id == 2 .and. viscous) call s_split_axis_flux(1._wp)
                         call nvtxEndRange
                     end if
