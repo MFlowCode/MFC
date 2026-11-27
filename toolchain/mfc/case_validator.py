@@ -314,13 +314,14 @@ PHYSICS_DOCS = {
         "category": "Adaptive Mesh Refinement",
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
-            "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= 2; "
+            "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= amr_max_level; "
             "amr_prolong = 2 needs amr_ref_ratio = 2; static nesting with ib goes up to amr_max_level = 2. "
             "Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
             "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
             "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
-            "and CBC boundaries, and operator-split reaction or burn substeps. Immersed boundaries must be non-STL on a static "
-            "block (amr_regrid_int = 0) with no reacting surface. Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 "
+            "and CBC boundaries. Operator-split reaction and burn substeps also run on each block. No immersed body may have a "
+            "reacting surface, thermal_bc = 2 or 3, or a thermal layer; the isothermal wall (thermal_bc = 1) is supported, with "
+            "or without chemistry. Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 "
             "and amr_buf >= 1. Under MPI a block covers at most about half of a rank's subdomain per dimension unless "
             "amr_max_grid_size caps it explicitly. See docs/documentation/amr.md."
         ),
