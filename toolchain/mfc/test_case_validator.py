@@ -493,6 +493,19 @@ class TestTimeStep(ConstraintTestCase):
         self.assertAccepts(BASE)
 
 
+class TestSurfaceTensionRiemannSolver(ConstraintTestCase):
+    """Only HLLC adds the capillary stress flux; another solver would drop the surface tension silently."""
+
+    MSG = "The surface tension model requires the HLLC Riemann solver"
+    CASE = {**BASE, "num_fluids": 2, "model_eqns": 3, "surface_tension": "T", "sigma": 1.0}
+
+    def test_rejects_hll(self):
+        self.assertRejects({**self.CASE, "riemann_solver": 1}, self.MSG)
+
+    def test_hllc_not_rejected_for_the_solver(self):
+        self.assertNotIn(self.MSG, self.errors_for({**self.CASE, "riemann_solver": 2}))
+
+
 class TestHllMethodTwoGeometry(ConstraintTestCase):
     MSG = "HLL Method 2 is not supported for 3D cylindrical geometry"
 

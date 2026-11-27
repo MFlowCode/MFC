@@ -2660,7 +2660,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! exclusive scan of each row's column counts, the row total into gp_slab; then of the row totals, one thread
+        ! exclusive scan of each row's column counts, the row total into gp_slab; then of the row totals (and their sum), one thread
         $:GPU_PARALLEL_LOOP(private='[i, j, run, c]', present='[gp_col, gp_slab]')
         do i = 0, m
             run = 0
@@ -2680,6 +2680,7 @@ contains
                 gp_slab(i) = run
                 run = run + c
             end do
+            gp_slab(slab_n + 1) = run
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -2689,6 +2690,12 @@ contains
         do i = 0, m
             do j = 0, n
                 c = gp_slab(i) + gp_col(i, j)
+                ! skip a column the count pass found empty: its end is the next column's (or row's) start
+                if (j < n) then
+                    if (gp_slab(i) + gp_col(i, j + 1) == c) cycle
+                else
+                    if (gp_slab(i + 1) == c) cycle
+                end if
                 do k = 0, p
                     if (ib_markers%sf(i, j, k) /= 0) then
                         is_gp = .false.
