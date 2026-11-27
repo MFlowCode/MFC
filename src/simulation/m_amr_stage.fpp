@@ -378,7 +378,7 @@ contains
         if (precision == 1) tol = max(tol, 1.e3_wp*real(epsilon(1._sp), wp))
         bad = 1._wp
         if (num_patches > 0) then
-            if (all(patch_icpp(1:num_patches)%hcid == dflt_int) .and. all(patch_icpp(1:num_patches)%geometry /= 21)) then
+            if (all(patch_icpp(1:num_patches)%hcid == dflt_int) .and. all(patch_icpp(1:num_patches)%geometry /= icpp_model)) then
                 call s_initialize_assign_variables_module()
                 bad = 0._wp
                 do i = 1, sys_size

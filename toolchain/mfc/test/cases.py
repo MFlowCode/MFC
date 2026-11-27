@@ -1493,6 +1493,42 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        if len(dimInfo[0]) == 3 and not viscous and num_fluids == 1:
+            # A two-way spinning cuboid split across the rank seam: its moment of inertia is summed over its cells, and every rank
+            # holding it must get the same whole-body value (#1994)
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Two-way Spinning Cuboid -> 2 MPI Ranks",
+                    {
+                        "m": 29,
+                        "n": 29,
+                        "p": 49,
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "patch_ib(1)%geometry": 9,
+                        "patch_ib(1)%x_centroid": 0.5123,
+                        "patch_ib(1)%y_centroid": 0.4871,
+                        "patch_ib(1)%z_centroid": 0.5037,
+                        "patch_ib(1)%length_x": 0.3,
+                        "patch_ib(1)%length_y": 0.2,
+                        "patch_ib(1)%length_z": 0.25,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%mass": 1.0,
+                        "patch_ib(1)%angular_vel(1)": 0.3,
+                        "patch_ib(1)%angular_vel(2)": -0.2,
+                        "patch_ib(1)%angular_vel(3)": 1.0,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                    ppn=2,
+                )
+            )
+
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
             # IB-interior cells must not set the adaptive dt. A body moving through gas at rest carries its velocity into
             # its interior, so there |u| + c exceeds anywhere in the fluid and dt shrinks ~8% if those cells are counted.

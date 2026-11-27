@@ -40,15 +40,15 @@ contains
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
 
-                if (patch_geometry == 8) then
+                if (patch_geometry == ib_sphere) then
                     call s_sphere_levelset(gps(i))
-                else if (patch_geometry == 9) then
+                else if (patch_geometry == ib_cuboid) then
                     call s_cuboid_levelset(gps(i))
-                else if (patch_geometry == 10) then
+                else if (patch_geometry == ib_cylinder) then
                     call s_cylinder_levelset(gps(i))
-                else if (patch_geometry == 11) then
+                else if (patch_geometry == ib_airfoil_3d) then
                     call s_3d_airfoil_levelset(gps(i))
-                else if (patch_geometry == 12) then
+                else if (patch_geometry == ib_model_3d) then
                     call s_model_levelset(gps(i))
                 end if
             end do
@@ -62,15 +62,15 @@ contains
                 patch_id = gps(i)%ib_patch_id
                 patch_geometry = patch_ib(patch_id)%geometry
 
-                if (patch_geometry == 2) then
+                if (patch_geometry == ib_circle) then
                     call s_circle_levelset(gps(i))
-                else if (patch_geometry == 3) then
+                else if (patch_geometry == ib_rectangle) then
                     call s_rectangle_levelset(gps(i))
-                else if (patch_geometry == 4) then
+                else if (patch_geometry == ib_airfoil_2d) then
                     call s_airfoil_levelset(gps(i))
-                else if (patch_geometry == 5) then
+                else if (patch_geometry == ib_model_2d) then
                     call s_model_levelset(gps(i))
-                else if (patch_geometry == 6) then
+                else if (patch_geometry == ib_ellipse) then
                     call s_ellipse_levelset(gps(i))
                 end if
             end do

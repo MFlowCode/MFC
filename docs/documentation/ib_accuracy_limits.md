@@ -3,7 +3,7 @@
 # Accuracy limits of the ghost-cell immersed boundary
 
 **Status:** open discrepancy (every item below is a limitation by construction; none is a bug report). **Code:** `master` at 0cdfdf02a.
-**Last update:** 2026-11-22. No example or test belongs to this page: it collects measured limits, and the pages it links hold the examples.
+**Last update:** 2026-11-22. Its examples are `examples/2D_ibm_conduction_annulus` (wall temperature, image-point weights) and `examples/2D_ibm_taylor_couette` (wall velocity, torque and wall shear, `ib_wall_order`); both are registered tests, and their READMEs hold the `master` tables.
 
 ## Purpose
 
@@ -83,6 +83,17 @@ No script is shipped for the pre-merge tables: they came from analysis tools tie
 ./mfc.sh run examples/2D_ibm_conduction_annulus/case.py -n 1 -- --cells_per_R 20 --interp 2
 python3 examples/2D_ibm_conduction_annulus/check_annulus.py examples/2D_ibm_conduction_annulus
 ```
+
+The Taylor-Couette rows reproduce with
+
+```
+./mfc.sh run examples/2D_ibm_taylor_couette/case.py -t pre_process simulation -n 1 -- --cells_per_R 20 --ntau 12 --wall_order 2
+python3 examples/2D_ibm_taylor_couette/check_couette.py examples/2D_ibm_taylor_couette
+```
+
+Its README measures on `master` (with #2383) the wall velocity of `ib_wall_order = 1` and `2` at 10, 20 and 40 cells/R: order 2 converges at
+about second order and order 1 at 0.5 to 0.9; TSC image points with `ib_visc_compact` bring the near-wall shear to 0.1 % at 40 cells/R, below
+the 2 % plateau of the pre-merge rows above.
 
 Open items to repeat on `master`: the annulus \f$L_\infty\f$, \f$L_1\f$ and total heat orders with `ib_ip_interp` 1 and 2 at 10 to 80 cells/R; the Taylor-Couette shear with `ib_wall_order` 1 and 2
 (and the 40 cells/R abort).

@@ -40,23 +40,23 @@ contains
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. patch_ib("//trim(iStr)//")%geometry must be set.")
 
                 ! Constraints on the geometric initial condition patch parameters
-                if (patch_ib(i)%geometry == 2) then
+                if (patch_ib(i)%geometry == ib_circle) then
                     call s_check_circle_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 3) then
+                else if (patch_ib(i)%geometry == ib_rectangle) then
                     call s_check_rectangle_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 8) then
+                else if (patch_ib(i)%geometry == ib_sphere) then
                     call s_check_sphere_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 9) then
+                else if (patch_ib(i)%geometry == ib_cuboid) then
                     call s_check_cuboid_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 4) then
+                else if (patch_ib(i)%geometry == ib_airfoil_2d) then
                     call s_check_airfoil_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 11) then
+                else if (patch_ib(i)%geometry == ib_airfoil_3d) then
                     call s_check_3d_airfoil_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 10) then
+                else if (patch_ib(i)%geometry == ib_cylinder) then
                     call s_check_cylinder_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 5 .or. patch_ib(i)%geometry == 12) then
+                else if (patch_ib(i)%geometry == ib_model_2d .or. patch_ib(i)%geometry == ib_model_3d) then
                     call s_check_model_ib_patch_geometry(i)
-                else if (patch_ib(i)%geometry == 6) then
+                else if (patch_ib(i)%geometry == ib_ellipse) then
                     call s_check_ellipse_ib_patch_geometry(i)
                 else
                     call s_prohibit_abort("Invalid IB patch", &
