@@ -85,9 +85,9 @@ module m_ibm
         & s_write_ib_surface, s_ib_flux_wall_prepare, s_update_ib_temperatures, s_ibm_alloc_fine, s_ibm_setup_fine, &
         & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, s_ibm_note_fine_memory, &
         & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, &
-        & s_add_swept_cells, s_fill_uncovered_cells, s_ibm_set_conduction_temperature, s_ibm_restore_conduction_temperature, &
-        & s_write_ib_conduction_temperature, s_read_ib_conduction_temperature, s_ibm_advance_wall_columns, s_wall_column_tcond, &
-        & s_ibm_pack_fine_tcond, s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, s_read_tcond_box, f_wall_column_dt
+        & s_add_swept_cells, s_fill_uncovered_cells, s_ibm_conduction_temperature, s_write_ib_conduction_temperature, &
+        & s_read_ib_conduction_temperature, s_ibm_advance_wall_columns, s_wall_column_tcond, s_ibm_pack_fine_tcond, &
+        & s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, s_read_tcond_box, f_wall_column_dt
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -1562,86 +1562,60 @@ contains
 
     end function f_cell_scale
 
-    !> Put the mirrored ghost temperature T_cond from s_ibm_correct_state in q_T_sf, where the wall conduction takes its face
-    !! difference. Only that difference may read it: the mirror of a cold wall in hot gas lies below 0 K, so the diffusion
-    !! properties use each ghost's own state, and s_ibm_restore_conduction_temperature undoes this once the fluxes are formed. Call
-    !! after the conservative-to-primitive conversion, before the halo exchange.
-    subroutine s_ibm_set_conduction_temperature(q_T_sf)
-
-        type(scalar_field), intent(inout) :: q_T_sf
-        integer                           :: i
-
-        if (amr_in_fine_advance) then
-            call s_ibm_fine_conduction_temperature(q_T_sf, .true.)
-            return
-        end if
-        if (num_gps == 0) return
-        $:GPU_PARALLEL_LOOP(private='[i]', present='[ghost_points]')
-        do i = 1, num_gps
-            if (ghost_points(i)%T_cond > T_cond_unset) then
-                ghost_points(i)%T_save = q_T_sf%sf(ghost_points(i)%loc(1), ghost_points(i)%loc(2), ghost_points(i)%loc(3))
-                q_T_sf%sf(ghost_points(i)%loc(1), ghost_points(i)%loc(2), ghost_points(i)%loc(3)) = ghost_points(i)%T_cond
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_ibm_set_conduction_temperature
-
-    !> Undo s_ibm_set_conduction_temperature on this rank's ghosts, so the reaction source and the split chemistry substep see each
-    !! ghost's own temperature
-    subroutine s_ibm_restore_conduction_temperature(q_T_sf)
-
-        type(scalar_field), intent(inout) :: q_T_sf
-        integer                           :: i
-
-        if (amr_in_fine_advance) then
-            call s_ibm_fine_conduction_temperature(q_T_sf, .false.)
-            return
-        end if
-        if (num_gps == 0) return
-        $:GPU_PARALLEL_LOOP(private='[i]', present='[ghost_points]')
-        do i = 1, num_gps
-            if (ghost_points(i)%T_cond > T_cond_unset) then
-                q_T_sf%sf(ghost_points(i)%loc(1), ghost_points(i)%loc(2), ghost_points(i)%loc(3)) = ghost_points(i)%T_save
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_ibm_restore_conduction_temperature
-
-    !> The set (set = T) or restore of the conduction temperature on an AMR fine frame: the coarse ghost list stays active there, so
-    !! each member block's own parked ghosts (gp_park) are used, at its slab offset from s_ibm_load_fine_markers.
-    impure subroutine s_ibm_fine_conduction_temperature(q_T_sf, set)
+    !> Put (set = T) the mirrored ghost temperature T_cond from s_ibm_correct_state in q_T_sf, where the wall conduction takes its
+    !! face difference, or undo that (set = F) so the reaction source and the split chemistry substep see each ghost's own
+    !! temperature. Only that difference may read T_cond: the mirror of a cold wall in hot gas lies below 0 K, so the diffusion
+    !! properties use each ghost's own state. Set after the conservative-to-primitive conversion, before the halo exchange; restore
+    !! once the fluxes are formed. On an AMR fine frame the coarse ghost list stays active, so each member block's own parked ghosts
+    !! (gp_park) are used, at its slab offset from s_ibm_load_fine_markers.
+    impure subroutine s_ibm_conduction_temperature(q_T_sf, set)
 
         type(scalar_field), intent(inout) :: q_T_sf
         logical, intent(in)               :: set
-        integer                           :: ibm, a, n_f, o(3), o1, o2, o3, j, k, l
+        integer                           :: i, ibm, a, n_f, o(3), o1, o2, o3, j, k, l
         integer(kind=8)                   :: off
 
-        do ibm = 1, fine_lay_nb
-            n_f = ib_fine(fine_lay_slots(ibm))%num_gps
-            if (n_f == 0) cycle
-            off = ib_fine(fine_lay_slots(ibm))%off
-            o = 0; o(fine_lay_sd) = (ibm - 1)*fine_lay_w
-            o1 = o(1); o2 = o(2); o3 = o(3)
-            $:GPU_PARALLEL_LOOP(private='[a, j, k, l]', firstprivate='[n_f, off, o1, o2, o3, set]')
-            do a = 1, n_f
-                if (gp_park(off + a)%T_cond > T_cond_unset) then
-                    j = gp_park(off + a)%loc(1) + o1
-                    k = gp_park(off + a)%loc(2) + o2
-                    l = gp_park(off + a)%loc(3) + o3
-                    if (set) then
-                        gp_park(off + a)%T_save = q_T_sf%sf(j, k, l)
-                        q_T_sf%sf(j, k, l) = gp_park(off + a)%T_cond
-                    else
-                        q_T_sf%sf(j, k, l) = gp_park(off + a)%T_save
+        if (amr_in_fine_advance) then
+            do ibm = 1, fine_lay_nb
+                n_f = ib_fine(fine_lay_slots(ibm))%num_gps
+                if (n_f == 0) cycle
+                off = ib_fine(fine_lay_slots(ibm))%off
+                o = 0; o(fine_lay_sd) = (ibm - 1)*fine_lay_w
+                o1 = o(1); o2 = o(2); o3 = o(3)
+                $:GPU_PARALLEL_LOOP(private='[a, j, k, l]', firstprivate='[n_f, off, o1, o2, o3, set]')
+                do a = 1, n_f
+                    if (gp_park(off + a)%T_cond > T_cond_unset) then
+                        j = gp_park(off + a)%loc(1) + o1
+                        k = gp_park(off + a)%loc(2) + o2
+                        l = gp_park(off + a)%loc(3) + o3
+                        if (set) then
+                            gp_park(off + a)%T_save = q_T_sf%sf(j, k, l)
+                            q_T_sf%sf(j, k, l) = gp_park(off + a)%T_cond
+                        else
+                            q_T_sf%sf(j, k, l) = gp_park(off + a)%T_save
+                        end if
                     end if
-                end if
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
-            $:END_GPU_PARALLEL_LOOP()
+            return
+        end if
+        if (num_gps == 0) return
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', firstprivate='[set]', present='[ghost_points]')
+        do i = 1, num_gps
+            if (ghost_points(i)%T_cond > T_cond_unset) then
+                j = ghost_points(i)%loc(1); k = ghost_points(i)%loc(2); l = ghost_points(i)%loc(3)
+                if (set) then
+                    ghost_points(i)%T_save = q_T_sf%sf(j, k, l)
+                    q_T_sf%sf(j, k, l) = ghost_points(i)%T_cond
+                else
+                    q_T_sf%sf(j, k, l) = ghost_points(i)%T_save
+                end if
+            end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_ibm_fine_conduction_temperature
+    end subroutine s_ibm_conduction_temperature
 
     !> Pack every ghost's global cell index (i, j, k) and T_cond into gp_tc_rec(1:4, 1:num_gps) on the device and bring only those
     !! four reals per ghost to the host, instead of the whole ghost_point (about 380 B).

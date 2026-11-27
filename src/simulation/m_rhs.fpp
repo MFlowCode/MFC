@@ -704,7 +704,7 @@ contains
                 call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_qp%vf, cv_int)
             end if
             call nvtxEndRange
-            if (ib .and. chemistry .and. chem_params%diffusion) call s_ibm_set_conduction_temperature(q_T_sf)
+            if (ib .and. chemistry .and. chem_params%diffusion) call s_ibm_conduction_temperature(q_T_sf, .true.)
 
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf, skip_mpi=amr_cons_ghosts_valid)
@@ -950,7 +950,7 @@ contains
 
         ! The face fluxes are formed: the ghosts' own temperatures back for the reaction source and the split chemistry (the set
         ! call is inside the .not. igr conversion above, and ib is not supported with igr)
-        if (ib .and. chemistry .and. chem_params%diffusion .and. .not. igr) call s_ibm_restore_conduction_temperature(q_T_sf)
+        if (ib .and. chemistry .and. chem_params%diffusion .and. .not. igr) call s_ibm_conduction_temperature(q_T_sf, .false.)
 
         ! Lagrangian particles too live on the coarse grid only (blocks are kept clear of them)
         if (particles_lagrange .and. .not. amr_in_fine_advance) then
