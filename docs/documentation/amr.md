@@ -110,7 +110,7 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | Viscous, Fourier heat conduction (`k_therm`), hypoelastic (with continuum damage), body forces | Supported |
 | Chemistry (reactions, diffusion) | Supported; with `chem_params%%reaction_substeps > 0` each block takes the split reaction at the end of the step, before the fold |
 | Immersed boundaries (fixed, prescribed or force-driven motion, STL included; not `surface_reaction`, `thermal_bc = 2` or `3`, `thermal_layer`, `ib_surface_wrt`, `ib_heat_wrt`, `ib_mass_relax` or `ib_uncover_fill`) | Supported; blocks always contain each body; moving bodies are lock-step only, and with `amr_max_level > 1` need `amr_regrid_int > 0`; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`); the default `ib_mass_relax = -1` resolves to off, so a moving body differs from a uniform-grid run, where it is on |
-| Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
+| Lagrangian bubbles | Supported, lock-step or subcycled; the cloud stays on the base grid (blocks are kept clear of it) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
 | Mean pressure gradient and bulk-flux / bulk-temperature controllers (`mean_dpdx`, `mean_mflux`, `mean_qdot`, `mean_temp`) | Supported without `mean_temp_wall`; each block zeroes the sources in its own solid cells; the controllers measure level 0 after the fold (exact for the mass flux, second order for the temperature) and apply one uniform source on every level |

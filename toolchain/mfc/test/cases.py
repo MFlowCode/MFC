@@ -3203,6 +3203,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             cases.append(define_case_d(stack, "dynamic regrid", regrid))
                             # the one bubble lives on one rank; the other writes header-only Lagrangian files
                             cases.append(define_case_d(stack, "dynamic regrid -> 2 MPI Ranks", regrid, ppn=2))
+                        # the cloud advances with level 0's stages; the subcycled fine substeps never touch it
+                        cases.append(define_case_d(stack, "subcycle", {"amr_subcycle": "T"}))
                         stack.pop()
 
                     # Regression guard for issue #1706: the Lagrange bubble initial gas
