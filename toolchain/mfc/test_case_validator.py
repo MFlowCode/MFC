@@ -661,6 +661,14 @@ class TestAmrDefaults(unittest.TestCase):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
 
+    def test_multilevel_block_pool(self):
+        """amr_max_level > 1 needs one pool slot per level, as the static builder's abort."""
+        ml = {**self.AMR, "amr_max_level": 3}
+        validate_case_constraints({**ml, "amr_max_blocks": 3}, "simulation")
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints({**ml, "amr_max_blocks": 2}, "simulation")
+        self.assertIn("needs amr_max_blocks >= amr_max_level", str(ctx.exception))
+
     def test_tag_var(self):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")

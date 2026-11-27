@@ -2332,8 +2332,9 @@ class CaseValidator:
         )
         self.prohibit(amr_max_level is not None and amr_max_level < 1, "amr_max_level must be >= 1")
         self.prohibit(
-            amr_max_level is not None and amr_max_level > 1 and amr_max_blocks is not None and amr_max_blocks < 2,
-            "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= 2 " "(at least one level-1 block plus one nested level-2 block)",
+            amr_max_level is not None and amr_max_level > 1 and amr_max_blocks is not None and amr_max_blocks < amr_max_level,
+            "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= amr_max_level (the run aborts unless amr_max_blocks >= "
+            "the level-1 block count + amr_max_level - 1: one nested block per deeper level)",
         )
         self.prohibit(amr_ref_ratio is not None and amr_ref_ratio not in (2, 4), "amr_ref_ratio must be 2 or 4")
         self.prohibit(self.get("amr_prolong", 1) not in (1, 2), "amr_prolong must be 1 (minmod-limited linear) or 2 (quartic)")
