@@ -4266,6 +4266,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_plane_poiseuille",
                 # Registered below at 12 cells per radius: at the 25-cell cap the gap holds about 4 cells
                 "2D_ibm_conduction_annulus",
+                # The annulus deck again, for its order study (order_study.py); the annulus registration covers it
+                "2D_ibm_accuracy_limits",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
                 # Registered below at their own sizes: the 25-cell cap would leave the bodies unresolved (12 cylinders need about 96 cells)
