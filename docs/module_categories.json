@@ -58,6 +58,7 @@
             "m_igr",
             "m_ib_patches",
             "m_ib_wall_column",
+            "m_ib_surface_chem",
             "m_compute_levelset"
         ]
     },
