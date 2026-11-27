@@ -110,15 +110,15 @@ module m_ibm
 
     !> Ghost-point updates per fill tier and AMR level (0 = the coarse grid), summed over the run and reported at its end, because a
     !! tight packing can sit mostly in tier 2 and a second-order claim is then not true of that surface.
-    integer, allocatable        :: n_fill_tier(:,:)
-    type(integer_field), public :: ib_markers
+    integer, allocatable                :: n_fill_tier(:,:)
+    type(integer_field), public, target :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
     !> Body markers in the fine-advance frame, read by s_compute_rhs's body-cell RHS zeroing while amr_in_fine_advance: the advanced
     !! block's fine markers (for a batch, every member's at its slab offset), loaded by s_ibm_load_fine_markers before each fine RHS
     !! pass. ib_markers holds the coarse markers during a fine RHS. Sized to the allocation extents plus one zeroed layer, which the
     !! face loops read (bodies sit inside their blocks).
-    type(integer_field), public :: ib_markers_fine
+    type(integer_field), public, target :: ib_markers_fine
     $:GPU_DECLARE(create='[ib_markers_fine]')
 
     !> Layout of the last s_ibm_load_fine_markers (member slots, stacking dimension and stride), for the fine conduction temperature

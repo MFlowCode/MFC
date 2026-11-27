@@ -58,8 +58,10 @@ module m_rhs
     $:GPU_DECLARE(create='[cons_copy_idx]')
     !> Set once at init. True when a q_cons_qp reader is on: qbmm, acoustic_source, bubbles_euler (incl. mpp_lim), euler_lagrange
     !! (bubbles or particles), chemistry, reactive_burn, cont_damage. Each call site below is marked "needs cons_copy_all".
-    logical            :: cons_copy_all
-    type(vector_field) :: q_prim_qp  !< Primitive variables at cell-interior quadrature points
+    logical :: cons_copy_all
+    !> The current frame's body markers: ib_markers, or ib_markers_fine during the AMR fine advance (set by s_compute_rhs)
+    type(integer_field), pointer :: rhs_marks => null()
+    type(vector_field)           :: q_prim_qp  !< Primitive variables at cell-interior quadrature points
     $:GPU_DECLARE(create='[q_prim_qp]')
 
     !> @name The first-order spatial derivatives of the primitive variables at cell- interior Gaussian quadrature points. These are
@@ -633,6 +635,8 @@ contains
 
         call nvtxStartRange("COMPUTE-RHS")
 
+        rhs_marks => ib_markers
+        if (amr_in_fine_advance) rhs_marks => ib_markers_fine
         cv_int = idwint
         if (amr_cons_ghosts_valid) then  ! the cons halo fills only the rank-boundary faces
             #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
@@ -786,16 +790,9 @@ contains
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
                         if (id == 2 .and. viscous) call s_split_axis_flux(-1._wp)
-                        ! a fine block (or batched slab) reads its own markers ib_markers_fine, not the coarse ib_markers
-                        if (amr_in_fine_advance) then
-                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
-                                                                    & ib_markers_fine, ib_wall_src(ibw_a), merge(merge(2, 1, &
-                                                                    & ib_flux_wall), 0, ib))
-                        else
-                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
-                                                                    & ib_markers, ib_wall_src(ibw_a), merge(merge(2, 1, &
-                                                                    & ib_flux_wall), 0, ib))
-                        end if
+                        call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
+                                                                & rhs_marks, ib_wall_src(ibw_a), merge(merge(2, 1, ib_flux_wall), &
+                                                                & 0, ib))
                         if (id == 2 .and. viscous) call s_split_axis_flux(1._wp)
                         call nvtxEndRange
                     end if
@@ -821,11 +818,7 @@ contains
 
                     ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
                     ! this direction's faces, on every AMR level with that level's markers.
-                    if (amr_in_fine_advance) then
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
-                    else
-                        call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
-                    end if
+                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, rhs_marks)
 
                     ! Bubble dynamics source terms
                     if (bubbles_euler) then
@@ -879,11 +872,7 @@ contains
                 call s_compute_advection_source_term(id, rhs_hatR_vf, q_cons_qp, q_prim_qp, .false.)
                 call nvtxEndRange
                 ! flux_rsx_vf holds the hat_L set and flux_hatR_rsx_vf the hat_R set, each the RHS's at its own faces
-                if (amr_in_fine_advance) then
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers_fine)
-                else
-                    call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, ib_markers)
-                end if
+                call s_accumulate_ib_face_fluxes(id, stage, q_cons_vf, q_prim_qp%vf, rhs_marks)
             end do
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
@@ -916,14 +905,7 @@ contains
             call s_compute_hypoelastic_rhs_iface(q_prim_qp%vf, rhs_vf, nc_iface_vel_n)
             call nvtxEndRange
         end if
-        if (ib) then
-            ! a fine block (or batched slab) uses its own markers ib_markers_fine (m_ibm), not the coarse ib_markers
-            if (amr_in_fine_advance) then
-                call s_zero_rhs_at_body(ib_markers_fine, rhs_vf)
-            else
-                call s_zero_rhs_at_body(ib_markers, rhs_vf)
-            end if
-        end if
+        if (ib) call s_zero_rhs_at_body(rhs_marks, rhs_vf)
 
         ! Additional Physics and Source Terms Additions for acoustic_source
         if (acoustic_source) then
@@ -1141,18 +1123,9 @@ contains
             if (weno_Re_flux_compact) call s_compact_normal_viscous_gradients(q_prim_qp%vf, id, &
                 & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
                 & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
-            ! a fine block (or batched slab) tests its own markers ib_markers_fine, not the coarse ib_markers
-            if (ib_visc_compact .and. amr_in_fine_advance) then
-                call s_compact_ib_viscous_gradients(q_prim_qp%vf, ib_markers_fine, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), &
-                                                    & dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
-                                                    & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), &
-                                                    & dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
-            else if (ib_visc_compact) then
-                call s_compact_ib_viscous_gradients(q_prim_qp%vf, ib_markers, id, dqL_prim_dx_n(id)%vf(iv%beg:iv%end), &
-                                                    & dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
-                                                    & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), &
-                                                    & dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
-            end if
+            if (ib_visc_compact) call s_compact_ib_viscous_gradients(q_prim_qp%vf, rhs_marks, id, &
+                & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
         end if
 
         if (particles_lagrange .and. .not. amr_in_fine_advance) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)
@@ -1217,13 +1190,7 @@ contains
         end if
         irx%end = m; iry%end = n; irz%end = p
 
-        if (ib) then
-            if (amr_in_fine_advance) then
-                call s_body_faces_take_cell_states(ib_markers_fine, id)
-            else
-                call s_body_faces_take_cell_states(ib_markers, id)
-            end if
-        end if
+        if (ib) call s_body_faces_take_cell_states(rhs_marks, id)
 
         ! Computing Riemann Solver Flux and Source Flux
         call nvtxStartRange("RHS-RIEMANN-SOLVER")
