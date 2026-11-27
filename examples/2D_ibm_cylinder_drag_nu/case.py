@@ -37,7 +37,9 @@ parser.add_argument("--tstar", type=float, default=50.0, help="Run length t U / 
 parser.add_argument("--cfl", type=float, default=0.4, help="CFL number of the fixed step (the adaptive step uses cfl_target, set from Re and --cells_per_D).")
 parser.add_argument("--frames", type=int, default=10, help="Saves of the adaptive run (a fixed-step run saves once, at the end).")
 parser.add_argument("--stride", type=int, default=20, help="ib_force_stride: steps between force and heat rows.")
-parser.add_argument("--ib_ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance, the default).")
+parser.add_argument("--ib_ip_interp", type=int, default=1, choices=(1, 2), help="Image-point interpolation (1: inverse distance).")
+parser.add_argument("--wall_order", type=int, default=2, choices=(1, 2), help="ib_wall_order (1 wall value, 2 quadratic, the solver default).")
+parser.add_argument("--visc_compact", type=int, default=1, choices=(0, 1), help="ib_visc_compact (1 compact viscous gradient next to the body, the solver default; 0 the WENO gradient).")
 parser.add_argument("--parallel_io", default="T", choices=("T", "F"), help="parallel_io (F for a build without MPI).")
 parser.add_argument("--silo", action="store_true", help="Write density, pressure and velocity for post_process (the momentum-balance check).")
 args = parser.parse_args()
@@ -124,6 +126,8 @@ case = {
     "patch_ib(1)%thermal_bc": args.thermal_bc,
     "patch_ib(1)%Twall": args.tw_ratio * T_inf,
     "ib_ip_interp": args.ib_ip_interp,
+    "ib_wall_order": args.wall_order,
+    "ib_visc_compact": "T" if args.visc_compact else "F",
     "ib_state_wrt": "T",
     "ib_force_wrt": "T",
     "ib_heat_wrt": "T",

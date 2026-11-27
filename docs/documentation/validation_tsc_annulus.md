@@ -3,13 +3,13 @@
 # Isothermal Conduction Annulus: Image-Point Interpolation
 
 **Status:** partially validated (wall temperature and whole-gap error validated at three resolutions; wall gradient measured only as a fit estimate).
-**Code:** `master` at d1e6852c1, with `ib_ip_interp` ([#2165](https://github.com/MFlowCode/MFC/pull/2165)). TSC is opt-in; no default change is planned.
+**Code:** `master` at d1e6852c1, with `ib_ip_interp` ([#2165](https://github.com/MFlowCode/MFC/pull/2165)). TSC was opt-in when this page was written; it is now the default (`ib_ip_interp = 1` gives the inverse-distance weights).
 **Example:** `examples/2D_ibm_conduction_annulus`. **Last run:** 2026-11-21.
 
 ## Purpose
 
 The ghost-cell immersed boundary method imposes an isothermal wall temperature through the state interpolated at an image point inside the gas.
-The weights of that interpolation set the accuracy of the imposed wall temperature. This page compares the inverse-distance weights (`ib_ip_interp = 1`, the default)
+The weights of that interpolation set the accuracy of the imposed wall temperature. This page compares the inverse-distance weights (`ib_ip_interp = 1`, the default when this page was written)
 with the triangular-shaped-cloud weights (`ib_ip_interp = 2`; the kernel is described by Ezra, Peles and Kozak, Int. J. Heat Mass Transf. 252:127314, 2025)
 against the exact conduction solution of an annulus.
 

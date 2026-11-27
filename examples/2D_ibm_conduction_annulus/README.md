@@ -6,7 +6,7 @@ from `ring.stl` whose inner edge is the circle `r = 2R` (wall temperature `T2 = 
 
     T(r) = T1 + (T2 - T1) ln(r / R) / ln(r2 / R).
 
-The case compares the two image-point weightings of the ghost-cell method: inverse distance (the solver default) and triangular-shaped
+The case compares the two image-point weightings of the ghost-cell method: inverse distance (`ib_ip_interp = 1`) and triangular-shaped
 cloud (`ib_ip_interp = 2`, TSC). The gas starts from the exact profile on 10 concentric constant shells (uniform pressure) and runs 8 slowest
 conduction times, so the error that remains is the steady discretization error of the wall condition.
 `check_annulus.py` reads the last `restart_data/lustre_<k>.dat` and prints, relative to `T2 - T1`:

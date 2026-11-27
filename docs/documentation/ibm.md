@@ -23,13 +23,13 @@ Moving-body kinematics and the restitution of a wall collision are checked in [V
 | Option | Effect |
 | :--- | :--- |
 | `ib_second_order_vel`, `ib_ip_min_dist` | linear ghost-velocity extrapolation; minimum image-point distance |
-| `ib_ip_interp = 2` | triangular-shaped-cloud image-point interpolation instead of inverse-distance weights |
-| `ib_wall_order = 2` | two-probe quadratic wall-normal ghost velocity at no-slip walls |
+| `ib_ip_interp` | 2 (default): triangular-shaped-cloud image-point weights; 1: inverse-distance weights |
+| `ib_wall_order` | 2 (default): two-probe quadratic wall-normal ghost velocity at no-slip walls; 1: the wall value |
 | `ib_slip_ccst`, `ib_uncover_fill` | slip-wall ghost state, fill of cells a moving body uncovers (`ib_smooth_contact` no longer has an effect) |
-| `weno_Re_flux`, `weno_Re_flux_compact`, `ib_visc_compact` | the face-normal viscous gradient as a face difference (on by default) and the compact velocity gradient on the viscous faces within two cells of a body |
+| `weno_Re_flux`, `weno_Re_flux_compact`, `ib_visc_compact` | the face-normal viscous gradient as a face difference and the compact velocity gradient on the viscous faces within two cells of a body (both on by default) |
 | `ib_mass_relax` | returns the spurious gas mass of a body over about N steps; the default resolves at start-up (see the parameter entry) |
 
-Each option has a default that leaves existing results unchanged, except `ib_mass_relax`, whose default depends on whether a body moves, and `weno_Re_flux_compact`, which is on by default.
+`ib_ip_interp = 2` and `ib_wall_order = 2` are the defaults (both resolve to 1 with `ib_second_order_vel`); set them to 1 for the earlier behaviour. `weno_Re_flux_compact` is on by default, and so is `ib_visc_compact` with `weno_Re_flux` (set it to F for the earlier gradient). `ib_mass_relax` resolves at start-up from whether a body moves. The other options default to off.
 Drag and Nusselt number of a cylinder: @ref validation_cyl_drag_nu. Interpolation against an exact conduction solution: @ref validation_tsc_annulus. Slip walls (mass budget, exact vortex, known failures): @ref validation_slip_walls. Lumped cooling and the wall conduction column: @ref validation_wall_thermal.
 
 ## Heat transfer and chemistry

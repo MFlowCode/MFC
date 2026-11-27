@@ -8,7 +8,7 @@ A fixed carbon body (D = 100 um) held at 2000 K gasifies in quiescent moist air 
 
 `compare_burn_rate.py` prints the burn rate (`D/ib_heat.dat` column 4, the face mass the flux wall passes to the gas, and column 3, the surface-solve rate) against the reference at 10, 20, 30 and 60 us, and the flame peak at the last save. `case.py` takes `--ndim`, `--D`, `--p_atm`, `--T`, `--H_over_R`, `--cells_per_D`, `--tend`, `--frames`, `--cfl` and `--set KEY=VAL`.
 
-NVIDIA A100 (NVHPC 25.11), error = (MFC - reference)/reference of the burn rate (`ib_heat.dat` column 4) at 10 and 20 us. "Shared" is `master` at 0cdfdf02a, which gave all species one ghost mirror weight; "per species" is the current rule (each species its own weight, the most abundant closing the sum). The recommended setting is `--set ib_ip_interp=2` (triangular-shaped-cloud image points); the suite test keeps the default.
+NVIDIA A100 (NVHPC 25.11), error = (MFC - reference)/reference of the burn rate (`ib_heat.dat` column 4) at 10 and 20 us. "Shared" is `master` at 0cdfdf02a, which gave all species one ghost mirror weight; "per species" is the current rule (each species its own weight, the most abundant closing the sum). The recommended setting, triangular-shaped-cloud image points (`ib_ip_interp = 2`), is now the solver default; the rows above marked default used inverse distance.
 
 | Body | cells per D | image points | shared | per species |
 | :--- | ---: | :--- | ---: | ---: |

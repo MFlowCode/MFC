@@ -21,7 +21,7 @@ from the face heat of `ib_heat_wrt`, against references and against a force that
 | Grid | 10 and 20 cells/D, uniform; domain [-15 D, 25 D] x [-16 D, 16 D] (blockage 3.1 %); Re 100: [-8 D, 16 D] x [-8 D, 8 D] (6.25 %) |
 | Boundaries | subsonic characteristic inflow, characteristic outflow holding the free-stream pressure (extrapolation at the outflow lets the far-field pressure creep up), extrapolated lateral faces |
 | Wall | fixed, no slip, `thermal_bc = 1`, Twall = T_inf (drag runs) or 1.1 T_inf (heat runs) |
-| Numerics | WENO5-M, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 4`, adaptive step with CFL min(0.5, 0.4 Re/N) and `chem_params%%transport_dt`; `ib_ip_interp = 1` (the default) |
+| Numerics | WENO5-M, HLLC, SSP-RK3, `weno_Re_flux`, `fd_order = 4`, adaptive step with CFL min(0.5, 0.4 Re/N) and `chem_params%%transport_dt`; `ib_ip_interp = 1`; these runs used `ib_wall_order = 1` and `ib_visc_compact = F`, the defaults then (the Reproduce commands pass `--wall_order 1 --visc_compact 0`; the example now follows the solver defaults 2 and T) |
 | Length | \f$t U/D\f$ = 50 (Re 20, 40), 120 (Re 100); averages over the last 20 % |
 | Hardware | AMD MI300A, OpenMP offload, double precision |
 
@@ -72,7 +72,7 @@ Heat transfer, Tw/T_inf = 1.1, 20 cells/D:
 
 ## Known limitations
 
-- **L/D is first order and low** (0.818 against 0.94 at Re 20, 2.064 against 2.35 at Re 40: 13 % and 12 % low at 20 cells/D, 23 % and 18 % low at 10). The no-slip ghost value is the wall value, not a reflection, so the effective wall sits up to a cell inside the surface ([#2014](https://github.com/MFlowCode/MFC/issues/2014)); `ib_wall_order = 2` is the option for it and was not run here.
+- **L/D is first order and low** (0.818 against 0.94 at Re 20, 2.064 against 2.35 at Re 40: 13 % and 12 % low at 20 cells/D, 23 % and 18 % low at 10). These runs used the wall-value ghost (`ib_wall_order = 1`), not a reflection, so the effective wall sits up to a cell inside the surface ([#2014](https://github.com/MFlowCode/MFC/issues/2014)). The quadratic fill, `ib_wall_order = 2`, is now the default; these tables were not repeated with it.
 - Not re-measured (cost, about 5 GPU-hours per run on the 40 D x 32 D domain): 40 cells per diameter, and Re 100 on the domain of Re 20 and 40.
 - Re 100 uses a 6.25 % blockage; Cd_CV depends on the box there (1.302 for 4 D, which comes within 4 D of the inflow and lateral faces).
 - Nu varies by 2-4 % between correlations. The face-heat Nu carries no wall-gradient fit: an earlier drift of Nu with refinement at Re 40 came from fitting the wall gradient of the temperature field, not from the solver.
@@ -82,9 +82,9 @@ Heat transfer, Tw/T_inf = 1.1, 20 cells/D:
 
 ```
 ./mfc.sh run examples/2D_ibm_cylinder_drag_nu/case.py -t pre_process simulation post_process -n 1 --gpu -- \
-    --silo --Re 40 --cells_per_D 20 --xu 15 --xd 25 --hy 16 --steps 0 --tstar 50
+    --silo --Re 40 --cells_per_D 20 --xu 15 --xd 25 --hy 16 --steps 0 --tstar 50 --wall_order 1 --visc_compact 0
 ./mfc.sh run examples/2D_ibm_cylinder_drag_nu/case.py -t pre_process simulation post_process -n 1 --gpu -- \
-    --silo --Re 40 --cells_per_D 20 --xu 15 --xd 25 --hy 16 --steps 0 --tstar 50 --tw_ratio 1.1
+    --silo --Re 40 --cells_per_D 20 --xu 15 --xd 25 --hy 16 --steps 0 --tstar 50 --tw_ratio 1.1 --wall_order 1 --visc_compact 0
 python3 examples/2D_ibm_cylinder_drag_nu/check_cylinder.py <cold run> --hot <hot run>
 ```
 

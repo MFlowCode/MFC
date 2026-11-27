@@ -21,7 +21,7 @@ a shock-tube experiment.
 | Bodies | fixed, D = 115 um; sphere: one body at the shock's arrival point; curtain: random sequential addition, minimum gap 0.2 D, periodic across the flow, bodies kept off the curtain faces by half a diameter |
 | Walls | inviscid no slip (`slip = F`, `viscous = F`: the ghost velocity enforces no slip) or inviscid slip (`--slip`) |
 | Grid | sphere: 12 and 14 cells/D in [-3 D, 7 D] x [-3 D, 3 D]^2; curtain: 10 cells/D, 30 D x 6 D x 6 D (1.08 M cells, 239 spheres, curtain 17.4 D thick, \f$\phi\f$ = 0.2) |
-| Numerics | WENO5-M, HLLC, SSP-RK3, `fd_order = 4`, adaptive step at CFL 0.4, `ib_ip_interp = 1` (the default) |
+| Numerics | WENO5-M, HLLC, SSP-RK3, `fd_order = 4`, adaptive step at CFL 0.4, `ib_ip_interp = 1` and `ib_wall_order = 1`, the defaults when these runs were made (the Reproduce commands pass `--wall_order 1`) |
 | Hardware | sphere runs: GNU 13 on an x86 CPU, one rank; curtain: NVIDIA A100 80GB, NVHPC 25.11; double precision |
 
 ## Reference data
@@ -76,11 +76,11 @@ The profiles of seed 1 are in `examples/2D_ibm_shock_curtain/curtain_profiles.pn
 
 ```
 ./mfc.sh run examples/2D_ibm_shock_curtain/case.py -n 1 --gpu -- --dim 3 --single --slip --mach 1.22 --xu 3 --xd 7 \
-    --width 6 --cells_per_D 12 --steps 0 --tau 8
+    --width 6 --cells_per_D 12 --steps 0 --tau 8 --wall_order 1
 python3 examples/2D_ibm_shock_curtain/check_curtain.py examples/2D_ibm_shock_curtain --drag --mach 1.22
 
 ./mfc.sh run examples/2D_ibm_shock_curtain/case.py -t pre_process simulation post_process -n 1 --gpu -- --dim 3 --h 17.4 \
-    --width 6 --xu 7 --xd 23 --cells_per_D 10 --steps 0 --tau 2 --frames 20 --silo
+    --width 6 --xu 7 --xd 23 --cells_per_D 10 --steps 0 --tau 2 --frames 20 --silo --wall_order 1
 python3 examples/2D_ibm_shock_curtain/check_curtain.py examples/2D_ibm_shock_curtain
 ```
 

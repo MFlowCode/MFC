@@ -858,13 +858,23 @@ BENCH_COMMAND = Command(
             default=1,
             metavar="MEM",
         ),
+        Argument(
+            name="cases",
+            help="Only run these cases (names from toolchain/bench.yaml).",
+            nargs="+",
+            type=str,
+            default=[],
+            metavar="CASE",
+        ),
     ],
     examples=[
         Example("./mfc.sh bench -o results.yaml", "Run benchmarks and save results"),
+        Example("./mfc.sh bench -o rerun.yaml --cases ibm igr", "Rerun two cases"),
     ],
     key_options=[
         ("-o, --output FILE", "Output file for benchmark results (required)"),
         ("-m, --mem SIZE", "Memory limit for benchmarks"),
+        ("--cases CASE ...", "Only run these cases"),
     ],
 )
 
