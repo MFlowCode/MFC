@@ -6401,6 +6401,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         visc_ib = {"viscous": "T", "fluid_pp(1)%Re(1)": 1000.0, "weno_Re_flux": "T", "weno_avg": "T", "ib_visc_compact": "T"}
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chk_ib, **visc_ib})
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> ib_visc_compact", spec))
+        # Isothermal wall without chemistry (gas T = 2.5, Twall = 1.5): the fine ghost state carries Twall into the Fourier flux
+        isothermal = {"patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1.5, "fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0}
+        cases.append(define_case_d(stack, "isothermal", {"amr_max_grid_size": 32, **isothermal}))
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chk_ib, **isothermal})
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> isothermal", spec))
         # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
         # fine-grid force (the coarse faces under the block are skipped)
         cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))

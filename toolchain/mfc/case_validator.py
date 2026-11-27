@@ -2403,10 +2403,13 @@ class CaseValidator:
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
                 "amr with a moving immersed body or dynamic regrid supports analytic geometries only (the block containment bounding box)",
             )
-            # The reacting-surface ghost reconstruction runs per fine block but has no AMR validation
+            # The isothermal wall without chemistry sets only the ghost state, which each fine block corrects itself. With chemistry the
+            # fine RHS would apply the coarse ghosts' conduction temperature (T_cond) and markers; the lumped wall needs per-block records.
+            chem = self.get("chemistry", "F") == "T"
+            tbc = [self.get(f"patch_ib({i})%thermal_bc") or 0 for i in range(1, num_ibs + 1)]
             self.prohibit(
-                any((self.get(f"patch_ib({i})%thermal_bc") or 0) != 0 or (self.get(f"patch_ib({i})%surface_reaction") or 0) != 0 for i in range(1, num_ibs + 1)),
-                "amr with ib does not support patch_ib thermal_bc or surface_reaction (not yet validated)",
+                any(t not in (0, 1) or (chem and t != 0) for t in tbc) or any((self.get(f"patch_ib({i})%surface_reaction") or 0) != 0 for i in range(1, num_ibs + 1)),
+                "amr with ib supports patch_ib thermal_bc = 1 only without chemistry (no surface_reaction, no thermal_bc = 2 or 3)",
             )
             # gp_surf is sized for the coarse ghost points; fine blocks swap in their own
             for wrt in ("ib_surface_wrt", "ib_heat_wrt"):
