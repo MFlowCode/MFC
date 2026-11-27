@@ -69,7 +69,13 @@ Conservation across coarse/fine faces holds to round-off for single- and multi-f
 a uniform state stays uniform with regrid on. Interiors keep the WENO order; the coarse/fine ghost fill is second
 order (linear) or fifth order (quartic). For a smooth wave crossing a static block, the measured global L2 rate is 2.5 with
 the linear fill (its second-order ghost values leave a second-order error in the few cells at each interface) and 5 with
-the quartic fill, as for WENO5 on a uniform grid; the `Convergence -> 1D -> AMR` tests track it. Results do not depend on
+the quartic fill, as for WENO5 on a uniform grid; the `Convergence -> 1D -> AMR` tests track it. Where a composition jump
+(two gases of different molar mass at one pressure) crosses a block edge, the edge cells over the jump gain a velocity
+across the edge that the uniform grid does not have, from the ghost fill of the coarse jump: in the H2/air diffusion check of
+`Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion`, 8e-5 kg/(m^2 s) of y-momentum after one step on the
+edge cells over the jump, with or without the body and wherever the jump sits along the edge. That check reports it as 1.3
+only because the body's flow sets the y-momentum scale (3e-4); without the body the scale is 1. The cells a few cells in
+match the uniform grid to round-off. Results do not depend on
 message timing, and agree across rank counts to round-off when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the
 block size cap, and therefore the box set, depends on the decomposition).
 
