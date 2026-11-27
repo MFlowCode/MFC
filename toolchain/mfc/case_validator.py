@@ -2295,6 +2295,12 @@ class CaseValidator:
         )
         for k in ("qbmm", "bubbles_euler", "surface_tension"):
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
+        # #2255: unlike Lagrangian bubbles, the particle hooks have no level-0 guard and no fine-block exclusion
+        self.prohibit(
+            self.get("particles_lagrange", "F") == "T",
+            "amr does not support particles_lagrange: the fine-block RHS would run the particle dynamics and the two-way "
+            "coupling source on the swapped block grid, and nothing keeps the blocks clear of the particle support (#2255)",
+        )
         for d in ("x", "y", "z"):
             for e in ("beg", "end"):
                 bc = self.get(f"bc_{d}%{e}")
