@@ -3059,6 +3059,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         interp6 = {"particle_params%interpolation_order": 6, **mpi_grid}
         cases.append(define_case_d(stack, ["Two-way Coupling", "interpolation_order=6", "2 MPI Ranks"], interp6, ppn=2))
         if ndims == 2:
+            # a static block clear of the particles (they stay on level 0), across the y = 0.8 pressure jump
+            blk = {"amr": "T", "amr_regrid_int": 0, "amr_max_grid_size": 64}
+            blk.update({"amr_block_beg(1)": 37, "amr_block_end(1)": 43, "amr_block_beg(2)": 24, "amr_block_end(2)": 33})
+            cases.append(define_case_d(stack, ["One-way Coupling", "AMR"], {**one_way, **blk}))
+            cases.append(define_case_d(stack, ["Two-way Coupling", "AMR"], blk))
+            cases.append(define_case_d(stack, ["Two-way Coupling", "AMR", "2 MPI Ranks"], blk, ppn=2))
+            cases.append(define_case_d(stack, ["Two-way Coupling", "AMR", "subcycle"], {**blk, "amr_subcycle": "T"}))
             for qs_force in [1, 2]:
                 cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
             # Restart roundtrip (serial I/O) with the saved seed and fluctuation state; added mass is off because its fluid

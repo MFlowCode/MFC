@@ -401,7 +401,7 @@ contains
         call s_phase_tic(PH_GATHER)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
         ! the Lagrangian-overlap safety check must cover every level-1 block (mine included)
-        if (bubbles_lagrange) then
+        if (euler_lagrange) then
             do k = 1, amr_num_blocks
                 if (amr_block_level(k) /= 1) cycle
                 call s_amr_select_slot(k)
@@ -793,7 +793,7 @@ contains
 
         call s_phase_tic(PH_GATHER)
         ! the Lagrangian-overlap safety check must cover every level-lev block (mine included)
-        if (bubbles_lagrange) then
+        if (euler_lagrange) then
             do k = 1, amr_num_blocks
                 if (amr_block_level(k) /= lev) cycle
                 call s_amr_select_slot(k)

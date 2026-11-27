@@ -47,7 +47,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
 
-        amr_cons_ghosts_valid = amr .and. amr_xchg_coarse_ghosts .and. (.not. bubbles_lagrange) .and. (.not. chemistry) &
+        amr_cons_ghosts_valid = amr .and. amr_xchg_coarse_ghosts .and. (.not. euler_lagrange) .and. (.not. chemistry) &
             & .and. (.not. igr)
         if (.not. amr_cons_ghosts_valid) return
         call s_phase_tic(PH_HALO)

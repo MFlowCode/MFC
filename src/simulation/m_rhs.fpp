@@ -970,7 +970,8 @@ contains
         ! call is inside the .not. igr conversion above, and ib is not supported with igr)
         if (ib .and. chemistry .and. chem_params%diffusion .and. .not. igr) call s_ibm_restore_conduction_temperature(q_T_sf)
 
-        if (particles_lagrange) then
+        ! Lagrangian particles too live on the coarse grid only (blocks are kept clear of them)
+        if (particles_lagrange .and. .not. amr_in_fine_advance) then
             call nvtxStartRange("RHS-EL-PARTICLES-DYN")
             call s_compute_particles_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
             call nvtxEndRange
@@ -1154,7 +1155,7 @@ contains
             end if
         end if
 
-        if (particles_lagrange) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)
+        if (particles_lagrange .and. .not. amr_in_fine_advance) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)
 
         call nvtxEndRange
 

@@ -660,9 +660,6 @@ class TestAmrDefaults(unittest.TestCase):
         for k in ("qbmm", "stretch_x", "cyl_coord", "relax"):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
-        with self.assertRaises(CaseConstraintError) as ctx:
-            validate_case_constraints({**self.AMR, "particles_lagrange": "T"}, "simulation")
-        self.assertIn("amr does not support particles_lagrange", str(ctx.exception))
 
     def test_tag_var(self):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
