@@ -52,7 +52,7 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
   aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
   largest stable `dt`. With regrid on, start-up also aborts if `dt` would exceed that limit were the fastest cells
-  refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes `amr_ref_ratio` steps per parent step, with ghost
   cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. A
@@ -143,8 +143,8 @@ Full descriptions: @ref case.
 | `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition (and, on several ranks, tiles regrid boxes smaller, not below 16, until there is one per rank) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
-| `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: no subcycling or quartic) |
-| `amr_subcycle` | F | Subcycle refined levels in time (ratio 2, up to two levels) |
+| `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: no quartic) |
+| `amr_subcycle` | F | Subcycle refined levels in time (`amr_ref_ratio` substeps per parent step, any depth) |
 | `amr_prolong` | 1 | 1: limited linear, 2: quartic (ratio 2) |
 | `amr_place_owner` | F | Owner-aware block placement |
 | `amr_snap` | 0 | Regrid hysteresis, coarse cells (<= `amr_buf - 2`; one refined level only under regrid) |

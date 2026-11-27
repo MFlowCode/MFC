@@ -315,7 +315,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
             "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= 2; "
-            "amr_subcycle and amr_prolong = 2 need amr_ref_ratio = 2. "
+            "amr_prolong = 2 needs amr_ref_ratio = 2. "
             "Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
             "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
             "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
@@ -2343,8 +2343,6 @@ class CaseValidator:
         self.prohibit(self.get("amr_prolong", 1) not in (1, 2), "amr_prolong must be 1 (minmod-limited linear) or 2 (quartic)")
         self.prohibit(self.get("amr_prolong", 1) == 2 and amr_ref_ratio not in (None, 2), "amr_prolong = 2 requires amr_ref_ratio = 2")
         if self.get("amr_subcycle", "F") == "T":
-            self.prohibit(amr_ref_ratio not in (None, 2), "amr_subcycle requires amr_ref_ratio = 2")
-            self.prohibit(amr_max_level is not None and amr_max_level > 2, "amr_subcycle supports up to two refined levels (amr_max_level <= 2)")
             self.prohibit(time_stepper == 1, "amr_subcycle requires time_stepper = 2 or 3 (RK1 keeps no step-start state)")
             self.prohibit(igr, "amr_subcycle does not support IGR")
             moving = [v for k, v in self.params.items() if re.fullmatch(r"(patch_ib|particle_cloud)\(\d+\)%moving_ibm", k)]

@@ -7210,6 +7210,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 1D -> three levels static", {**amr_1d_base, **jump_mid, "amr_regrid_int": 0, "amr_max_level": 3, "amr_max_blocks": 8})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         cases.append(define_case_d(stack, "np=2", {"amr_max_grid_size": 32}, ppn=2))
+        # the recursive subcycle driver three levels deep: 8 finest substeps per coarse step
+        cases.append(define_case_d(stack, "subcycle", {"amr_max_grid_size": 32, "amr_subcycle": "T"}))
         stack.pop()
 
         # amr_ref_ratio = 4 on two levels (16 level-2 cells per coarse cell): static at np=1 (restart) and 2, dynamic with every
@@ -7224,6 +7226,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "dynamic np=2", {**dyn, "amr_max_grid_size": 64}, ppn=2))
         uni = {f"patch_icpp({i})%{k}": v for i in (1, 2, 3) for k, v in (("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.3))}
         cases.append(define_case_d(stack, "free stream", {"amr_regrid_int": 0, **uni}))
+        # subcycled: four substeps per parent step on each level
+        cases.append(define_case_d(stack, "static subcycle", {"amr_regrid_int": 0, "amr_subcycle": "T"}))
+        cases.append(define_case_d(stack, "dynamic subcycle", {**dyn, "amr_subcycle": "T"}))
         stack.pop()
 
         # amr_tag_var: features with no density jump, which the default density tagger cannot see. Uniform density and

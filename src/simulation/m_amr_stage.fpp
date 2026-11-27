@@ -99,7 +99,8 @@ contains
         call s_amr_pc_gather(q_old, 0)
         call s_amr_pc_gather(q_new, 1)
         dt0 = dt
-        call s_amr_subcycle_level(1, 0._wp, 1._wp, 0.5_wp*dt0, q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_amr_subcycle_level(1, 0._wp, 1._wp, dt0/real(amr_ref_ratio, wp), q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, &
+                                  & mv_in, rhs_mv, t_step)
         amr_adv_level = 0
         dt = dt0
         $:GPU_UPDATE(device='[dt]')
@@ -111,10 +112,10 @@ contains
 
     end subroutine s_amr_subcycle_fine
 
-    !> Level lev's two substeps of dtl across the fraction [th0, th0 + dth] of the coarse step. Level 1 fills its ghosts from the
-    !! patch cache at that coarse time; a deeper level fills from its parents blended between their substep-start backup and end
-    !! state (amr_par_theta). After each substep the next level substeps across it: this level's ghosts are first refilled at the
-    !! substep end (the children's parent patches can reach them), and the children are then synced back into this level.
+    !> Level lev's amr_ref_ratio substeps of dtl across the fraction [th0, th0 + dth] of the coarse step. Level 1 fills its ghosts
+    !! from the patch cache at that coarse time; a deeper level fills from its parents blended between their substep-start backup
+    !! and end state (amr_par_theta). After each substep the next level substeps across it: this level's ghosts are first refilled
+    !! at the substep end (the children's parent patches can reach them), and the children are then synced back into this level.
     recursive subroutine s_amr_subcycle_level(lev, th0, dth, dtl, q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, mv_in, rhs_mv, &
         & t_step)
 
@@ -126,24 +127,26 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        integer                                                    :: k, s
+        integer                                                    :: k, s, ns
+        real(wp)                                                   :: rr, fs  !< ratio; fraction of the parent's step per substep
 
-        do k = 0, 1
+        rr = real(amr_ref_ratio, wp); fs = 1._wp/rr; ns = size(amr_rk_c)
+        do k = 0, amr_ref_ratio - 1
             amr_sub_first = k == 0
             amr_adv_level = lev
             dt = dtl
             $:GPU_UPDATE(device='[dt]')
-            do s = 1, size(amr_rk_c)
-                ! this substage's time: fraction th0 + dth*(k + c_s)/2 of the coarse step dtl*2/dth
-                t_rhs = f_step_time(th0 + 0.5_wp*dth*(real(k, wp) + amr_rk_c(s)), t_step, 2._wp*dtl/dth)
+            do s = 1, ns
+                ! this substage's time: fraction th0 + dth*(k + c_s)/rr of the coarse step dtl*rr/dth
+                t_rhs = f_step_time(th0 + fs*dth*(real(k, wp) + amr_rk_c(s)), t_step, rr*dtl/dth)
                 $:GPU_UPDATE(device='[t_rhs]')
-                call s_amr_fill_sub(lev, q_new, 0.5_wp*(real(k, wp) + amr_rk_c(s)), th0, dth)
+                call s_amr_fill_sub(lev, q_new, fs*(real(k, wp) + amr_rk_c(s)), th0, dth)
                 call s_amr_fine_stage_advance_batched(s, coefs(s,:), bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             end do
             if (lev >= amr_max_level) cycle
-            call s_amr_fill_sub(lev, q_new, 0.5_wp*real(k + 1, wp), th0, dth)
-            call s_amr_subcycle_level(lev + 1, th0 + 0.5_wp*dth*real(k, wp), 0.5_wp*dth, 0.5_wp*dtl, q_new, coefs, q_T_sf, &
-                                      & bc_type, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            call s_amr_fill_sub(lev, q_new, fs*real(k + 1, wp), th0, dth)
+            call s_amr_subcycle_level(lev + 1, th0 + fs*dth*real(k, wp), fs*dth, fs*dtl, q_new, coefs, q_T_sf, bc_type, pb_in, &
+                                      & rhs_pb, mv_in, rhs_mv, t_step)
             amr_par_theta = 1._wp
             dt = dtl
             $:GPU_UPDATE(device='[dt]')
