@@ -1135,7 +1135,7 @@ class CaseValidator:
         self.prohibit(ib_flux_wall and moving_any, "ib_flux_wall requires every immersed boundary to be fixed (moving_ibm = 0)")
         self.prohibit(ib_flux_wall and self.get("hypoelasticity", "F") == "T", "ib_flux_wall is not supported with hypoelasticity")
         # the wall fields live on the coarse grid only
-        self.prohibit(ib_flux_wall and self.get("amr", "F") == "T", "ib_flux_wall is not supported with amr")
+        self.prohibit(ib_flux_wall and self.get("amr", "F") == "T", "ib_flux_wall is not supported with amr (#2230)")
         for i in reacting:
             self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
@@ -2403,14 +2403,11 @@ class CaseValidator:
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
                 "amr with a moving immersed body or dynamic regrid needs a geometry with a block containment bounding box",
             )
-            # The adiabatic and isothermal walls set only the ghost state, which each fine block corrects itself (with chemistry the fine
-            # RHS takes each block's own markers and T_cond). The reacting surface's wall sources and the lumped wall's records are
-            # coarse-grid state; the initial thermal layer is not checked on blocks.
+            # The adiabatic and isothermal walls, reacting or not, set only the ghost state, which each fine block corrects itself (with
+            # chemistry the fine RHS takes each block's own markers and T_cond). The surface energy balance and the lumped wall's
+            # records are not checked on blocks, nor is the initial thermal layer.
             tbc = [self.get(f"patch_ib({i})%thermal_bc") or 0 for i in range(1, num_ibs + 1)]
-            self.prohibit(
-                any(t not in (0, 1) for t in tbc) or any((self.get(f"patch_ib({i})%surface_reaction") or 0) != 0 for i in range(1, num_ibs + 1)),
-                "amr with ib supports patch_ib thermal_bc = 0 or 1 (no surface_reaction, no thermal_bc = 2 or 3)",
-            )
+            self.prohibit(any(t not in (0, 1) for t in tbc), "amr with ib supports patch_ib thermal_bc = 0 or 1 (no thermal_bc = 2 or 3)")
             self.prohibit(
                 any((self.get(f"patch_ib({i})%thermal_layer") or 0) > 0 for i in range(1, num_ibs + 1)),
                 "amr with ib does not support patch_ib thermal_layer (not yet validated)",

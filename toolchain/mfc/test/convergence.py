@@ -532,9 +532,10 @@ def run_amr_check(spec: ConvergenceSpec) -> typing.Tuple[bool, str]:
     with tempfile.TemporaryDirectory() as tmpdir:
         case = os.path.join(tmpdir, "case.json")
         common.file_write(case, json.dumps(params))
-        # the arguments after the test command's "--" (e.g. -c <computer>) reach the inner runs, as for every other test
-        run_args = ["--", *ARG("--")] if ARG("--") else []
-        run = subprocess.run([MFC, "amr_check", case, "--tol", str(spec.tol)] + spec.extra_args + run_args, capture_output=True, text=True, check=False)
+        # the arguments after the test command's "--" (e.g. -c <computer>) reach the inner runs, as for every other test, behind the
+        # case's own run arguments (a second "--" would hide them)
+        extra = spec.extra_args + ([] if "--" in spec.extra_args or not ARG("--") else ["--"]) + list(ARG("--") or [])
+        run = subprocess.run([MFC, "amr_check", case, "--tol", str(spec.tol)] + extra, capture_output=True, text=True, check=False)
     return run.returncode == 0, run.stdout[-3000:] + run.stderr[-1000:]
 
 

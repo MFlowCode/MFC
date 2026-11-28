@@ -5187,6 +5187,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_surface_wrt": "T"},
         )
     )
+    # The same wall inside a static AMR block (extrapolated inflow: AMR does not take the characteristic one), the body centred so
+    # the block stays buff_size = 10 cells inside the domain
+    react_amr = {"amr": "T", "amr_regrid_int": 0, "patch_ib(1)%x_centroid": 7.0e-3, **{f"amr_block_{e}({d})": v for d in (1, 2) for e, v in (("beg", 17), ("end", 32))}}
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> AMR",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 48, "n": 48, "parallel_io": "F", "t_stop": 1.0e-5, "t_save": 1.0e-5, "bc_x%beg": -3, "bc_x%grcbc_in": "F", **react_amr},
+            override_tol=1e-6,
+        )
+    )
 
     # No registered case for the reacting surface: the ibm_reacting_surface Example is
     # auto-registered from examples/ and covers it, including the species side of the
@@ -6566,6 +6577,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "stl", {"amr_max_grid_size": 32, **stl}))
         spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**chk_ib, **stl})
         cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> stl", spec))
+        # The reacting carbon cylinder of examples/2D_ibm_reacting_surface (1200 K wall, gas reactions) in a closed 4D box, the body
+        # in the block's core: each block solves the surface balance at its own ghost points. Each absent species is seeded at 1e-4
+        # (from N2): amr_check scales a variable by its own largest value, so a trace radical would read its roundoff as O(1).
+        L = 8.0e-3
+        react = {"x_domain%end": L, "y_domain%end": L, "m": 63, "n": 63, "dt": 5.0e-8, "t_step_start": 0, "cfl_adap_dt": "F", "bc_x%grcbc_in": "F"}
+        react.update({f"bc_{d}%{e}": -3 for d in "xy" for e in ("beg", "end")})
+        react.update({f"patch_icpp(1)%{k}": v for k, v in (("x_centroid", L / 2), ("y_centroid", L / 2), ("length_x", L), ("length_y", L))})
+        react.update({"patch_ib(1)%x_centroid": L / 2, "patch_ib(1)%y_centroid": L / 2, "parallel_io": "F", "format": 1, "precision": 2})
+        react.update({f"patch_icpp(1)%Y({k})": 1.0e-4 for k in (1, 3, 7, 8, 9, 10, 11)})
+        react["patch_icpp(1)%Y(6)"] = 0.760557 - 7.0e-4
+        react.update({"amr": "T", "amr_regrid_int": 0, "amr_max_grid_size": 32, **{f"amr_block_{e}({d})": v for d in (1, 2) for e, v in (("beg", 16), ("end", 47))}})
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="examples/2D_ibm_reacting_surface/case.py", expected_order=0.0, tol=1.0e-8, params=react)
+        spec.extra_args = ["--", "-j", "4"]
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> immersed body -> reacting surface", spec))
         # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
         # fine-grid force (the coarse faces under the block are skipped)
         cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))

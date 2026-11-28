@@ -726,14 +726,19 @@ class TestAmrDefaults(unittest.TestCase):
                 self.assertIn("amr", str(ctx.exception))
 
     def test_ib_gates_under_amr(self):
-        """Reacting and lumped surfaces, the thermal layer, ib_surface_wrt and ib_heat_wrt are rejected; STL bodies (static, moving
-        or regridded), an analytic non-box body that regrids and the isothermal wall are allowed."""
+        """The surface energy balance, the lumped wall, the flux wall, the thermal layer, ib_surface_wrt and ib_heat_wrt are rejected;
+        STL bodies (static, moving or regridded), an analytic non-box body that regrids and the isothermal wall, reacting or not, are
+        allowed."""
         ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
         ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1})
         validate_case_constraints(dict(ib), "simulation")
+        react = {"chemistry": "T", "cantera_file": "h2o2.yaml", "surface_cantera_file": "s.yaml", "surface_phase": "surf", "patch_ib(1)%surface_reaction": 1}
+        react.update({"patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0})
+        validate_case_constraints({**ib, **react}, "simulation")
         rejected = [
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0, "patch_ib(1)%thermal_layer": 1.0e-3}, "thermal_layer"),
-            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%surface_reaction": 1}, "no surface_reaction"),
+            ({**react, "patch_ib(1)%thermal_bc": 2}, "no thermal_bc = 2 or 3"),
+            ({**react, "ib_flux_wall": "T"}, "ib_flux_wall is not supported with amr (#2230)"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_surface_wrt": "T"}, "ib_surface_wrt"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_heat_wrt": "T"}, "ib_heat_wrt (not yet validated)"),
             ({"patch_ib(1)%thermal_bc": 3, "patch_ib(1)%Twall": 600.0, "patch_ib(1)%rho_solid": 2000.0, "patch_ib(1)%cp_solid": 700.0}, "no thermal_bc = 2 or 3"),
