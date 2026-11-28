@@ -168,6 +168,19 @@ _CONS_FILE = re.compile(r"D/cons\.(\d+)\.(\d+)\.(\d+)\.dat")
 _CLEANUP_REPORT = re.compile(r"Species cleanup at step (\d+)(?:, AMR level \d+)?: (\d+) cell cleanings, sum \|d rho\| =\s*(\S+)")
 
 
+_SURFACE_SOLVE_REPORT = re.compile(r"Immersed-boundary surface chemistry: .*")
+
+
+def _assert_surface_energy_solve(case: TestCase, stdout: str):
+    """A thermal_bc = 2 surface whose energy balance has a root must solve at every ghost point: the run-end report of
+    non-converged or ill-posed (zero-distance) surface solves, which fall back to an inert wall, fails the case."""
+    if not any(key.endswith("%thermal_bc") and int(val) == 2 for key, val in case.params.items()):
+        return
+    report = _SURFACE_SOLVE_REPORT.search(stdout)
+    if report:
+        raise MFCException(f"thermal_bc = 2 surface solve fell back to an inert wall: {report.group(0)}")
+
+
 def _assert_species_bounds(case: TestCase, pack, stdout: str, single: bool = False):
     """With chemistry, saved mass fractions lie in [0, 1] and the fallback clean-up (m_species_bounds) stays at roundoff scale.
 
@@ -923,6 +936,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                 )
 
             _assert_species_bounds(case, pack, cmd.stdout, ARG("single"))
+            _assert_surface_energy_solve(case, cmd.stdout)
 
             golden_filepath = os.path.join(case.get_dirpath(), "golden.txt")
             if ARG("generate"):
