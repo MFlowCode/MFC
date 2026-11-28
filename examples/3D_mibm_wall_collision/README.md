@@ -36,6 +36,21 @@ Error in e_n against the steps per collision (`--steps-per-collision`):
 | 0.5 | -4.70 % | -2.33 % | -1.16 % |
 | 0.8 | -1.54 % | not run | -0.37 % |
 
+With `--wall-bc -2` the face y = 0 is reflective (a symmetry plane). The sphere then meets its mirror image: the image contact has
+half the effective mass, twice the overlap and twice the closing speed, so the normal force equals the wall's, and the image's
+surface moves with the body's along the face, so there is no friction. Measured on an MI300A (CCE 19, OpenMP offload), same setup:
+
+| Case | slip wall (`-15`) | reflective (`-2`) | expected |
+|---|---|---|---|
+| normal, e = 0.5, 20 steps: e_n | 0.47651 | 0.47651 | 0.5 (same discretisation error) |
+| normal, e = 0.5, 80 steps: e_n | 0.49420 | 0.49420 | 0.5 |
+| normal, e = 0.8, 20 steps: e_n | 0.78767 | 0.78767 | 0.8 |
+| 50 deg, e = 0.98: `vx_out` (slip with mu = 0, reflective with mu = 0.092) | 2.987518 | 2.987518 | 2.98757 (v_t unchanged) |
+
+A sphere of mass 3000 (the gas force now matters) over the reflective face and the same sphere paired with its mirror image in a
+domain twice as tall, with slip walls far away, follow the same path: velocities agree to 1.7e-5 of the impact speed and centroids
+to 2e-9 R.
+
 The restitution error is first order in the steps per collision (it halves at each doubling). At the default 20 steps expect a few
 percent at low e. Its size and sign depend on where in a step the contact begins: an earlier run with the contact beginning on a step
 boundary gave +2.17 % and +0.69 % for e = 0.5 and 0.8 at 20 steps. The test registration therefore starts the contact half a step into
@@ -46,8 +61,8 @@ a step, which keeps the contact timing the same on every compiler.
     ./mfc.sh run examples/3D_mibm_wall_collision/case.py -t pre_process simulation -n 1 --gpu mp
     python3 examples/3D_mibm_wall_collision/check_collision.py examples/3D_mibm_wall_collision
 
-`case.py` takes `--angle`, `--e`, `--mu`, `--speed`, `--cells`, `--steps-per-collision`, `--lead-steps` and `--weno_order`. The suite registers
-the normal impact and the 50 degree sliding impact as `3D -> IBM -> Wall Collision -> ...`. The sticking case is not a golden: where
+`case.py` takes `--angle`, `--e`, `--mu`, `--wall-bc`, `--speed`, `--cells`, `--steps-per-collision`, `--lead-steps` and `--weno_order`. The suite registers
+the normal impact, the 50 degree sliding impact and the 50 degree impact on a reflective face as `3D -> IBM -> Wall Collision -> ...`. The sticking case is not a golden: where
 the contact point stops sliding, the friction direction is the sign of a velocity that goes to zero, so the rebound depends on round-off.
 The tests are skipped in the single-precision lane, where one-step shifts of the contact onset flip the rebound.
 
