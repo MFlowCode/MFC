@@ -252,4 +252,5 @@ comparable (forces on coarse faces only).
   the initial regrid and fills the blocks from the patches.
   The overlay carries density, pressure, velocity and volume fractions only; probes and derived post_process fields read
   level 0, `run_time_info` reads the level-0 state but scales its CFL numbers to the finest level covering each cell
-  (its Mie-Gruneisen compression check also reads the fine blocks), and `sim_data` is rejected.
+  (its Mie-Gruneisen compression check also reads the fine blocks), and `sim_data` reads level 0 (its volume and total energy sums
+  equal the composite ones, since the restriction conserves them; its kinetic and internal energies are level-0 approximations).

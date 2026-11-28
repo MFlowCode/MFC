@@ -3455,8 +3455,6 @@ class CaseValidator:
         self.prohibit(self.get("p", 0) == 0, "sim_data requires p > 0 (3D)")
         self.prohibit(self.get("num_fluids") != 2, "sim_data requires num_fluids = 2")
         self.prohibit(self.get("model_eqns") not in [2, 3], "sim_data requires model_eqns = 2 or 3")
-        # Both writers read the coarse grid only: the energies and the interface come from restricted cell averages
-        self.prohibit(self.get("amr", "F") == "T", "sim_data is not supported with amr")
 
     def check_no_flow_variables(self):
         """Checks that at least one flow variable is selected (post-process)"""
