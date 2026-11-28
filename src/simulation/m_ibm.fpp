@@ -99,6 +99,12 @@ module m_ibm
     !! the counter above because this is a grid/geometry degeneracy, not a kinetics failure.
     integer :: n_surface_ill_posed = 0
 
+    !> Device tallies of one s_ibm_correct_state call: (1) not converged, (2) ill posed. Counted with atomics, not in the
+    !! ghost-point kernel's reduction clause: on Cray OpenMP offload that reduction came back corrupted (millions of counts from
+    !! ~1e3 updates) whenever a thermal_bc = 2 surface solve ran in the kernel.
+    integer, dimension(2) :: ib_surf_fail
+    $:GPU_DECLARE(create='[ib_surf_fail]')
+
     !> Quadratic wall-normal fill of one ghost point (ib_wall_order = 2): TSC stencils of two probes along the surface normal and
     !! the Lagrange weights that carry the profile through them back to the ghost (see s_wall_fill).
     type :: wall_fill
@@ -662,7 +668,6 @@ contains
         real(wp) :: h_IP, dh_ccst, p_ratio  !< Enthalpy at the image point, its excess over the slip ghost, (p_GP + B)/(p_IP + B)
         logical :: use_ccst  !< ib_slip_ccst applies to this ghost point
         logical :: surface_converged
-        integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
         real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
@@ -705,8 +710,8 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        n_not_converged = 0
-        n_ill_posed = 0
+        ib_surf_fail = 0
+        $:GPU_UPDATE(device='[ib_surf_fail]')
         nf1 = 0; nf2 = 0; nf3 = 0
 
         if (num_gps > 0) then
@@ -725,8 +730,7 @@ contains
                                 & gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, W_species, T_IP, &
                                 & mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, T_adv, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, d, &
                                 & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, h_w, e_s, nrm_l, wf, &
-                                & h_IP, dh_ccst, p_ratio, use_ccst]', reduction='[[n_not_converged, n_ill_posed, nf1, nf2, &
-                                & nf3]]', reductionOp='[+]', present='[ghost_points]')
+                                & h_IP, dh_ccst, p_ratio, use_ccst]', reduction='[[nf1, nf2, nf3]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 if (record_surface) then
                     $:GPU_LOOP(parallelism='[seq]')
@@ -800,9 +804,13 @@ contains
                             call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, merge(1, &
                                                  & patch_ib(patch_id)%thermal_bc, f_holds_twall(patch_ib(patch_id)%thermal_bc)), &
                                                  & Ys_s, T_s, mdot_s, surface_converged)
-                            if (.not. surface_converged) n_not_converged = n_not_converged + 1
+                            if (.not. surface_converged) then
+                                $:GPU_ATOMIC(atomic='update')
+                                ib_surf_fail(1) = ib_surf_fail(1) + 1
+                            end if
                         else
-                            n_ill_posed = n_ill_posed + 1
+                            $:GPU_ATOMIC(atomic='update')
+                            ib_surf_fail(2) = ib_surf_fail(2) + 1
                         end if
 
                         if (surface_converged) then
@@ -1137,8 +1145,9 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        n_surface_not_converged = n_surface_not_converged + n_not_converged
-        n_surface_ill_posed = n_surface_ill_posed + n_ill_posed
+        $:GPU_UPDATE(host='[ib_surf_fail]')
+        n_surface_not_converged = n_surface_not_converged + ib_surf_fail(1)
+        n_surface_ill_posed = n_surface_ill_posed + ib_surf_fail(2)
         n_fill_tier(:,lvl) = n_fill_tier(:,lvl) + [nf1, nf2, nf3]
 
     end subroutine s_ibm_correct_state
