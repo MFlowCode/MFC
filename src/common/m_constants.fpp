@@ -43,13 +43,13 @@ module m_constants
     !> Immersed-boundary geometry ids (patch_ib%geometry). They differ from the patch_icpp ids (e.g. 4 is the airfoil here and the
     !! swept line there).
     integer, parameter :: ib_circle = 2, ib_rectangle = 3, ib_airfoil_2d = 4, ib_model_2d = 5, ib_ellipse = 6
-    integer, parameter :: ib_sphere = 8, ib_cuboid = 9, ib_cylinder = 10, ib_airfoil_3d = 11, ib_model_3d = 12
+    integer, parameter :: ib_sphere = 8, ib_cuboid = 9, ib_cylinder = 10, ib_airfoil_3d = 11, ib_model_3d = 12, ib_ellipsoid = 13
     !> Initial-condition patch geometry ids (patch_icpp%geometry)
     integer, parameter :: icpp_line_segment = 1, icpp_circle = 2, icpp_rectangle = 3, icpp_sweep_line = 4, icpp_ellipse = 5
     integer, parameter :: icpp_isentropic_vortex = 6  !< retired
     integer, parameter :: icpp_sphere = 8, icpp_cuboid = 9, icpp_cylinder = 10, icpp_sweep_plane = 11, icpp_ellipsoid = 12
     integer, parameter :: icpp_2d_modal = 13, icpp_spherical_harmonic = 14, icpp_bubble_pulse = 16, icpp_spiral = 17
-    integer, parameter :: icpp_varcircle = 18, icpp_3d_varcircle = 19, icpp_taylor_green = 20, icpp_model = 21
+    integer, parameter :: icpp_varcircle = 18, icpp_3d_varcircle = 19, icpp_taylor_green = 20, icpp_model = 21, icpp_airfoil = 22
     integer, parameter :: icpp_retired(3) = [icpp_isentropic_vortex, 7, 15]
     !> Geometries whose boundary can be smoothed (smoothen)
     integer, parameter :: icpp_smoothable(11) = [icpp_circle, icpp_rectangle, icpp_sweep_line, icpp_ellipse, icpp_sphere, &

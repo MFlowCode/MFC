@@ -18,7 +18,8 @@ module m_patch_geometries
 
     implicit none
 
-    public :: f_is_inside_sphere, f_is_inside_cylinder, f_is_inside_cuboid, f_is_inside_airfoil, f_is_inside_ellipse
+    public :: f_is_inside_sphere, f_is_inside_cylinder, f_is_inside_cuboid, f_is_inside_airfoil, f_is_inside_ellipse, &
+        & f_is_inside_ellipsoid, s_build_airfoil_grid
 
 contains
 
@@ -124,5 +125,90 @@ contains
         is_inside = (x/(0.5_wp*length(1)))**2 + (y/(0.5_wp*length(2)))**2 <= 1._wp
 
     end function f_is_inside_ellipse
+
+    !> Check if x, y, z lie inside the ellipsoid with full axis lengths length(1:3)
+    function f_is_inside_ellipsoid(x, y, z, length) result(is_inside)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)               :: x, y, z
+        real(wp), dimension(3), intent(in) :: length
+        logical                            :: is_inside
+
+        is_inside = (x/(0.5_wp*length(1)))**2 + (y/(0.5_wp*length(2)))**2 + (z/(0.5_wp*length(3)))**2 <= 1._wp
+
+    end function f_is_inside_ellipsoid
+
+    !> Build the NACA surface segments of ib_airfoil(airfoil_id) once, with 20 surface points per min_grid_spacing (the same on
+    !! every rank). Shared by airfoil IB patches and airfoil initial-condition patches.
+    subroutine s_build_airfoil_grid(airfoil_id, min_grid_spacing)
+
+        integer, intent(in)  :: airfoil_id
+        real(wp), intent(in) :: min_grid_spacing
+        integer              :: j, Np
+        real(wp)             :: ca_in, pa, ma, ta
+        real(wp)             :: xa, yc, dycdxc, yt, xu, yu, xl, yl, sin_c, cos_c
+        real(wp)             :: edge(1:2)  !< segment vector from vertex 1 to vertex 2
+
+        ca_in = ib_airfoil(airfoil_id)%c
+        pa = ib_airfoil(airfoil_id)%p
+        ma = ib_airfoil(airfoil_id)%m
+        ta = ib_airfoil(airfoil_id)%t
+
+        Np = int(10._wp*ca_in/min_grid_spacing) + 1  ! 20 surface points per smallest cell
+        ib_airfoil_grids(airfoil_id)%Np = Np
+        $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%Np]')
+
+        if (.not. allocated(ib_airfoil_grids(airfoil_id)%upper)) then
+            @:ALLOCATE(ib_airfoil_grids(airfoil_id)%upper(1:Np - 1, 1:3, 1:2))
+            @:ALLOCATE(ib_airfoil_grids(airfoil_id)%lower(1:Np - 1, 1:3, 1:2))
+
+            ! segments run from the leading edge to the trailing edge
+            ib_airfoil_grids(airfoil_id)%upper(1, 1,:) = 0._wp
+            ib_airfoil_grids(airfoil_id)%lower(1, 1,:) = 0._wp
+
+            do j = 1, Np - 2
+                ! cosine spacing clusters points at the leading and trailing edges, Katz & Plotkin (2001)
+                ! "Low-Speed Aerodynamics", 2nd ed., Cambridge University Press
+                xa = 0.5_wp*(1._wp - cos(pi*real(j, wp)/real(Np - 1, wp)))
+                if (xa <= pa) then
+                    yc = (ma/pa**2)*(2*pa*xa - xa**2)
+                    dycdxc = (2*ma/pa**2)*(pa - xa)
+                else
+                    yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
+                    dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
+                end if
+
+                yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
+                sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
+                cos_c = 1/(1 + dycdxc**2)**0.5_wp
+
+                xu = (xa - yt*sin_c)*ca_in
+                yu = (yc + yt*cos_c)*ca_in
+                xl = (xa + yt*sin_c)*ca_in
+                yl = (yc - yt*cos_c)*ca_in
+
+                ! each surface point ends segment j and starts segment j + 1
+                ib_airfoil_grids(airfoil_id)%upper(j, 2,:) = [xu, yu]
+                ib_airfoil_grids(airfoil_id)%upper(j + 1, 1,:) = [xu, yu]
+                ib_airfoil_grids(airfoil_id)%lower(j, 2,:) = [xl, yl]
+                ib_airfoil_grids(airfoil_id)%lower(j + 1, 1,:) = [xl, yl]
+            end do
+
+            ib_airfoil_grids(airfoil_id)%upper(Np - 1, 2,:) = [ca_in, 0._wp]
+            ib_airfoil_grids(airfoil_id)%lower(Np - 1, 2,:) = [ca_in, 0._wp]
+
+            ! outward unit normals: left of the edge on the upper surface, right of it on the lower
+            do j = 1, Np - 1
+                edge = ib_airfoil_grids(airfoil_id)%upper(j, 2,:) - ib_airfoil_grids(airfoil_id)%upper(j, 1,:)
+                ib_airfoil_grids(airfoil_id)%upper(j, 3,:) = [-edge(2), edge(1)]/norm2(edge)
+                edge = ib_airfoil_grids(airfoil_id)%lower(j, 2,:) - ib_airfoil_grids(airfoil_id)%lower(j, 1,:)
+                ib_airfoil_grids(airfoil_id)%lower(j, 3,:) = [edge(2), -edge(1)]/norm2(edge)
+            end do
+
+            $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%upper, ib_airfoil_grids(airfoil_id)%lower]')
+        end if
+
+    end subroutine s_build_airfoil_grid
 
 end module m_patch_geometries

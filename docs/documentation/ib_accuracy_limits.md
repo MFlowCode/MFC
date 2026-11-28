@@ -3,7 +3,7 @@
 # Accuracy limits of the ghost-cell immersed boundary
 
 **Status:** open discrepancy (every item below is a limitation by construction; none is a bug report). **Code:** `master` at 0cdfdf02a.
-**Last update:** 2026-11-22. Its examples are `examples/2D_ibm_conduction_annulus` (wall temperature, image-point weights) and `examples/2D_ibm_taylor_couette` (wall velocity, torque and wall shear, `ib_wall_order`); both are registered tests, and their READMEs hold the `master` tables.
+**Last update:** 2026-11-27. The wall-temperature rows reproduce with `examples/2D_ibm_accuracy_limits` (`order_study.py`, re-measured on `master` after #2486, same orders). Its examples are `examples/2D_ibm_conduction_annulus` (wall temperature, image-point weights) and `examples/2D_ibm_taylor_couette` (wall velocity, torque and wall shear, `ib_wall_order`); both are registered tests, and their READMEs hold the `master` tables.
 
 ## Purpose
 
@@ -76,6 +76,12 @@ The options are described in @ref ibm "the immersed-boundary overview". Resoluti
 - Thermal runs used quiescent moist air with mixture-averaged transport and an exact Kirchhoff solution; velocity and temperature were never coupled in these measurements.
 
 ## Reproduce
+
+The two wall-temperature rows, with the page check, in one command (about 9 minutes on one GPU):
+
+```
+python3 examples/2D_ibm_accuracy_limits/order_study.py -- -n 1 --gpu mp
+```
 
 No script is shipped for the pre-merge tables: they came from analysis tools tied to run directories of a development build. The `master` rows reproduce with
 

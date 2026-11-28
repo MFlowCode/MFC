@@ -122,6 +122,12 @@ contains
                                             if (f_is_inside_airfoil(xyz_local(1), xyz_local(2), xyz_local(3), &
                                                 & patch_ib(patch_id)%length_z, airfoil_id)) ib_markers%sf(i, j, &
                                                 & k) = f_ib_marker(ib_markers%sf(i, j, k), encoded_patch_id)
+                                        else if (patch_ib(patch_id)%geometry == ib_ellipsoid) then
+                                            length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, &
+                                                               & patch_ib(patch_id)%length_z]
+                                            if (f_is_inside_ellipsoid(xyz_local(1), xyz_local(2), xyz_local(3), &
+                                                & length)) ib_markers%sf(i, j, k) = f_ib_marker(ib_markers%sf(i, j, k), &
+                                                & encoded_patch_id)
                                         else if (patch_ib(patch_id)%geometry == ib_model_3d) then
                                             ! STL model geometry
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
@@ -291,6 +297,13 @@ contains
                                                 $:GPU_ATOMIC(atomic='update')
                                                 ib_markers%sf(i, j, k) = max(ib_markers%sf(i, j, k), encoded_patch_id)
                                             end if
+                                        else if (patch_ib(patch_id)%geometry == ib_ellipsoid) then
+                                            length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, &
+                                                               & patch_ib(patch_id)%length_z]
+                                            if (f_is_inside_ellipsoid(xyz_local(1), xyz_local(2), xyz_local(3), length)) then
+                                                $:GPU_ATOMIC(atomic='update')
+                                                ib_markers%sf(i, j, k) = max(ib_markers%sf(i, j, k), encoded_patch_id)
+                                            end if
                                         else if (patch_ib(patch_id)%geometry == ib_model_3d) then
                                             ! STL model geometry
                                             xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
@@ -443,10 +456,7 @@ contains
     !! and before s_apply_ib_patches or s_apply_levelset.
     subroutine s_initialize_ib_airfoils()
 
-        integer  :: i, j, airfoil_id, Np
-        real(wp) :: ca_in, pa, ma, ta
-        real(wp) :: xa, yc, dycdxc, yt, xu, yu, xl, yl, sin_c, cos_c
-        real(wp) :: edge(1:2)         !< segment vector from vertex 1 to vertex 2
+        integer  :: i, airfoil_id
         real(wp) :: min_grid_spacing  !< smallest cell width across all ranks
 
         if (.not. any(patch_ib(1:num_ibs)%geometry == ib_airfoil_2d .or. patch_ib(1:num_ibs)%geometry == ib_airfoil_3d)) return
@@ -459,64 +469,7 @@ contains
             if (patch_ib(i)%geometry /= ib_airfoil_2d .and. patch_ib(i)%geometry /= ib_airfoil_3d) cycle
 
             airfoil_id = patch_ib(i)%airfoil_id
-            ca_in = ib_airfoil(airfoil_id)%c
-            pa = ib_airfoil(airfoil_id)%p
-            ma = ib_airfoil(airfoil_id)%m
-            ta = ib_airfoil(airfoil_id)%t
-
-            Np = int(10._wp*ca_in/min_grid_spacing) + 1  ! 20 surface points per smallest cell
-            ib_airfoil_grids(airfoil_id)%Np = Np
-            $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%Np]')
-
-            if (.not. allocated(ib_airfoil_grids(airfoil_id)%upper)) then
-                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%upper(1:Np - 1, 1:3, 1:2))
-                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%lower(1:Np - 1, 1:3, 1:2))
-
-                ! segments run from the leading edge to the trailing edge
-                ib_airfoil_grids(airfoil_id)%upper(1, 1,:) = 0._wp
-                ib_airfoil_grids(airfoil_id)%lower(1, 1,:) = 0._wp
-
-                do j = 1, Np - 2
-                    ! cosine spacing clusters points at the leading and trailing edges, Katz & Plotkin (2001)
-                    ! "Low-Speed Aerodynamics", 2nd ed., Cambridge University Press
-                    xa = 0.5_wp*(1._wp - cos(pi*real(j, wp)/real(Np - 1, wp)))
-                    if (xa <= pa) then
-                        yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                        dycdxc = (2*ma/pa**2)*(pa - xa)
-                    else
-                        yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                        dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
-                    end if
-
-                    yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
-                    sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
-                    cos_c = 1/(1 + dycdxc**2)**0.5_wp
-
-                    xu = (xa - yt*sin_c)*ca_in
-                    yu = (yc + yt*cos_c)*ca_in
-                    xl = (xa + yt*sin_c)*ca_in
-                    yl = (yc - yt*cos_c)*ca_in
-
-                    ! each surface point ends segment j and starts segment j + 1
-                    ib_airfoil_grids(airfoil_id)%upper(j, 2,:) = [xu, yu]
-                    ib_airfoil_grids(airfoil_id)%upper(j + 1, 1,:) = [xu, yu]
-                    ib_airfoil_grids(airfoil_id)%lower(j, 2,:) = [xl, yl]
-                    ib_airfoil_grids(airfoil_id)%lower(j + 1, 1,:) = [xl, yl]
-                end do
-
-                ib_airfoil_grids(airfoil_id)%upper(Np - 1, 2,:) = [ca_in, 0._wp]
-                ib_airfoil_grids(airfoil_id)%lower(Np - 1, 2,:) = [ca_in, 0._wp]
-
-                ! outward unit normals: left of the edge on the upper surface, right of it on the lower
-                do j = 1, Np - 1
-                    edge = ib_airfoil_grids(airfoil_id)%upper(j, 2,:) - ib_airfoil_grids(airfoil_id)%upper(j, 1,:)
-                    ib_airfoil_grids(airfoil_id)%upper(j, 3,:) = [-edge(2), edge(1)]/norm2(edge)
-                    edge = ib_airfoil_grids(airfoil_id)%lower(j, 2,:) - ib_airfoil_grids(airfoil_id)%lower(j, 1,:)
-                    ib_airfoil_grids(airfoil_id)%lower(j, 3,:) = [edge(2), -edge(1)]/norm2(edge)
-                end do
-
-                $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%upper, ib_airfoil_grids(airfoil_id)%lower]')
-            end if
+            call s_build_airfoil_grid(airfoil_id, min_grid_spacing)
 
             $:GPU_UPDATE(device='[ib_airfoil(airfoil_id)]')
         end do
@@ -597,6 +550,8 @@ contains
         else if (patch%geometry == ib_ellipse) then
             ! ellipse geometry
             bound = 0.5_wp*max(patch%length_x, patch%length_y)
+        else if (patch%geometry == ib_ellipsoid) then
+            bound = 0.5_wp*max(patch%length_x, patch%length_y, patch%length_z)
         else if (patch%geometry == ib_cuboid) then
             ! cuboid geometries
             bound = 0.5_wp*sqrt(patch%length_x**2 + patch%length_y**2 + patch%length_z**2)

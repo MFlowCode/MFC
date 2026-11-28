@@ -1116,6 +1116,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
+    def alter_icpp_airfoil():
+        # NACA airfoil initial-condition patch (geometry 22) laid over the three base patches; its leading edge is off the cell
+        # centres and its camber breaks the mirror symmetry about the chord
+        airfoil = {"num_patches": 4, "patch_icpp(4)%geometry": 22, "patch_icpp(4)%airfoil_id": 1, "patch_icpp(4)%x_centroid": 0.2137}
+        airfoil.update({"patch_icpp(4)%y_centroid": 0.4912, "patch_icpp(4)%pres": 0.8, "patch_icpp(4)%alpha_rho(1)": 0.3, "patch_icpp(4)%alpha(1)": 1.0})
+        airfoil.update({"patch_icpp(4)%vel(1)": 0.05, "patch_icpp(4)%vel(2)": 0.0})
+        airfoil.update({"ib_airfoil(1)%c": 0.6, "ib_airfoil(1)%t": 0.15, "ib_airfoil(1)%p": 0.4, "ib_airfoil(1)%m": 0.02})
+        airfoil.update({f"patch_icpp(4)%alter_patch({i})": "T" for i in (1, 2, 3)})
+        cases.append(define_case_d(stack, "ICPP Airfoil", airfoil))
+
     def alter_3d():
         stack.push(
             "Cylindrical",
@@ -1426,6 +1436,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             },
                         )
                     )
+
+            if not slip and not viscous and num_fluids == 1 and len(dimInfo[0]) == 3:
+                # Ellipsoid (geometry 13): unequal axes, tilted about all three axes, centroid off the grid's symmetry planes
+                ellipsoid = {"patch_ib(1)%geometry": 13, "patch_ib(1)%x_centroid": 0.4987, "patch_ib(1)%y_centroid": 0.5031, "patch_ib(1)%z_centroid": 0.5012}
+                ellipsoid.update({"patch_ib(1)%length_x": 0.26, "patch_ib(1)%length_y": 0.18, "patch_ib(1)%length_z": 0.14})
+                ellipsoid.update({"patch_ib(1)%angles(1)": 0.31, "patch_ib(1)%angles(2)": -0.22, "patch_ib(1)%angles(3)": 0.47})
+                cases.append(define_case_d(stack, "Ellipsoid", ellipsoid))
 
             if not slip and not viscous and num_fluids == 1 and len(dimInfo[0]) >= 2:
                 # The default TSC image points read ghost cells, which the inverse-distance weights (ib_ip_interp = 1, the opt-out)
@@ -4037,6 +4054,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()
+                alter_icpp_airfoil()
             if len(dimInfo[0]) == 3:
                 alter_3d()
             alter_lag_bubbles(dimInfo)
@@ -4254,6 +4272,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_plane_poiseuille",
                 # Registered below at 12 cells per radius: at the 25-cell cap the gap holds about 4 cells
                 "2D_ibm_conduction_annulus",
+                # The annulus deck again, for its order study (order_study.py); the annulus registration covers it
+                "2D_ibm_accuracy_limits",
                 # Registered below at 16 cells per diameter, where the body is resolved
                 "2D_ibm_cylinder_drag_nu",
                 # Registered below at their own sizes: the 25-cell cap would leave the bodies unresolved (12 cylinders need about 96 cells)
