@@ -35,7 +35,7 @@ module m_time_steppers
     use m_stage_hooks, only: s_stage_hooks_pre_ib, s_stage_hooks_post_ib
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
-    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_burn_fine
+    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_split_fine
     use m_amr_advance, only: s_amr_fine_stage_ib
     use m_amr_registers, only: s_amr_set_rk_table
 
@@ -650,29 +650,18 @@ contains
             end if
         end do
 
-        ! Operator-split reaction: integrate the stiff chemistry ODE per cell after the flow update,
-        ! with sub-stepping, instead of adding the reaction source to the flow RHS (chem_params%reaction_substeps > 0).
-        if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0) then
-            call nvtxStartRange("CHEM-REACTION-SUBSTEP")
-            call s_chemistry_reaction_substep(q_cons_ts(1)%vf, q_T_sf, dt, idwint)
-            call nvtxEndRange
-        end if
-
+        if (.not. amr_sub_on) call s_split_sources()
         if (chemistry) call s_report_species_cleanup(t_step)
         call s_report_chem_stiffness(t_step)
 
-        ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
-        ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
-        if (reactive_burn .and. rburn%substeps > 0) then
-            call nvtxStartRange("BURN-SUBSTEP")
-            call s_reactive_burn_substep(q_cons_ts(1)%vf, dt, idwint)
-            call nvtxEndRange
+        if (amr_sub_on) then
+            call s_amr_subcycle_fine(q_cons_ts(1)%vf, q_cons_ts(stor)%vf, rk_coef, q_T_sf, bc_type, pb_ts(1)%sf, rhs_pb, &
+                                     & mv_ts(1)%sf, rhs_mv, t_step)
+            ! after the substeps: their coarse ghosts blend the step-start and end states of the flow update alone
+            call s_split_sources()
         end if
-
-        if (amr_sub_on) call s_amr_subcycle_fine(q_cons_ts(1)%vf, q_cons_ts(stor)%vf, rk_coef, q_T_sf, bc_type, pb_ts(1)%sf, &
-            & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
         amr_sub_on = .false.
-        if (amr .and. reactive_burn .and. rburn%substeps > 0) call s_amr_burn_fine()
+        if (amr) call s_amr_split_fine(q_T_sf)
         if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
 
         if (ib) then
@@ -702,6 +691,24 @@ contains
         end if
 
     end subroutine s_tvd_rk
+
+    !> Operator splits on the coarse grid after the flow update, over the full step (the fine blocks' are in s_amr_split_fine): the
+    !! stiff chemistry ODE (chem_params%reaction_substeps > 0) and the condensed-phase burn (rburn%substeps > 0), each per cell with
+    !! sub-stepping instead of a source in the flow RHS.
+    impure subroutine s_split_sources()
+
+        if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0) then
+            call nvtxStartRange("CHEM-REACTION-SUBSTEP")
+            call s_chemistry_reaction_substep(q_cons_ts(1)%vf, q_T_sf, dt, idwint)
+            call nvtxEndRange
+        end if
+        if (reactive_burn .and. rburn%substeps > 0) then
+            call nvtxStartRange("BURN-SUBSTEP")
+            call s_reactive_burn_substep(q_cons_ts(1)%vf, dt, idwint)
+            call nvtxEndRange
+        end if
+
+    end subroutine s_split_sources
 
     !> Seconds between two system_clock counts, correcting for the counter wrapping past cmax.
     pure function f_clock_seconds(t0, t1, rate, cmax) result(sec)

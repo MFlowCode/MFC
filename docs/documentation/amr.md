@@ -12,7 +12,8 @@ their own grids, nested up to `amr_max_level` levels at `amr_ref_ratio`:1 per le
 
 With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the density gradient exceeds `amr_tag_eps`:
 once per level before the first step of a fresh run, so they start on the initial features, and then every
-`amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`.
+`amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`; with `amr_max_level > 1` each
+deeper level adds one block, inset by a quarter of its parent's extent (at least the stencil margin) on each side.
 
 On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
 that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
@@ -100,12 +101,13 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | Feature | Status |
 | :--- | :--- |
 | Single- and multi-fluid Euler, 6-equation model | Supported |
-| Viscous, hypoelastic (with continuum damage), body forces | Supported |
-| Chemistry (reactions, diffusion) | Lock-step only; no reaction substepping |
-| Immersed boundaries (fixed, prescribed or force-driven motion; not STL, `thermal_bc`, `surface_reaction`, `ib_surface_wrt`, `ib_heat_wrt`, `ib_mass_relax` or `ib_uncover_fill`) | Supported; blocks always contain each body; moving bodies are lock-step only; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`); the default `ib_mass_relax = -1` resolves to off, so a moving body differs from a uniform-grid run, where it is on |
+| Viscous, Fourier heat conduction (`k_therm`), hypoelastic (with continuum damage), body forces | Supported |
+| Chemistry (reactions, diffusion) | Supported; with `chem_params%%reaction_substeps > 0` each block takes the split reaction at the end of the step, before the fold |
+| Immersed boundaries (fixed, prescribed or force-driven motion; STL on static blocks only; not `surface_reaction`, `thermal_bc` other than the isothermal wall without chemistry, `ib_surface_wrt`, `ib_heat_wrt`, `ib_mass_relax` or `ib_uncover_fill`) | Supported; blocks always contain each body; moving bodies are lock-step only, and with `amr_max_level > 1` need `amr_regrid_int > 0`; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`); the default `ib_mass_relax = -1` resolves to off, so a moving body differs from a uniform-grid run, where it is on |
 | Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
+| Mean pressure gradient and bulk-flux / bulk-temperature controllers (`mean_dpdx`, `mean_mflux`, `mean_qdot`, `mean_temp`) | Supported without `ib` and `mean_temp_wall`; the controllers measure level 0 after the fold (exact for the mass flux, second order for the temperature) and apply one uniform source on every level |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
 | Synthetic turbulence forcing | Supported; evaluated on each block's own grid |
@@ -135,7 +137,7 @@ Full descriptions: @ref case.
 | `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition (and, on several ranks, tiles regrid boxes smaller, not below 16, until there is one per rank) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
-| `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: one level only) |
+| `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: no subcycling or quartic) |
 | `amr_subcycle` | F | Subcycle refined levels in time (ratio 2, up to two levels) |
 | `amr_prolong` | 1 | 1: limited linear, 2: quartic (ratio 2) |
 | `amr_place_owner` | F | Owner-aware block placement |

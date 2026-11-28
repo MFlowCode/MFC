@@ -116,9 +116,14 @@ module m_ibm
 
     !> Body markers in the fine-advance frame, read by s_compute_rhs's body-cell RHS zeroing while amr_in_fine_advance: the advanced
     !! block's fine markers (for a batch, every member's at its slab offset), loaded by s_ibm_load_fine_markers before each fine RHS
-    !! pass. ib_markers holds the coarse markers during a fine RHS. Interior-only, sized to the allocation extents.
+    !! pass. ib_markers holds the coarse markers during a fine RHS. Sized to the allocation extents plus one zeroed layer, which the
+    !! face loops read (bodies sit inside their blocks).
     type(integer_field), public :: ib_markers_fine
     $:GPU_DECLARE(create='[ib_markers_fine]')
+
+    !> Layout of the last s_ibm_load_fine_markers (member slots, stacking dimension and stride), for the fine conduction temperature
+    integer              :: fine_lay_nb = 0, fine_lay_sd = 1, fine_lay_w = 0
+    integer, allocatable :: fine_lay_slots(:)
 
     !> 1 at ghost points whose image point reaches the fluid, 2 at those with a buried image point, 0 elsewhere. The latter average
     !! over the former, and never over each other.
@@ -242,7 +247,7 @@ contains
             @:ALLOCATE(ib_markers%sf(mkr_lo(1):mkr_hi(1), mkr_lo(2):mkr_hi(2), mkr_lo(3):mkr_hi(3)))
             ! corrected_gps spans the same bounds
             @:ALLOCATE(corrected_gps%sf(mkr_lo(1):mkr_hi(1), mkr_lo(2):mkr_hi(2), mkr_lo(3):mkr_hi(3)))
-            @:ALLOCATE(ib_markers_fine%sf(0:m_alloc, 0:n_alloc, 0:p_alloc))
+            @:ALLOCATE(ib_markers_fine%sf(-1:m_alloc + 1, -min(n, 1):n_alloc + min(n, 1), -min(p, 1):p_alloc + min(p, 1)))
             @:ACC_SETUP_SFs(ib_markers_fine)
             ib_markers_fine%sf = 0
             $:GPU_UPDATE(device='[ib_markers_fine%sf]')
@@ -1566,6 +1571,10 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         integer                           :: i
 
+        if (amr_in_fine_advance) then
+            call s_ibm_fine_conduction_temperature(q_T_sf, .true.)
+            return
+        end if
         if (num_gps == 0) return
         $:GPU_PARALLEL_LOOP(private='[i]', present='[ghost_points]')
         do i = 1, num_gps
@@ -1585,6 +1594,10 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         integer                           :: i
 
+        if (amr_in_fine_advance) then
+            call s_ibm_fine_conduction_temperature(q_T_sf, .false.)
+            return
+        end if
         if (num_gps == 0) return
         $:GPU_PARALLEL_LOOP(private='[i]', present='[ghost_points]')
         do i = 1, num_gps
@@ -1595,6 +1608,40 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_ibm_restore_conduction_temperature
+
+    !> The set (set = T) or restore of the conduction temperature on an AMR fine frame: the coarse ghost list stays active there, so
+    !! each member block's own parked ghosts (gp_park) are used, at its slab offset from s_ibm_load_fine_markers.
+    impure subroutine s_ibm_fine_conduction_temperature(q_T_sf, set)
+
+        type(scalar_field), intent(inout) :: q_T_sf
+        logical, intent(in)               :: set
+        integer                           :: ibm, a, n_f, o(3), o1, o2, o3, j, k, l
+        integer(kind=8)                   :: off
+
+        do ibm = 1, fine_lay_nb
+            n_f = ib_fine(fine_lay_slots(ibm))%num_gps
+            if (n_f == 0) cycle
+            off = ib_fine(fine_lay_slots(ibm))%off
+            o = 0; o(fine_lay_sd) = (ibm - 1)*fine_lay_w
+            o1 = o(1); o2 = o(2); o3 = o(3)
+            $:GPU_PARALLEL_LOOP(private='[a, j, k, l]', firstprivate='[n_f, off, o1, o2, o3, set]')
+            do a = 1, n_f
+                if (gp_park(off + a)%T_cond > T_cond_unset) then
+                    j = gp_park(off + a)%loc(1) + o1
+                    k = gp_park(off + a)%loc(2) + o2
+                    l = gp_park(off + a)%loc(3) + o3
+                    if (set) then
+                        gp_park(off + a)%T_save = q_T_sf%sf(j, k, l)
+                        q_T_sf%sf(j, k, l) = gp_park(off + a)%T_cond
+                    else
+                        q_T_sf%sf(j, k, l) = gp_park(off + a)%T_save
+                    end if
+                end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end do
+
+    end subroutine s_ibm_fine_conduction_temperature
 
     !> Pack every ghost's global cell index (i, j, k) and T_cond into gp_tc_rec(1:4, 1:num_gps) on the device and bring only those
     !! four reals per ghost to the host, instead of the whole ghost_point (about 380 B).
@@ -4809,22 +4856,25 @@ contains
     end subroutine s_ibm_check_bodies_on_one_rank
 
     !> Load ib_markers_fine for the next fine RHS pass: member ibm's fine markers (interior 0:mext(:, ibm)) land at offset (ibm -
-    !! 1)*w along dimension sd; the rest of the installed frame reads 0, so padding and gaps zero nothing. Per-block callers pass nb
-    !! = 1, w = 0. Grid globals must already be swapped.
+    !! 1)*w along dimension sd; the rest of the installed frame and its first ghost layer read 0, so padding and gaps zero nothing.
+    !! Per-block callers pass nb = 1, w = 0. Grid globals must already be swapped.
     impure subroutine s_ibm_load_fine_markers(nb, slots, mext, sd, w)
 
         integer, intent(in) :: nb, sd, w
         integer, intent(in) :: slots(nb), mext(3, nb)
-        integer             :: ibm, o(3)
+        integer             :: ibm, o(3), e2, e3
 
-        ib_markers_fine%sf(0:m,0:n,0:p) = 0
+        e2 = min(n, 1); e3 = min(p, 1)
+        ib_markers_fine%sf(-1:m + 1,-e2:n + e2,-e3:p + e3) = 0
         do ibm = 1, nb
             if (.not. associated(ib_fine(slots(ibm))%markers%sf)) cycle  ! never swapped in: no body markers
             o = 0; o(sd) = (ibm - 1)*w
             ib_markers_fine%sf(o(1):o(1) + mext(1, ibm),o(2):o(2) + mext(2, ibm),o(3):o(3) + mext(3, &
                                & ibm)) = ib_fine(slots(ibm))%markers%sf(0:mext(1, ibm),0:mext(2, ibm),0:mext(3, ibm))
         end do
-        $:GPU_UPDATE(device='[ib_markers_fine%sf(:, :, 0:p)]')
+        $:GPU_UPDATE(device='[ib_markers_fine%sf(:, :, -e3:p + e3)]')
+        fine_lay_nb = nb; fine_lay_sd = sd; fine_lay_w = w
+        fine_lay_slots = slots
 
     end subroutine s_ibm_load_fine_markers
 
