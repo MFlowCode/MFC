@@ -429,6 +429,7 @@ AMR_VETTED_FLAGS = (
     "adap_dt",
     "alt_soundspeed",
     "bc_[xyz]%isothermal_*",
+    "bc_[xyz]%grcbc_*",
     "bf_[xyz]",
     "bf_spatial_support",
     "synthetic_turbulence",

@@ -124,7 +124,7 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | Surface tension | One refined level (`amr_max_level = 1`); the capillary flux is refluxed, so mass, momentum and energy are conserved across block faces also without `viscous` |
 | Euler-Euler bubbles, QBMM | Not supported |
 | Riemann-extrapolation boundaries (`bc = -4`) | Supported, except with `null_weights` |
-| Characteristic boundaries (`bc = -5` to `-12`) | Supported; the coarse grid applies them at the domain boundary (blocks stay `buff_size` cells inside it) |
+| Characteristic boundaries (`bc = -5` to `-12`, GRCBC included) | Supported; the coarse grid applies them at the domain boundary (blocks stay `buff_size` cells inside it) |
 | Cylindrical coordinates, stretched grids | Not supported |
 
 ## Parameters {#amr-parameters}

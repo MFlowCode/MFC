@@ -6051,6 +6051,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
         # non-reflecting subsonic buffer at both ends: the coarse grid applies it, the block's edges are coarse/fine faces
         cases.append(define_case_d(stack, "CBC", {"bc_x%beg": -6, "bc_x%end": -6}))
+        # GRCBC subsonic inflow and outflow relaxing toward a state the initial one is not
+        grcbc = {"bc_x%beg": -7, "bc_x%end": -8, "bc_x%pres_in": 1.2, "bc_x%alpha_rho_in(1)": 1.0, "bc_x%alpha_in(1)": 1.0, "bc_x%pres_out": 0.2}
+        grcbc.update({f"bc_x%vel_{s}({d})": 0.5 * (d == 1) for s in ("in", "out") for d in (1, 2, 3)})
+        cases.append(define_case_d(stack, "grcbc", {**grcbc, **{f"bc_x%grcbc_{k}": "T" for k in ("in", "out", "vel_out")}}))
         cases.append(define_case_d(stack, "teno", {"teno": "T", "teno_CT": 1.0e-6}))
         cases.append(define_case_d(stack, "wenoz", {"wenoz": "T"}))
         cases.append(define_case_d(stack, "null_weights", {"null_weights": "T"}))
