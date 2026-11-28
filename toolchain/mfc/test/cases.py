@@ -5350,6 +5350,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+    # thermal_bc = 2 (surface energy balance) on the same example and mechanism, in 1500 K air (rho at 1 atm), so every ghost
+    # point starts past ignition: its only root is the diffusion-limited one ~1400 K above the gas, which the walk from T_IP has
+    # to reach (#1892). The harness fails the case if the run reports a non-converged or ill-posed surface solve.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Energy Balance",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={
+                "m": 24,
+                "n": 24,
+                "parallel_io": "F",
+                "t_stop": 2.0e-5,
+                "t_save": 2.0e-5,
+                "ib_surface_wrt": "T",
+                "patch_ib(1)%thermal_bc": 2,
+                "patch_icpp(1)%alpha_rho(1)": 0.2336783034007213,
+                "bc_x%alpha_rho_in(1)": 0.2336783034007213,
+            },
+            override_tol=1e-6,
+        )
+    )
+
     # thermal_bc = 3 on the same example and mechanism, at the Example grid cap (~16 steps to 2e-5 s). rho*c = 1e4 J/m^3/K,
     # far below graphite's, so the wall temperature moves by a few K within the test; ib_surface_wrt and ib_heat_wrt exercise the
     # writers.

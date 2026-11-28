@@ -662,7 +662,10 @@ contains
         real(wp) :: h_IP, dh_ccst, p_ratio  !< Enthalpy at the image point, its excess over the slip ghost, (p_GP + B)/(p_IP + B)
         logical :: use_ccst  !< ib_slip_ccst applies to this ghost point
         logical :: surface_converged
-        integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
+        ! Per-call reacting-surface failure tallies (see the module-level counters). Counted with atomics on copied scalars, not
+        ! in the ghost-point kernel's reduction: on Cray OpenMP offload that reduction came back corrupted (millions of counts from
+        ! ~1e3 updates) whenever a thermal_bc = 2 surface solve ran in the kernel.
+        integer                :: n_not_converged, n_ill_posed
         real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
@@ -725,8 +728,8 @@ contains
                                 & gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, W_species, T_IP, &
                                 & mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, T_adv, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, d, &
                                 & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, h_w, e_s, nrm_l, wf, &
-                                & h_IP, dh_ccst, p_ratio, use_ccst]', reduction='[[n_not_converged, n_ill_posed, nf1, nf2, &
-                                & nf3]]', reductionOp='[+]', present='[ghost_points]')
+                                & h_IP, dh_ccst, p_ratio, use_ccst]', reduction='[[nf1, nf2, nf3]]', reductionOp='[+]', &
+                                & copy='[n_not_converged, n_ill_posed]', present='[ghost_points]')
             do i = 1, num_gps
                 if (record_surface) then
                     $:GPU_LOOP(parallelism='[seq]')
@@ -800,8 +803,12 @@ contains
                             call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, merge(1, &
                                                  & patch_ib(patch_id)%thermal_bc, f_holds_twall(patch_ib(patch_id)%thermal_bc)), &
                                                  & Ys_s, T_s, mdot_s, surface_converged)
-                            if (.not. surface_converged) n_not_converged = n_not_converged + 1
+                            if (.not. surface_converged) then
+                                $:GPU_ATOMIC(atomic='update')
+                                n_not_converged = n_not_converged + 1
+                            end if
                         else
+                            $:GPU_ATOMIC(atomic='update')
                             n_ill_posed = n_ill_posed + 1
                         end if
 
@@ -1889,7 +1896,7 @@ contains
         call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
         if (proc_rank == 0) then
             if (n_not_converged_glb > 0) then
-                print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', &
+                print '(A,I0,A)', ' Immersed-boundary surface chemistry: the surface solve did not converge at ', &
                     & n_not_converged_glb, &
                     & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, ' &
                     & // 'zero temperature gradient for thermal_bc = 2).'
