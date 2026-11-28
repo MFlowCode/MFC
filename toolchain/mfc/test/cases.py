@@ -5899,7 +5899,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # restart_check on the regridded layout: a regridded block set cannot be rebuilt from the ICs
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         # 1e-9: bubble round-off grows through the regrids; NVHPC against the amdflang golden differs by up to 2.5e-10
-        cases.append(define_case_d(stack, "bubbles_euler", {"amr_max_grid_size": 32, **bub_gold}, restart_check=True, override_tol=1e-9))
+        cases.append(define_case_d(stack, "bubbles_euler", {"amr_max_grid_size": 32, **bub_gold}, restart_check=True, override_tol=1e-9, override_tol_single=1e-2))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
         # SSP-RK1 and RK2: the reflux weights and stage times come from the scheme's coefficients (s_amr_set_rk_table)
@@ -6068,11 +6068,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
         # the bubbly patches meet inside the block, as in the amr_check above
         bub_blk = {**bub_gold, **{k: v for k, v in amr_chk.items() if k.endswith(("x_centroid", "length_x"))}}
-        # 1e-9 for these bubble goldens: NVHPC against the amdflang golden differs by up to 1.3e-10
-        cases.append(define_case_d(stack, "bubbles_euler", bub_blk, override_tol=1e-9))
+        # 1e-9 for these bubble goldens: NVHPC against the amdflang golden differs by up to 1.3e-10; single keeps the bubble
+        # default of 1e-2 (a single run differs from the double golden by 5.5e-4)
+        cases.append(define_case_d(stack, "bubbles_euler", bub_blk, override_tol=1e-9, override_tol_single=1e-2))
         # the bubble-number transport and a 3-bin polydisperse cloud through the same block, as in the amr_checks above
-        cases.append(define_case_d(stack, "bubbles_euler -> adv_n", {**bub_blk, "adv_n": "T"}, override_tol=1e-9))
-        cases.append(define_case_d(stack, "bubbles_euler -> polydisperse", {**bub_blk, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}, override_tol=1e-9))
+        cases.append(define_case_d(stack, "bubbles_euler -> adv_n", {**bub_blk, "adv_n": "T"}, override_tol=1e-9, override_tol_single=1e-2))
+        cases.append(define_case_d(stack, "bubbles_euler -> polydisperse", {**bub_blk, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}, override_tol=1e-9, override_tol_single=1e-2))
         # non-reflecting subsonic buffer at both ends: the coarse grid applies it, the block's edges are coarse/fine faces
         cases.append(define_case_d(stack, "CBC", {"bc_x%beg": -6, "bc_x%end": -6}))
         # GRCBC subsonic inflow and outflow relaxing toward a state the initial one is not
