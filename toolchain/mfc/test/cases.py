@@ -1952,6 +1952,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             wall_slide = friction_box(10.0, [(5.0 + ox, 0.45, 1.0e-4, -0.1)], 60, 3.0e-4, 0.3, **{"bc_y%beg": -15, "bc_y%end": -15})
             cases.append(define_case_d(stack, "IBM -> Collision -> Friction slip regularisation at a wall", wall_slide, override_tol=1e-10, override_tol_single=fric_single))
             if num_fluids == 1:
+                # A circle hitting the reflective face y = 0 at an angle meets its mirror image: a frictionless wall, so mu = 0.3 must
+                # not slow the slide. On 2 ranks the 7 x 14 box splits along y and only the lower rank holds the face.
+                mirror = friction_box(14.0, [(3.5 + ox, 0.6237, 0.05, -0.1)], 80, 0.0, 0.3, **{"x_domain%end": 7.0, "m": 27, "bc_y%beg": -2, "bc_y%end": -2, "ib_force_wrt": "T"})
+                for ppn in (1, 2):
+                    cases.append(define_case_d(stack, ["IBM -> Collision -> Reflective boundary", f"{ppn} MPI Ranks"], mirror, ppn=ppn))
+            if num_fluids == 1:
                 # The seam pair on 1 rank and transposed along y (#2432): ib_mass_relax gave a cell within reach of both shells to the
                 # first marker of the x-inner scan, so the two differed by 7.6e-3. The Convergence check asserts the transpose.
                 pair_y = friction_box(20.0, [(y, x, uy, ux) for x, y, ux, uy in seam_bodies], 100, 0.003, 0.1)
@@ -5161,7 +5167,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # on round-off. Against goldens generated on the current master, the CI lanes agree to 1e-14 absolute on the fields and 5e-9
     # relative on the contact force (1e-9 on tiny entries), so 1e-6 leaves two orders of margin and still fails a one-step shift of the
     # contact (order 1e-2). Regenerate the goldens whenever a default in the moving-body numerics changes.
-    for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"])):
+    # Reflective: the 50 degree impact against a symmetry face, which is frictionless, so mu = 0.092 leaves v_t unchanged.
+    for label, args in (("Normal", []), ("Sliding Friction", ["--angle", "50", "--e", "0.98", "--mu", "0.092"]), ("Reflective", ["--wall-bc", "-2", "--angle", "50", "--e", "0.98", "--mu", "0.092"])):
         cases.append(define_case_f(f"3D -> IBM -> Wall Collision -> {label}", "examples/3D_mibm_wall_collision/case.py", args=args, mods={"parallel_io": "F"}, override_tol=1e-6))
 
     # Wall-normal ghost velocity (ib_wall_order = 2) at viscous no-slip walls whose exact solutions are known: a rotating inner circle with
