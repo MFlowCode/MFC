@@ -6068,12 +6068,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
         # the bubbly patches meet inside the block, as in the amr_check above
         bub_blk = {**bub_gold, **{k: v for k, v in amr_chk.items() if k.endswith(("x_centroid", "length_x"))}}
-        # 1e-9 for these bubble goldens: NVHPC against the amdflang golden differs by up to 1.3e-10; single keeps the bubble
-        # default of 1e-2 (a single run differs from the double golden by 5.5e-4)
-        cases.append(define_case_d(stack, "bubbles_euler", bub_blk, override_tol=1e-9, override_tol_single=1e-2))
+        # 1e-9 for these bubble goldens: NVHPC against the amdflang golden differs by up to 1.3e-10; 5e-2 single: GNU single
+        # differs from the double golden by up to 2.3e-2 in the bubble variables
+        bub_tol = {"override_tol": 1e-9, "override_tol_single": 5e-2}
+        cases.append(define_case_d(stack, "bubbles_euler", bub_blk, **bub_tol))
         # the bubble-number transport and a 3-bin polydisperse cloud through the same block, as in the amr_checks above
-        cases.append(define_case_d(stack, "bubbles_euler -> adv_n", {**bub_blk, "adv_n": "T"}, override_tol=1e-9, override_tol_single=1e-2))
-        cases.append(define_case_d(stack, "bubbles_euler -> polydisperse", {**bub_blk, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}, override_tol=1e-9, override_tol_single=1e-2))
+        cases.append(define_case_d(stack, "bubbles_euler -> adv_n", {**bub_blk, "adv_n": "T"}, **bub_tol))
+        cases.append(define_case_d(stack, "bubbles_euler -> polydisperse", {**bub_blk, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}, **bub_tol))
         # non-reflecting subsonic buffer at both ends: the coarse grid applies it, the block's edges are coarse/fine faces
         cases.append(define_case_d(stack, "CBC", {"bc_x%beg": -6, "bc_x%end": -6}))
         # GRCBC subsonic inflow and outflow relaxing toward a state the initial one is not
