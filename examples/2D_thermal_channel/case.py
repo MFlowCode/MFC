@@ -23,6 +23,7 @@ parser.add_argument("--mach", type=float, default=0.1, help="bulk Mach number")
 parser.add_argument("--re", type=float, default=150.0, help="Re_Dh = rho U_b 2H / mu")
 parser.add_argument("--tend", type=float, default=0.5, help="run time [H^2 / alpha]; developed in about 0.1")
 parser.add_argument("--saves", type=int, default=10)
+parser.add_argument("--body", action="store_true", help="add an isothermal square body (side H/4, at Tw) inside the channel")
 args, _ = parser.parse_known_args()
 
 gas = ct.Solution("h2o2.yaml")
@@ -107,6 +108,9 @@ case = {
     "mean_temp_gain": 0.05,
     "mean_temp_wall": args.tw,
 }
+if args.body:
+    case.update({"ib": "T", "num_ibs": 1, "patch_ib(1)%geometry": 3, "patch_ib(1)%x_centroid": 0.4880 * Lx, "patch_ib(1)%y_centroid": 0.4510 * H})
+    case.update({"patch_ib(1)%length_x": 0.25 * H, "patch_ib(1)%length_y": 0.25 * H, "patch_ib(1)%slip": "F", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": args.tw})
 for i, y in enumerate(gas.Y):
     case[f"patch_icpp(1)%Y({i + 1})"] = y
     case[f"chem_wrt_Y({i + 1})"] = "T"

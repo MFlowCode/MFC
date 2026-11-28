@@ -93,8 +93,8 @@ s_amr_stage_fine           (lock-step only)
 and after the stage loop:
 
 ```
-s_amr_subcycle_fine        (subcycled only) level 1 takes two dt/2 steps with time-interpolated ghosts,
-                           level 2 two steps per level-1 step; then the registers correct the coarse state
+s_amr_subcycle_fine        (subcycled only) each level takes amr_ref_ratio steps of its parent dt/ratio with time-interpolated ghosts,
+                           recursively per level; then the registers correct the coarse state
 s_amr_step_fold            restrict each level into its parent, bottom-up, and reflux level>=2 into its parent  [PH_RESTR]
 ```
 

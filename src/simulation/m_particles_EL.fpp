@@ -55,7 +55,7 @@ module m_particles_EL
     public :: s_initialize_particles_EL_module, s_finalize_particles_EL_module, s_compute_particles_EL_dynamics, &
         & s_compute_particle_gradients, s_compute_particles_EL_source, s_update_lagrange_particles_tdv_rk, &
         & s_sync_particles_for_save, q_particles, lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, &
-        & particle_mass, particle_seed, f_p, fqs_fluct, fluid_vel_at_particle, density_at_particle
+        & particle_mass, particle_seed, f_p, fqs_fluct, fluid_vel_at_particle, density_at_particle, s_lag_particle_bbox_local
 
     integer                              :: particle_cap  !< Allocated length of the per-particle arrays
     integer, allocatable, dimension(:,:) :: lag_part_id   !< Global and local IDs
@@ -861,6 +861,27 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_copy_particle_time_level
+
+    !> Rank-local bounding box of the committed particle positions; pmin > pmax when the rank holds none.
+    impure subroutine s_lag_particle_bbox_local(pmin, pmax)
+
+        real(wp), dimension(3), intent(out) :: pmin, pmax
+        real(wp)                            :: x1n, x2n, x3n, x1x, x2x, x3x
+        integer                             :: k
+
+        x1n = huge(1._wp); x2n = huge(1._wp); x3n = huge(1._wp)
+        x1x = -huge(1._wp); x2x = -huge(1._wp); x3x = -huge(1._wp)
+        $:GPU_PARALLEL_LOOP(private='[k]', reduction='[[x1n, x2n, x3n], [x1x, x2x, x3x]]', reductionOp='[MIN, MAX]', copy='[x1n, &
+                            & x2n, x3n, x1x, x2x, x3x]')
+        do k = 1, n_el_particles_loc
+            x1n = min(x1n, particle_pos(k, 1, 1)); x1x = max(x1x, particle_pos(k, 1, 1))
+            x2n = min(x2n, particle_pos(k, 2, 1)); x2x = max(x2x, particle_pos(k, 2, 1))
+            x3n = min(x3n, particle_pos(k, 3, 1)); x3x = max(x3x, particle_pos(k, 3, 1))
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        pmin = [x1n, x2n, x3n]; pmax = [x1x, x2x, x3x]
+
+    end subroutine s_lag_particle_bbox_local
 
     !> Store the particle field gradients along dir (pressure, velocity, and density with added mass) from this sweep's
     !! reconstructed face states. Called inside the RHS direction loop, so the face states need no extra copy.

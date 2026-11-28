@@ -86,9 +86,10 @@ module m_ibm
         & s_write_ib_surface, s_ib_flux_wall_prepare, s_update_ib_temperatures, s_ibm_alloc_fine, s_ibm_setup_fine, &
         & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, s_ibm_note_fine_memory, &
         & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, &
-        & s_add_swept_cells, s_fill_uncovered_cells, s_ibm_set_conduction_temperature, s_ibm_restore_conduction_temperature, &
-        & s_write_ib_conduction_temperature, s_read_ib_conduction_temperature, s_ibm_advance_wall_columns, s_wall_column_tcond, &
-        & f_wall_column_dt
+        & s_add_swept_cells, s_fill_uncovered_cells, s_ibm_conduction_temperature, s_write_ib_conduction_temperature, &
+        & s_read_ib_conduction_temperature, s_ibm_advance_wall_columns, s_wall_column_tcond, s_ibm_pack_fine_tcond, &
+        & s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, s_read_tcond_box, f_wall_column_dt, &
+        & s_correct_ib_subcycle_impulse
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -111,15 +112,15 @@ module m_ibm
 
     !> Ghost-point updates per fill tier and AMR level (0 = the coarse grid), summed over the run and reported at its end, because a
     !! tight packing can sit mostly in tier 2 and a second-order claim is then not true of that surface.
-    integer, allocatable        :: n_fill_tier(:,:)
-    type(integer_field), public :: ib_markers
+    integer, allocatable                :: n_fill_tier(:,:)
+    type(integer_field), public, target :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
     !> Body markers in the fine-advance frame, read by s_compute_rhs's body-cell RHS zeroing while amr_in_fine_advance: the advanced
     !! block's fine markers (for a batch, every member's at its slab offset), loaded by s_ibm_load_fine_markers before each fine RHS
     !! pass. ib_markers holds the coarse markers during a fine RHS. Sized to the allocation extents plus one zeroed layer, which the
     !! face loops read (bodies sit inside their blocks).
-    type(integer_field), public :: ib_markers_fine
+    type(integer_field), public, target :: ib_markers_fine
     $:GPU_DECLARE(create='[ib_markers_fine]')
 
     !> Layout of the last s_ibm_load_fine_markers (member slots, stacking dimension and stride), for the fine conduction temperature
@@ -234,6 +235,9 @@ module m_ibm
     !> Force (1:3) and torque (4:6) on each local IB from the fluid-body face fluxes of the last RHS evaluation
     real(wp), allocatable, dimension(:,:) :: ib_face_ft
     $:GPU_DECLARE(create='[ib_face_ft]')
+    !> amr_subcycle: the fine levels' impulse less the covered coarse faces' over the step, per local IB (as ib_face_ft)
+    real(wp), allocatable, dimension(:,:) :: ib_ft_sub
+    $:GPU_DECLARE(create='[ib_ft_sub]')
 
 contains
 
@@ -320,9 +324,9 @@ contains
         if (num_procs > 1) call s_setup_ib_force_comm()
 #endif
 
-        @:ALLOCATE(ib_face_ft(6, num_local_ibs_max))
-        ib_face_ft = 0._wp
-        $:GPU_UPDATE(device='[ib_face_ft]')
+        @:ALLOCATE(ib_face_ft(6, num_local_ibs_max), ib_ft_sub(6, num_local_ibs_max))
+        ib_face_ft = 0._wp; ib_ft_sub = 0._wp
+        $:GPU_UPDATE(device='[ib_face_ft, ib_ft_sub]')
 
         call s_update_ib_lookup()
 
@@ -1563,86 +1567,60 @@ contains
 
     end function f_cell_scale
 
-    !> Put the mirrored ghost temperature T_cond from s_ibm_correct_state in q_T_sf, where the wall conduction takes its face
-    !! difference. Only that difference may read it: the mirror of a cold wall in hot gas lies below 0 K, so the diffusion
-    !! properties use each ghost's own state, and s_ibm_restore_conduction_temperature undoes this once the fluxes are formed. Call
-    !! after the conservative-to-primitive conversion, before the halo exchange.
-    subroutine s_ibm_set_conduction_temperature(q_T_sf)
-
-        type(scalar_field), intent(inout) :: q_T_sf
-        integer                           :: i
-
-        if (amr_in_fine_advance) then
-            call s_ibm_fine_conduction_temperature(q_T_sf, .true.)
-            return
-        end if
-        if (num_gps == 0) return
-        $:GPU_PARALLEL_LOOP(private='[i]', present='[ghost_points]')
-        do i = 1, num_gps
-            if (ghost_points(i)%T_cond > T_cond_unset) then
-                ghost_points(i)%T_save = q_T_sf%sf(ghost_points(i)%loc(1), ghost_points(i)%loc(2), ghost_points(i)%loc(3))
-                q_T_sf%sf(ghost_points(i)%loc(1), ghost_points(i)%loc(2), ghost_points(i)%loc(3)) = ghost_points(i)%T_cond
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_ibm_set_conduction_temperature
-
-    !> Undo s_ibm_set_conduction_temperature on this rank's ghosts, so the reaction source and the split chemistry substep see each
-    !! ghost's own temperature
-    subroutine s_ibm_restore_conduction_temperature(q_T_sf)
-
-        type(scalar_field), intent(inout) :: q_T_sf
-        integer                           :: i
-
-        if (amr_in_fine_advance) then
-            call s_ibm_fine_conduction_temperature(q_T_sf, .false.)
-            return
-        end if
-        if (num_gps == 0) return
-        $:GPU_PARALLEL_LOOP(private='[i]', present='[ghost_points]')
-        do i = 1, num_gps
-            if (ghost_points(i)%T_cond > T_cond_unset) then
-                q_T_sf%sf(ghost_points(i)%loc(1), ghost_points(i)%loc(2), ghost_points(i)%loc(3)) = ghost_points(i)%T_save
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_ibm_restore_conduction_temperature
-
-    !> The set (set = T) or restore of the conduction temperature on an AMR fine frame: the coarse ghost list stays active there, so
-    !! each member block's own parked ghosts (gp_park) are used, at its slab offset from s_ibm_load_fine_markers.
-    impure subroutine s_ibm_fine_conduction_temperature(q_T_sf, set)
+    !> Put (set = T) the mirrored ghost temperature T_cond from s_ibm_correct_state in q_T_sf, where the wall conduction takes its
+    !! face difference, or undo that (set = F) so the reaction source and the split chemistry substep see each ghost's own
+    !! temperature. Only that difference may read T_cond: the mirror of a cold wall in hot gas lies below 0 K, so the diffusion
+    !! properties use each ghost's own state. Set after the conservative-to-primitive conversion, before the halo exchange; restore
+    !! once the fluxes are formed. On an AMR fine frame the coarse ghost list stays active, so each member block's own parked ghosts
+    !! (gp_park) are used, at its slab offset from s_ibm_load_fine_markers.
+    impure subroutine s_ibm_conduction_temperature(q_T_sf, set)
 
         type(scalar_field), intent(inout) :: q_T_sf
         logical, intent(in)               :: set
-        integer                           :: ibm, a, n_f, o(3), o1, o2, o3, j, k, l
+        integer                           :: i, ibm, a, n_f, o(3), o1, o2, o3, j, k, l
         integer(kind=8)                   :: off
 
-        do ibm = 1, fine_lay_nb
-            n_f = ib_fine(fine_lay_slots(ibm))%num_gps
-            if (n_f == 0) cycle
-            off = ib_fine(fine_lay_slots(ibm))%off
-            o = 0; o(fine_lay_sd) = (ibm - 1)*fine_lay_w
-            o1 = o(1); o2 = o(2); o3 = o(3)
-            $:GPU_PARALLEL_LOOP(private='[a, j, k, l]', firstprivate='[n_f, off, o1, o2, o3, set]')
-            do a = 1, n_f
-                if (gp_park(off + a)%T_cond > T_cond_unset) then
-                    j = gp_park(off + a)%loc(1) + o1
-                    k = gp_park(off + a)%loc(2) + o2
-                    l = gp_park(off + a)%loc(3) + o3
-                    if (set) then
-                        gp_park(off + a)%T_save = q_T_sf%sf(j, k, l)
-                        q_T_sf%sf(j, k, l) = gp_park(off + a)%T_cond
-                    else
-                        q_T_sf%sf(j, k, l) = gp_park(off + a)%T_save
+        if (amr_in_fine_advance) then
+            do ibm = 1, fine_lay_nb
+                n_f = ib_fine(fine_lay_slots(ibm))%num_gps
+                if (n_f == 0) cycle
+                off = ib_fine(fine_lay_slots(ibm))%off
+                o = 0; o(fine_lay_sd) = (ibm - 1)*fine_lay_w
+                o1 = o(1); o2 = o(2); o3 = o(3)
+                $:GPU_PARALLEL_LOOP(private='[a, j, k, l]', firstprivate='[n_f, off, o1, o2, o3, set]')
+                do a = 1, n_f
+                    if (gp_park(off + a)%T_cond > T_cond_unset) then
+                        j = gp_park(off + a)%loc(1) + o1
+                        k = gp_park(off + a)%loc(2) + o2
+                        l = gp_park(off + a)%loc(3) + o3
+                        if (set) then
+                            gp_park(off + a)%T_save = q_T_sf%sf(j, k, l)
+                            q_T_sf%sf(j, k, l) = gp_park(off + a)%T_cond
+                        else
+                            q_T_sf%sf(j, k, l) = gp_park(off + a)%T_save
+                        end if
                     end if
-                end if
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end do
-            $:END_GPU_PARALLEL_LOOP()
+            return
+        end if
+        if (num_gps == 0) return
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', firstprivate='[set]', present='[ghost_points]')
+        do i = 1, num_gps
+            if (ghost_points(i)%T_cond > T_cond_unset) then
+                j = ghost_points(i)%loc(1); k = ghost_points(i)%loc(2); l = ghost_points(i)%loc(3)
+                if (set) then
+                    ghost_points(i)%T_save = q_T_sf%sf(j, k, l)
+                    q_T_sf%sf(j, k, l) = ghost_points(i)%T_cond
+                else
+                    q_T_sf%sf(j, k, l) = ghost_points(i)%T_save
+                end if
+            end if
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_ibm_fine_conduction_temperature
+    end subroutine s_ibm_conduction_temperature
 
     !> Pack every ghost's global cell index (i, j, k) and T_cond into gp_tc_rec(1:4, 1:num_gps) on the device and bring only those
     !! four reals per ghost to the host, instead of the whole ghost_point (about 380 B).
@@ -1681,17 +1659,78 @@ contains
 
     end subroutine s_unpack_ghost_tcond
 
-    !> Path of the T_cond file of a save: one shared file, or one file per rank with file_per_process (as ib_state).
-    impure function f_tcond_file(t_step) result(file_loc)
+    !> s_pack_ghost_tcond for fine slot islot's parked ghosts (gp_park), keyed by the level's global cell index (block origin s),
+    !! copied to rec(1:4, 1:n_f) if present.
+    impure subroutine s_ibm_pack_fine_tcond(islot, s, rec)
 
-        integer, intent(in)                  :: t_step
+        integer, intent(in)                               :: islot, s(3)
+        real(wp), dimension(:,:), intent(inout), optional :: rec
+        integer                                           :: a, n_f, s1, s2, s3
+        integer(kind=8)                                   :: off
+
+        n_f = ib_fine(islot)%num_gps
+        if (n_f == 0) return
+        off = ib_fine(islot)%off
+        s1 = s(1); s2 = s(2); s3 = s(3)
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off, s1, s2, s3]', present='[gp_tc_rec]')
+        do a = 1, n_f
+            gp_tc_rec(1, a) = real(gp_park(off + a)%loc(1) + s1, wp)
+            gp_tc_rec(2, a) = real(gp_park(off + a)%loc(2) + s2, wp)
+            gp_tc_rec(3, a) = real(gp_park(off + a)%loc(3) + s3, wp)
+            gp_tc_rec(4, a) = gp_park(off + a)%T_cond
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[gp_tc_rec(:, 1:n_f)]')
+        if (present(rec)) rec(:,1:n_f) = gp_tc_rec(:,1:n_f)
+
+    end subroutine s_ibm_pack_fine_tcond
+
+    !> Restore fine slot islot's parked T_cond from the box tc of its level's T_cond file (box origin = block origin s).
+    impure subroutine s_ibm_fine_tcond_from_box(islot, s, tc)
+
+        integer, intent(in)                       :: islot, s(3)
+        real(wp), dimension(0:,0:,0:), intent(in) :: tc
+
+        call s_ibm_pack_fine_tcond(islot, s)
+        call s_tcond_from_box(tc, s, ib_fine(islot)%num_gps)
+        call s_ibm_unpack_fine_tcond(islot)
+
+    end subroutine s_ibm_fine_tcond_from_box
+
+    !> s_unpack_ghost_tcond for fine slot islot's parked ghosts.
+    impure subroutine s_ibm_unpack_fine_tcond(islot)
+
+        integer, intent(in) :: islot
+        integer             :: a, n_f
+        integer(kind=8)     :: off
+
+        n_f = ib_fine(islot)%num_gps
+        if (n_f == 0) return
+        off = ib_fine(islot)%off
+        $:GPU_UPDATE(device='[gp_tc_rec(:, 1:n_f)]')
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', present='[gp_tc_rec]')
+        do a = 1, n_f
+            gp_park(off + a)%T_cond = gp_tc_rec(4, a)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ibm_unpack_fine_tcond
+
+    !> Path of the T_cond file of a save: one shared file, or one file per rank with file_per_process (as ib_state). AMR level lev >
+    !! 0 (its fine ghosts) adds _L<lev>.
+    impure function f_tcond_file(t_step, lev) result(file_loc)
+
+        integer, intent(in)                  :: t_step, lev
         character(len=path_len + 2*name_len) :: file_loc
+        character(len=16)                    :: tag
 
+        tag = ''
+        if (lev > 0) write (tag, '(A,I0)') '_L', lev
         if (file_per_process) then
             write (file_loc, '(A,I0,A,I0,A,I7.7,A)') trim(case_dir) // '/restart_data/lustre_', t_step, '/ib_tcond_', t_step, &
-                   & '_', proc_rank, '.dat'
+                   & '_', proc_rank, trim(tag) // '.dat'
         else
-            write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_tcond_', t_step, '.dat'
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_tcond_', t_step, trim(tag) // '.dat'
         end if
 
     end function f_tcond_file
@@ -1705,13 +1744,25 @@ contains
     !! the primitive state at the start of the last stage, so it cannot be rebuilt from the saved conservative state. Collective.
     impure subroutine s_write_ib_conduction_temperature(t_step)
 
-        integer, intent(in)                  :: t_step
-        character(len=path_len + 2*name_len) :: file_loc
-        character(len=10)                    :: t_step_string
-        integer(kind=8)                      :: info(7), off
-        integer(kind=8), allocatable         :: tab(:,:), hdr(:)
-        integer                              :: i, n_loc, n_w
-        logical                              :: lead
+        integer, intent(in) :: t_step
+
+        call s_pack_ghost_tcond()
+        call s_write_tcond_records(t_step, 0, gp_tc_rec, num_gps)
+
+    end subroutine s_write_ib_conduction_temperature
+
+    !> The file of s_write_ib_conduction_temperature for level lev from the records rec(1:4, 1:n_rec), keeping those with a T_cond
+    !! (rec is compacted in place). Collective.
+    impure subroutine s_write_tcond_records(t_step, lev, rec, n_rec)
+
+        integer, intent(in)                     :: t_step, lev, n_rec
+        real(wp), dimension(:,:), intent(inout) :: rec
+        character(len=path_len + 2*name_len)    :: file_loc
+        character(len=10)                       :: t_step_string
+        integer(kind=8)                         :: info(7), off
+        integer(kind=8), allocatable            :: tab(:,:), hdr(:)
+        integer                                 :: i, n_loc, n_w
+        logical                                 :: lead
 
 #ifdef MFC_MPI
         integer(kind=MPI_OFFSET_KIND)       :: base, rb
@@ -1721,19 +1772,18 @@ contains
         integer :: file_unit
 #endif
 
-        call s_pack_ghost_tcond()
         n_loc = 0
         info = 0
-        do i = 1, num_gps
-            if (gp_tc_rec(4, i) <= T_cond_unset) cycle
+        do i = 1, n_rec
+            if (rec(4, i) <= T_cond_unset) cycle
             n_loc = n_loc + 1
-            gp_tc_rec(:,n_loc) = gp_tc_rec(:,i)
+            rec(:,n_loc) = rec(:,i)
             if (n_loc == 1) then
-                info(2:4) = nint(gp_tc_rec(1:3,i), 8)
+                info(2:4) = nint(rec(1:3,n_loc), 8)
                 info(5:7) = info(2:4)
             else
-                info(2:4) = min(info(2:4), nint(gp_tc_rec(1:3,i), 8))
-                info(5:7) = max(info(5:7), nint(gp_tc_rec(1:3,i), 8))
+                info(2:4) = min(info(2:4), nint(rec(1:3,n_loc), 8))
+                info(5:7) = max(info(5:7), nint(rec(1:3,n_loc), 8))
             end if
         end do
         info(1) = n_loc
@@ -1759,7 +1809,7 @@ contains
         end if
         call s_mpi_barrier()
         if (file_per_process) call s_delay_file_access(proc_rank)
-        file_loc = f_tcond_file(t_step)
+        file_loc = f_tcond_file(t_step, lev)
 
         allocate (hdr(4 + 7*n_w))
         if (lead) then
@@ -1777,18 +1827,17 @@ contains
         if (lead) call MPI_FILE_WRITE_AT(ifile, 0_MPI_OFFSET_KIND, hdr, size(hdr), MPI_INTEGER8, status, ierr)
         do k0 = 1, n_loc, tcond_chunk
             nc = min(tcond_chunk, n_loc - k0 + 1)
-            call MPI_FILE_WRITE_AT(ifile, base + int(k0 - 1, MPI_OFFSET_KIND)*rb, gp_tc_rec(:,k0:k0 + nc - 1), 4*nc, mpi_p, &
-                                   & status, ierr)
+            call MPI_FILE_WRITE_AT(ifile, base + int(k0 - 1, MPI_OFFSET_KIND)*rb, rec(:,k0:k0 + nc - 1), 4*nc, mpi_p, status, ierr)
         end do
         call MPI_FILE_CLOSE(ifile, ierr)
 #else
         open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace')
         write (file_unit) hdr
-        write (file_unit) gp_tc_rec(:,1:n_loc)
+        write (file_unit) rec(:,1:n_loc)
         close (file_unit)
 #endif
 
-    end subroutine s_write_ib_conduction_temperature
+    end subroutine s_write_tcond_records
 
     !> Restore T_cond of this rank's ghosts from the file of s_write_ib_conduction_temperature, after s_ibm_setup has found them.
     !! Rank 0 reads the header and broadcasts it (with file_per_process each rank reads its own); a rank then reads only the slabs
@@ -1800,20 +1849,41 @@ contains
 
         integer, intent(in)                     :: t_step
         real(wp), allocatable, dimension(:,:,:) :: tc
-        real(wp), allocatable, dimension(:,:)   :: buf
-        character(len=path_len + 2*name_len)    :: file_loc
-        integer(kind=8)                         :: head(4), pre, hbytes, rb, fsize, k0, cnt
+        integer(kind=8)                         :: head(4)
         integer(kind=8), allocatable            :: tab(:,:)
-        integer                                 :: i, w, r, nc, ios, file_unit, c(3), lo(3), hi(3)
-        logical                                 :: file_exist, rd
+        integer                                 :: file_unit, lo(3)
+
+        if (.not. f_tcond_open(t_step, 0, file_unit, head, tab)) return
+        lo = 0
+        lo(1:num_dims) = start_idx(1:num_dims)
+        call s_read_tcond_box(file_unit, head, tab, lo, lo + [m, n, p], tc)
+        close (file_unit)
+        call s_pack_ghost_tcond()
+        call s_tcond_from_box(tc, lo, num_gps)
+        call s_unpack_ghost_tcond()
+
+    end subroutine s_read_ib_conduction_temperature
+
+    !> Open the T_cond file of level lev and read its header (rank 0 broadcasts it unless file_per_process); false, with a warning,
+    !! if the save has none. Collective.
+    impure logical function f_tcond_open(t_step, lev, file_unit, head, tab) result(found)
+
+        integer, intent(in)                       :: t_step, lev
+        integer, intent(out)                      :: file_unit
+        integer(kind=8), intent(out)              :: head(4)
+        integer(kind=8), allocatable, intent(out) :: tab(:,:)
+        character(len=path_len + 2*name_len)      :: file_loc
+        integer(kind=8)                           :: rb, fsize
+        integer                                   :: ios
+        logical                                   :: rd
 
 #ifdef MFC_MPI
         integer :: ierr
 #endif
 
-        file_loc = f_tcond_file(t_step)
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (.not. file_exist) then
+        file_loc = f_tcond_file(t_step, lev)
+        inquire (FILE=trim(file_loc), EXIST=found)
+        if (.not. found) then
             if (proc_rank == 0) print '(A)', &
                 & 'Warning: ' // trim(file_loc) // ' not found; the first stage conducts through the ghost temperature'
             return
@@ -1841,14 +1911,26 @@ contains
 #ifdef MFC_MPI
         if (.not. file_per_process) call MPI_BCAST(tab, 7*int(head(4)), MPI_INTEGER8, 0, MPI_COMM_WORLD, ierr)
 #endif
-        hbytes = 8*(4 + 7*head(4))
         inquire (UNIT=file_unit, SIZE=fsize)
-        if (fsize /= hbytes + sum(tab(1,:))*rb) call s_mpi_abort(trim(file_loc) // ' is truncated or does not match its header')
+        if (fsize /= 8*(4 + 7*head(4)) + sum(tab(1, &
+            & :))*rb) call s_mpi_abort(trim(file_loc) // ' is truncated or does not match its header')
 
-        lo = 0
-        lo(1:num_dims) = start_idx(1:num_dims)
-        hi = lo + [m, n, p]
-        allocate (tc(0:m,0:n,0:p), buf(4, tcond_chunk))
+    end function f_tcond_open
+
+    !> T_cond of the cells lo:hi (global indices of the file's level) from the slabs of an open T_cond file whose bounding box meets
+    !! them, in blocks of tcond_chunk records; T_cond_unset where the file has none. Local.
+    impure subroutine s_read_tcond_box(file_unit, head, tab, lo, hi, tc)
+
+        integer, intent(in)                                  :: file_unit, lo(3), hi(3)
+        integer(kind=8), intent(in)                          :: head(4), tab(:,:)
+        real(wp), allocatable, dimension(:,:,:), intent(out) :: tc
+        real(wp), allocatable, dimension(:,:)                :: buf
+        integer(kind=8)                                      :: pre, hbytes, rb, k0, cnt
+        integer                                              :: w, r, nc, ios, c(3)
+
+        rb = int(storage_size(0._wp)/8, 8)*4
+        hbytes = 8*(4 + 7*head(4))
+        allocate (tc(0:hi(1) - lo(1),0:hi(2) - lo(2),0:hi(3) - lo(3)), buf(4, tcond_chunk))
         tc = T_cond_unset
         pre = 0
         do w = 1, int(head(4))
@@ -1857,25 +1939,31 @@ contains
                 do k0 = 0, cnt - 1, tcond_chunk
                     nc = int(min(int(tcond_chunk, 8), cnt - k0))
                     read (file_unit, iostat=ios, pos=hbytes + (pre + k0)*rb + 1) buf(:,1:nc)
-                    if (ios /= 0) call s_mpi_abort('Error reading ' // trim(file_loc))
+                    if (ios /= 0) call s_mpi_abort('Error reading an ib_tcond file')
                     do r = 1, nc
                         c = nint(buf(1:3,r)) - lo
-                        if (all(c >= 0) .and. all(c <= [m, n, p])) tc(c(1), c(2), c(3)) = buf(4, r)
+                        if (all(c >= 0) .and. all(c <= hi - lo)) tc(c(1), c(2), c(3)) = buf(4, r)
                     end do
                 end do
             end if
             pre = pre + cnt
         end do
-        close (file_unit)
 
-        call s_pack_ghost_tcond()
-        do i = 1, num_gps
+    end subroutine s_read_tcond_box
+
+    !> Set gp_tc_rec(4, 1:n) from the box tc at the packed cells (box origin lo).
+    impure subroutine s_tcond_from_box(tc, lo, n)
+
+        real(wp), dimension(0:,0:,0:), intent(in) :: tc
+        integer, intent(in)                       :: lo(3), n
+        integer                                   :: i, c(3)
+
+        do i = 1, n
             c = nint(gp_tc_rec(1:3,i)) - lo
             gp_tc_rec(4, i) = tc(c(1), c(2), c(3))
         end do
-        call s_unpack_ghost_tcond()
 
-    end subroutine s_read_ib_conduction_temperature
+    end subroutine s_tcond_from_box
 
     !> One line at the end of a run if the reacting surface ever failed to solve. Silence means every ghost point on every step
     !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.
@@ -1883,21 +1971,27 @@ contains
 
         integer               :: n_not_converged_glb, n_ill_posed_glb, q, lvl
         integer, dimension(3) :: ft  !< Global fill-tier tallies of one level
-        character(len=16)     :: tag
+        character(len=24)     :: tag
 
+        ! The surface counters sum the coarse and fine ghost-point updates
+
+        tag = ''
+        if (amr) tag = ' (all AMR levels)'
         call s_mpi_reduce_int_sum(n_surface_not_converged, n_not_converged_glb)
         call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
         if (proc_rank == 0) then
             if (n_not_converged_glb > 0) then
                 print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', &
                     & n_not_converged_glb, &
-                    & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, ' &
+                    & ' ghost-point updates' // trim(tag) &
+                    & // ', which fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, ' &
                     & // 'zero temperature gradient for thermal_bc = 2).'
             end if
 
             if (n_ill_posed_glb > 0) then
                 print '(A,I0,A)', ' Immersed-boundary surface chemistry: ', n_ill_posed_glb, &
-                    & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
+                    & ' ghost-point updates' // trim(tag) &
+                    & // ' had a zero levelset distance, leaving the surface balance undefined; those points ' &
                     & // 'fell back to a chemically inert wall (Twall kept for thermal_bc = 1 or 3, zero temperature gradient for ' // 'thermal_bc = 2). Check the immersed geometry against the grid.'
             end if
         end if
@@ -3748,10 +3842,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(integer_field), intent(in) :: markers  !< ib_markers, or ib_markers_fine on an AMR fine frame
         real(wp), dimension(3) :: f, r, tq, vb
-        real(wp) :: area, w, f_E, f_m, f_mom
+        real(wp) :: area, w, f_E, f_m, f_mom, wt
         integer :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g
         integer :: j0, k0, l0, fj, fk, fl, ibm, jl, kl, ll, sd, bw, cov, nc, sh, c
-        logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR, fine, heat, covd
+        logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR, fine, heat, covd, sub
 
         do_ft = moving_immersed_boundary_flag .or. ib_state_wrt .or. ib_force_wrt
         if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
@@ -3763,13 +3857,27 @@ contains
         ! AMR: each face counts on the finest level covering its fluid cell. The coarse pass of a stage starts the sums and skips
         ! covered cells (cov = 1, the cell map); a fine frame adds its faces, skipping those under its own children (cov = 2, their
         ! boxes). A fine frame takes interior faces only (its markers have no ghosts; bodies sit inside their blocks) and no
-        ! heat exchange (thermal walls are rejected with amr). Subcycled levels are not taken: their passes span several stages.
+        ! heat exchange (thermal walls are rejected with amr). Subcycled with a force-driven body (sub): the coarse stages move it
+        ! on all their faces; ib_ft_sub collects the step's impulse correction, the fine faces times dt_l and the stage weight
+        ! less the covered coarse faces times dt and the stage weight (s_correct_ib_subcycle_impulse).
         fine = amr_in_fine_advance
         heat = ib_exchange .and. .not. fine
+        sub = amr .and. amr_subcycle .and. any(patch_ib(1:num_ibs)%moving_ibm >= 2)
         cov = 0
-        if (amr .and. .not. amr_subcycle) cov = merge(2, 1, fine)
+        if (amr .and. (sub .or. .not. amr_subcycle)) cov = merge(2, 1, fine)
         nc = merge(amr_cov_n, 0, cov == 2); sd = amr_bat_sd; bw = max(amr_bat_w, 1)
         if (fine .and. .not. (do_ft .and. cov == 2)) return
+        wt = merge(1._wp, -1._wp, fine)*dt*f_ib_stage_weight(stage)
+
+        if (sub .and. idir == 1 .and. stage == 1 .and. .not. fine) then
+            $:GPU_PARALLEL_LOOP(private='[i, l]', collapse=2)
+            do i = 1, num_ibs
+                do l = 1, 6
+                    ib_ft_sub(l, i) = 0._wp
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         if (do_ft .and. idir == 1 .and. .not. fine) then
             $:GPU_PARALLEL_LOOP(private='[i, l]', collapse=2)
@@ -3796,7 +3904,7 @@ contains
         ! Face (j, k, l) lies between that cell and the next one along idir
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, area, &
                             & f, r, tq, vb, f_E, f_m, f_mom, hatR, fj, fk, fl, ibm, jl, kl, ll, covd, sh]', firstprivate='[fine, &
-                            & heat, cov, nc, sd, bw]')
+                            & heat, cov, nc, sd, bw, sub, wt]')
         do l = l0, p
             do k = k0, n
                 do j = j0, m
@@ -3834,7 +3942,7 @@ contains
                                     & i)) covd = .true.
                             end do
                         end if
-                        if (covd) side = 0
+                        if (covd .and. (fine .or. .not. sub)) side = 0
                     end if
                     if (side /= 0) then
                         call s_decode_patch_periodicity(markers%sf(ci, cj, ck), ib_tmp, xp, yp, zp)
@@ -3882,10 +3990,18 @@ contains
                                 end do
                                 call s_cross_product(r, f, tq)
                                 do i = 1, 3
-                                    $:GPU_ATOMIC(atomic='update')
-                                    ib_face_ft(i, ib_id) = ib_face_ft(i, ib_id) + f(i)
-                                    $:GPU_ATOMIC(atomic='update')
-                                    ib_face_ft(i + 3, ib_id) = ib_face_ft(i + 3, ib_id) + tq(i)
+                                    if (.not. (fine .and. sub)) then
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_face_ft(i, ib_id) = ib_face_ft(i, ib_id) + f(i)
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_face_ft(i + 3, ib_id) = ib_face_ft(i + 3, ib_id) + tq(i)
+                                    end if
+                                    if (sub .and. (fine .or. covd)) then
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_ft_sub(i, ib_id) = ib_ft_sub(i, ib_id) + wt*f(i)
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_ft_sub(i + 3, ib_id) = ib_ft_sub(i + 3, ib_id) + wt*tq(i)
+                                    end if
                                 end do
                             end if
                             if (heat .and. (all_ibs .or. patch_ib(ib_id)%thermal_bc == 3)) then
@@ -3993,6 +4109,40 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_ib_forces
+
+    !> amr_subcycle, after the fine substeps: as the reflux does for the fluid, each force-driven body's step impulse takes the fine
+    !! levels' faces in place of the covered coarse ones (ib_ft_sub); its step-end pose moves by the velocity change times dt/2,
+    !! exact for a correction force constant over the step.
+    impure subroutine s_correct_ib_subcycle_impulse()
+
+        integer                         :: i
+        real(wp), dimension(num_ibs, 3) :: dp, dl
+        real(wp), dimension(3)          :: dv, dw, ang
+
+        if (.not. (amr .and. amr_subcycle .and. moving_immersed_boundary_flag)) return
+        $:GPU_UPDATE(host='[ib_ft_sub]')
+        do i = 1, num_ibs
+            dp(i,:) = ib_ft_sub(1:3,i); dl(i,:) = ib_ft_sub(4:6,i)
+        end do
+        call s_communicate_ib_forces(dp, dl)
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm < 2 .or. patch_ib(i)%kin_model > 0) cycle
+            dv = dp(i,:)/patch_ib(i)%mass
+            ang = patch_ib(i)%angular_vel*patch_ib(i)%moment + dl(i,:)
+            if (num_dims == 3) call s_compute_moment_of_inertia(patch_ib(i), ang, patch_ib(i)%moment)
+            dw = ang/patch_ib(i)%moment - patch_ib(i)%angular_vel
+            patch_ib(i)%vel = patch_ib(i)%vel + dv
+            patch_ib(i)%angular_vel = patch_ib(i)%angular_vel + dw
+            patch_ib(i)%x_centroid = patch_ib(i)%x_centroid + 0.5_wp*dt*dv(1)
+            patch_ib(i)%y_centroid = patch_ib(i)%y_centroid + 0.5_wp*dt*dv(2)
+            patch_ib(i)%z_centroid = patch_ib(i)%z_centroid + 0.5_wp*dt*dv(3)
+            patch_ib(i)%angles = patch_ib(i)%angles + 0.5_wp*dt*dw
+        end do
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        call s_update_ib_rotation_matrices(num_ibs)
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
+    end subroutine s_correct_ib_subcycle_impulse
 
     !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
     !> These patches include things like NACA airfoils and STL models
@@ -5064,7 +5214,7 @@ contains
             end do
             @:DEALLOCATE(ib_wall_theta%sf)
         end if
-        @:DEALLOCATE(ib_face_ft)
+        @:DEALLOCATE(ib_face_ft, ib_ft_sub)
         if (associated(ib_markers_fine%sf)) then
             @:DEALLOCATE(ib_markers_fine%sf)
         end if

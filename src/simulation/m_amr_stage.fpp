@@ -19,19 +19,30 @@ module m_amr_stage
     use m_assign_variables, only: s_initialize_assign_variables_module
     use m_variables_conversion, only: s_convert_primitive_to_conservative_variables
     use m_mpi_common, only: s_mpi_allreduce_sum
+    use m_igr, only: jac
     use m_amr
+    use m_amr_advance, only: s_amr_fine_stage_ib, s_amr_ib_pose_begin, s_amr_ib_pose
+    use m_ibm, only: s_correct_ib_subcycle_impulse
 
     implicit none
 
     private
     public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine, s_amr_split_fine, &
-        & s_amr_apply_ic_patches, s_amr_fill_levels
+        & s_amr_apply_ic_patches, s_amr_fill_levels, s_amr_igr_keep_sigma
 
     !> cell-local end-of-step operators of s_amr_fine_cell_op
-    integer, parameter :: fine_op_relax = 1, fine_op_burn = 2, fine_op_chem = 3
+    integer, parameter :: fine_op_relax = 1, fine_op_split = 2
+
+    !> Level-0 q_T_sf kept across a fine pass (chemistry): the fine frames write their temperatures into q_T_sf at block indices,
+    !! which would become the Newton guesses of unrelated level-0 cells
+    type(scalar_field) :: amr_T_keep
+    $:GPU_DECLARE(create='[amr_T_keep]')
 
     !> Whether patch_icpp was compared with the level-0 initial data, and reproduces it
     logical :: ic_checked = .false., ic_from_patches = .false.
+
+    !> Subcycled IGR: the coarse sigma (jac) solved at stage times 0 and 1 (stages 1 and 2), and at the step end
+    real(wp), allocatable :: amr_sig(:,:,:,:)
 
 contains
 
@@ -42,7 +53,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
 
-        amr_cons_ghosts_valid = amr .and. amr_xchg_coarse_ghosts .and. (.not. bubbles_lagrange) .and. (.not. chemistry) &
+        amr_cons_ghosts_valid = amr .and. amr_xchg_coarse_ghosts .and. (.not. euler_lagrange) .and. (.not. chemistry) &
             & .and. (.not. igr)
         if (.not. amr_cons_ghosts_valid) return
         call s_phase_tic(PH_HALO)
@@ -71,7 +82,9 @@ contains
         call s_phase_toc(PH_HALO)
         amr_cons_ghosts_valid = .false.
         call s_amr_fill_levels(q_cons, 1, amr_num_levels)
+        call s_amr_keep_temperature(q_T_sf, .true.)
         call s_amr_fine_stage_advance_batched(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_amr_keep_temperature(q_T_sf, .false.)
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()
         call s_amr_apply_reflux(rhs_vf, q_cons)
@@ -99,10 +112,18 @@ contains
         call s_amr_pc_gather(q_old, 0)
         call s_amr_pc_gather(q_new, 1)
         dt0 = dt
-        call s_amr_subcycle_level(1, 0._wp, 1._wp, 0.5_wp*dt0, q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_amr_ib_pose_begin(t_step)
+        call s_amr_igr_sigma(2, 0._wp)
+        call s_amr_keep_temperature(q_T_sf, .true.)
+        call s_amr_subcycle_level(1, 0._wp, 1._wp, dt0/real(amr_ref_ratio, wp), q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, &
+                                  & mv_in, rhs_mv, t_step)
+        call s_amr_keep_temperature(q_T_sf, .false.)
         amr_adv_level = 0
         dt = dt0
         $:GPU_UPDATE(device='[dt]')
+        call s_amr_ib_pose(1._wp)
+        call s_correct_ib_subcycle_impulse()
+        call s_amr_igr_sigma(-2, 0._wp)
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()
         call s_amr_apply_reflux(q_new, q_old)  ! alpha for the source correction: step start (exact for uniform alpha)
@@ -111,10 +132,10 @@ contains
 
     end subroutine s_amr_subcycle_fine
 
-    !> Level lev's two substeps of dtl across the fraction [th0, th0 + dth] of the coarse step. Level 1 fills its ghosts from the
-    !! patch cache at that coarse time; a deeper level fills from its parents blended between their substep-start backup and end
-    !! state (amr_par_theta). After each substep the next level substeps across it: this level's ghosts are first refilled at the
-    !! substep end (the children's parent patches can reach them), and the children are then synced back into this level.
+    !> Level lev's amr_ref_ratio substeps of dtl across the fraction [th0, th0 + dth] of the coarse step. Level 1 fills its ghosts
+    !! from the patch cache at that coarse time; a deeper level fills from its parents blended between their substep-start backup
+    !! and end state (amr_par_theta). After each substep the next level substeps across it: this level's ghosts are first refilled
+    !! at the substep end (the children's parent patches can reach them), and the children are then synced back into this level.
     recursive subroutine s_amr_subcycle_level(lev, th0, dth, dtl, q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, mv_in, rhs_mv, &
         & t_step)
 
@@ -126,24 +147,30 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        integer                                                    :: k, s
+        integer                                                    :: k, s, ns
+        real(wp)                                                   :: rr, fs  !< ratio; fraction of the parent's step per substep
 
-        do k = 0, 1
+        rr = real(amr_ref_ratio, wp); fs = 1._wp/rr; ns = size(amr_rk_c)
+        do k = 0, amr_ref_ratio - 1
             amr_sub_first = k == 0
             amr_adv_level = lev
             dt = dtl
             $:GPU_UPDATE(device='[dt]')
-            do s = 1, size(amr_rk_c)
-                ! this substage's time: fraction th0 + dth*(k + c_s)/2 of the coarse step dtl*2/dth
-                t_rhs = f_step_time(th0 + 0.5_wp*dth*(real(k, wp) + amr_rk_c(s)), t_step, 2._wp*dtl/dth)
+            do s = 1, ns
+                ! this substage's time: fraction th0 + dth*(k + c_s)/rr of the coarse step dtl*rr/dth
+                t_rhs = f_step_time(th0 + fs*dth*(real(k, wp) + amr_rk_c(s)), t_step, rr*dtl/dth)
                 $:GPU_UPDATE(device='[t_rhs]')
-                call s_amr_fill_sub(lev, q_new, 0.5_wp*(real(k, wp) + amr_rk_c(s)), th0, dth)
+                call s_amr_fill_sub(lev, q_new, fs*(real(k, wp) + amr_rk_c(s)), th0, dth)
+                call s_amr_ib_pose(th0 + fs*dth*(real(k, wp) + amr_rk_c(s)))
                 call s_amr_fine_stage_advance_batched(s, coefs(s,:), bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+                ! moving bodies: the rebuild and correction the stage left waiting, at the pose of the state it produced
+                call s_amr_ib_pose(th0 + fs*dth*(real(k, wp) + merge(1._wp, amr_rk_c(min(s + 1, ns)), s == ns)))
+                call s_amr_fine_stage_ib(pb_in, mv_in)
             end do
             if (lev >= amr_max_level) cycle
-            call s_amr_fill_sub(lev, q_new, 0.5_wp*real(k + 1, wp), th0, dth)
-            call s_amr_subcycle_level(lev + 1, th0 + 0.5_wp*dth*real(k, wp), 0.5_wp*dth, 0.5_wp*dtl, q_new, coefs, q_T_sf, &
-                                      & bc_type, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+            call s_amr_fill_sub(lev, q_new, fs*real(k + 1, wp), th0, dth)
+            call s_amr_subcycle_level(lev + 1, th0 + fs*dth*real(k, wp), fs*dth, fs*dtl, q_new, coefs, q_T_sf, bc_type, pb_in, &
+                                      & rhs_pb, mv_in, rhs_mv, t_step)
             amr_par_theta = 1._wp
             dt = dtl
             $:GPU_UPDATE(device='[dt]')
@@ -162,6 +189,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_new
         real(wp), intent(in)                                   :: th, th0, dth
 
+        call s_amr_igr_sigma(-1, th0 + dth*th)  ! the fine sigma seeds read the coarse sigma at this time
         if (lev == 1) then
             call s_amr_fill_levels(q_new, 1, 1, th0 + dth*th)
         else
@@ -280,6 +308,51 @@ contains
 
     end subroutine s_amr_pc_copy
 
+    !> Subcycled IGR, after level 0's stage s RHS: keep its sigma at stage times 0 (s = 1) and 1 (s = 2).
+    impure subroutine s_amr_igr_keep_sigma(s)
+
+        integer, intent(in) :: s
+
+        if (s > 2) return
+        call s_amr_igr_sigma(s - 1, 0._wp)
+
+    end subroutine s_amr_igr_keep_sigma
+
+    !> The coarse sigma jac against amr_sig over the buffered coarse range: t >= 0 keeps jac as slot t (t = 0 sizes amr_sig); t = -1
+    !! sets jac = (1 - theta)*slot 0 + theta*slot 1; t = -2 restores jac from slot 2 (the step end).
+    impure subroutine s_amr_igr_sigma(t, theta)
+
+        integer, intent(in)  :: t
+        real(wp), intent(in) :: theta
+        integer              :: j, k, l, b1, e1, b2, e2, b3, e3
+        real(wp)             :: th
+
+        if (.not. (amr .and. igr .and. amr_subcycle)) return
+        b1 = idwbuff(1)%beg; e1 = idwbuff(1)%end
+        b2 = idwbuff(2)%beg; e2 = idwbuff(2)%end
+        b3 = idwbuff(3)%beg; e3 = idwbuff(3)%end
+        if (t == 0 .and. .not. allocated(amr_sig)) then
+            @:ALLOCATE(amr_sig(b1:e1, b2:e2, b3:e3, 0:2))
+        end if
+        th = theta
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', copyin='[t, th]')
+        do l = b3, e3
+            do k = b2, e2
+                do j = b1, e1
+                    if (t >= 0) then
+                        amr_sig(j, k, l, t) = jac(j, k, l)
+                    else if (t == -1) then
+                        jac(j, k, l) = (1._wp - th)*amr_sig(j, k, l, 0) + th*amr_sig(j, k, l, 1)
+                    else
+                        jac(j, k, l) = amr_sig(j, k, l, 2)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_igr_sigma
+
     !> End of step: fold the fine solution into the level-0 covered cells (the only deliberate level-0 write) and Berger-Colella
     !! state-reflux each level>=2 block into its parent. Bottom-up (per-level waves), so covered cells hold the finest data.
     impure subroutine s_amr_step_fold(q_cons)
@@ -313,17 +386,62 @@ contains
 
         type(scalar_field), intent(inout) :: q_T_sf
 
-        if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0) call s_amr_fine_cell_op(fine_op_chem, &
-            & q_T_sf)
-        if (reactive_burn .and. rburn%substeps > 0) call s_amr_fine_cell_op(fine_op_burn)
+        if (.not. (f_split_chem() .or. f_split_burn())) return
+        call s_amr_keep_temperature(q_T_sf, .true.)
+        call s_amr_fine_cell_op(fine_op_split, q_T_sf)
+        call s_amr_keep_temperature(q_T_sf, .false.)
 
     end subroutine s_amr_split_fine
+
+    !> Save (save = T) or restore the level-0 q_T_sf around a fine pass (chemistry only: elsewhere no Newton reads it; the coarse
+    !! mean_temp_wall source, which requires chemistry, reads it after the fine stage)
+    impure subroutine s_amr_keep_temperature(q_T_sf, save)
+
+        type(scalar_field), intent(inout) :: q_T_sf
+        logical, intent(in)               :: save
+        integer                           :: j, k, l, lo1, hi1, lo2, hi2, lo3, hi3
+
+        if (.not. chemistry) return
+        lo1 = lbound(q_T_sf%sf, 1); hi1 = ubound(q_T_sf%sf, 1)
+        lo2 = lbound(q_T_sf%sf, 2); hi2 = ubound(q_T_sf%sf, 2)
+        lo3 = lbound(q_T_sf%sf, 3); hi3 = ubound(q_T_sf%sf, 3)
+        if (.not. associated(amr_T_keep%sf)) then
+            @:ALLOCATE(amr_T_keep%sf(lo1:hi1, lo2:hi2, lo3:hi3))
+            @:ACC_SETUP_SFs(amr_T_keep)
+        end if
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[lo1, hi1, lo2, hi2, lo3, hi3, save]')
+        do l = lo3, hi3
+            do k = lo2, hi2
+                do j = lo1, hi1
+                    if (save) then
+                        amr_T_keep%sf(j, k, l) = q_T_sf%sf(j, k, l)
+                    else
+                        q_T_sf%sf(j, k, l) = amr_T_keep%sf(j, k, l)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_keep_temperature
+
+    logical function f_split_chem()
+
+        f_split_chem = chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0
+
+    end function f_split_chem
+
+    logical function f_split_burn()
+
+        f_split_burn = reactive_burn .and. rburn%substeps > 0
+
+    end function f_split_burn
 
     !> Apply the cell-local end-of-step operator op to every owned fine block in its own frame (block order is free).
     impure subroutine s_amr_fine_cell_op(op, q_T_sf)
 
         integer, intent(in)                         :: op
-        type(scalar_field), intent(inout), optional :: q_T_sf  !< fine_op_chem: the Newton guess (any T converges)
+        type(scalar_field), intent(inout), optional :: q_T_sf  !< fine_op_split: the chemistry Newton guess (scratch)
         integer                                     :: kk, nb
 
         call s_amr_refresh_my_blocks()
@@ -334,10 +452,9 @@ contains
             select case (op)
             case (fine_op_relax)
                 call s_infinite_relaxation_k(amr_cons_br)
-            case (fine_op_burn)
-                call s_reactive_burn_substep(amr_cons_br, dt, idwint)
-            case (fine_op_chem)
-                call s_chemistry_reaction_substep(amr_cons_br, q_T_sf, dt, idwint)
+            case (fine_op_split)  ! both splits in one swap per block: each is cell-local
+                if (f_split_chem()) call s_chemistry_reaction_substep(amr_cons_br, q_T_sf, dt, idwint)
+                if (f_split_burn()) call s_reactive_burn_substep(amr_cons_br, dt, idwint)
             end select
             call s_amr_fine_leave()
         end do

@@ -314,13 +314,14 @@ PHYSICS_DOCS = {
         "category": "Adaptive Mesh Refinement",
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
-            "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= 2; "
-            "amr_subcycle and amr_prolong = 2 need amr_ref_ratio = 2. "
+            "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= amr_max_level; "
+            "amr_prolong = 2 needs amr_ref_ratio = 2; static nesting with ib goes up to amr_max_level = 2. "
             "Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
-            "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
-            "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
-            "and CBC boundaries, and operator-split reaction or burn substeps. Immersed boundaries must be non-STL on a static "
-            "block (amr_regrid_int = 0) with no reacting surface. Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 "
+            "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Surface tension needs amr_max_level = 1; Euler-Euler bubbles need one "
+            "fluid and polytropic bubbles. Incompatible with QBMM, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
+            "and CBC boundaries. Operator-split reaction and burn substeps also run on each block. No immersed body may have a "
+            "reacting surface, thermal_bc = 2 or 3, or a thermal layer; the isothermal wall (thermal_bc = 1) is supported, with "
+            "or without chemistry. Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 "
             "and amr_buf >= 1. Under MPI a block covers at most about half of a rank's subdomain per dimension unless "
             "amr_max_grid_size caps it explicitly. See docs/documentation/amr.md."
         ),
@@ -428,11 +429,14 @@ AMR_VETTED_FLAGS = (
     "adap_dt",
     "alt_soundspeed",
     "bc_[xyz]%isothermal_*",
+    "bc_[xyz]%grcbc_*",
     "bf_[xyz]",
     "bf_spatial_support",
     "synthetic_turbulence",
     "bubbles_lagrange",
     "lag_params%*",
+    "particles_lagrange",
+    "particle_params%*",
     "cfl_adap_dt",
     "cfl_const_dt",
     "cfl_dt",
@@ -460,21 +464,23 @@ AMR_VETTED_FLAGS = (
     "wenoz",
     "weno_avg",
     "weno_Re_flux",
+    "weno_Re_flux_compact",
     "mixture_err",
     "mpp_lim",
     "reactive_burn",
     "relativity",
     "viscous",
     "polytropic",
+    "polydisperse",
+    "adv_n",
+    "bubbles_euler",
     "relax",
+    "surface_tension",
     *AMR_INERT_FLAGS,
 )
 
 # Vetted switches no AMR test sets true yet. A lint keeps this list exact, so it can only shrink: add an AMR test, drop the entry.
-AMR_UNTESTED_FLAGS = (
-    "bc_[xyz]%isothermal_*",
-    "cfl_dt",
-)
+AMR_UNTESTED_FLAGS = ("cfl_dt",)
 
 
 def amr_unvetted_flags(params: Dict[str, Any], logical_names: Set[str]) -> List[str]:
@@ -1129,7 +1135,7 @@ class CaseValidator:
         self.prohibit(ib_flux_wall and moving_any, "ib_flux_wall requires every immersed boundary to be fixed (moving_ibm = 0)")
         self.prohibit(ib_flux_wall and self.get("hypoelasticity", "F") == "T", "ib_flux_wall is not supported with hypoelasticity")
         # the wall fields live on the coarse grid only
-        self.prohibit(ib_flux_wall and self.get("amr", "F") == "T", "ib_flux_wall is not supported with amr")
+        self.prohibit(ib_flux_wall and self.get("amr", "F") == "T", "ib_flux_wall is not supported with amr (#2230)")
         for i in reacting:
             self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
@@ -1852,8 +1858,6 @@ class CaseValidator:
                 f"mean_dpdx({i})/mean_mflux({i}) require periodic bc_{d} (-1) on both ends",
             )
             self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
-            # The fine-block source would test the coarse IB markers at block indices
-            self.prohibit(self.get("amr", "F") == "T" and self.get("ib", "F") == "T", "mean_dpdx/mean_mflux with amr do not support ib")
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
 
     def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
@@ -1877,10 +1881,6 @@ class CaseValidator:
             return
         self.prohibit(self.get("chemistry", "F") != "T", "mean_qdot/mean_temp require chemistry")
         self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
-        # As for mean_dpdx; mean_temp_wall's terms are built on the coarse grid and need q_T_sf, which the fine hook does not get
-        amr = self.get("amr", "F") == "T"
-        self.prohibit(amr and self.get("ib", "F") == "T", "mean_qdot/mean_temp with amr do not support ib")
-        self.prohibit(amr and wall is not None, "mean_temp_wall does not support amr")
         dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
         for d, active in dims:
             # x is the streamwise (mixing-cup) direction; walls may bound the others
@@ -2296,22 +2296,28 @@ class CaseValidator:
         # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member:
         # QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
         # applies it at the slab ends only; bc = -4 without null_weights is fine, the fine frames skip its edge-state
-        # copy). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
-        # hypoelasticity, continuum damage, Lagrangian bubbles, chemistry, IGR, the 6-equation model and prescribed-motion
-        # immersed bodies are supported.
+        # copy). Surface tension and Euler bubbles have no AMR golden. MHD, relativity, hypoelasticity, continuum damage,
+        # Lagrangian and single-fluid polytropic Euler bubbles, chemistry, IGR, the 6-equation model, surface tension and
+        # prescribed-motion immersed bodies are supported.
         self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
         self.prohibit(
             any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
             "amr requires a uniform grid (no stretching)",
         )
-        for k in ("qbmm", "bubbles_euler", "surface_tension"):
+        for k in ("qbmm",):
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
-        # #2255: unlike Lagrangian bubbles, the particle hooks have no level-0 guard and no fine-block exclusion
+        # surface tension is validated on one refined level only (static, regrid, subcycled, multi-rank)
         self.prohibit(
-            self.get("particles_lagrange", "F") == "T",
-            "amr does not support particles_lagrange: the fine-block RHS would run the particle dynamics and the two-way "
-            "coupling source on the swapped block grid, and nothing keeps the blocks clear of the particle support (#2255)",
+            self.get("surface_tension", "F") == "T" and (self.get("amr_max_level") or 1) > 1,
+            "amr with surface_tension supports one refined level (amr_max_level = 1)",
         )
+        # adap_dt integrates the bubble ODE on level 0 only; the other combinations are not checked on blocks
+        if self.get("bubbles_euler", "F") == "T":
+            self.prohibit(self.get("adap_dt", "F") == "T", "amr with bubbles_euler does not support adap_dt (it advances the bubbles on level 0 only)")
+            self.prohibit(self.get("polytropic", "T") != "T", "amr with bubbles_euler requires polytropic = T (not yet validated)")
+            self.prohibit((self.get("num_fluids") or 1) > 1, "amr with bubbles_euler requires num_fluids = 1 (not yet validated)")
+            self.prohibit(self.get("amr_prolong", 1) == 2, "amr with bubbles_euler requires amr_prolong = 1 (not yet validated)")
+            self.prohibit(self.get("ib", "F") == "T", "amr with bubbles_euler does not support ib (not yet validated)")
         for d in ("x", "y", "z"):
             for e in ("beg", "end"):
                 bc = self.get(f"bc_{d}%{e}")
@@ -2350,20 +2356,17 @@ class CaseValidator:
         )
         self.prohibit(amr_max_level is not None and amr_max_level < 1, "amr_max_level must be >= 1")
         self.prohibit(
-            amr_max_level is not None and amr_max_level > 1 and amr_max_blocks is not None and amr_max_blocks < 2,
-            "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= 2 " "(at least one level-1 block plus one nested level-2 block)",
+            amr_max_level is not None and amr_max_level > 1 and amr_max_blocks is not None and amr_max_blocks < amr_max_level,
+            "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= amr_max_level (the run aborts unless amr_max_blocks >= "
+            "the level-1 block count + amr_max_level - 1: one nested block per deeper level)",
         )
         self.prohibit(amr_ref_ratio is not None and amr_ref_ratio not in (2, 4), "amr_ref_ratio must be 2 or 4")
         self.prohibit(self.get("amr_prolong", 1) not in (1, 2), "amr_prolong must be 1 (minmod-limited linear) or 2 (quartic)")
         self.prohibit(self.get("amr_prolong", 1) == 2 and amr_ref_ratio not in (None, 2), "amr_prolong = 2 requires amr_ref_ratio = 2")
         if self.get("amr_subcycle", "F") == "T":
-            self.prohibit(amr_ref_ratio not in (None, 2), "amr_subcycle requires amr_ref_ratio = 2")
-            self.prohibit(amr_max_level is not None and amr_max_level > 2, "amr_subcycle supports up to two refined levels (amr_max_level <= 2)")
             self.prohibit(time_stepper == 1, "amr_subcycle requires time_stepper = 2 or 3 (RK1 keeps no step-start state)")
-            self.prohibit(igr, "amr_subcycle does not support IGR")
-            self.prohibit(self.get("bubbles_lagrange", "F") == "T", "amr_subcycle does not support Lagrangian bubbles")
-            moving = [v for k, v in self.params.items() if re.fullmatch(r"(patch_ib|particle_cloud)\(\d+\)%moving_ibm", k)]
-            self.prohibit(any(m not in (0, None) for m in moving), "amr_subcycle does not support moving immersed boundaries yet")
+            clouds = [v for k, v in self.params.items() if re.fullmatch(r"particle_cloud\(\d+\)%moving_ibm", k)]
+            self.prohibit(any(m not in (0, None) for m in clouds), "amr_subcycle does not support moving particle clouds")
         self.prohibit(
             amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
             "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",
@@ -2412,21 +2415,20 @@ class CaseValidator:
             # static/prescribed-motion IB AMR: bodies resolved on a static fine block.
             num_ibs = self.get("num_ibs") or 0
             moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
-            # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds every analytic geometry; an STL body (5, 12) has
-            # no box there, so it needs a static block
-            bbox_geoms = (2, 3, 4, 6, 8, 9, 10, 11, 13)
+            # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds every geometry (STL 5, 12 by the model's box)
+            bbox_geoms = (2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13)
             self.prohibit(
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
-                "amr with a moving immersed body or dynamic regrid supports analytic geometries only (the block containment bounding box)",
+                "amr with a moving immersed body or dynamic regrid needs a geometry with a block containment bounding box",
             )
-            # The isothermal wall without chemistry sets only the ghost state, which each fine block corrects itself. With chemistry only
-            # the adiabatic wall is checked on blocks (the fine RHS takes each block's own markers and T_cond); the lumped wall needs
-            # per-block records.
-            chem = self.get("chemistry", "F") == "T"
+            # The adiabatic and isothermal walls, reacting or not, set only the ghost state, which each fine block corrects itself (with
+            # chemistry the fine RHS takes each block's own markers and T_cond). The surface energy balance and the lumped wall's
+            # records are not checked on blocks, nor is the initial thermal layer.
             tbc = [self.get(f"patch_ib({i})%thermal_bc") or 0 for i in range(1, num_ibs + 1)]
+            self.prohibit(any(t not in (0, 1) for t in tbc), "amr with ib supports patch_ib thermal_bc = 0 or 1 (no thermal_bc = 2 or 3)")
             self.prohibit(
-                any(t not in (0, 1) or (chem and t != 0) for t in tbc) or any((self.get(f"patch_ib({i})%surface_reaction") or 0) != 0 for i in range(1, num_ibs + 1)),
-                "amr with ib supports patch_ib thermal_bc = 1 only without chemistry (no surface_reaction, no thermal_bc = 2 or 3)",
+                any((self.get(f"patch_ib({i})%thermal_layer") or 0) > 0 for i in range(1, num_ibs + 1)),
+                "amr with ib does not support patch_ib thermal_layer (not yet validated)",
             )
             # gp_surf is sized for the coarse ghost points; fine blocks swap in their own
             for wrt in ("ib_surface_wrt", "ib_heat_wrt"):
@@ -2435,6 +2437,11 @@ class CaseValidator:
             self.prohibit(
                 amr_max_level is not None and amr_max_level > 1 and moving and (amr_regrid_int or 0) == 0,
                 "multi-level AMR (amr_max_level > 1) with a moving immersed body requires amr_regrid_int > 0",
+            )
+            # each static level is a fixed inset of its parent; past level 2 a body could straddle a level boundary unchecked
+            self.prohibit(
+                amr_max_level is not None and amr_max_level > 2 and (amr_regrid_int or 0) == 0,
+                "static multi-level AMR (amr_regrid_int = 0) with ib supports up to amr_max_level = 2 (deeper blocks are fixed insets that do not track the bodies); use amr_regrid_int > 0",
             )
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(
@@ -3457,8 +3464,6 @@ class CaseValidator:
         self.prohibit(self.get("p", 0) == 0, "sim_data requires p > 0 (3D)")
         self.prohibit(self.get("num_fluids") != 2, "sim_data requires num_fluids = 2")
         self.prohibit(self.get("model_eqns") not in [2, 3], "sim_data requires model_eqns = 2 or 3")
-        # Both writers read the coarse grid only: the energies and the interface come from restricted cell averages
-        self.prohibit(self.get("amr", "F") == "T", "sim_data is not supported with amr")
 
     def check_no_flow_variables(self):
         """Checks that at least one flow variable is selected (post-process)"""

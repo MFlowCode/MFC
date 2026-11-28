@@ -300,7 +300,7 @@ contains
         @:ALLOCATE(alpha_rho_in(1:num_fluids, 1:num_dims), alpha_in(1:num_fluids, 1:num_dims))
 
         ! Assign and update GRCBC inputs
-        #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+        #:for CBC_DIR, XYZ, MNP in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
             if (${CBC_DIR}$ <= num_dims) then
                 vel_in(${CBC_DIR}$, 1) = bc_${XYZ}$%vel_in(1)
                 vel_out(${CBC_DIR}$, 1) = bc_${XYZ}$%vel_out(1)
@@ -312,8 +312,9 @@ contains
                         vel_out(${CBC_DIR}$, 3) = bc_${XYZ}$%vel_out(3)
                     end if
                 end if
-                Del_in(${CBC_DIR}$) = maxval(d${XYZ}$)
-                Del_out(${CBC_DIR}$) = maxval(d${XYZ}$)
+                ! the grid's own cells: with AMR, d${XYZ}$ is allocated to the largest block and the rest is unset
+                Del_in(${CBC_DIR}$) = maxval(d${XYZ}$(-buff_size:${MNP}$ + buff_size))
+                Del_out(${CBC_DIR}$) = Del_in(${CBC_DIR}$)
                 pres_in(${CBC_DIR}$) = bc_${XYZ}$%pres_in
                 pres_out(${CBC_DIR}$) = bc_${XYZ}$%pres_out
                 do i = 1, num_fluids

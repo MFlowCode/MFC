@@ -19,7 +19,8 @@ module m_amr_advance
     use m_amr_registers, only: f_amr_is_child, s_amr_parent_foot
     use m_ibm, only: s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, s_ibm_load_fine_markers, &
         & s_update_mib, s_ibm_reset_fine_park, moving_immersed_boundary_flag, num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, &
-        & s_ibm_check_bodies_on_one_rank
+        & s_ibm_check_bodies_on_one_rank, s_ibm_pack_fine_tcond, s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, &
+        & s_read_tcond_box, s_prescribed_kinematics, s_update_ib_rotation_matrices
     use m_amr_state
     use m_amr_distribution
     use m_amr_store
@@ -30,7 +31,13 @@ module m_amr_advance
     implicit none
 
     private
-    public :: s_amr_fine_stage_advance_batched, s_amr_setup_ib, s_amr_fine_stage_ib
+    public :: s_amr_fine_stage_advance_batched, s_amr_setup_ib, s_amr_fine_stage_ib, s_amr_ib_tcond_restart, s_amr_ib_pose_begin, &
+        & s_amr_ib_pose
+
+    !> Subcycling with prescribed motion: the bodies' step-end pose (host), and the coarse step's t_step and dt
+    type(ib_patch_parameters), allocatable :: ib_end(:)
+    integer                                :: ib_t_step
+    real(wp)                               :: ib_dt0
 
 contains
 
@@ -63,14 +70,64 @@ contains
 
     end subroutine s_amr_setup_ib
 
+    !> Write (wrt) or restore the T_cond of the fine blocks' ghosts: one ib_tcond file per level, keyed by the level's global cell
+    !! index like the coarse file (s_write_ib_conduction_temperature). Collective; the restore follows s_amr_setup_ib.
+    impure subroutine s_amr_ib_tcond_restart(t_step, wrt)
+
+        integer, intent(in)                     :: t_step
+        logical, intent(in)                     :: wrt
+        real(wp), allocatable, dimension(:,:)   :: rec
+        real(wp), allocatable, dimension(:,:,:) :: tc
+        integer(kind=8)                         :: head(4)
+        integer(kind=8), allocatable            :: tab(:,:)
+        integer                                 :: lev, islot, k, n_f, file_unit, s(3), save_cur
+
+        save_cur = amr_cur
+        do lev = 1, amr_max_level
+            if (wrt) then
+                allocate (rec(4, max(sum([(f_ibm_fine_gps(islot), islot=1, amr_num_blocks)]), 1)))
+                k = 0
+            else if (.not. f_tcond_open(t_step, lev, file_unit, head, tab)) then
+                cycle
+            end if
+            do islot = 1, amr_num_blocks
+                call s_amr_select_slot(islot)
+                n_f = f_ibm_fine_gps(islot)
+                if (.not. amr_rank_owns_block .or. amr_block_level(islot) /= lev .or. n_f == 0) cycle
+                ! the block's first cell in the level's global indices
+                s = 0
+                #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+                    if (amr_dim(${D}$)) s(${D}$) = nint((amr_slots(islot)%${X}$_cc(0) - glb_bounds(${D}$)%beg) &
+                        & /amr_slots(islot)%d${X}$(0) - 0.5_wp)
+                #:endfor
+                if (wrt) then
+                    call s_ibm_pack_fine_tcond(islot, s, rec(:,k + 1:k + n_f))
+                    k = k + n_f
+                else
+                    call s_read_tcond_box(file_unit, head, tab, s, s + [amr_slots(islot)%m, amr_slots(islot)%n, &
+                                          & amr_slots(islot)%p], tc)
+                    call s_ibm_fine_tcond_from_box(islot, s, tc)
+                end if
+            end do
+            if (wrt) then
+                call s_write_tcond_records(t_step, lev, rec, k)
+                deallocate (rec)
+            else
+                close (file_unit)
+            end if
+        end do
+        call s_amr_select_slot(save_cur)
+
+    end subroutine s_amr_ib_tcond_restart
+
     !> Apply the IB state correction on the current fine block after its RK update, mirroring the coarse s_ibm_correct_state.
     !! amr_cur is set by the caller.
     impure subroutine s_amr_ib_correct_fine(q_prim_b, pb_in, mv_in)
 
         !> the q_prim the block's RHS pass filled (pooled scratch)
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_b
-        real(stp), dimension(:,:,:,:,:), intent(inout)           :: pb_in, mv_in  !< unread: amr prohibits qbmm
-        integer                                                  :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
+        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in  !< unread: amr requires polytropic bubbles without QBMM
+        integer :: loc_cur                                              !< plain scalars for device routines (NVHPC -Minline)
 
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
@@ -213,7 +270,7 @@ contains
             h_merge_1_wp_dt_igr = merge(1._wp, dt, igr)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, h_coefs_1, h_coefs_2, h_coefs_3, h_coefs_4, h_merge_1_wp_dt_igr)
             if (ib .or. f_stage_hooks_pre_ib_on_block() .or. f_stage_hooks_post_ib()) then
-                call s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in)
+                call s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in, q_T_sf)
             end if
             call s_phase_toc(PH_RK)
         end do
@@ -276,12 +333,13 @@ contains
     end subroutine s_amr_bat_ib_tables
 
     !> Per-member post-RK hooks of the coarse stage (q_cons_ts(1), m_time_steppers).
-    impure subroutine s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in)
+    impure subroutine s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in, q_T_sf)
 
         real(wp), intent(in)                           :: coefs(4)
         real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
+        type(scalar_field), intent(in)                 :: q_T_sf  !< the slab's temperatures from this stage's RHS
         integer                                        :: ibm, nb
-        logical                                        :: pre, post
+        logical                                        :: pre, post, mtw
 
         ! the coarse stage's post-RK hooks (m_time_steppers) run here per member in its own frame, from the same lists
         ! (m_stage_hooks) around the same IB correction. Each reads only the member's cells, so member order is free.
@@ -289,14 +347,24 @@ contains
         ! need the member's extents.
 
         pre = f_stage_hooks_pre_ib_on_block(); post = f_stage_hooks_post_ib()
+        mtw = bodyForces .and. mean_temp_wall > 0._wp
         nb = amr_bat_n; amr_bat_n = 1
         do ibm = 1, nb
             call s_amr_select_slot(amr_bat_blk(ibm))
             if (pre .and. amr_rank_owns_block) then
-                ! same ldt as the coarse stage; the synthetic turbulence forcing reads the member's own primitive state
-                if (synthetic_turbulence) call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
+                ! same ldt as the coarse stage; the synthetic turbulence forcing reads the member's own primitive state, the
+                ! mean_temp_wall source its temperatures
+                if (mtw) then
+                    call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk, q_T_sf, amr_T_blk)
+                else if (synthetic_turbulence) then
+                    call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
+                end if
                 call s_amr_fine_enter()
-                if (synthetic_turbulence) then
+                ! the body forces zero the mean sources in the block's own solid cells
+                if (ib .and. bodyForces) call s_ibm_load_fine_markers(1, [amr_cur], reshape([m, n, p], [3, 1]), 1, 0)
+                if (mtw) then
+                    call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim_blk, amr_scr_rhs, coefs(3)*dt/coefs(4), .true., amr_T_blk)
+                else if (synthetic_turbulence) then
                     call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim_blk, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)
                 else
                     call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)
@@ -425,6 +493,46 @@ contains
         call s_amr_select_slot(1)  ! the next stage's coarse RHS captures creg into slot 1
 
     end subroutine s_amr_fine_stage_ib
+
+    !> Subcycling: keep the bodies' step-end pose (the coarse step has moved them) for s_amr_ib_pose.
+    impure subroutine s_amr_ib_pose_begin(t_step)
+
+        integer, intent(in) :: t_step
+
+        if (.not. (ib .and. moving_immersed_boundary_flag)) return
+        ib_end = patch_ib(1:num_ibs)
+        ib_t_step = t_step; ib_dt0 = dt
+
+    end subroutine s_amr_ib_pose_begin
+
+    !> Subcycling: set each moving body to its pose at the fraction th of the coarse step: its kinematics at that time, else the
+    !! linear blend of the step-start (step_*) and step-end poses; th = 1 is the end pose.
+    impure subroutine s_amr_ib_pose(th)
+
+        real(wp), intent(in) :: th
+        integer              :: i
+
+        if (.not. (ib .and. moving_immersed_boundary_flag)) return
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm == 0) cycle
+            if (th >= 1._wp) then
+                patch_ib(i) = ib_end(i)
+            else if (patch_ib(i)%kin_model > 0) then
+                call s_prescribed_kinematics(i, f_step_time(th, ib_t_step, ib_dt0))
+            else
+                patch_ib(i)%x_centroid = (1._wp - th)*patch_ib(i)%step_x_centroid + th*ib_end(i)%x_centroid
+                patch_ib(i)%y_centroid = (1._wp - th)*patch_ib(i)%step_y_centroid + th*ib_end(i)%y_centroid
+                patch_ib(i)%z_centroid = (1._wp - th)*patch_ib(i)%step_z_centroid + th*ib_end(i)%z_centroid
+                patch_ib(i)%angles = (1._wp - th)*patch_ib(i)%step_angles + th*ib_end(i)%angles
+                patch_ib(i)%vel = (1._wp - th)*patch_ib(i)%step_vel + th*ib_end(i)%vel
+                patch_ib(i)%angular_vel = (1._wp - th)*patch_ib(i)%step_angular_vel + th*ib_end(i)%angular_vel
+            end if
+        end do
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        call s_update_ib_rotation_matrices(num_ibs)
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
+    end subroutine s_amr_ib_pose
 
     !> The batch's slab layout: members stacked along the last active dim, stride amr_bat_w.
     impure subroutine s_amr_bat_layout()

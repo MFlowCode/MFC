@@ -206,8 +206,8 @@ class TestMeanPressureGradient(ConstraintTestCase):
     def test_accepts_ib(self):
         self.assertAccepts({**BASE, **CYLINDER, "mean_dpdx(1)": -1.0})
 
-    def test_rejects_amr_with_ib(self):
-        self.assertRejects({**BASE, **CYLINDER, "amr": "T", "mean_dpdx(1)": -1.0}, "mean_dpdx/mean_mflux with amr do not support ib")
+    def test_allows_amr_with_ib(self):
+        self.assertNotIn("do not support ib", self.errors_for({**BASE, **CYLINDER, "amr": "T", "mean_dpdx(1)": -1.0}))
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**BASE, "mean_mflux(1)": 1.0}, "mean_dpdx_gain must be set")
@@ -256,11 +256,11 @@ class TestMeanTemperatureSource(ConstraintTestCase):
     def test_accepts_ib(self):
         self.assertAccepts({**self.PERIODIC, **CYLINDER, "mean_qdot": 1.0e6})
 
-    def test_rejects_amr_with_ib(self):
-        self.assertRejects({**self.PERIODIC, **CYLINDER, "amr": "T", "mean_qdot": 1.0e6}, "mean_qdot/mean_temp with amr do not support ib")
+    def test_allows_amr_with_ib(self):
+        self.assertNotIn("do not support ib", self.errors_for({**self.PERIODIC, **CYLINDER, "amr": "T", "mean_qdot": 1.0e6}))
 
-    def test_rejects_amr_with_wall(self):
-        self.assertRejects({**self.WALL_CHANNEL, "amr": "T"}, "mean_temp_wall does not support amr")
+    def test_allows_amr_with_wall(self):
+        self.assertNotIn("mean_temp_wall does not support amr", self.errors_for({**self.WALL_CHANNEL, "amr": "T"}))
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")
@@ -660,9 +660,43 @@ class TestAmrDefaults(unittest.TestCase):
         for k in ("qbmm", "stretch_x", "cyl_coord", "relax"):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
+
+    def test_bubbles_euler_under_amr(self):
+        """Single-fluid polytropic Euler bubbles (with adv_n or polydisperse) are allowed; adap_dt, QBMM, non-polytropic, more than
+        one fluid, the quartic prolongation and immersed bodies are not."""
+        bub = {**self.AMR, "bubbles_euler": "T", "nb": 1, "bubble_model": 2, "polytropic": "T", "thermal": 3}
+        bub.update({"bub_pp%R0ref": 1.0, "bub_pp%p0ref": 1.0, "bub_pp%rho0ref": 1.0, "bub_pp%ss": 0.07, "bub_pp%pv": 0.02, "bub_pp%mu_l": 0.01})
+        bub.update({"bub_pp%gam_g": 1.4, "fluid_pp(1)%eos": 1, "fluid_pp(1)%pi_inf": 3515.0, "patch_icpp(1)%r0": 1.0, "patch_icpp(1)%v0": 0.0})
+        validate_case_constraints(bub, "simulation")
+        validate_case_constraints({**bub, "adv_n": "T"}, "simulation")
+        validate_case_constraints({**bub, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}, "simulation")
+        for mods, msg in (
+            ({"adap_dt": "T"}, "does not support adap_dt"),
+            ({"polytropic": "F"}, "requires polytropic = T"),
+            ({"num_fluids": 2, "mpp_lim": "T"}, "requires num_fluids = 1"),
+            ({"amr_prolong": 2}, "requires amr_prolong = 1"),
+            ({"ib": "T", "num_ibs": 1}, "does not support ib"),
+            ({"nb": 3, "qbmm": "T"}, "incompatible with qbmm"),
+        ):
+            with self.assertRaises(CaseConstraintError, msg=str(mods)) as ctx:
+                validate_case_constraints({**bub, **mods}, "simulation")
+            self.assertIn(msg, str(ctx.exception))
+
+    def test_multilevel_block_pool(self):
+        """amr_max_level > 1 needs one pool slot per level, as the static builder's abort."""
+        ml = {**self.AMR, "amr_max_level": 3}
+        validate_case_constraints({**ml, "amr_max_blocks": 3}, "simulation")
         with self.assertRaises(CaseConstraintError) as ctx:
-            validate_case_constraints({**self.AMR, "particles_lagrange": "T"}, "simulation")
-        self.assertIn("amr does not support particles_lagrange", str(ctx.exception))
+            validate_case_constraints({**ml, "amr_max_blocks": 2}, "simulation")
+        self.assertIn("needs amr_max_blocks >= amr_max_level", str(ctx.exception))
+
+    def test_surface_tension_on_one_level(self):
+        st = {**self.AMR, "num_fluids": 2, "model_eqns": 3, "mpp_lim": "T", "riemann_solver": 2, "surface_tension": "T", "sigma": 1.0}
+        validate_case_constraints(st, "simulation")
+        ml = {**st, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_max_level": 2, "amr_max_blocks": 8}
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints(ml, "simulation")
+        self.assertIn("amr with surface_tension supports one refined level", str(ctx.exception))
 
     def test_tag_var(self):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
@@ -694,6 +728,14 @@ class TestAmrDefaults(unittest.TestCase):
             validate_case_constraints({**sub, "time_stepper": 1}, "simulation")
         self.assertIn("amr_subcycle requires time_stepper = 2 or 3", str(ctx.exception))
 
+    def test_subcycle_any_ratio_and_depth(self):
+        sub = {**self.AMR, "amr_subcycle": "T", "amr_max_blocks": 8, "amr_block_beg(1)": 30, "amr_block_end(1)": 33}
+        validate_case_constraints({**sub, "amr_ref_ratio": 4, "amr_max_level": 2}, "simulation")
+        validate_case_constraints({**sub, "amr_max_level": 3}, "simulation")
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints({**sub, "amr_ref_ratio": 4, "amr_prolong": 2}, "simulation")
+        self.assertIn("amr_prolong = 2 requires amr_ref_ratio = 2", str(ctx.exception))
+
     def test_every_logical_switch_is_vetted_or_rejected(self):
         """A LOG parameter AMR_VETTED_FLAGS does not cover must make check_amr reject the case."""
         for name in sorted(_logical_switch_names()):
@@ -705,21 +747,30 @@ class TestAmrDefaults(unittest.TestCase):
                 self.assertIn("amr", str(ctx.exception))
 
     def test_ib_gates_under_amr(self):
-        """STL that moves or regrids, reacting, chemistry-thermal and lumped surfaces, ib_surface_wrt and ib_heat_wrt are rejected;
-        STL on a static block, an analytic non-box body that regrids and the isothermal wall without chemistry are allowed."""
+        """The surface energy balance, the lumped wall, the flux wall, the thermal layer, ib_surface_wrt and ib_heat_wrt are rejected;
+        STL bodies (static, moving or regridded), an analytic non-box body that regrids and the isothermal wall, reacting or not, are
+        allowed."""
         ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
         ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1})
         validate_case_constraints(dict(ib), "simulation")
+        react = {"chemistry": "T", "cantera_file": "h2o2.yaml", "surface_cantera_file": "s.yaml", "surface_phase": "surf", "patch_ib(1)%surface_reaction": 1}
+        react.update({"patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0})
+        validate_case_constraints({**ib, **react}, "simulation")
         rejected = [
-            ({"patch_ib(1)%geometry": 5, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "analytic geometries only"),
-            ({"patch_ib(1)%geometry": 5, "patch_ib(1)%moving_ibm": 1}, "analytic geometries only"),
-            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0}, "thermal_bc = 1 only without chemistry"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0, "patch_ib(1)%thermal_layer": 1.0e-3}, "thermal_layer"),
+            ({**react, "patch_ib(1)%thermal_bc": 2}, "no thermal_bc = 2 or 3"),
+            ({**react, "ib_flux_wall": "T"}, "ib_flux_wall is not supported with amr (#2230)"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_surface_wrt": "T"}, "ib_surface_wrt"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_heat_wrt": "T"}, "ib_heat_wrt (not yet validated)"),
-            ({"patch_ib(1)%thermal_bc": 3, "patch_ib(1)%Twall": 600.0, "patch_ib(1)%rho_solid": 2000.0, "patch_ib(1)%cp_solid": 700.0}, "thermal_bc = 1 only without chemistry"),
+            ({"patch_ib(1)%thermal_bc": 3, "patch_ib(1)%Twall": 600.0, "patch_ib(1)%rho_solid": 2000.0, "patch_ib(1)%cp_solid": 700.0}, "no thermal_bc = 2 or 3"),
         ]
-        validate_case_constraints({**ib, "patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1}, "simulation")
+        stl = {**ib, "patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1}
+        validate_case_constraints(stl, "simulation")
+        # STL bodies are bounded by the model's box, so they may move or regrid too
+        validate_case_constraints({**stl, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "simulation")
+        validate_case_constraints({**stl, "patch_ib(1)%moving_ibm": 1}, "simulation")
         validate_case_constraints({**ib, "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1.5, "fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0}, "simulation")
+        validate_case_constraints({**ib, "chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0}, "simulation")
         # analytic non-box bodies are bounded by their marker-drawing radius, so they may move or regrid
         validate_case_constraints({**ib, "patch_ib(1)%geometry": 6, "patch_ib(1)%length_x": 0.2, "patch_ib(1)%length_y": 0.1, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "simulation")
         for mods, msg in rejected:
@@ -736,6 +787,22 @@ class TestAmrDefaults(unittest.TestCase):
         with self.assertRaises(CaseConstraintError) as ctx:
             validate_case_constraints({**ib, "amr_regrid_int": 0}, "simulation")
         self.assertIn("requires amr_regrid_int > 0", str(ctx.exception))
+
+    def test_subcycle_force_driven_ib(self):
+        """A force-driven body may subcycle: its step impulse takes the fine faces after the substeps."""
+        ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
+        ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.05})
+        validate_case_constraints({**ib, "amr_subcycle": "T", "patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 1.0}, "simulation")
+
+    def test_static_ib_nesting_depth(self):
+        """Static nesting with ib stops at level 2: deeper fixed insets do not track the body."""
+        ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
+        ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.05})
+        ib.update({"amr_max_blocks": 16, "amr_regrid_int": 0})
+        validate_case_constraints({**ib, "amr_max_level": 2}, "simulation")
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints({**ib, "amr_max_level": 3}, "simulation")
+        self.assertIn("with ib supports up to amr_max_level = 2", str(ctx.exception))
 
     def test_non_amr_untouched(self):
         q = dict(BASE)
@@ -1227,8 +1294,9 @@ class TestSimData(ConstraintTestCase):
     def test_rejects_gamma_law(self):
         self.assertRejects({**self.GOOD, "model_eqns": 1}, "sim_data requires model_eqns = 2 or 3")
 
-    def test_rejects_amr(self):
-        self.assertRejects({**self.GOOD, "amr": "T"}, "sim_data is not supported with amr")
+    def test_accepts_amr(self):
+        """With amr both writers read level 0, the fine solution restricted into it."""
+        self.assertAccepts({**self.GOOD, "amr": "T"})
 
     def test_not_tripped_when_disabled(self):
         self.assertAccepts({**BASE_2D, "rho_wrt": "T", "sim_data": "F"})

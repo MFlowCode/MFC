@@ -36,7 +36,7 @@ contains
         logical, intent(in)                                      :: on_block
         type(scalar_field), intent(inout), optional              :: q_T_sf
 
-        if (bodyForces) call s_apply_bodyforces(q_cons, q_prim, rhs, ldt, q_T_sf)
+        if (bodyForces) call s_apply_bodyforces(q_cons, q_prim, rhs, ldt, on_block, q_T_sf)
         if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons, q_prim, rhs, ldt)
         if (grid_geometry == 3 .and. .not. on_block) call s_apply_fourier_filter(q_cons)
         if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_pressure_relaxation_procedure(q_cons)

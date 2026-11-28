@@ -14,6 +14,7 @@ With `amr_regrid_int > 0`, the blocks are rebuilt around the cells where the den
 once per level before the first step of a fresh run, so they start on the initial features, and then every
 `amr_regrid_int` steps. With `amr_regrid_int = 0` a single block stays at `amr_block_beg`..`amr_block_end`; with `amr_max_level > 1` each
 deeper level adds one block, inset by a quarter of its parent's extent (at least the stencil margin) on each side.
+The insets ignore immersed bodies, so with `ib` static nesting stops at `amr_max_level = 2`.
 
 On a fresh run the blocks start from `patch_icpp` evaluated at their own cell centers, as on a uniform grid at
 that resolution. If the patches alone do not reproduce the level-0 data (hard-coded or STL patches, a perturbed or
@@ -52,15 +53,15 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
   aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
   largest stable `dt`. With regrid on, start-up also aborts if `dt` would exceed that limit were the fastest cells
-  refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes `amr_ref_ratio` steps per parent step, with ghost
   cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
-- **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
+- **Refluxing and restriction.** Fine face fluxes (advective, viscous, capillary, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. A
   volume fraction's flux pairs with an \f$\alpha\,\nabla\cdot u\f$ source on the same faces, so the registers also hold
   the face velocity and the volume fractions' reflux corrects both: uniform \f$\alpha\f$ stays uniform, and a material
   interface on a block face keeps pressure and velocity equilibrium (HLLC, HLL with `hll_u_interface` and LF, with two or
   more fluids). The same correction covers the `alt_soundspeed` \f$K\,\nabla\cdot u\f$ term, the 6-equation internal
-  energies' \f$\alpha_k p\,\nabla\cdot u\f$, and HLL Method 1, whose per-fluid interface volume fractions the registers
+  energies' \f$\alpha_k p\,\nabla\cdot u\f$, the surface-tension colour function's \f$c\,\nabla\cdot u\f$, and HLL Method 1, whose per-fluid interface volume fractions the registers
   also hold. Each covered coarse cell is then set to the average of its fine children.
 
 ## Conservation and accuracy {#amr-conservation}
@@ -69,7 +70,13 @@ Conservation across coarse/fine faces holds to round-off for single- and multi-f
 a uniform state stays uniform with regrid on. Interiors keep the WENO order; the coarse/fine ghost fill is second
 order (linear) or fifth order (quartic). For a smooth wave crossing a static block, the measured global L2 rate is 2.5 with
 the linear fill (its second-order ghost values leave a second-order error in the few cells at each interface) and 5 with
-the quartic fill, as for WENO5 on a uniform grid; the `Convergence -> 1D -> AMR` tests track it. Results do not depend on
+the quartic fill, as for WENO5 on a uniform grid; the `Convergence -> 1D -> AMR` tests track it. Where a composition jump
+(two gases of different molar mass at one pressure) crosses a block edge, the edge cells over the jump gain a velocity
+across the edge that the uniform grid does not have, from the ghost fill of the coarse jump: in the H2/air diffusion check of
+`Convergence -> amr_check -> 2D -> immersed body -> chemistry diffusion`, 8e-5 kg/(m^2 s) of y-momentum after one step on the
+edge cells over the jump, with or without the body and wherever the jump sits along the edge. That check reports it as 1.3
+only because the body's flow sets the y-momentum scale (3e-4); without the body the scale is 1. The cells a few cells in
+match the uniform grid to round-off. Results do not depend on
 message timing, and agree across rank counts to round-off when `amr_max_grid_size` is set (with `amr_max_grid_size = 0` the
 block size cap, and therefore the box set, depends on the decomposition).
 
@@ -101,21 +108,24 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | Feature | Status |
 | :--- | :--- |
 | Single- and multi-fluid Euler, 6-equation model | Supported |
-| Viscous, Fourier heat conduction (`k_therm`), hypoelastic (with continuum damage), body forces | Supported |
+| Viscous (`weno_Re_flux` with or without `weno_Re_flux_compact`), Fourier heat conduction (`k_therm`), hypoelastic (with continuum damage), body forces | Supported |
 | Chemistry (reactions, diffusion) | Supported; with `chem_params%%reaction_substeps > 0` each block takes the split reaction at the end of the step, before the fold |
-| Immersed boundaries (fixed, prescribed or force-driven motion; STL on static blocks only; not `surface_reaction`, `thermal_bc` other than the isothermal wall without chemistry, `ib_surface_wrt`, `ib_heat_wrt`, `ib_mass_relax` or `ib_uncover_fill`) | Supported; blocks always contain each body; moving bodies are lock-step only, and with `amr_max_level > 1` need `amr_regrid_int > 0`; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the coarse grid only with `amr_subcycle`); the default `ib_mass_relax = -1` resolves to off, so a moving body differs from a uniform-grid run, where it is on |
-| Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
+| Immersed boundaries (fixed, prescribed or force-driven motion, STL included; adiabatic or isothermal walls, reacting (`surface_reaction`) or not; not `thermal_bc = 2` or `3`, `thermal_layer`, `ib_flux_wall`, `ib_surface_wrt`, `ib_heat_wrt`, `ib_mass_relax` or `ib_uncover_fill`) | Supported; blocks always contain each body; moving bodies run lock-step or subcycled (each fine stage sets the pose at its own time; a force-driven body's step impulse then takes the fine faces in place of the covered coarse ones, as the reflux does for the fluid); with `amr_max_level > 1` moving bodies need `amr_regrid_int > 0`; multi-level with IB is single-rank; forces and torques are summed on the finest level covering each face (the written forces: the coarse grid only with `amr_subcycle`); the default `ib_mass_relax = -1` resolves to off, so a moving body differs from a uniform-grid run, where it is on |
+| Lagrangian bubbles | Supported, lock-step or subcycled; the cloud stays on the base grid (blocks are kept clear of it) |
+| Lagrangian particles (`particles_lagrange`) | Supported, lock-step or subcycled; the particles stay on the base grid (blocks are kept clear of their kernel and stencils) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
-| Mean pressure gradient and bulk-flux / bulk-temperature controllers (`mean_dpdx`, `mean_mflux`, `mean_qdot`, `mean_temp`) | Supported without `ib` and `mean_temp_wall`; the controllers measure level 0 after the fold (exact for the mass flux, second order for the temperature) and apply one uniform source on every level |
+| Mean pressure gradient and bulk-flux / bulk-temperature controllers (`mean_dpdx`, `mean_mflux`, `mean_qdot`, `mean_temp`, `mean_temp_wall`) | Supported, `mean_temp_wall` included (each block's source reads its own temperatures); each block zeroes the sources in its own solid cells; the controllers measure level 0 after the fold (exact for the mass flux, second order for the temperature) and apply one uniform source on every level |
 | MHD / RMHD | 1D only |
-| IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
+| IGR | Single-rank, lock-step or subcycled (the fine sigma seed blends the coarse sigma of stage times 0 and 1); coarse/fine conservation is truncation-order |
 | Synthetic turbulence forcing | Supported; evaluated on each block's own grid |
 | Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
 | Condensed-phase burn (`reactive_burn`) | Supported; with `rburn%%substeps > 0` each block takes the split burn at the end of the step, before the fold |
-| Euler-Euler bubbles, QBMM, surface tension | Not supported |
+| Surface tension | One refined level (`amr_max_level = 1`); the capillary flux is refluxed, so mass, momentum and energy are conserved across block faces also without `viscous` |
+| Euler-Euler bubbles (`bubbles_euler`) | Single fluid, polytropic, with `adv_n` or `polydisperse`; not with `adap_dt`, `qbmm`, immersed bodies or `amr_prolong = 2`; the bubble variables are prolonged, restricted and refluxed like the others |
+| QBMM | Not supported |
 | Riemann-extrapolation boundaries (`bc = -4`) | Supported, except with `null_weights` |
-| Characteristic boundaries (`bc = -5` to `-12`) | Supported; the coarse grid applies them at the domain boundary (blocks stay `buff_size` cells inside it) |
+| Characteristic boundaries (`bc = -5` to `-12`, GRCBC included) | Supported; the coarse grid applies them at the domain boundary (blocks stay `buff_size` cells inside it) |
 | Cylindrical coordinates, stretched grids | Not supported |
 
 ## Parameters {#amr-parameters}
@@ -137,8 +147,8 @@ Full descriptions: @ref case.
 | `amr_max_grid_size` | 0 | Maximum box width, coarse cells; 0 derives it from the decomposition (and, on several ranks, tiles regrid boxes smaller, not below 16, until there is one per rank) |
 | `amr_max_blocks` | 1024 | Maximum number of blocks |
 | `amr_max_level` | 1 | Number of refined levels |
-| `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: no subcycling or quartic) |
-| `amr_subcycle` | F | Subcycle refined levels in time (ratio 2, up to two levels) |
+| `amr_ref_ratio` | 2 | Refinement ratio, 2 or 4 (4: no quartic) |
+| `amr_subcycle` | F | Subcycle refined levels in time (`amr_ref_ratio` substeps per parent step, any depth) |
 | `amr_prolong` | 1 | 1: limited linear, 2: quartic (ratio 2) |
 | `amr_place_owner` | F | Owner-aware block placement |
 | `amr_snap` | 0 | Regrid hysteresis, coarse cells (<= `amr_buf - 2`; one refined level only under regrid) |
@@ -243,4 +253,5 @@ comparable (forces on coarse faces only).
   the initial regrid and fills the blocks from the patches.
   The overlay carries density, pressure, velocity and volume fractions only; probes and derived post_process fields read
   level 0, `run_time_info` reads the level-0 state but scales its CFL numbers to the finest level covering each cell
-  (its Mie-Gruneisen compression check also reads the fine blocks), and `sim_data` is rejected.
+  (its Mie-Gruneisen compression check also reads the fine blocks), and `sim_data` reads level 0 (its volume and total energy sums
+  equal the composite ones, since the restriction conserves them; its kinetic and internal energies are level-0 approximations).

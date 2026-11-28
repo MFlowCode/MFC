@@ -18,6 +18,7 @@ module m_amr_state
     use m_mpi_common, only: s_mpi_allreduce_array_max
     use m_amr_registers, only: s_amr_parent_foot
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
+    use m_particles_EL, only: s_lag_particle_bbox_local
 
     implicit none
 
@@ -71,6 +72,9 @@ module m_amr_state
     type(scalar_field), allocatable :: amr_scr_prim(:), amr_scr_rhs(:)
     !> block-frame prim scratch for the batched per-member IB correction (ib only); the slab prim stacks members along amr_bat_sd
     type(scalar_field), allocatable :: amr_scr_prim_blk(:)
+    !> block-frame temperature scratch for the per-member mean_temp_wall source (the slab's are in q_T_sf)
+    type(scalar_field) :: amr_T_blk
+    $:GPU_DECLARE(create='[amr_T_blk]')
     !> Blocks per batched s_compute_rhs call (amr_bat_max once initialized); bounded to avoid exhausting device memory.
     integer :: amr_br_batch = 1
     integer :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
@@ -436,20 +440,34 @@ contains
 
     end subroutine s_amr_phys_to_cells
 
-    !> Rank-local per-stage guard: the local bubbles' padded bbox must stay clear of the current block (initial overlap, or drift
-    !! beyond the regrid margin).
+    !> Rank-local bounding box of the Lagrangian bubbles or particles; pmin > pmax when the rank holds none.
+    impure subroutine s_amr_lag_bbox_local(pmin, pmax)
+
+        real(wp), dimension(3), intent(out) :: pmin, pmax
+
+        if (bubbles_lagrange) then
+            call s_lag_cloud_bbox_local(pmin, pmax)
+        else
+            call s_lag_particle_bbox_local(pmin, pmax)
+        end if
+
+    end subroutine s_amr_lag_bbox_local
+
+    !> Rank-local per-stage guard: the local bubbles' or particles' padded bbox must stay clear of the current block (initial
+    !! overlap, or drift beyond the regrid margin). The pad (mapCells + 2) covers the particles' kernel, interpolation and gradient
+    !! stencils too.
     impure subroutine s_amr_check_lag_clear()
 
         real(wp), dimension(3) :: pmin_loc, pmax_loc
         integer                :: blo(3), bhi(3)
 
-        if (.not. bubbles_lagrange) return
-        call s_lag_cloud_bbox_local(pmin_loc, pmax_loc)
-        if (pmin_loc(1) > pmax_loc(1)) return  ! no bubbles on this rank
+        if (.not. euler_lagrange) return
+        call s_amr_lag_bbox_local(pmin_loc, pmax_loc)
+        if (pmin_loc(1) > pmax_loc(1)) return  ! none on this rank
         call s_amr_phys_to_cells(pmin_loc, pmax_loc, mapCells + 2, blo, bhi)
         if (f_amr_boxes_overlap(blo, bhi, amr_slots(amr_cur)%region%lo, amr_slots(amr_cur)%region%hi)) then
-            call s_mpi_abort('amr with Lagrangian bubbles: the bubble cloud (positions + smearing support) ' &
-                             & // 'overlaps an active fine block, where two-way coupling would be lost. Keep the initial ' &
+            call s_mpi_abort('amr with Lagrangian bubbles or particles: the cloud (positions + smearing support) ' &
+                             & // 'overlaps an active fine block, where the coupling would be lost. Keep the initial ' &
                              & // 'block clear of the cloud; under dynamic regrid, reduce amr_regrid_int or increase ' &
                              & // 'amr_buf so the exclusion margin covers the cloud drift between regrids')
         end if
@@ -563,7 +581,11 @@ contains
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
         end do
-        if (ib .or. synthetic_turbulence) then
+        if (mean_temp_wall > 0._wp) then
+            @:ALLOCATE(amr_T_blk%sf(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3)))
+            @:ACC_SETUP_SFs(amr_T_blk)
+        end if
+        if (ib .or. synthetic_turbulence .or. mean_temp_wall > 0._wp) then
             allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim_blk)
             $:GPU_ENTER_DATA(create='[amr_scr_prim_blk]')
             do i = 1, sys_size

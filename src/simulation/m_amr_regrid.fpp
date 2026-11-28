@@ -18,7 +18,7 @@ module m_amr_regrid
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_amr_wave
-    use m_amr_state, only: amr_band_migrate
+    use m_amr_state, only: amr_band_migrate, s_amr_lag_bbox_local
     use m_phase_timing
     use m_amr_cluster, only: s_amr_cluster
     use m_amr_nest, only: s_amr_regrid_nest_children, f_amr_boxes_compatible, f_amr_nested, f_amr_tag_val_sf, f_amr_tag_vort_sf, &
@@ -33,7 +33,6 @@ module m_amr_regrid
         & s_amr_fill_wave_done, amr_fw_dev, amr_nest_seam, s_amr_refresh_lists
     use m_amr_stage, only: s_amr_fill_levels
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
-    use m_bubbles_EL, only: s_lag_cloud_bbox_local
 
     implicit none
 
@@ -182,15 +181,15 @@ contains
 
     end subroutine s_amr_clip_box_from_sources
 
-    !> Collectively recompute the global bubble-cloud exclusion bbox, padded by pad_cells; lag_supp_on = false when no rank holds a
-    !! bubble.
+    !> Collectively recompute the global bubble- or particle-cloud exclusion bbox, padded by pad_cells; lag_supp_on = false when no
+    !! rank holds one.
     impure subroutine s_amr_compute_lag_supp(pad_cells)
 
         integer, intent(in)    :: pad_cells
         real(wp), dimension(3) :: pmin_loc, pmax_loc, pmin_glb, pmax_glb
         integer                :: d
 
-        call s_lag_cloud_bbox_local(pmin_loc, pmax_loc)
+        call s_amr_lag_bbox_local(pmin_loc, pmax_loc)
         do d = 1, 3
             call s_mpi_allreduce_min(pmin_loc(d), pmin_glb(d))
             call s_mpi_allreduce_max(pmax_loc(d), pmax_glb(d))
@@ -245,7 +244,7 @@ contains
         integer, intent(inout) :: lo(3), hi(3)
 
         if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
-        if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
+        if (euler_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
 
     end subroutine s_amr_clip_box_clear
 
@@ -308,7 +307,7 @@ contains
         call s_phase_toc(PH_RG_HALO)
 
         ! cloud pad: smearing (mapCells) + stencil (2) + drift (amr_buf)
-        if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
+        if (euler_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
 
         call s_phase_tic(PH_RG_TAG)
         call s_amr_regrid_tag_cells(q_cons_base, tag_grid, sidx)
@@ -392,7 +391,7 @@ contains
                         if (f_in_acoustic_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
                     end if
                     ! bubble cloud stays coarse (two-way coupling lives there)
-                    if (bubbles_lagrange .and. tag_grid(ci, cj, ck)) then
+                    if (euler_lagrange .and. tag_grid(ci, cj, ck)) then
                         if (f_in_lag_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
                     end if
                 end do
@@ -746,7 +745,7 @@ contains
         if (ib) call s_amr_check_boxes_agree(boxes, nboxes)
 
         ! a body block cannot both contain the body and exclude a source/cloud: fail closed
-        if (ib .and. (acoustic_source .or. (bubbles_lagrange .and. lag_supp_on))) then
+        if (ib .and. (acoustic_source .or. (euler_lagrange .and. lag_supp_on))) then
             do k = 1, nboxes
                 lo = boxes(k)%lo; hi = boxes(k)%hi
                 call s_amr_clip_box_clear(lo, hi)

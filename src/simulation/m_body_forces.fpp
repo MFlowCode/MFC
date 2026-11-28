@@ -13,7 +13,7 @@ module m_body_forces
     use m_mpi_proxy
     use m_helper, only: s_prng_splitmix32, f_unit_vector, f_cross
     use m_helper_basic, only: f_is_default
-    use m_ibm, only: ib_markers
+    use m_ibm, only: ib_markers, ib_markers_fine
     use m_viscous, only: Res_viscous
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cp_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_mixture_viscosity_mixavg
@@ -120,7 +120,8 @@ contains
         mts_sim = .not. f_is_default(mean_temp_wall)
         mts_beta = 0._wp
         if (mts_sim) then
-            @:ALLOCATE(mts_g1(0:m, 0:n, 0:p), mts_g2(0:m, 0:n, 0:p))
+            ! m_alloc: AMR fine frames evaluate them too
+            @:ALLOCATE(mts_g1(0:m_alloc, 0:n_alloc, 0:p_alloc), mts_g2(0:m_alloc, 0:n_alloc, 0:p_alloc))
         else
             @:ALLOCATE(mts_g1(0:0, 0:0, 0:0), mts_g2(0:0, 0:0, 0:0))
         end if
@@ -349,13 +350,14 @@ contains
     end subroutine s_compute_mixture_density
 
     !> Compute the body force source terms for momentum and energy equations
-    subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf, bounds, q_T_sf)
+    subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf, bounds, marks, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
         type(scalar_field), intent(in), optional               :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
+        type(integer_field), intent(in)                        :: marks       !< the frame's IB markers
         integer                                                :: i, j, k, l  !< Loop variables
         real(wp)                                               :: f_mpg, q_mts, beta
         logical                                                :: sim
@@ -408,7 +410,7 @@ contains
                     do k = bounds(2)%beg, bounds(2)%end
                         do j = bounds(1)%beg, bounds(1)%end
                             f_mpg = mpg_force(${DIR}$)
-                            if (.not. f_is_fluid_cell(ib_markers, j, k, l)) f_mpg = 0._wp
+                            if (.not. f_is_fluid_cell(marks, j, k, l)) f_mpg = 0._wp
                             rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
                                    & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + f_mpg
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
@@ -432,7 +434,7 @@ contains
                     do j = bounds(1)%beg, bounds(1)%end
                         q_mts = mts_qdot
                         if (sim) q_mts = beta*(mts_g1(j, k, l) + beta*mts_g2(j, k, l))
-                        if (.not. f_is_fluid_cell(ib_markers, j, k, l)) q_mts = 0._wp
+                        if (.not. f_is_fluid_cell(marks, j, k, l)) q_mts = 0._wp
                         rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_mts
                     end do
                 end do
@@ -488,13 +490,14 @@ contains
     !! the energy of each fluid cell: the developed state T_s + psi exp(-beta x) excludes it (Patankar et al. 1977), and the
     !! controller would otherwise remove it through the mode, biasing Nu and cooling a fast core without bound (#2418). The shear
     !! viscosity is the one the viscous fluxes use: Cantera's mixture average at the cell's T and Y with chemistry.
-    subroutine s_remove_mts_dissipation(q_prim_vf, q_T_sf, rhs_vf, dqx_vf, dqy_vf, dqz_vf)
+    subroutine s_remove_mts_dissipation(q_prim_vf, q_T_sf, rhs_vf, dqx_vf, dqy_vf, dqz_vf, marks)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf, dqx_vf, dqy_vf, dqz_vf
         type(scalar_field), intent(in)                         :: q_T_sf
+        type(integer_field), intent(in)                        :: marks  !< the frame's IB markers
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp), dimension(3, 3)                              :: g
-        real(wp), dimension(2)                                 :: mu  !< shear and bulk viscosity
+        real(wp), dimension(2)                                 :: mu     !< shear and bulk viscosity
         real(wp), dimension(num_species)                       :: Ys
         real(wp)                                               :: dv, s2, T, mu_c
         integer                                                :: i, j, k, l, q, r
@@ -504,7 +507,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    if (f_is_fluid_cell(ib_markers, j, k, l)) then
+                    if (f_is_fluid_cell(marks, j, k, l)) then
                         g = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_dims
@@ -549,17 +552,22 @@ contains
     end subroutine s_remove_mts_dissipation
 
     !> Apply the body forces source term at each Runge-Kutta stage
-    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt, q_T_sf)
+    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt, on_block, q_T_sf)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
-        real(wp), intent(in)                                     :: ldt     !< local dt
-        type(scalar_field), intent(in), optional                 :: q_T_sf  !< absent on AMR fine blocks (mean_temp_wall: no amr)
+        real(wp), intent(in)                                     :: ldt       !< local dt
+        logical, intent(in)                                      :: on_block  !< a fine block: ib_markers_fine
+        type(scalar_field), intent(in), optional                 :: q_T_sf    !< read with mean_temp_wall only
         integer                                                  :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
-        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint, q_T_sf)
+        if (on_block .and. ib) then
+            call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint, ib_markers_fine, q_T_sf)
+        else
+            call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint, ib_markers, q_T_sf)
+        end if
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = eqn_idx%mom%beg, eqn_idx%E

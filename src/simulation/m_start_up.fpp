@@ -55,7 +55,8 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
-    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
+    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib, &
+        & s_amr_ib_tcond_restart
     use m_amr_regrid, only: s_amr_regrid
     use m_amr_stage, only: s_amr_relax_fine, s_amr_apply_ic_patches
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
@@ -866,6 +867,7 @@ contains
 
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
+        if (ib .and. amr .and. chemistry .and. chem_params%diffusion) call s_amr_ib_tcond_restart(save_count, .true.)
         if (ib .and. ib_surface_wrt) call s_write_ib_surface(save_count)
         ! Fine-level AMR restart file (current box + intersection-local fine state) alongside the level-0 restart
         if (amr) call s_write_amr_restart(save_count)
@@ -1003,6 +1005,13 @@ contains
         if (n > 0) dy_min = minval(dy(-buff_size:n + buff_size))
         if (p > 0) dz_min = minval(dz(-buff_size:p + buff_size))
 
+        ! the initial blocks contain each body's box (s_amr_init_first_blocks): an STL box needs the model and its orientation
+        if (ib) then
+            call s_instantiate_STL_models()
+            do i = 1, num_ibs
+                call s_update_ib_rotation_matrix(i)
+            end do
+        end if
         call s_initialize_amr_module()
         call s_initialize_amr_registers(amr_maxc_fit)
         ! restarts restore the saved fine state; otherwise prolong from coarse
@@ -1012,7 +1021,6 @@ contains
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            call s_instantiate_STL_models()
             call s_initialize_ib_airfoils()
             call s_get_neighbor_bounds()
             if (cfl_dt .and. n_start > 0) then
@@ -1029,6 +1037,8 @@ contains
                 & cfl_dt) > 0) call s_read_ib_conduction_temperature(merge(n_start, t_step_start, cfl_dt))
             ! resolve the body on each fine block from the geometry
             if (amr) call s_amr_setup_ib()
+            if (amr .and. chemistry .and. chem_params%diffusion .and. merge(n_start, t_step_start, &
+                & cfl_dt) > 0) call s_amr_ib_tcond_restart(merge(n_start, t_step_start, cfl_dt), .false.)
             ! a CFL-mode run keeps t_step_start = 0, so only n_start tells a restart apart
             if (merge(n_start, t_step_start, cfl_dt) == 0) call s_write_ib_data_file(0)
         end if
