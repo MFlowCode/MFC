@@ -117,8 +117,8 @@ PARAM_DOCS = {
     "docs/documentation/case.md": CASE_MD_SKIP,
 }
 
-# Match @ref page_id patterns (page IDs may contain hyphens)
-REF_RE = re.compile(r"@ref\s+([\w-]+)")
+# Match @ref and @subpage page_id patterns (page IDs may contain hyphens)
+REF_RE = re.compile(r"@(ref|subpage)\s+([\w-]+)")
 
 
 def check_docs(repo_root: Path) -> list[str]:
@@ -438,9 +438,9 @@ def check_page_refs(repo_root: Path) -> list[str]:
         text = _strip_code_blocks(md_file.read_text(encoding="utf-8"))
         rel = md_file.relative_to(repo_root)
         for match in REF_RE.finditer(text):
-            ref_target = match.group(1)
+            cmd, ref_target = match.groups()
             if ref_target not in page_ids:
-                errors.append(f"  {rel} uses @ref {ref_target} but no @page with that ID exists. Fix: check the page ID or add @page declaration")
+                errors.append(f"  {rel} uses @{cmd} {ref_target} but no @page with that ID exists. Fix: check the page ID or add @page declaration")
 
     return errors
 

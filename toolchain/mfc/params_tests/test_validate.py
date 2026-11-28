@@ -85,6 +85,12 @@ class TestCheckUnknownParams(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("renamed to 'lag_params%coupling'", errors[0])
 
+    def test_renamed_friction_names_replacement(self):
+        """The old IB-only friction coefficient should point to coefficient_of_friction."""
+        errors = check_unknown_params({"ib_coefficient_of_friction": 0.1})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("renamed to 'coefficient_of_friction'", errors[0])
+
     def test_removed_param_says_why(self):
         """A removed parameter should say it was removed and why."""
         errors = check_unknown_params({"ib_smooth_contact": "T"})

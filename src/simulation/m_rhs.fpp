@@ -18,7 +18,7 @@ module m_rhs
     use m_eos
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
-        & recon_type_muscl, coupling_two_way
+        & recon_type_muscl, coupling_one_way, coupling_two_way
     use m_muscl
     use m_riemann_solvers
     use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf, flux_axis_vf, axis_face_split, s_split_axis_flux
@@ -786,9 +786,16 @@ contains
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
                         if (id == 2 .and. viscous) call s_split_axis_flux(-1._wp)
-                        call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
-                                                                & ib_markers, ib_wall_src(ibw_a), merge(merge(2, 1, &
-                                                                & ib_flux_wall), 0, ib))
+                        ! a fine block (or batched slab) reads its own markers ib_markers_fine, not the coarse ib_markers
+                        if (amr_in_fine_advance) then
+                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
+                                                                    & ib_markers_fine, ib_wall_src(ibw_a), merge(merge(2, 1, &
+                                                                    & ib_flux_wall), 0, ib))
+                        else
+                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
+                                                                    & ib_markers, ib_wall_src(ibw_a), merge(merge(2, 1, &
+                                                                    & ib_flux_wall), 0, ib))
+                        end if
                         if (id == 2 .and. viscous) call s_split_axis_flux(1._wp)
                         call nvtxEndRange
                     end if
@@ -968,7 +975,7 @@ contains
             call s_compute_particles_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
             call nvtxEndRange
 
-            if (particle_params%coupling == coupling_two_way) then
+            if (particle_params%coupling /= coupling_one_way) then  ! two-way or four-way
                 call nvtxStartRange("RHS-EL-PARTICLES-SRC")
                 ! needs cons_copy_all
                 call s_compute_particles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)

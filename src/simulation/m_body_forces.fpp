@@ -555,7 +555,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
         real(wp), intent(in)                                     :: ldt     !< local dt
-        type(scalar_field), intent(in), optional                 :: q_T_sf  !< absent in the AMR fine advance (mean_temp: no amr)
+        type(scalar_field), intent(in), optional                 :: q_T_sf  !< absent on AMR fine blocks (mean_temp_wall: no amr)
         integer                                                  :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
@@ -640,7 +640,8 @@ contains
     !! logged to mean_temp.dat with the mixing-cup T_m = sum(rho u_1 T dV)/sum(rho u_1 dV) and the fluid volume. With
     !! mean_temp_wall, the controller holds T_m instead and beta solves source total = beta (A1 + beta A2), A1 = sum(rho cp u_1 psi
     !! dV), A2 = sum(lam psi dV), psi = T - T_s, with A1 including the discrete conduction terms of the applied source; beta, A1, A2
-    !! are logged too.
+    !! are logged too. Under AMR the sums run over level 0, whose covered cells hold the fold of the fine state: exact for the
+    !! momentum, mass and volume sums, second order for the temperature.
     impure subroutine s_update_mean_sources(q_cons_vf, q_T_sf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf

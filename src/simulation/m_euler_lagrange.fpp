@@ -17,9 +17,10 @@ module m_euler_lagrange
     implicit none
 
     private
+
     public :: s_get_cell, f_lag_entity_in_physical_domain, s_get_char_vol, s_get_lag_restart_point, s_set_lag_comm_coords, &
-        & s_count_lag_entities_glb, s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, f_lag_rk_stage, &
-        & f_lag_entity_in_wall, s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
+        & s_count_lag_entities_glb, s_apply_lag_entity_domain_bc, s_reflect_lag_entity_at_wall, s_wrap_lag_entities_periodic, &
+        & f_lag_rk_stage, f_lag_entity_in_wall, s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
 
     !> Fornberg first-derivative weights at each cell center along x, y and z, one field per stencil point
     type(scalar_field), dimension(:), allocatable :: weights_x_grad, weights_y_grad, weights_z_grad
@@ -356,6 +357,31 @@ contains
         end if
 
     end subroutine s_apply_lag_entity_domain_bc
+
+    !> Mirror an entity whose center crossed a wall back inside along dir and point its velocity away from the wall (host data)
+    impure subroutine s_reflect_lag_entity_at_wall(dir, pos, vel)
+
+        integer, intent(in)     :: dir
+        real(wp), intent(inout) :: pos, vel
+        integer                 :: bc_beg, bc_end
+
+        if (dir == 1) then
+            bc_beg = bc_x%beg; bc_end = bc_x%end
+        else if (dir == 2) then
+            bc_beg = bc_y%beg; bc_end = bc_y%end
+        else
+            bc_beg = bc_z%beg; bc_end = bc_z%end
+        end if
+
+        if (f_is_lag_entity_wall(bc_beg) .and. pos < pcomm_coords(dir)%beg) then
+            pos = 2._wp*pcomm_coords(dir)%beg - pos
+            vel = abs(vel)
+        else if (f_is_lag_entity_wall(bc_end) .and. pos > pcomm_coords(dir)%end) then
+            pos = 2._wp*pcomm_coords(dir)%end - pos
+            vel = -abs(vel)
+        end if
+
+    end subroutine s_reflect_lag_entity_at_wall
 
     !> True for the boundary types a Lagrangian entity cannot cross.
     logical function f_is_lag_entity_wall(bc) result(is_wall)

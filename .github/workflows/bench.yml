@@ -224,7 +224,7 @@ jobs:
             pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml
             pr/bench-${{ matrix.device }}-${{ matrix.interface }}.gpu
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 90
 
       # A pull request's numbers and master's, for the comment bench-comment.yml posts.
       - name: Archive Comparison
@@ -236,7 +236,7 @@ jobs:
             pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml
             master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 90
 
       # All other runners (non-Phoenix) just run without special env
       - name: Archive Logs (Frontier)

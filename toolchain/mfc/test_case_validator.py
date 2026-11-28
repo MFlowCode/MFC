@@ -206,8 +206,8 @@ class TestMeanPressureGradient(ConstraintTestCase):
     def test_accepts_ib(self):
         self.assertAccepts({**BASE, **CYLINDER, "mean_dpdx(1)": -1.0})
 
-    def test_rejects_amr(self):
-        self.assertRejects({**BASE, "amr": "T", "mean_dpdx(1)": -1.0}, "have not been validated with amr")
+    def test_rejects_amr_with_ib(self):
+        self.assertRejects({**BASE, **CYLINDER, "amr": "T", "mean_dpdx(1)": -1.0}, "mean_dpdx/mean_mflux with amr do not support ib")
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**BASE, "mean_mflux(1)": 1.0}, "mean_dpdx_gain must be set")
@@ -256,8 +256,11 @@ class TestMeanTemperatureSource(ConstraintTestCase):
     def test_accepts_ib(self):
         self.assertAccepts({**self.PERIODIC, **CYLINDER, "mean_qdot": 1.0e6})
 
-    def test_rejects_amr(self):
-        self.assertRejects({**self.PERIODIC, "amr": "T", "mean_qdot": 1.0e6}, "mean_qdot/mean_temp have not been validated with amr")
+    def test_rejects_amr_with_ib(self):
+        self.assertRejects({**self.PERIODIC, **CYLINDER, "amr": "T", "mean_qdot": 1.0e6}, "mean_qdot/mean_temp with amr do not support ib")
+
+    def test_rejects_amr_with_wall(self):
+        self.assertRejects({**self.WALL_CHANNEL, "amr": "T"}, "mean_temp_wall does not support amr")
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")
@@ -657,6 +660,9 @@ class TestAmrDefaults(unittest.TestCase):
         for k in ("qbmm", "stretch_x", "cyl_coord", "relax"):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints({**self.AMR, "particles_lagrange": "T"}, "simulation")
+        self.assertIn("amr does not support particles_lagrange", str(ctx.exception))
 
     def test_tag_var(self):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
@@ -699,23 +705,37 @@ class TestAmrDefaults(unittest.TestCase):
                 self.assertIn("amr", str(ctx.exception))
 
     def test_ib_gates_under_amr(self):
-        """STL (2D and 3D), reacting and lumped surfaces, ib_surface_wrt and ib_heat_wrt are rejected; an analytic non-box body may regrid."""
+        """STL that moves or regrids, reacting, chemistry-thermal and lumped surfaces, ib_surface_wrt and ib_heat_wrt are rejected;
+        STL on a static block, an analytic non-box body that regrids and the isothermal wall without chemistry are allowed."""
         ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
         ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1})
         validate_case_constraints(dict(ib), "simulation")
         rejected = [
-            ({"patch_ib(1)%geometry": 5}, "STL-model geometry"),
-            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0}, "thermal_bc or surface_reaction"),
+            ({"patch_ib(1)%geometry": 5, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "analytic geometries only"),
+            ({"patch_ib(1)%geometry": 5, "patch_ib(1)%moving_ibm": 1}, "analytic geometries only"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0}, "thermal_bc = 1 only without chemistry"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_surface_wrt": "T"}, "ib_surface_wrt"),
             ({"chemistry": "T", "cantera_file": "h2o2.yaml", "ib_heat_wrt": "T"}, "ib_heat_wrt (not yet validated)"),
-            ({"patch_ib(1)%thermal_bc": 3, "patch_ib(1)%Twall": 600.0, "patch_ib(1)%rho_solid": 2000.0, "patch_ib(1)%cp_solid": 700.0}, "thermal_bc or surface_reaction"),
+            ({"patch_ib(1)%thermal_bc": 3, "patch_ib(1)%Twall": 600.0, "patch_ib(1)%rho_solid": 2000.0, "patch_ib(1)%cp_solid": 700.0}, "thermal_bc = 1 only without chemistry"),
         ]
+        validate_case_constraints({**ib, "patch_ib(1)%geometry": 5, "patch_ib(1)%model_id": 1, "num_stl_models": 1}, "simulation")
+        validate_case_constraints({**ib, "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1.5, "fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0}, "simulation")
         # analytic non-box bodies are bounded by their marker-drawing radius, so they may move or regrid
         validate_case_constraints({**ib, "patch_ib(1)%geometry": 6, "patch_ib(1)%length_x": 0.2, "patch_ib(1)%length_y": 0.1, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "simulation")
         for mods, msg in rejected:
             with self.assertRaises(CaseConstraintError, msg=str(mods)) as ctx:
                 validate_case_constraints({**ib, **mods}, "simulation")
             self.assertIn(msg, str(ctx.exception))
+
+    def test_multilevel_moving_ib_under_amr(self):
+        """A moving body at amr_max_level = 2 needs dynamic regrid: the static level-2 block is blind to the body."""
+        ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
+        ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.05})
+        ib.update({"patch_ib(1)%moving_ibm": 1, "amr_max_level": 2, "amr_max_blocks": 16})
+        validate_case_constraints({**ib, "amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2}, "simulation")
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints({**ib, "amr_regrid_int": 0}, "simulation")
+        self.assertIn("requires amr_regrid_int > 0", str(ctx.exception))
 
     def test_non_amr_untouched(self):
         q = dict(BASE)
@@ -1359,11 +1379,11 @@ class TestParticlesLagrange(ConstraintTestCase):
         self.assertRejects({**PARTICLES, "particle_params%suth(1)": 110.4}, "needs fluid_pp(1)%cv > 0")
         self.assertAccepts({**PARTICLES, "particle_params%suth(1)": 110.4, "fluid_pp(1)%cv": 717.5})
 
-    def test_no_periodic_boundaries(self):
-        self.assertRejects({**PARTICLES, "bc_y%beg": -1, "bc_y%end": -1}, "periodic and reflective boundaries are not yet supported")
+    def test_periodic_boundaries(self):
+        self.assertAccepts({**PARTICLES, "bc_y%beg": -1, "bc_y%end": -1})
 
-    def test_no_reflective_boundaries(self):
-        self.assertRejects({**PARTICLES, "bc_x%beg": -2}, "bc_x%beg = -2")
+    def test_reflective_boundaries(self):
+        self.assertAccepts({**PARTICLES, "bc_x%beg": -2})
 
     def test_mu_ref_not_needed_without_drag(self):
         params = {k: v for k, v in PARTICLES.items() if k != "particle_params%mu_ref(1)"}

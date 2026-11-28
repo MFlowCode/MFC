@@ -138,7 +138,7 @@ DESCRIPTIONS = {
     "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Multi-level (>= 2) supported: static (amr_regrid_int=0) up to 2, dynamic regrid (>0) deeper",
     "amr_cluster_eff": "Berger-Rigoutsos min tag efficiency (tagged/total) a clustered block box must reach before splitting stops (0 < eff <= 1)",
     "amr_blocking_factor": "Minimum block-box extent in coarse cells the Berger-Rigoutsos bisection may produce; stops over-generation (>= 1, default 1 = none)",
-    "amr_ref_ratio": "AMR refinement ratio between coarse and fine levels (2 or 4; default 2; only 2 supported with multi-level)",
+    "amr_ref_ratio": "AMR refinement ratio between coarse and fine levels (2 or 4; default 2; 4 needs amr_subcycle = F and amr_prolong = 1)",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",
     "parallel_io": "Enable parallel I/O",
@@ -330,8 +330,8 @@ DESCRIPTIONS = {
     "collision_temporal_resolution": "Minimum number of adaptive time steps used to resolve collision_time while collisions are occurring",
     "collision_time": "Amount of simulation time each collision will take to resolve",
     "ramp_ratio": "Maximum factor by which the adaptive time step may grow from one time step to the next",
-    "ib_coefficient_of_friction": "coefficient of friction used in IB collisions",
-    "ib_friction_slip_eps": "Slip speed below which IB collision friction ramps linearly to zero (0 = off)",
+    "coefficient_of_friction": "coefficient of friction used in collisions",
+    "ib_friction_slip_eps": "Slip speed below which collision friction ramps linearly to zero (0 = off)",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters

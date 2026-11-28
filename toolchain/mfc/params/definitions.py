@@ -370,12 +370,13 @@ CONSTRAINTS = {
         "value_labels": {1: "single", 2: "double"},
         "names": {"single": 1, "double": 2},
     },
-    # Euler-Lagrange coupling (emitted once as coupling_one_way, coupling_two_way)
+    # Euler-Lagrange coupling (emitted once as coupling_one_way, coupling_two_way, coupling_four_way); four-way is two-way plus
+    # particle collisions
     **{
         f"{pp}%coupling": {
-            "choices": [1, 2],
-            "value_labels": {1: "one-way", 2: "two-way"},
-            "names": {"one_way": 1, "two_way": 2},
+            "choices": [1, 2, 4],
+            "value_labels": {1: "one-way", 2: "two-way", 4: "four-way"},
+            "names": {"one_way": 1, "two_way": 2, "four_way": 4},
             "fortran_prefix": "coupling",
         }
         for pp in ("lag_params", "particle_params")
@@ -459,7 +460,7 @@ DEPENDENCIES = {
     },
     "collision_model": {
         "when_set": {
-            "requires": ["ib", "coefficient_of_restitution", "collision_time"],
+            "requires": ["coefficient_of_restitution", "collision_time"],
         }
     },
     "collision_temporal_resolution": {
@@ -710,11 +711,11 @@ def _load():
     _r("ib_neighborhood_radius", INT, {"ib"})
     _r("num_local_ibs_max", INT, {"ib"})
     _r("ib", LOG, {"ib"})
-    _r("collision_model", INT, {"ib"})
-    _r("collision_temporal_resolution", INT, {"ib"})
-    _r("coefficient_of_restitution", REAL, {"ib"})
-    _r("collision_time", REAL, {"ib"})
-    _r("ib_coefficient_of_friction", REAL, {"ib"})
+    _r("collision_model", INT, {"ib", "particles"})
+    _r("collision_temporal_resolution", INT, {"ib", "particles"})
+    _r("coefficient_of_restitution", REAL, {"ib", "particles"})
+    _r("collision_time", REAL, {"ib", "particles"})
+    _r("coefficient_of_friction", REAL, {"ib", "particles"})
     _r("ib_friction_slip_eps", REAL, {"ib"})
     _r("many_ib_patch_parallelism", LOG, {"ib"})
     _r("ib_second_order_vel", LOG, {"ib"})
@@ -1583,7 +1584,7 @@ _nv(
     "ramp_ratio",
     "coefficient_of_restitution",
     "collision_time",
-    "ib_coefficient_of_friction",
+    "coefficient_of_friction",
     "ib_friction_slip_eps",
     "ib_neighborhood_radius",
     "num_local_ibs_max",

@@ -192,6 +192,7 @@ def dimension_error(param: str, requirement: str) -> str:
 # Parameters removed by a rename, with what replaces them
 RENAMED_PARAMS = {
     "lag_params%solver_approach": '\'lag_params%coupling\' ("one_way" for 1, "two_way" for 2)',
+    "ib_coefficient_of_friction": "'coefficient_of_friction' (it now applies to IB and four-way particle contacts)",
 }
 
 # Parameters removed outright, with why

@@ -9,11 +9,13 @@ Every check has an example in `examples/` with a checker script and a README, an
 Status words: **validated** (agrees with the reference within the stated error), **partially validated** (agrees where measured; a regime or quantity is open), **open discrepancy** (disagrees, cause known or not), **comparison only** (reference data are qualitative).
 Errors are (MFC − reference)/reference.
 
-Separate pages: @ref validation_wall_order_couette "Wall-normal ghost velocity at viscous walls" (`ib_wall_order` against plane Poiseuille and Taylor-Couette flow).
-Other pages: @ref validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube).
-Gas-dynamics pages: @ref validation_shock_tubes "Shock tubes" (Sod, Lax, 123 and Shu-Osher), @ref validation_vortex_order "Vortex order of accuracy" (isentropic vortex, Taylor-Green decay), @ref validation_blast "Circular blast wave", @ref validation_positivity "Positivity at a near-vacuum collapse".
-Reacting-flow pages: @ref validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @ref validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @ref validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
-Multiphase pages: @ref validation_multiphase_riemann "Two-fluid flows" (water-air shock tube, interface advection, phase-change equilibrium), @ref validation_bubbles "Bubble dynamics" (Keller-Miksis collapse), @ref validation_surface_tension "Surface tension" (Laplace pressure jump), @ref validation_interface_instabilities "Interface instabilities" (viscous Rayleigh-Taylor growth rate).
+Pages, one per family (the sections below summarize each):
+
+- Gas dynamics: @subpage validation_shock_tubes "Shock tubes" (Sod, Lax, 123 and Shu-Osher), @subpage validation_vortex_order "Vortex order of accuracy" (isentropic vortex, Taylor-Green decay), @subpage validation_blast "Circular blast wave", @subpage validation_positivity "Positivity at a near-vacuum collapse", @subpage validation_coordinates "Cylindrical coordinates and stretched grids", @subpage validation_amr "Adaptive mesh refinement".
+- Immersed boundaries and particles: @subpage validation_cyl_drag_nu "Cylinder drag and Nusselt number", @subpage validation_sphere_drag_nu "Sphere drag and Nusselt number", @subpage validation_particle_array "Periodic particle arrays", @subpage validation_shock_curtain "Shock-particle interaction and dense curtains", @subpage validation_standoff "Bow-shock stand-off", @subpage validation_slip_walls "Slip immersed walls", @subpage validation_wall_order_couette "Wall-normal ghost velocity at viscous walls" (`ib_wall_order` against plane Poiseuille and Taylor-Couette flow), @subpage validation_tsc_annulus "Isothermal conduction annulus", @subpage validation_wall_thermal "Solid-wall thermal models", @subpage validation_moving_body_budget "Moving-body mass budget", @subpage ib_accuracy_limits "Accuracy limits of the ghost-cell immersed boundary".
+- Chemistry and transport: @subpage validation_gas_chemistry "Gas-phase chemistry" (ignition, flame speed, reactive shock tube), @subpage validation_species_transport "Species diffusion and heat conduction", @subpage validation_detonation "Detonation" (1D CJ front speed and state, 2D cell width), @subpage validation_flame_vortex "Flame-vortex interaction" (2D pair, 3D ring), @subpage validation_burning_body "Burning carbon body" (cylinder and sphere burn rate).
+- Multiphase: @subpage validation_multiphase_riemann "Two-fluid flows" (water-air shock tube, interface advection, phase-change equilibrium), @subpage validation_bubbles "Bubble dynamics" (Keller-Miksis collapse), @subpage validation_surface_tension "Surface tension" (Laplace pressure jump), @subpage validation_interface_instabilities "Interface instabilities" (viscous Rayleigh-Taylor growth rate).
+- Other physics: @subpage validation_acoustics "Acoustic sources", @subpage validation_mhd "Ideal MHD", @subpage validation_elastic_waves "Hypoelastic wave speeds".
 
 ## Moving-body kinematics {#sec-validation-moving-kinematics}
 
@@ -47,7 +49,7 @@ Limits: only constant acceleration is checked. For a prescribed body (`moving_ib
 | :--- | :--- |
 | Body | sphere, R = 5 m, mass 1e6 (gas force negligible), impact speed 3.9 m/s |
 | Wall | `y = 0`, `bc_y%%beg = -15`; other boundaries extrapolation |
-| Model | `collision_model = 1`, `collision_time` = N\f$\Delta t\f$, \f$\Delta t\f$ = 5e-6 s, `coefficient_of_restitution` e, `ib_coefficient_of_friction` \f$\mu\f$ |
+| Model | `collision_model = 1`, `collision_time` = N\f$\Delta t\f$, \f$\Delta t\f$ = 5e-6 s, `coefficient_of_restitution` e, `coefficient_of_friction` \f$\mu\f$ |
 | Numerics | first-order reconstruction, HLLC, SSP-RK3, fixed \f$\Delta t\f$, 16³ cells, air at 1e5 Pa (the gas plays no role) |
 | Reference | rigid-body impact of a sphere on a fixed wall with Coulomb friction and no tangential elasticity (\cite Maw1976): \f$v_n' = -e v_n\f$; sliding throughout (\f$\tan\theta \ge 3.5\mu(1+e)\f$): \f$v_t' = v_t - \mu(1+e)|v_n|\f$; sticking (\f$\tan\theta < 3.5\mu(1+e)\f$): \f$v_t' = \frac{5}{7}v_t\f$. Setup after \cite DiMaio2004 |
 | Measured | \f$e_n = -v_y^\text{out}/v_y^\text{in}\f$ and \f$v_x^\text{out}\f$ from the last `ib_state` record, by `check_collision.py` |
