@@ -450,6 +450,7 @@ contains
         do i = 1, num_patches_max
             patch_icpp(i)%geometry = dflt_int
             patch_icpp(i)%model_id = 0
+            patch_icpp(i)%airfoil_id = 0
             patch_icpp(i)%x_centroid = dflt_real
             patch_icpp(i)%y_centroid = dflt_real
             patch_icpp(i)%z_centroid = dflt_real

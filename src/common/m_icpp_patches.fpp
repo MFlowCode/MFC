@@ -28,6 +28,12 @@ module m_icpp_patches
 
     private; public :: s_apply_icpp_patches
 
+#ifdef MFC_MIXED_PRECISION
+    integer, parameter :: pid_kind = 1  !< Kind of patch_id_fp: one byte per cell in mixed precision
+#else
+    integer, parameter :: pid_kind = kind(0)
+#endif
+
     real(wp)          :: x_centroid, y_centroid, z_centroid
     real(wp)          :: length_x, length_y, length_z
     integer           :: smooth_patch_id
@@ -42,15 +48,10 @@ contains
     !> Dispatch each initial condition patch to its geometry-specific initialization routine.
     impure subroutine s_apply_icpp_patches(patch_id_fp, q_prim_vf, g)
 
-        type(ic_grid), intent(in)                                :: g
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        integer :: i
+        type(ic_grid), intent(in)                                      :: g
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        integer                                                        :: i
 
         if (.not. g%hardcoded .and. any(patch_icpp(1:num_patches)%hcid /= dflt_int)) then
             call s_mpi_abort('Hard-coded initial conditions (hcid) are only supported on the pre_process grid.')
@@ -62,6 +63,11 @@ contains
             if (patch_icpp(i)%geometry == icpp_model) then
                 call s_instantiate_STL_models()
                 exit
+            end if
+        end do
+        do i = 1, num_patches
+            if (patch_icpp(i)%geometry == icpp_airfoil) then
+                call s_build_airfoil_grid(patch_icpp(i)%airfoil_id, min(g%dx_min, g%dy_min))
             end if
         end do
         !  3D Patch Geometries
@@ -98,6 +104,8 @@ contains
                     ! 3D STL patch
                 else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
+                else if (patch_icpp(i)%geometry == icpp_airfoil) then
+                    call s_icpp_airfoil(i, patch_id_fp, q_prim_vf, g)
                 end if
             end do
             !> @}
@@ -142,6 +150,8 @@ contains
                     ! STL patch
                 else if (patch_icpp(i)%geometry == icpp_model) then
                     call s_icpp_model(i, patch_id_fp, q_prim_vf, g)
+                else if (patch_icpp(i)%geometry == icpp_airfoil) then
+                    call s_icpp_airfoil(i, patch_id_fp, q_prim_vf, g)
                 end if
                 !> @}
             end do
@@ -170,15 +180,10 @@ contains
     !! patch DOES NOT allow for the smearing of its boundaries.
     subroutine s_icpp_line_segment(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -227,19 +232,14 @@ contains
     !! are provided. Note that the circular patch DOES allow for the smoothing of its boundary.
     impure subroutine s_icpp_spiral(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< Generic loop iterators
-        real(wp)                                                 :: th, thickness, nturns, mya
-        real(wp)                                                 :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
-        integer, allocatable, dimension(:,:)                     :: logic_grid
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< Generic loop iterators
+        real(wp)                                                       :: th, thickness, nturns, mya
+        real(wp)                                                       :: spiral_x_min, spiral_x_max, spiral_y_min, spiral_y_max
+        integer, allocatable, dimension(:,:)                           :: logic_grid
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -294,17 +294,12 @@ contains
     !! its boundary.
     subroutine s_icpp_circle(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        real(wp)                                                 :: radius
-        integer                                                  :: i, j, k  !< Generic loop iterators
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        real(wp)                                                       :: radius
+        integer                                                        :: i, j, k  !< Generic loop iterators
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -351,15 +346,10 @@ contains
     subroutine s_icpp_varcircle(patch_id, patch_id_fp, q_prim_vf, g)
 
         ! Patch identifier
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
 
         ! Generic loop iterators
         integer  :: i, j, k
@@ -409,15 +399,10 @@ contains
     subroutine s_icpp_3dvarcircle(patch_id, patch_id_fp, q_prim_vf, g)
 
         ! Patch identifier
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
 
         ! Generic loop iterators
         integer  :: i, j, k
@@ -473,17 +458,12 @@ contains
     !! Note that the elliptical patch DOES allow for the smoothing of its boundary
     subroutine s_icpp_ellipse(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< Generic loop operators
-        real(wp)                                                 :: a, b
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< Generic loop operators
+        real(wp)                                                       :: a, b
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -532,15 +512,10 @@ contains
     subroutine s_icpp_ellipsoid(patch_id, patch_id_fp, q_prim_vf, g)
 
         ! Patch identifier
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
 
         ! Generic loop iterators
         integer  :: i, j, k
@@ -579,8 +554,8 @@ contains
                                    & - z_centroid)/c)**2) - 1._wp))*(-0.5_wp) + 0.5_wp
                     end if
 
-                    if ((((g%x_cc(i) - x_centroid)/a)**2 + ((cart_y - y_centroid)/b)**2 + ((cart_z - z_centroid)/c)**2 <= 1._wp &
-                        & .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
+                    if ((f_is_inside_ellipsoid(g%x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, [2._wp*a, &
+                        & 2._wp*b, 2._wp*c]) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) .or. patch_id_fp(i, j, &
                         & k) == smooth_patch_id) then
                         call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
 
@@ -605,16 +580,11 @@ contains
     !! allow for the smoothing of its boundaries.
     subroutine s_icpp_rectangle(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< generic loop iterators
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< generic loop iterators
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -663,17 +633,12 @@ contains
     !! the smoothing of its boundary.
     subroutine s_icpp_sweep_line(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< Generic loop operators
-        real(wp)                                                 :: a, b, c
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< Generic loop operators
+        real(wp)                                                       :: a, b, c
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -722,17 +687,12 @@ contains
     !! Geometry of the patch is well-defined when its centroid are provided.
     subroutine s_icpp_2D_TaylorGreen_Vortex(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< generic loop iterators
-        real(wp)                                                 :: L0, U0   !< Taylor Green Vortex parameters
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< generic loop iterators
+        real(wp)                                                       :: L0, U0   !< Taylor Green Vortex parameters
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded2DVariables()
@@ -789,15 +749,10 @@ contains
         ! Description: This patch assigns the primitive variables as analytical functions such that the code can be verified.
 
         ! Patch identifier
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
 
         ! Generic loop iterators
         integer :: i, j, k
@@ -839,17 +794,12 @@ contains
     !! coefficients are relative (dimensionless).
     subroutine s_icpp_2d_modal(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        real(wp)                                                 :: r, theta, R_boundary, sum_series
-        integer                                                  :: i, j, nn
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        real(wp)                                                       :: r, theta, R_boundary, sum_series
+        integer                                                        :: i, j, nn
 
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
@@ -895,17 +845,12 @@ contains
     !! atan2(y,x) relative to centroid.
     subroutine s_icpp_3d_spherical_harmonic(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
+        integer, intent(in) :: patch_id
         type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        real(wp)                                                 :: dx_loc, dy_loc, dz_loc, r, theta, phi, R_surface, eta_local
-        integer                                                  :: i, j, k, ll, mm
+        real(wp) :: dx_loc, dy_loc, dz_loc, r, theta, phi, R_surface, eta_local
+        integer :: i, j, k, ll, mm
 
         x_centroid = patch_icpp(patch_id)%x_centroid
         y_centroid = patch_icpp(patch_id)%y_centroid
@@ -960,15 +905,10 @@ contains
     !! its boundary.
     subroutine s_icpp_sphere(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
 
         ! Generic loop iterators
         integer  :: i, j, k
@@ -1030,16 +970,11 @@ contains
     !! allow for the smearing of its boundaries.
     subroutine s_icpp_cuboid(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< Generic loop iterators
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< Generic loop iterators
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -1101,17 +1036,12 @@ contains
     !! allow for the smoothing of its lateral boundary.
     subroutine s_icpp_cylinder(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< Generic loop iterators
-        real(wp)                                                 :: radius
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< Generic loop iterators
+        real(wp)                                                       :: radius
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -1197,17 +1127,12 @@ contains
     !! the smoothing of its boundary.
     subroutine s_icpp_sweep_plane(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
-        type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
-        integer                                                  :: i, j, k  !< Generic loop iterators
-        real(wp)                                                 :: a, b, c, d
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k  !< Generic loop iterators
+        real(wp)                                                       :: a, b, c, d
 
         @:HardcodedDimensionsExtrusion()
         @:Hardcoded3DVariables()
@@ -1266,14 +1191,9 @@ contains
     !> The STL patch is a 2/3D geometry that is imported from an STL file.
     subroutine s_icpp_model(patch_id, patch_id_fp, q_prim_vf, g)
 
-        integer, intent(in)       :: patch_id
+        integer, intent(in) :: patch_id
         type(ic_grid), intent(in) :: g
-
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#else
-        integer, dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
-#endif
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
         integer :: i, j, k                 !< loop iterators
         integer :: model_id                !< Index into the preloading stl_models(:)
@@ -1316,6 +1236,46 @@ contains
         end do; end do; end do
 
     end subroutine s_icpp_model
+
+    !> NACA 4-digit airfoil ib_airfoil(airfoil_id), the shape of the airfoil immersed boundary (geometry 4 and 11), unrotated: the
+    !! leading edge at the centroid, the chord along +x and, in 3D, the span length_z centred on z_centroid. No smoothing.
+    subroutine s_icpp_airfoil(patch_id, patch_id_fp, q_prim_vf, g)
+
+        integer, intent(in)                                            :: patch_id
+        type(ic_grid), intent(in)                                      :: g
+        integer(pid_kind), dimension(0:g%m,0:g%n,0:g%p), intent(inout) :: patch_id_fp
+        type(scalar_field), dimension(1:sys_size), intent(inout)       :: q_prim_vf
+        integer                                                        :: i, j, k
+
+        x_centroid = patch_icpp(patch_id)%x_centroid
+        y_centroid = patch_icpp(patch_id)%y_centroid
+        z_centroid = 0._wp
+        if (g%p > 0) z_centroid = patch_icpp(patch_id)%z_centroid
+        eta = 1._wp
+
+        do k = 0, g%p
+            do j = 0, g%n
+                do i = 0, g%m
+                    cart_y = g%y_cc(j)
+                    cart_z = 0._wp
+                    if (g%p > 0) then
+                        cart_z = g%z_cc(k)
+                        if (grid_geometry == 3) call s_convert_cylindrical_to_cartesian_coord(g%y_cc(j), g%z_cc(k))
+                    end if
+                    if (f_is_inside_airfoil(g%x_cc(i) - x_centroid, cart_y - y_centroid, cart_z - z_centroid, &
+                        & patch_icpp(patch_id)%length_z, &
+                        & patch_icpp(patch_id)%airfoil_id) .and. patch_icpp(patch_id)%alter_patch(patch_id_fp(i, j, k))) then
+                        call s_assign_patch_primitive_variables(patch_id, i, j, k, eta, q_prim_vf, patch_id_fp)
+
+                        @:analytical()
+
+                        patch_id_fp(i, j, k) = patch_id
+                    end if
+                end do
+            end do
+        end do
+
+    end subroutine s_icpp_airfoil
 
     !> Convert cylindrical (r, theta) coordinates to Cartesian (y, z) module variables.
     subroutine s_convert_cylindrical_to_cartesian_coord(cyl_y, cyl_z)

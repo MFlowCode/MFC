@@ -149,7 +149,7 @@ The cold run uses `--tw 270` in a copy of the directory (the output is written n
 
 ## Accuracy limits of the ghost-cell immersed boundary {#sec-validation-ib-limits}
 
-**Status:** open discrepancy (measured limits, no example). Wall value about second order, wall-normal gradient first order or worse, rotating-wall shear plateau near 2 %, and the options that help or do not: @ref ib_accuracy_limits.
+**Status:** open discrepancy (measured limits). **Example:** `examples/2D_ibm_accuracy_limits` (`order_study.py`: the wall-temperature orders of inverse-distance and TSC image points, checked against the page). Wall value about second order, wall-normal gradient first order or worse, rotating-wall shear plateau near 2 %, and the options that help or do not: @ref ib_accuracy_limits.
 
 ## Slip immersed walls {#sec-validation-slip-walls}
 

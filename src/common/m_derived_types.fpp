@@ -353,7 +353,8 @@ module m_derived_types
         real(wp) :: Y(1:num_species)  !< Species mass fractions
 
         ! STL/OBJ model patch: index into the shared stl_models(:) table
-        integer :: model_id  !< index into stl_models(:) for STL/OBJ geometry patches
+        integer :: model_id    !< index into stl_models(:) for STL/OBJ geometry patches
+        integer :: airfoil_id  !< index into ib_airfoil(:) for NACA airfoil patches
     end type ic_patch_parameters
 
     !> User-input parameters for a NACA 4-digit airfoil (namelist-safe: scalars only)

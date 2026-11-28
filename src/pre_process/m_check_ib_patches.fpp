@@ -58,9 +58,10 @@ contains
                     call s_check_model_ib_patch_geometry(i)
                 else if (patch_ib(i)%geometry == ib_ellipse) then
                     call s_check_ellipse_ib_patch_geometry(i)
+                else if (patch_ib(i)%geometry == ib_ellipsoid) then
+                    call s_check_ellipsoid_ib_patch_geometry(i)
                 else
-                    call s_prohibit_abort("Invalid IB patch", &
-                                          & "patch_ib(" // trim(iStr) // ")%geometry must be " // "2-4, 8-10, 11 or 12.")
+                    call s_prohibit_abort("Invalid IB patch", "patch_ib(" // trim(iStr) // ")%geometry must be 2-6 or 8-13.")
                 end if
             else
                 @:PROHIBIT(patch_ib(i)%geometry /= dflt_int, &
@@ -96,6 +97,18 @@ contains
                    & 'in ellipse IB patch ' // trim(iStr))
 
     end subroutine s_check_ellipse_ib_patch_geometry
+
+    !> Verify that the geometric parameters of the ellipsoid patch have been consistently inputted.
+    impure subroutine s_check_ellipsoid_ib_patch_geometry(patch_id)
+
+        integer, intent(in) :: patch_id
+
+        call s_int_to_str(patch_id, iStr)
+
+        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp &
+                   & .or. patch_ib(patch_id)%length_z <= 0._wp, 'in ellipsoid IB patch ' // trim(iStr))
+
+    end subroutine s_check_ellipsoid_ib_patch_geometry
 
     !> Verify that the geometric parameters of the airfoil patch have been consistently inputted.
 

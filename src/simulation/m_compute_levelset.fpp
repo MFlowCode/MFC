@@ -50,6 +50,8 @@ contains
                     call s_3d_airfoil_levelset(gps(i))
                 else if (patch_geometry == ib_model_3d) then
                     call s_model_levelset(gps(i))
+                else if (patch_geometry == ib_ellipsoid) then
+                    call s_ellipsoid_levelset(gps(i))
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -346,6 +348,39 @@ contains
                                & *quadratic_coeffs(3)))/quadratic_coeffs(1)
 
     end subroutine s_ellipse_levelset
+
+    !> Signed distance and outward normal from a ghost point to an ellipsoidal immersed boundary, as for the ellipse: the normal is
+    !! the gradient of the implicit surface at the ghost point and the distance is taken along it to the surface
+    subroutine s_ellipsoid_levelset(gp)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ghost_point), intent(inout) :: gp
+        real(wp), dimension(3)           :: semi, xyz_local, nrm, center
+        real(wp)                         :: qa, qb, qc  !< A, B, C of the quadratic for the distance along nrm
+        integer                          :: ib_patch_id
+
+        ib_patch_id = gp%ib_patch_id
+        semi = 0.5_wp*[patch_ib(ib_patch_id)%length_x, patch_ib(ib_patch_id)%length_y, patch_ib(ib_patch_id)%length_z]
+        center(1) = patch_ib(ib_patch_id)%x_centroid + real(gp%x_periodicity, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+        center(2) = patch_ib(ib_patch_id)%y_centroid + real(gp%y_periodicity, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+        center(3) = patch_ib(ib_patch_id)%z_centroid + real(gp%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+
+        xyz_local = [x_cc(gp%loc(1)), y_cc(gp%loc(2)), z_cc(gp%loc(3))] - center
+        xyz_local = matmul(patch_ib(ib_patch_id)%rotation_matrix_inverse, xyz_local)
+
+        nrm = xyz_local/semi**2
+        if (f_approx_equal(sqrt(dot_product(nrm, nrm)), 0._wp)) nrm = [1._wp, 0._wp, 0._wp]
+        nrm = nrm/sqrt(dot_product(nrm, nrm))
+        call s_store_rotated_normal(gp, patch_ib(ib_patch_id)%rotation_matrix, nrm)
+
+        ! xyz_local + t nrm on the surface: qa t^2 + qb t + qc = 0, qc < 0 inside; the levelset is -t
+        qa = sum((nrm/semi)**2)
+        qb = 2._wp*sum(xyz_local*nrm/semi**2)
+        qc = sum((xyz_local/semi)**2) - 1._wp
+        gp%levelset = -0.5_wp*(-qb + sqrt(qb**2 - 4._wp*qa*qc))/qa
+
+    end subroutine s_ellipsoid_levelset
 
     !> Compute the signed distance and outward normal from a ghost point to a cuboid immersed boundary
     subroutine s_cuboid_levelset(gp)

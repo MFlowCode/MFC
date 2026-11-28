@@ -84,8 +84,8 @@ module m_global_parameters
     !> @name Immersed Boundaries
     !> @{
     ! patch_ib, ib_airfoil, stl_models: auto-generated in generated_decls.fpp
-    !> Per-airfoil computed surface grids (unused in pre_process)
-    type(ib_airfoil_grid), allocatable, dimension(:) :: ib_airfoil_grids
+    !> Per-airfoil computed surface grids, built for airfoil initial-condition patches (geometry 22)
+    type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids
     !> @}
 
     !> @name Non-polytropic bubble gas compression
