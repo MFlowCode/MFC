@@ -6046,7 +6046,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
         # the bubbly patches meet inside the block, as in the amr_check above
-        cases.append(define_case_d(stack, "bubbles_euler", {**bub_gold, **{k: v for k, v in amr_chk.items() if k.endswith(("x_centroid", "length_x"))}}))
+        bub_blk = {**bub_gold, **{k: v for k, v in amr_chk.items() if k.endswith(("x_centroid", "length_x"))}}
+        cases.append(define_case_d(stack, "bubbles_euler", bub_blk))
+        # the bubble-number transport and a 3-bin polydisperse cloud through the same block, as in the amr_checks above
+        cases.append(define_case_d(stack, "bubbles_euler -> adv_n", {**bub_blk, "adv_n": "T"}))
+        cases.append(define_case_d(stack, "bubbles_euler -> polydisperse", {**bub_blk, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}))
         # non-reflecting subsonic buffer at both ends: the coarse grid applies it, the block's edges are coarse/fine faces
         cases.append(define_case_d(stack, "CBC", {"bc_x%beg": -6, "bc_x%end": -6}))
         # GRCBC subsonic inflow and outflow relaxing toward a state the initial one is not

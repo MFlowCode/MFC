@@ -480,10 +480,7 @@ AMR_VETTED_FLAGS = (
 )
 
 # Vetted switches no AMR test sets true yet. A lint keeps this list exact, so it can only shrink: add an AMR test, drop the entry.
-AMR_UNTESTED_FLAGS = (
-    "bc_[xyz]%isothermal_*",
-    "cfl_dt",
-)
+AMR_UNTESTED_FLAGS = ("cfl_dt",)
 
 
 def amr_unvetted_flags(params: Dict[str, Any], logical_names: Set[str]) -> List[str]:
