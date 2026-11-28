@@ -373,9 +373,9 @@ contains
                 end do
             end if
 
-            ! The cylindrical axis source reads tau_Re_vf(mom%beg:E), so conduction needs it too,
-            ! but without the viscous gradient fields below.
-            if (viscous .or. heat_conduction) then
+            ! The cylindrical axis source reads tau_Re_vf(mom%beg:E), so conduction and axisymmetric
+            ! surface tension need it too, but without the viscous gradient fields below.
+            if (viscous .or. heat_conduction .or. (surface_tension .and. grid_geometry == 2)) then
                 @:ALLOCATE(tau_Re_vf(1:sys_size))
                 do i = 1, num_dims
                     @:ALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
@@ -2062,7 +2062,11 @@ contains
                     call s_compute_conduction_axis_source(q_prim_vf, q_T_sf, tau_Re_vf, idwbuff(1), idwbuff(2), idwbuff(3))
                 end if
 
-                if (viscous .or. heat_conduction) then
+                if (surface_tension .and. grid_geometry == 2) then
+                    call s_compute_capillary_axis_source(q_prim_vf, tau_Re_vf)
+                end if
+
+                if (viscous .or. heat_conduction .or. (surface_tension .and. grid_geometry == 2)) then
                     $:GPU_PARALLEL_LOOP(private='[i, j, l]', collapse=2)
                     do l = 0, p
                         do j = 0, m
@@ -2185,7 +2189,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (viscous .or. heat_conduction) then
+                    if (viscous .or. heat_conduction .or. (surface_tension .and. grid_geometry == 2)) then
                         $:GPU_PARALLEL_LOOP(private='[i, j, l]', collapse=2)
                         do l = 0, p
                             do j = 0, m
@@ -2229,6 +2233,8 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
             end if
+
+            if (surface_tension .and. grid_geometry == 2) call s_compute_capillary_hoop_source(rhs_vf)
         else if (idir == 3) then  ! z-direction
             ! In 3D cylindrical z is theta (dz in radians): the divergence is (1/r) dF/dtheta, as in the advection path
             if (surface_tension) then
@@ -2511,7 +2517,7 @@ contains
                 end if
             end if
 
-            if (viscous .or. heat_conduction) then
+            if (viscous .or. heat_conduction .or. (surface_tension .and. grid_geometry == 2)) then
                 do i = 1, num_dims
                     @:DEALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf)
                 end do
