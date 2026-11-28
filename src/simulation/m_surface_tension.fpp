@@ -251,14 +251,16 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        integer                                                    :: j, k, l, i
+        integer                                                    :: j, k, l, i, g, gy, gz
+
+        g = merge(1, 0, amr_in_fine_advance); gy = g*min(n, 1); gz = g*min(p, 1)  ! ghost layers to compute
 
         ! compute gradient components
 
         $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = -gz, p + gz
+            do k = -gy, n + gy
+                do j = -g, m + g
                     c_divs(1)%sf(j, k, l) = 1._wp/(x_cc(j + 1) - x_cc(j - 1))*(q_prim_vf(eqn_idx%c)%sf(j + 1, k, &
                            & l) - q_prim_vf(eqn_idx%c)%sf(j - 1, k, l))
                 end do
@@ -267,9 +269,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = -gz, p + gz
+            do k = -gy, n + gy
+                do j = -g, m + g
                     c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k + 1, &
                            & l) - q_prim_vf(eqn_idx%c)%sf(j, k - 1, l))
                 end do
@@ -279,9 +281,9 @@ contains
 
         if (p > 0) then
             $:GPU_PARALLEL_LOOP(collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
+            do l = -gz, p + gz
+                do k = -gy, n + gy
+                    do j = -g, m + g
                         c_divs(3)%sf(j, k, l) = 1._wp/(z_cc(l + 1) - z_cc(l - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k, &
                                & l + 1) - q_prim_vf(eqn_idx%c)%sf(j, k, l - 1))
                         ! 3D cylindrical: z is theta, so the gradient is (1/r) dc/dtheta
@@ -293,9 +295,9 @@ contains
         end if
 
         $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        do l = -gz, p + gz
+            do k = -gy, n + gy
+                do j = -g, m + g
                     c_divs(num_dims + 1)%sf(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_dims
@@ -308,7 +310,9 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_populate_capillary_buffers(c_divs, bc_type, bc_xyz_info(bc_x, bc_y, bc_z))
+        ! an AMR fine frame's ghost primitives hold the block's own data, so its first ghost layer was computed above; the coarse
+        ! grid's boundary fill would apply at the block faces
+        if (.not. amr_in_fine_advance) call s_populate_capillary_buffers(c_divs, bc_type, bc_xyz_info(bc_x, bc_y, bc_z))
 
         iv%beg = 1; iv%end = num_dims + 1
 
