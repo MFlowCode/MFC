@@ -30,11 +30,8 @@ module m_derived_types
 
     !> Derived type annexing an integer scalar field (SF)
     type integer_field
-#ifdef MFC_MIXED_PRECISION
-        integer(kind=1), pointer, dimension(:,:,:) :: sf => null()
-#else
+        ! Patch encodings, GPU atomics and MPI_INTEGER I/O require default-width integer metadata.
         integer, pointer, dimension(:,:,:) :: sf => null()
-#endif
     end type integer_field
 
     !> Derived type for levelset
