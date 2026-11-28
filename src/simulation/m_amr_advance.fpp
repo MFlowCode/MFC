@@ -496,8 +496,8 @@ contains
 
     end subroutine s_amr_ib_pose_begin
 
-    !> Subcycling: set each prescribed-motion body (moving_ibm = 1) to its pose at the fraction th of the coarse step: its
-    !! kinematics at that time, else the linear blend of the step-start (step_*) and step-end poses; th = 1 is the end pose.
+    !> Subcycling: set each moving body to its pose at the fraction th of the coarse step: its kinematics at that time, else the
+    !! linear blend of the step-start (step_*) and step-end poses; th = 1 is the end pose.
     impure subroutine s_amr_ib_pose(th)
 
         real(wp), intent(in) :: th
@@ -505,7 +505,7 @@ contains
 
         if (.not. (ib .and. moving_immersed_boundary_flag)) return
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 1) cycle
+            if (patch_ib(i)%moving_ibm == 0) cycle
             if (th >= 1._wp) then
                 patch_ib(i) = ib_end(i)
             else if (patch_ib(i)%kin_model > 0) then

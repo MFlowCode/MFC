@@ -87,7 +87,8 @@ module m_ibm
         & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, &
         & s_add_swept_cells, s_fill_uncovered_cells, s_ibm_conduction_temperature, s_write_ib_conduction_temperature, &
         & s_read_ib_conduction_temperature, s_ibm_advance_wall_columns, s_wall_column_tcond, s_ibm_pack_fine_tcond, &
-        & s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, s_read_tcond_box, f_wall_column_dt
+        & s_ibm_fine_tcond_from_box, s_write_tcond_records, f_tcond_open, s_read_tcond_box, f_wall_column_dt, &
+        & s_correct_ib_subcycle_impulse
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -233,6 +234,9 @@ module m_ibm
     !> Force (1:3) and torque (4:6) on each local IB from the fluid-body face fluxes of the last RHS evaluation
     real(wp), allocatable, dimension(:,:) :: ib_face_ft
     $:GPU_DECLARE(create='[ib_face_ft]')
+    !> amr_subcycle: the fine levels' impulse less the covered coarse faces' over the step, per local IB (as ib_face_ft)
+    real(wp), allocatable, dimension(:,:) :: ib_ft_sub
+    $:GPU_DECLARE(create='[ib_ft_sub]')
 
 contains
 
@@ -319,9 +323,9 @@ contains
         if (num_procs > 1) call s_setup_ib_force_comm()
 #endif
 
-        @:ALLOCATE(ib_face_ft(6, num_local_ibs_max))
-        ib_face_ft = 0._wp
-        $:GPU_UPDATE(device='[ib_face_ft]')
+        @:ALLOCATE(ib_face_ft(6, num_local_ibs_max), ib_ft_sub(6, num_local_ibs_max))
+        ib_face_ft = 0._wp; ib_ft_sub = 0._wp
+        $:GPU_UPDATE(device='[ib_face_ft, ib_ft_sub]')
 
         call s_update_ib_lookup()
 
@@ -3831,10 +3835,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_prim_vf
         type(integer_field), intent(in) :: markers  !< ib_markers, or ib_markers_fine on an AMR fine frame
         real(wp), dimension(3) :: f, r, tq, vb
-        real(wp) :: area, w, f_E, f_m, f_mom
+        real(wp) :: area, w, f_E, f_m, f_mom, wt
         integer :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g
         integer :: j0, k0, l0, fj, fk, fl, ibm, jl, kl, ll, sd, bw, cov, nc, sh, c
-        logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR, fine, heat, covd
+        logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR, fine, heat, covd, sub
 
         do_ft = moving_immersed_boundary_flag .or. ib_state_wrt .or. ib_force_wrt
         if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
@@ -3846,13 +3850,27 @@ contains
         ! AMR: each face counts on the finest level covering its fluid cell. The coarse pass of a stage starts the sums and skips
         ! covered cells (cov = 1, the cell map); a fine frame adds its faces, skipping those under its own children (cov = 2, their
         ! boxes). A fine frame takes interior faces only (its markers have no ghosts; bodies sit inside their blocks) and no
-        ! heat exchange (thermal walls are rejected with amr). Subcycled levels are not taken: their passes span several stages.
+        ! heat exchange (thermal walls are rejected with amr). Subcycled with a force-driven body (sub): the coarse stages move it
+        ! on all their faces; ib_ft_sub collects the step's impulse correction, the fine faces times dt_l and the stage weight
+        ! less the covered coarse faces times dt and the stage weight (s_correct_ib_subcycle_impulse).
         fine = amr_in_fine_advance
         heat = ib_exchange .and. .not. fine
+        sub = amr .and. amr_subcycle .and. any(patch_ib(1:num_ibs)%moving_ibm >= 2)
         cov = 0
-        if (amr .and. .not. amr_subcycle) cov = merge(2, 1, fine)
+        if (amr .and. (sub .or. .not. amr_subcycle)) cov = merge(2, 1, fine)
         nc = merge(amr_cov_n, 0, cov == 2); sd = amr_bat_sd; bw = max(amr_bat_w, 1)
         if (fine .and. .not. (do_ft .and. cov == 2)) return
+        wt = merge(1._wp, -1._wp, fine)*dt*f_ib_stage_weight(stage)
+
+        if (sub .and. idir == 1 .and. stage == 1 .and. .not. fine) then
+            $:GPU_PARALLEL_LOOP(private='[i, l]', collapse=2)
+            do i = 1, num_ibs
+                do l = 1, 6
+                    ib_ft_sub(l, i) = 0._wp
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
         if (do_ft .and. idir == 1 .and. .not. fine) then
             $:GPU_PARALLEL_LOOP(private='[i, l]', collapse=2)
@@ -3879,7 +3897,7 @@ contains
         ! Face (j, k, l) lies between that cell and the next one along idir
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, area, &
                             & f, r, tq, vb, f_E, f_m, f_mom, hatR, fj, fk, fl, ibm, jl, kl, ll, covd, sh]', firstprivate='[fine, &
-                            & heat, cov, nc, sd, bw]')
+                            & heat, cov, nc, sd, bw, sub, wt]')
         do l = l0, p
             do k = k0, n
                 do j = j0, m
@@ -3917,7 +3935,7 @@ contains
                                     & i)) covd = .true.
                             end do
                         end if
-                        if (covd) side = 0
+                        if (covd .and. (fine .or. .not. sub)) side = 0
                     end if
                     if (side /= 0) then
                         call s_decode_patch_periodicity(markers%sf(ci, cj, ck), ib_tmp, xp, yp, zp)
@@ -3965,10 +3983,18 @@ contains
                                 end do
                                 call s_cross_product(r, f, tq)
                                 do i = 1, 3
-                                    $:GPU_ATOMIC(atomic='update')
-                                    ib_face_ft(i, ib_id) = ib_face_ft(i, ib_id) + f(i)
-                                    $:GPU_ATOMIC(atomic='update')
-                                    ib_face_ft(i + 3, ib_id) = ib_face_ft(i + 3, ib_id) + tq(i)
+                                    if (.not. (fine .and. sub)) then
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_face_ft(i, ib_id) = ib_face_ft(i, ib_id) + f(i)
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_face_ft(i + 3, ib_id) = ib_face_ft(i + 3, ib_id) + tq(i)
+                                    end if
+                                    if (sub .and. (fine .or. covd)) then
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_ft_sub(i, ib_id) = ib_ft_sub(i, ib_id) + wt*f(i)
+                                        $:GPU_ATOMIC(atomic='update')
+                                        ib_ft_sub(i + 3, ib_id) = ib_ft_sub(i + 3, ib_id) + wt*tq(i)
+                                    end if
                                 end do
                             end if
                             if (heat .and. (all_ibs .or. patch_ib(ib_id)%thermal_bc == 3)) then
@@ -4076,6 +4102,40 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_ib_forces
+
+    !> amr_subcycle, after the fine substeps: as the reflux does for the fluid, each force-driven body's step impulse takes the fine
+    !! levels' faces in place of the covered coarse ones (ib_ft_sub); its step-end pose moves by the velocity change times dt/2,
+    !! exact for a correction force constant over the step.
+    impure subroutine s_correct_ib_subcycle_impulse()
+
+        integer                         :: i
+        real(wp), dimension(num_ibs, 3) :: dp, dl
+        real(wp), dimension(3)          :: dv, dw, ang
+
+        if (.not. (amr .and. amr_subcycle .and. moving_immersed_boundary_flag)) return
+        $:GPU_UPDATE(host='[ib_ft_sub]')
+        do i = 1, num_ibs
+            dp(i,:) = ib_ft_sub(1:3,i); dl(i,:) = ib_ft_sub(4:6,i)
+        end do
+        call s_communicate_ib_forces(dp, dl)
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm < 2 .or. patch_ib(i)%kin_model > 0) cycle
+            dv = dp(i,:)/patch_ib(i)%mass
+            ang = patch_ib(i)%angular_vel*patch_ib(i)%moment + dl(i,:)
+            if (num_dims == 3) call s_compute_moment_of_inertia(patch_ib(i), ang, patch_ib(i)%moment)
+            dw = ang/patch_ib(i)%moment - patch_ib(i)%angular_vel
+            patch_ib(i)%vel = patch_ib(i)%vel + dv
+            patch_ib(i)%angular_vel = patch_ib(i)%angular_vel + dw
+            patch_ib(i)%x_centroid = patch_ib(i)%x_centroid + 0.5_wp*dt*dv(1)
+            patch_ib(i)%y_centroid = patch_ib(i)%y_centroid + 0.5_wp*dt*dv(2)
+            patch_ib(i)%z_centroid = patch_ib(i)%z_centroid + 0.5_wp*dt*dv(3)
+            patch_ib(i)%angles = patch_ib(i)%angles + 0.5_wp*dt*dw
+        end do
+        $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
+        call s_update_ib_rotation_matrices(num_ibs)
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
+    end subroutine s_correct_ib_subcycle_impulse
 
     !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
     !> These patches include things like NACA airfoils and STL models
@@ -5147,7 +5207,7 @@ contains
             end do
             @:DEALLOCATE(ib_wall_theta%sf)
         end if
-        @:DEALLOCATE(ib_face_ft)
+        @:DEALLOCATE(ib_face_ft, ib_ft_sub)
         if (associated(ib_markers_fine%sf)) then
             @:DEALLOCATE(ib_markers_fine%sf)
         end if

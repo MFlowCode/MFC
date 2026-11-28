@@ -6816,6 +6816,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         two_rank = {"m": 127, "n": 127, "patch_ib(1)%radius": 0.05, "patch_ib(1)%mass": 0.0157}
         two_rank.update({"amr_block_beg(1)": 50, "amr_block_end(1)": 73, "amr_block_beg(2)": 53, "amr_block_end(2)": 76})
         cases.append(define_case_d(stack, "force-driven -> 2 MPI Ranks", {**force_driven, **two_rank}, ppn=2))
+        # subcycled force-driven: the step impulse takes the fine substeps' faces (reduced across ranks on two)
+        cases.append(define_case_d(stack, "force-driven -> subcycle", {**force_driven, "amr_subcycle": "T"}))
+        cases.append(define_case_d(stack, "force-driven -> subcycle -> 2 MPI Ranks", {**force_driven, **two_rank, "amr_subcycle": "T"}, ppn=2))
         # Two levels under dynamic regrid (lock-step, np=1): each level's blocks nest over the body and rebuild its markers per stage
         ml_regrid = {"patch_ib(1)%radius": 0.05, "amr_max_grid_size": 32, "amr_max_level": 2, "amr_max_blocks": 16}
         ml_regrid.update({"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2})

@@ -22,6 +22,7 @@ module m_amr_stage
     use m_igr, only: jac
     use m_amr
     use m_amr_advance, only: s_amr_fine_stage_ib, s_amr_ib_pose_begin, s_amr_ib_pose
+    use m_ibm, only: s_correct_ib_subcycle_impulse
 
     implicit none
 
@@ -121,6 +122,7 @@ contains
         dt = dt0
         $:GPU_UPDATE(device='[dt]')
         call s_amr_ib_pose(1._wp)
+        call s_correct_ib_subcycle_impulse()
         call s_amr_igr_sigma(-2, 0._wp)
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()

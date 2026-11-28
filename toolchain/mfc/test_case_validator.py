@@ -762,6 +762,12 @@ class TestAmrDefaults(unittest.TestCase):
             validate_case_constraints({**ib, "amr_regrid_int": 0}, "simulation")
         self.assertIn("requires amr_regrid_int > 0", str(ctx.exception))
 
+    def test_subcycle_force_driven_ib(self):
+        """A force-driven body may subcycle: its step impulse takes the fine faces after the substeps."""
+        ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
+        ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.05})
+        validate_case_constraints({**ib, "amr_subcycle": "T", "patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 1.0}, "simulation")
+
     def test_static_ib_nesting_depth(self):
         """Static nesting with ib stops at level 2: deeper fixed insets do not track the body."""
         ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
