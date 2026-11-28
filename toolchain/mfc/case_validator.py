@@ -463,6 +463,7 @@ AMR_VETTED_FLAGS = (
     "wenoz",
     "weno_avg",
     "weno_Re_flux",
+    "weno_Re_flux_compact",
     "mixture_err",
     "mpp_lim",
     "reactive_burn",
