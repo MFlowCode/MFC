@@ -126,8 +126,8 @@ contains
 
         !> the q_prim the block's RHS pass filled (pooled scratch)
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_b
-        real(stp), dimension(:,:,:,:,:), intent(inout)           :: pb_in, mv_in  !< unread: amr prohibits qbmm
-        integer                                                  :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
+        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in  !< unread: amr requires polytropic bubbles without QBMM
+        integer :: loc_cur                                              !< plain scalars for device routines (NVHPC -Minline)
 
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return

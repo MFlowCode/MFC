@@ -267,6 +267,33 @@ def make_3d_box_patches(
     return d
 
 
+# Water-like liquid with 4 % air bubbles at equilibrium (R0 = 1, p0 = 1) in each of BASE_CFG's three patches
+BUBBLE_EE_MODS = {
+    "fluid_pp(1)%gamma": 0.16,
+    "fluid_pp(1)%eos": "stiffened_gas",
+    "fluid_pp(1)%pi_inf": 3515.0,
+    "bub_pp%R0ref": 1.0,
+    "bub_pp%p0ref": 1.0,
+    "bub_pp%rho0ref": 1.0,
+    "bub_pp%T0ref": 1.0,
+    "bub_pp%ss": 0.07179866765358993,
+    "bub_pp%pv": 0.02308216136195411,
+    "bub_pp%vd": 0.2404125083932959,
+    "bub_pp%mu_l": 0.009954269975623244,
+    "bub_pp%mu_v": 8.758168074360729e-05,
+    "bub_pp%mu_g": 0.00017881922111898042,
+    "bub_pp%gam_v": 1.33,
+    "bub_pp%gam_g": 1.4,
+    "bub_pp%M_v": 18.02,
+    "bub_pp%M_g": 28.97,
+    "bub_pp%k_v": 0.5583395141263873,
+    "bub_pp%k_g": 0.7346421281308791,
+    "bub_pp%R_v": 1334.8378710170155,
+    "bub_pp%R_g": 830.2995663005393,
+    **{f"patch_icpp({i})%{k}": v for i in (1, 2, 3) for k, v in (("alpha_rho(1)", 0.96), ("alpha(1)", 4e-02))},
+}
+
+
 def qbmm_mods(dimInfo):
     """QBMM on: 3D runs 5 steps (25^3 x 50 steps took 5 min on CI); 1D and 2D keep the full 50 and cover the bubble physics."""
     return {"qbmm": "T", **({"t_step_stop": 5, "t_step_save": 5} if len(dimInfo[0]) == 3 else {})}
@@ -2247,33 +2274,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "",
                 {
                     "nb": 3,
-                    "fluid_pp(1)%gamma": 0.16,
-                    "fluid_pp(1)%eos": "stiffened_gas",
-                    "fluid_pp(1)%pi_inf": 3515.0,
-                    "bub_pp%R0ref": 1.0,
-                    "bub_pp%p0ref": 1.0,
-                    "bub_pp%rho0ref": 1.0,
-                    "bub_pp%T0ref": 1.0,
-                    "bub_pp%ss": 0.07179866765358993,
-                    "bub_pp%pv": 0.02308216136195411,
-                    "bub_pp%vd": 0.2404125083932959,
-                    "bub_pp%mu_l": 0.009954269975623244,
-                    "bub_pp%mu_v": 8.758168074360729e-05,
-                    "bub_pp%mu_g": 0.00017881922111898042,
-                    "bub_pp%gam_v": 1.33,
-                    "bub_pp%gam_g": 1.4,
-                    "bub_pp%M_v": 18.02,
-                    "bub_pp%M_g": 28.97,
-                    "bub_pp%k_v": 0.5583395141263873,
-                    "bub_pp%k_g": 0.7346421281308791,
-                    "bub_pp%R_v": 1334.8378710170155,
-                    "bub_pp%R_g": 830.2995663005393,
-                    "patch_icpp(1)%alpha_rho(1)": 0.96,
-                    "patch_icpp(1)%alpha(1)": 4e-02,
-                    "patch_icpp(2)%alpha_rho(1)": 0.96,
-                    "patch_icpp(2)%alpha(1)": 4e-02,
-                    "patch_icpp(3)%alpha_rho(1)": 0.96,
-                    "patch_icpp(3)%alpha(1)": 4e-02,
+                    **BUBBLE_EE_MODS,
                     "patch_icpp(1)%pres": 1.0,
                     "patch_icpp(2)%pres": 1.0,
                     "patch_icpp(3)%pres": 1.0,
@@ -2899,33 +2900,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "",
                 {
                     "nb": 1,
-                    "fluid_pp(1)%gamma": 0.16,
-                    "fluid_pp(1)%eos": "stiffened_gas",
-                    "fluid_pp(1)%pi_inf": 3515.0,
-                    "bub_pp%R0ref": 1.0,
-                    "bub_pp%p0ref": 1.0,
-                    "bub_pp%rho0ref": 1.0,
-                    "bub_pp%T0ref": 1.0,
-                    "bub_pp%ss": 0.07179866765358993,
-                    "bub_pp%pv": 0.02308216136195411,
-                    "bub_pp%vd": 0.2404125083932959,
-                    "bub_pp%mu_l": 0.009954269975623244,
-                    "bub_pp%mu_v": 8.758168074360729e-05,
-                    "bub_pp%mu_g": 0.00017881922111898042,
-                    "bub_pp%gam_v": 1.33,
-                    "bub_pp%gam_g": 1.4,
-                    "bub_pp%M_v": 18.02,
-                    "bub_pp%M_g": 28.97,
-                    "bub_pp%k_v": 0.5583395141263873,
-                    "bub_pp%k_g": 0.7346421281308791,
-                    "bub_pp%R_v": 1334.8378710170155,
-                    "bub_pp%R_g": 830.2995663005393,
-                    "patch_icpp(1)%alpha_rho(1)": 0.96,
-                    "patch_icpp(1)%alpha(1)": 4e-02,
-                    "patch_icpp(2)%alpha_rho(1)": 0.96,
-                    "patch_icpp(2)%alpha(1)": 4e-02,
-                    "patch_icpp(3)%alpha_rho(1)": 0.96,
-                    "patch_icpp(3)%alpha(1)": 4e-02,
+                    **BUBBLE_EE_MODS,
                     "patch_icpp(1)%pres": 1.0,
                     "patch_icpp(2)%pres": 1.0,
                     "patch_icpp(3)%pres": 1.0,
@@ -5550,33 +5525,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "nb": 1,
                 "polytropic": "T",
                 "bubble_model": 2,
-                "fluid_pp(1)%gamma": 0.16,
-                "fluid_pp(1)%eos": "stiffened_gas",
-                "fluid_pp(1)%pi_inf": 3515.0,
-                "bub_pp%R0ref": 1.0,
-                "bub_pp%p0ref": 1.0,
-                "bub_pp%rho0ref": 1.0,
-                "bub_pp%T0ref": 1.0,
-                "bub_pp%ss": 0.07179866765358993,
-                "bub_pp%pv": 0.02308216136195411,
-                "bub_pp%vd": 0.2404125083932959,
-                "bub_pp%mu_l": 0.009954269975623244,
-                "bub_pp%mu_v": 8.758168074360729e-05,
-                "bub_pp%mu_g": 0.00017881922111898042,
-                "bub_pp%gam_v": 1.33,
-                "bub_pp%gam_g": 1.4,
-                "bub_pp%M_v": 18.02,
-                "bub_pp%M_g": 28.97,
-                "bub_pp%k_v": 0.5583395141263873,
-                "bub_pp%k_g": 0.7346421281308791,
-                "bub_pp%R_v": 1334.8378710170155,
-                "bub_pp%R_g": 830.2995663005393,
-                "patch_icpp(1)%alpha_rho(1)": 0.96,
-                "patch_icpp(1)%alpha(1)": 4e-02,
-                "patch_icpp(2)%alpha_rho(1)": 0.96,
-                "patch_icpp(2)%alpha(1)": 4e-02,
-                "patch_icpp(3)%alpha_rho(1)": 0.96,
-                "patch_icpp(3)%alpha(1)": 4e-02,
+                **BUBBLE_EE_MODS,
                 "patch_icpp(1)%pres": 1.0,
                 "patch_icpp(2)%pres": 1.0,
                 "patch_icpp(3)%pres": 1.0,
@@ -5891,6 +5840,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(1)": 16,
             "amr_block_end(1)": 47,
         }
+        # Euler-Euler bubbles out of equilibrium at the patches' pressures and with a wall speed (a bubble field at rest for one step
+        # would read its roundoff relative to a near-zero amr_check scale): the bubble source acts in every block cell. The fine
+        # cells' liquid sound speed limits dt to 5e-5.
+        bub_amr = {**BUBBLE_EE_MODS, "bubbles_euler": "T", "nb": 1, "bubble_model": 2, "dt": 2.5e-5, **{f"patch_icpp({i})%v0": 0.1 for i in (1, 2, 3)}}
+        bub_gold = {**bub_amr, "t_step_stop": 40, "t_step_save": 40}
 
         # static block
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0})
@@ -5924,6 +5878,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         # restart_check on the regridded layout: a regridded block set cannot be rebuilt from the ICs
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
+        cases.append(define_case_d(stack, "bubbles_euler", {"amr_max_grid_size": 32, **bub_gold}, restart_check=True))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
         # SSP-RK1 and RK2: the reflux weights and stage times come from the scheme's coefficients (s_amr_set_rk_table)
@@ -6071,11 +6026,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             ("viscous", {"viscous": "T", "fluid_pp(1)%Re(1)": 100.0}),
             ("subcycle", {"amr_subcycle": "T"}),
             ("two fluids", chk_two_fluid),
+            ("bubbles_euler", bub_amr),
+            ("bubbles_euler -> adv_n", {**bub_amr, "adv_n": "T"}),
+            ("bubbles_euler -> polydisperse", {**bub_amr, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}),
         ):
             spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params={**amr_chk, **chk_mods})
             cases.append(define_convergence_case(f"Convergence -> amr_check -> 1D -> {label}", spec))
+        # 2D bubbles: a 0.25-wide square at half the pressure inside the block, which splits into four members (seams through the core)
+        bub_2d = {k: v for k, v in {**BASE_CFG, **bub_amr}.items() if not k.startswith("patch_icpp(3)")}
+        bub_2d.update({"m": 63, "n": 63, "num_patches": 2, "amr": "T", "amr_regrid_int": 0, "amr_max_grid_size": 32, "patch_icpp(2)%alter_patch(1)": "T"})
+        bub_2d.update({f"{d}_domain%{e}": v for d in "xy" for e, v in (("beg", 0.0), ("end", 1.0))})
+        bub_2d.update({f"bc_{d}%{e}": -3 for d in "xy" for e in ("beg", "end")})
+        bub_2d.update({f"amr_block_{e}({d})": v for d in (1, 2) for e, v in (("beg", 16), ("end", 47))})
+        for i, w in ((1, 1.0), (2, 0.25)):
+            bub_2d.update({f"patch_icpp({i})%{k}": v for k, v in (("geometry", 3), ("x_centroid", 0.5), ("y_centroid", 0.5), ("length_x", w), ("length_y", w))})
+            bub_2d.update({f"patch_icpp({i})%vel(1)": 0.0, f"patch_icpp({i})%vel(2)": 0.0})
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=bub_2d)
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> bubbles_euler", spec))
 
         stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64})
+        # the bubbly patches meet inside the block, as in the amr_check above
+        cases.append(define_case_d(stack, "bubbles_euler", {**bub_gold, **{k: v for k, v in amr_chk.items() if k.endswith(("x_centroid", "length_x"))}}))
         # non-reflecting subsonic buffer at both ends: the coarse grid applies it, the block's edges are coarse/fine faces
         cases.append(define_case_d(stack, "CBC", {"bc_x%beg": -6, "bc_x%end": -6}))
         # GRCBC subsonic inflow and outflow relaxing toward a state the initial one is not

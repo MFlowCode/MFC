@@ -925,8 +925,8 @@ contains
 
         ! ptil is a probe-output diagnostic only, so evaluate it only when probes are on.
         ! This sits outside the source-term branch above so that the qbmm and adap_dt
-        ! paths, which skip that branch, still get a filled ptil.
-        if (bubbles_euler .and. probe_wrt) then
+        ! paths, which skip that branch, still get a filled ptil. The probes read level 0's ptil.
+        if (bubbles_euler .and. probe_wrt .and. .not. amr_in_fine_advance) then
             ! needs cons_copy_all
             call s_compute_ptilde(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size))
         end if

@@ -317,8 +317,8 @@ PHYSICS_DOCS = {
             "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= amr_max_level; "
             "amr_prolong = 2 needs amr_ref_ratio = 2; static nesting with ib goes up to amr_max_level = 2. "
             "Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
-            "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Surface tension needs amr_max_level = 1. Incompatible with Euler-Euler "
-            "bubbles, QBMM, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
+            "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Surface tension needs amr_max_level = 1; Euler-Euler bubbles need one "
+            "fluid and polytropic bubbles. Incompatible with QBMM, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
             "and CBC boundaries. Operator-split reaction and burn substeps also run on each block. No immersed body may have a "
             "reacting surface, thermal_bc = 2 or 3, or a thermal layer; the isothermal wall (thermal_bc = 1) is supported, with "
             "or without chemistry. Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 "
@@ -471,6 +471,9 @@ AMR_VETTED_FLAGS = (
     "relativity",
     "viscous",
     "polytropic",
+    "polydisperse",
+    "adv_n",
+    "bubbles_euler",
     "relax",
     "surface_tension",
     *AMR_INERT_FLAGS,
@@ -2286,20 +2289,28 @@ class CaseValidator:
         # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member:
         # QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
         # applies it at the slab ends only; bc = -4 without null_weights is fine, the fine frames skip its edge-state
-        # copy). Euler bubbles have no AMR golden. MHD, relativity, hypoelasticity, continuum damage, Lagrangian bubbles,
-        # chemistry, IGR, the 6-equation model, surface tension and prescribed-motion immersed bodies are supported.
+        # copy). Surface tension and Euler bubbles have no AMR golden. MHD, relativity, hypoelasticity, continuum damage,
+        # Lagrangian and single-fluid polytropic Euler bubbles, chemistry, IGR, the 6-equation model, surface tension and
+        # prescribed-motion immersed bodies are supported.
         self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
         self.prohibit(
             any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
             "amr requires a uniform grid (no stretching)",
         )
-        for k in ("qbmm", "bubbles_euler"):
+        for k in ("qbmm",):
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
         # surface tension is validated on one refined level only (static, regrid, subcycled, multi-rank)
         self.prohibit(
             self.get("surface_tension", "F") == "T" and (self.get("amr_max_level") or 1) > 1,
             "amr with surface_tension supports one refined level (amr_max_level = 1)",
         )
+        # adap_dt integrates the bubble ODE on level 0 only; the other combinations are not checked on blocks
+        if self.get("bubbles_euler", "F") == "T":
+            self.prohibit(self.get("adap_dt", "F") == "T", "amr with bubbles_euler does not support adap_dt (it advances the bubbles on level 0 only)")
+            self.prohibit(self.get("polytropic", "T") != "T", "amr with bubbles_euler requires polytropic = T (not yet validated)")
+            self.prohibit((self.get("num_fluids") or 1) > 1, "amr with bubbles_euler requires num_fluids = 1 (not yet validated)")
+            self.prohibit(self.get("amr_prolong", 1) == 2, "amr with bubbles_euler requires amr_prolong = 1 (not yet validated)")
+            self.prohibit(self.get("ib", "F") == "T", "amr with bubbles_euler does not support ib (not yet validated)")
         for d in ("x", "y", "z"):
             for e in ("beg", "end"):
                 bc = self.get(f"bc_{d}%{e}")

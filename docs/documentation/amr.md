@@ -122,7 +122,8 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL
 | Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
 | Condensed-phase burn (`reactive_burn`) | Supported; with `rburn%%substeps > 0` each block takes the split burn at the end of the step, before the fold |
 | Surface tension | One refined level (`amr_max_level = 1`); the capillary flux is refluxed, so mass, momentum and energy are conserved across block faces also without `viscous` |
-| Euler-Euler bubbles, QBMM | Not supported |
+| Euler-Euler bubbles (`bubbles_euler`) | Single fluid, polytropic, with `adv_n` or `polydisperse`; not with `adap_dt`, `qbmm`, immersed bodies or `amr_prolong = 2`; the bubble variables are prolonged, restricted and refluxed like the others |
+| QBMM | Not supported |
 | Riemann-extrapolation boundaries (`bc = -4`) | Supported, except with `null_weights` |
 | Characteristic boundaries (`bc = -5` to `-12`, GRCBC included) | Supported; the coarse grid applies them at the domain boundary (blocks stay `buff_size` cells inside it) |
 | Cylindrical coordinates, stretched grids | Not supported |

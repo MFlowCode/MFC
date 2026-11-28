@@ -661,6 +661,27 @@ class TestAmrDefaults(unittest.TestCase):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
 
+    def test_bubbles_euler_under_amr(self):
+        """Single-fluid polytropic Euler bubbles (with adv_n or polydisperse) are allowed; adap_dt, QBMM, non-polytropic, more than
+        one fluid, the quartic prolongation and immersed bodies are not."""
+        bub = {**self.AMR, "bubbles_euler": "T", "nb": 1, "bubble_model": 2, "polytropic": "T", "thermal": 3}
+        bub.update({"bub_pp%R0ref": 1.0, "bub_pp%p0ref": 1.0, "bub_pp%rho0ref": 1.0, "bub_pp%ss": 0.07, "bub_pp%pv": 0.02, "bub_pp%mu_l": 0.01})
+        bub.update({"bub_pp%gam_g": 1.4, "fluid_pp(1)%eos": 1, "fluid_pp(1)%pi_inf": 3515.0, "patch_icpp(1)%r0": 1.0, "patch_icpp(1)%v0": 0.0})
+        validate_case_constraints(bub, "simulation")
+        validate_case_constraints({**bub, "adv_n": "T"}, "simulation")
+        validate_case_constraints({**bub, "nb": 3, "polydisperse": "T", "poly_sigma": 0.3}, "simulation")
+        for mods, msg in (
+            ({"adap_dt": "T"}, "does not support adap_dt"),
+            ({"polytropic": "F"}, "requires polytropic = T"),
+            ({"num_fluids": 2, "mpp_lim": "T"}, "requires num_fluids = 1"),
+            ({"amr_prolong": 2}, "requires amr_prolong = 1"),
+            ({"ib": "T", "num_ibs": 1}, "does not support ib"),
+            ({"nb": 3, "qbmm": "T"}, "incompatible with qbmm"),
+        ):
+            with self.assertRaises(CaseConstraintError, msg=str(mods)) as ctx:
+                validate_case_constraints({**bub, **mods}, "simulation")
+            self.assertIn(msg, str(ctx.exception))
+
     def test_multilevel_block_pool(self):
         """amr_max_level > 1 needs one pool slot per level, as the static builder's abort."""
         ml = {**self.AMR, "amr_max_level": 3}
