@@ -1,6 +1,7 @@
 """Fail loudly if the committed coverage map is stale or under-covers. Used by coverage-health.yml."""
 import datetime
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "toolchain"))
@@ -30,6 +31,14 @@ VERIFIED_REF = "refs/coverage-map/verified"
 # alarms (a change that never triggers a refresh would look like a missed refresh).
 COVERAGE_RELEVANT_PATHS = [":(glob)src/**/*.fpp", "toolchain/mfc/test/cases.py"]
 
+# How long a coverage-relevant commit may sit unverified before it counts as a missed refresh.
+# A refresh takes about 40 minutes on Phoenix but may take up to its 480-minute job timeout,
+# after waiting for a runner. Pushes cluster in the hours before this check's 07:00 UTC cron,
+# so without this window it went red on mornings when the refresh for master's newest commit
+# was simply still running (2026-11-27 and 2026-11-28). A refresh that is really broken
+# leaves the commit unverified past the window, and the next daily run reports it.
+REFRESH_GRACE_HOURS = 12
+
 
 def verified_sha(cwd=None):
     """Commit the last successful refresh verified the map against, or None if unknown.
@@ -43,12 +52,18 @@ def verified_sha(cwd=None):
     return rev.stdout.strip() or None
 
 
-def verified_after_last_change(git_sha, cwd=None):
+def verified_after_last_change(git_sha, cwd=None, now=None, grace_hours=REFRESH_GRACE_HOURS):
     """Did that refresh run at or after the last coverage-relevant commit? None if unknowable.
 
     This is the direct question the wall-clock age check only approximated: it stays quiet
     over a genuinely quiet repo (no refresh needed, so no heartbeat needed either) and
-    fires on the next relevant push after a refresh breaks, rather than 10 days later.
+    fires after a refresh breaks, rather than 10 days later.
+
+    When no refresh has verified the newest relevant commit yet, this still counts as current
+    while the OLDEST relevant commit the verified one lacks is younger than `grace_hours`:
+    that refresh may still be running. Timing the oldest, not the newest, bounds how long a
+    broken refresh can go unreported. Timed from the newest, a relevant push every few hours
+    would keep the check green forever. `now` is a Unix timestamp, defaulting to the clock.
     """
     if not git_sha:
         return None
@@ -56,7 +71,17 @@ def verified_after_last_change(git_sha, cwd=None):
     if last.returncode != 0 or not last.stdout.strip():
         return None  # shallow clone or no such commit -> fall back to the age rule
     ancestor = run_git(["merge-base", "--is-ancestor", last.stdout.strip(), git_sha], cwd)
-    return {0: True, 1: False}.get(ancestor.returncode)  # anything else -> None (unknown sha, shallow history)
+    verdict = {0: True, 1: False}.get(ancestor.returncode)  # anything else -> None (unknown sha, shallow history)
+    if verdict is False:
+        missing = run_git(["log", "--format=%H %ct", f"{git_sha}..HEAD", "--", *COVERAGE_RELEVANT_PATHS], cwd)
+        if missing.returncode != 0 or not missing.stdout.strip():
+            return verdict
+        oldest_sha, oldest_time = missing.stdout.strip().splitlines()[-1].split()  # git log lists newest first
+        age_hours = ((time.time() if now is None else now) - int(oldest_time)) / 3600
+        if age_hours < grace_hours:
+            print(f"Note: {oldest_sha[:9]} ({age_hours:.1f}h old) is the oldest unverified coverage-relevant commit; its refresh has until {grace_hours}h.")
+            return True
+    return verdict
 
 
 def main():

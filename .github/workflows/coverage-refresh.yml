@@ -70,7 +70,36 @@ jobs:
             # direct pushes, but a PAT authenticates as the user (OrganizationAdmin),
             # which IS an honored bypass actor. persist-credentials:false above
             # ensures this token is actually used for the push.
-            git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" HEAD:master
+            #
+            # Master often moves during the ~40-minute SLURM job, and a plain push was then
+            # rejected as non-fast-forward (five refreshes lost this way, 2026-11-23 to 25).
+            # On a rejection, rebase the map commit onto the new master and retry.
+            #
+            # A bot push must start no workflow. test.yml queues master's push runs in one
+            # concurrency group, where a newer run replaces one still waiting, so a bot push
+            # that started CI would displace the queued run of a real commit. Benchmarks run
+            # only from schedules (bench.yml has no push trigger), so they never see these
+            # pushes. GitHub skips CI for a push whose HEAD commit carries the skip marker
+            # in the message above. The rebase keeps the bot commit at HEAD, and the check
+            # below refuses a push that would lose the marker.
+            pushed=0
+            for attempt in 1 2 3 4 5; do
+              git log -1 --format=%B | grep -qF '[skip ci]' \
+                || { echo "::error::Map commit lost its skip-CI marker; refusing to push."; exit 1; }
+              if git push "https://x-access-token:${CACHE_PUSH_TOKEN}@github.com/MFlowCode/MFC.git" HEAD:master; then
+                pushed=1; break
+              fi
+              git fetch --no-tags origin master
+              # A newer coverage-relevant commit starts its own refresh, which rebuilds the map
+              # from newer sources and cancels this run. Do not race it with an older map.
+              if ! git diff --quiet "$GITHUB_SHA" FETCH_HEAD -- ':(glob)src/**/*.fpp' toolchain/mfc/test/cases.py; then
+                echo "::notice::Master gained a coverage-relevant commit during this refresh; its own refresh supersedes this one."
+                exit 0
+              fi
+              git rebase FETCH_HEAD || { git rebase --abort; echo "::error::Map commit does not rebase onto master."; exit 1; }
+              sleep $((attempt * 5))
+            done
+            [ "$pushed" -eq 1 ] || { echo "::error::Map push rejected after 5 attempts."; exit 1; }
           else
             # Discard the rebuilt file so the runner's working tree matches master.
             git checkout -- tests/coverage_map.json.gz

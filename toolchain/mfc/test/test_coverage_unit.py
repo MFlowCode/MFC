@@ -585,20 +585,57 @@ def test_verified_after_last_change_true_when_a_refresh_ran_since_the_change():
         assert health.verified_after_last_change(relevant, cwd=repo) is True
 
 
+def _repo_with_unverified_change(d):
+    """History whose newest coverage-relevant commit postdates the verified one."""
+    repo, relevant, _ = _repo_with_history(d)
+    env = _env_without_git()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+    before = subprocess.run([*git, "rev-parse", "HEAD~1"], capture_output=True, text=True, check=True, env=env).stdout.strip()
+    assert before == relevant
+    (repo / "src" / "simulation" / "m_rhs.fpp").write_text("! v2\n")
+    subprocess.run([*git, "add", "-A"], check=True, env=env)
+    subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "relevant again"], check=True, env=env)
+    _set_verified(repo, relevant)
+    return repo, relevant
+
+
 def test_verified_after_last_change_false_when_the_refresh_predates_the_change():
-    """The genuine broken-refresh case this check exists to catch."""
+    """The genuine broken-refresh case this check exists to catch: past the grace window."""
+    import time
+
     health = _health_module()
     with tempfile.TemporaryDirectory() as d:
-        repo, relevant, _ = _repo_with_history(d)
-        env = _env_without_git()
+        repo, relevant = _repo_with_unverified_change(d)
+        later = time.time() + (health.REFRESH_GRACE_HOURS + 1) * 3600
+        assert health.verified_after_last_change(relevant, cwd=repo, now=later) is False
+
+
+def test_an_unverified_change_inside_the_grace_window_is_not_stale():
+    """The 2026-11-27/28 false alarms: the check ran while the refresh for master's newest
+    commit was still on Phoenix. A commit younger than the window is still being refreshed."""
+    import time
+
+    health = _health_module()
+    with tempfile.TemporaryDirectory() as d:
+        repo, relevant = _repo_with_unverified_change(d)
+        assert health.verified_after_last_change(relevant, cwd=repo) is True
+        soon = time.time() + (health.REFRESH_GRACE_HOURS - 1) * 3600
+        assert health.verified_after_last_change(relevant, cwd=repo, now=soon) is True
+
+
+def test_a_fresh_push_does_not_hide_an_old_unverified_change():
+    """The window is timed from the OLDEST unverified relevant commit. Timed from the newest,
+    a relevant push every few hours would keep a broken refresh green indefinitely."""
+    health = _health_module()
+    with tempfile.TemporaryDirectory() as d:
+        repo, relevant = _repo_with_unverified_change(d)
+        env = {**_env_without_git(), "GIT_COMMITTER_DATE": "@4000000000 +0000"}
         git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
-        before = subprocess.run([*git, "rev-parse", "HEAD~1"], capture_output=True, text=True, check=True, env=env).stdout.strip()
-        assert before == relevant
-        (repo / "src" / "simulation" / "m_rhs.fpp").write_text("! v2\n")
+        (repo / "src" / "simulation" / "m_rhs.fpp").write_text("! v3\n")
         subprocess.run([*git, "add", "-A"], check=True, env=env)
-        subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "relevant again"], check=True, env=env)
-        _set_verified(repo, relevant)
-        assert health.verified_after_last_change(relevant, cwd=repo) is False
+        subprocess.run([*git, "commit", "-q", "--no-verify", "-m", "fresh relevant"], check=True, env=env)
+        # The newest commit is 1h old at `now`; the first unverified one is decades old.
+        assert health.verified_after_last_change(relevant, cwd=repo, now=4000000000 + 3600) is False
 
 
 def test_a_no_op_refresh_still_keeps_the_map_healthy():
