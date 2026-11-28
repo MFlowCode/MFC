@@ -378,131 +378,82 @@ contains
         real(wp), intent(in)  :: Ys_IP(num_species), W_species(num_species)
         real(wp), intent(out) :: Ys_s(num_species), T_s, mdot_s
         logical, intent(out)  :: converged
-        integer, parameter    :: max_walk = 100, max_bracket = 60
+        integer, parameter    :: max_eval = 160
         real(wp), parameter   :: step_frac = 0.05_wp
-        real(wp)              :: Ys_b(num_species), Ys_c(num_species)
-        real(wp)              :: T_a, F_a, T_b, F_b, T_c, F_c, T_p, F_p, mdot_b, mdot_c, scale_c, dir, step, dT_secant, width
-        logical               :: ok, bracketed
-        integer               :: n, nslow
-
-        converged = .false.
-
-        ! Start: T_a = T_IP, clamped into [T_surface_min, T_surface_max]
-        T_a = min(max(T_IP, T_surface_min), T_surface_max)
-        Ys_s = Ys_IP
-        call s_surface_energy_state(pres, T_IP, T_a, d, Ys_IP, W_species, Ys_s, F_a, scale_c, mdot_s, ok)
-        T_s = T_a
-        if (.not. ok) return
-        if (abs(F_a) < energy_tol*scale_c) then
-            converged = .true.
-            return
-        end if
-
-        ! Walk from T_IP until F changes sign
-        dir = merge(1._wp, -1._wp, F_a < 0._wp)
-        T_p = T_a
-        F_p = F_a
-        Ys_b = Ys_s
-        bracketed = .false.
-        do n = 1, max_walk
-            step = step_frac*T_a
-            if (F_a /= F_p) then
-                dT_secant = -F_a*(T_a - T_p)/(F_a - F_p)
-                if (dT_secant*dir > 0._wp) step = min(step, 2._wp*abs(dT_secant))
-            end if
-            T_b = min(max(T_a + dir*step, T_surface_min), T_surface_max)
-            call s_surface_energy_state(pres, T_IP, T_b, d, Ys_IP, W_species, Ys_b, F_b, scale_c, mdot_b, ok)
-            if (.not. ok) return
-            if (abs(F_b) < energy_tol*scale_c) then
-                call s_accept_surface(T_b, Ys_b, mdot_b, T_s, Ys_s, mdot_s, converged)
-                return
-            end if
-            if ((F_b < 0._wp) .neqv. (F_a < 0._wp)) then
-                bracketed = .true.
-                exit
-            end if
-            if (T_b == T_surface_min .or. T_b == T_surface_max) return
-            T_p = T_a
-            F_p = F_a
-            T_a = T_b
-            F_a = F_b
-        end do
-        if (.not. bracketed) return
-
-        ! Illinois regula falsi on [T_a, T_b], whose ends keep opposite signs
-        nslow = 0
-        width = abs(T_b - T_a)
-        Ys_c = Ys_b
-        do n = 1, max_bracket
-            if (nslow < 2) then
-                T_c = T_b - F_b*(T_b - T_a)/(F_b - F_a)
-            else
-                T_c = 0.5_wp*(T_a + T_b)
-            end if
-            call s_surface_energy_state(pres, T_IP, T_c, d, Ys_IP, W_species, Ys_c, F_c, scale_c, mdot_c, ok)
-            if (.not. ok) return
-            if (abs(F_c) < energy_tol*scale_c) then
-                call s_accept_surface(T_c, Ys_c, mdot_c, T_s, Ys_s, mdot_s, converged)
-                return
-            end if
-            if ((F_c < 0._wp) .eqv. (F_b < 0._wp)) then
-                F_a = 0.5_wp*F_a
-            else
-                T_a = T_b
-                F_a = F_b
-            end if
-            T_b = T_c
-            F_b = F_c
-            nslow = merge(nslow + 1, 0, abs(T_b - T_a) > 0.5_wp*width)
-            width = abs(T_b - T_a)
-            if (width <= 100._wp*epsilon(1._wp)*T_b) then
-                call s_accept_surface(T_c, Ys_c, mdot_c, T_s, Ys_s, mdot_s, converged)
-                return
-            end if
-        end do
-
-    end subroutine s_solve_surface_energy
-
-    !> Species solve at T_s (warm-started from Ys_s) and the energy residual F there, with its scale max(|q|, 1).
-    subroutine s_surface_energy_state(pres, T_IP, T_s, d, Ys_IP, W_species, Ys_s, F, F_scale, mdot_s, ok)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in)    :: pres, T_IP, T_s, d
-        real(wp), intent(in)    :: Ys_IP(num_species), W_species(num_species)
-        real(wp), intent(inout) :: Ys_s(num_species)
-        real(wp), intent(out)   :: F, F_scale, mdot_s
-        logical, intent(out)    :: ok
         ! F inherits the species solve's error as noise of about tol*flux_scale/(diffusive flux). At a hot surface the
         ! image-point scale is ~1e4 times the diffusive flux, so species_tol would leave F with 1e-5 noise and stall the root
         ! solve. The species residual is cheap to drive further, to where its own roundoff stops it.
         real(wp), parameter :: nested_tol = 1.e-12_wp
-        real(wp)            :: omega_s(num_species), q_rxn
+        real(wp)            :: omega_s(num_species)
+        real(wp)            :: T_c, F_c, q_c, T_a, F_a, T_b, F_b, T_p, F_p, dir, step, dT_secant, width
+        logical             :: ok, bracketed
+        integer             :: n, nslow
 
-        call s_solve_surface_species(pres, T_s, d, Ys_IP, W_species, nested_tol, Ys_s, omega_s, mdot_s, ok)
-        F = 0._wp
-        F_scale = 1._wp
-        if (.not. ok) return
-        call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, F, q_rxn)
-        F_scale = max(abs(q_rxn), 1._wp)
+        converged = .false.
+        bracketed = .false.
+        nslow = 0
+        dir = 1._wp
+        T_a = 0._wp; F_a = 0._wp; T_b = 0._wp; F_b = 0._wp; T_p = 0._wp; F_p = 0._wp; width = 0._wp
+        T_c = min(max(T_IP, T_surface_min), T_surface_max)
+        Ys_s = Ys_IP
+        T_s = T_c
 
-    end subroutine s_surface_energy_state
+        ! One species solve and energy residual per pass, at T_c, warm-started from the previous pass's composition
+        do n = 1, max_eval
+            call s_solve_surface_species(pres, T_c, d, Ys_IP, W_species, nested_tol, Ys_s, omega_s, mdot_s, ok)
+            if (.not. ok) return
+            call s_surface_energy_residual(pres, T_IP, T_c, d, Ys_s, F_c, q_c)
+            T_s = T_c
+            if (abs(F_c) < energy_tol*max(abs(q_c), 1._wp)) then
+                converged = .true.
+                return
+            end if
 
-    !> Copy an accepted energy-balance state to the outputs.
-    subroutine s_accept_surface(T, Ys, mdot, T_s, Ys_s, mdot_s, converged)
+            if (n == 1) then
+                ! Walk from T_IP toward -F(T_IP)
+                dir = merge(1._wp, -1._wp, F_c < 0._wp)
+                T_a = T_c; F_a = F_c; T_p = T_c; F_p = F_c
+            else if (.not. bracketed) then
+                if ((F_c < 0._wp) .neqv. (F_a < 0._wp)) then
+                    bracketed = .true.
+                    T_b = T_c; F_b = F_c
+                    width = abs(T_b - T_a)
+                else
+                    if (T_c == T_surface_min .or. T_c == T_surface_max) return
+                    T_p = T_a; F_p = F_a; T_a = T_c; F_a = F_c
+                end if
+            else
+                ! Illinois update: (T_a, F_a) and (T_b, F_b) keep opposite signs
+                if ((F_c < 0._wp) .eqv. (F_b < 0._wp)) then
+                    F_a = 0.5_wp*F_a
+                else
+                    T_a = T_b; F_a = F_b
+                end if
+                T_b = T_c; F_b = F_c
+                nslow = merge(nslow + 1, 0, abs(T_b - T_a) > 0.5_wp*width)
+                width = abs(T_b - T_a)
+                if (width <= 100._wp*epsilon(1._wp)*T_b) then
+                    converged = .true.
+                    return
+                end if
+            end if
 
-        $:GPU_ROUTINE(parallelism='[seq]')
+            ! Next trial temperature
+            if (.not. bracketed) then
+                step = step_frac*T_a
+                if (F_a /= F_p) then
+                    dT_secant = -F_a*(T_a - T_p)/(F_a - F_p)
+                    if (dT_secant*dir > 0._wp) step = min(step, 2._wp*abs(dT_secant))
+                end if
+                T_c = min(max(T_a + dir*step, T_surface_min), T_surface_max)
+            else if (nslow < 2) then
+                T_c = T_b - F_b*(T_b - T_a)/(F_b - F_a)
+            else
+                T_c = 0.5_wp*(T_a + T_b)
+            end if
+        end do
 
-        real(wp), intent(in)  :: T, Ys(num_species), mdot
-        real(wp), intent(out) :: T_s, Ys_s(num_species), mdot_s
-        logical, intent(out)  :: converged
-
-        T_s = T
-        Ys_s = Ys
-        mdot_s = mdot
-        converged = .true.
-
-    end subroutine s_accept_surface
+    end subroutine s_solve_surface_energy
 
     !> Small dense linear solve with partial pivoting for the local surface Newton system.
     subroutine s_solve_surface_linear_system(A, b, x, success)
