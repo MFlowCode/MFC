@@ -607,7 +607,7 @@ contains
             type(scalar_field), dimension(sys_size), intent(in)    :: q_src
             integer                                                :: eq, c1, c2, c1w, c2w, k, gmax1, gmax2
             integer                                                :: f10, f20, dd1, dd2, nch, rr, dd1_hi, dd2_hi, side
-            integer                                                :: i2, i3, iu, ab, ae, ib, ie, f, oo(3), ich
+            integer                                                :: i2, i3, iu, ab, ae, ib, ie, ic, f, oo(3), ich
             logical                                                :: dta, dtb, ext, usrc, altss, amode
             real(wp)                                               :: fb, du, cu, sc, ke, en, rh
 
@@ -624,11 +624,11 @@ contains
             nch = rr**count([dta, dtb])
             dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
             gmax1 = a_m(1, ${D}$); gmax2 = a_m(2, ${D}$)
-            call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext); altss = alt_soundspeed; amode = amr_reg_amode
+            call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ic, ext); altss = alt_soundspeed; amode = amr_reg_amode
             ! separate launches: one block's high outside cell can be another's low outside cell
             do side = 0, 1
                 $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fb, du, cu, sc, ke, en, rh, f, oo, usrc, &
-                                    & arho, alf, i2, i3, ich]', firstprivate='[iu, ab, ae, ib, ie, ext, altss, amode]')
+                                    & arho, alf, i2, i3, ich]', firstprivate='[iu, ab, ae, ib, ie, ic, ext, altss, amode]')
                 do k = 1, amr_reg_n
                     do c2w = 0, gmax2
                         do c1w = 0, gmax1
@@ -639,7 +639,7 @@ contains
                                 i2 = aint(3, k, ${D}$) + c1; i3 = aint(4, k, ${D}$) + c2
                                 f10 = 0; if (dta) f10 = rr*c1
                                 f20 = 0; if (dtb) f20 = rr*c2
-                                usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie)
+                                usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie) .or. eq == ic
                                 ich = iu; if (amode .and. usrc) ich = iu + eq - ab  ! HLL Method 1: this fluid's interface alpha
                                 fb = 0._wp; du = 0._wp
                                 do dd2 = 0, dd2_hi
@@ -663,7 +663,7 @@ contains
                                     ! du sums the nch fine face velocities; fb absorbs s*(du/nch - u_coarse), s the coefficient
                                     ! of the face velocity in eq's rhs at the outside cell, so one update carries both
                                     cu = merge(creg(${D}$)%lo(ich, c1, c2, k), creg(${D}$)%hi(ich, c1, c2, k), side == 0)
-                                    if (ext) then
+                                    if (ext .and. eq /= ic) then
                                         rh = 0._wp; ke = 0._wp
                                         do f = 1, num_fluids
                                             arho(f) = q_src(eqn_idx%cont%beg + f - 1)%sf(oo(1), oo(2), oo(3))
@@ -747,7 +747,7 @@ contains
         integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
         real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
         integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb, iu, ab, ae, ib, ie, &
-            & f, ich
+            & ic, f, ich
         logical  :: dta, dtb, ext, usrc, altss, amode
         real(wp) :: fb, wl, wh, ml, mh, du, cu, sc, mm, ke_lo, ke_hi, en_lo, en_hi, un_lo, un_hi
 
@@ -762,7 +762,7 @@ contains
         ! need is read before this thread writes them. The two faces are written out, not looped over: CCE's OpenACC lowering
         ! fails on a runtime side loop with side-indexed private arrays ("Subtree parent problem").
 
-        call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext); altss = alt_soundspeed; amode = amr_reg_amode
+        call s_amr_usrc_ranges(iu, ab, ae, ib, ie, ic, ext); altss = alt_soundspeed; amode = amr_reg_amode
         #:for D, TA, TB, IDX in [(1, 2, 3, 'ol, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, ol, wb + g2'), (3, 1, 2, &
                                   & 'wa + g1, wb + g2, ol')]
             if (amr_dim(${D}$) .and. (w_lo(${D}$) /= 0._wp .or. w_hi(${D}$) /= 0._wp)) then
@@ -772,7 +772,7 @@ contains
                 ol = olo(${D}$); oh = ohi(${D}$); wl = w_lo(${D}$); wh = w_hi(${D}$); ml = mlo(${D}$); mh = mhi(${D}$)
                 $:GPU_PARALLEL_LOOP(collapse=2, private='[eq, f10, f20, dd1, dd2, fb, du, cu, sc, mm, usrc, f, ich, ke_lo, ke_hi, &
                                     & en_lo, en_hi, un_lo, un_hi, ar_lo, ar_hi, al_lo, al_hi]', firstprivate='[iu, ab, ae, ib, &
-                                    & ie, ext, altss, amode]')
+                                    & ie, ic, ext, altss, amode]')
                 do g2 = glb, ghb
                     do g1 = gla, gha
                         f10 = 0; if (dta) f10 = rr*g1
@@ -793,7 +793,7 @@ contains
                             end if
                         #:endfor
                         do eq = 1, sys_size
-                            usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie)
+                            usrc = (eq >= ab .and. eq <= ae) .or. (eq >= ib .and. eq <= ie) .or. eq == ic
                             ich = iu; if (amode .and. usrc) ich = iu + eq - ab  ! HLL Method 1: this fluid's interface alpha
                             #:for S, O, W, M, OP in [('lo', 'ol', 'wl', 'ml', '+'), ('hi', 'oh', 'wh', 'mh', '-')]
                                 if (${W}$ /= 0._wp) then
@@ -809,7 +809,7 @@ contains
                                         cu = creg(${D}$)%${S}$(ich, g1, g2, islot)
                                         if (ext .and. amode) then
                                             sc = -un_${S}$
-                                        else if (ext) then
+                                        else if (ext .and. eq /= ic) then
                                             sc = f_amr_usrc_coef(ar_${S}$, al_${S}$, ke_${S}$, en_${S}$, eq, altss)
                                         else
                                             sc = q(eq)%sf(${IDX.replace('ol', O)}$)
@@ -830,17 +830,19 @@ contains
     end subroutine s_amr_reflux_apply_faces
 
     !> Equations whose rhs carries a face-velocity term the reflux corrects (s_amr_capture_total's amr_reg_u channel): the volume
-    !! fractions [ab:ae], and with the 6-equation model the internal energies [ib:ie] (empty ranges otherwise). ext: some of those
-    !! coefficients need the cell's pressure (alt_soundspeed's K, the internal energies' alpha_k*p), not alpha alone.
-    impure subroutine s_amr_usrc_ranges(iu, ab, ae, ib, ie, ext)
+    !! fractions [ab:ae], with the 6-equation model the internal energies [ib:ie] (empty ranges otherwise), and the colour function
+    !! ic (c*div(u), coefficient c; 0 without surface tension). ext: some of the [ab:ae], [ib:ie] coefficients need the cell's
+    !! pressure (alt_soundspeed's K, the internal energies' alpha_k*p), not alpha alone.
+    impure subroutine s_amr_usrc_ranges(iu, ab, ae, ib, ie, ic, ext)
 
-        integer, intent(out) :: iu, ab, ae, ib, ie
+        integer, intent(out) :: iu, ab, ae, ib, ie, ic
         logical, intent(out) :: ext
 
         iu = amr_reg_u; ab = eqn_idx%adv%beg; ae = merge(eqn_idx%adv%end, ab - 1, iu > 0); ib = 1; ie = 0
         if (iu > 0 .and. model_eqns == model_eqns_6eq .and. .not. amr_reg_amode) then
             ib = eqn_idx%int_en%beg; ie = eqn_idx%int_en%end
         end if
+        ic = merge(eqn_idx%c, 0, iu > 0 .and. surface_tension)
         ext = iu > 0 .and. (amr_reg_amode .or. alt_soundspeed .or. model_eqns == model_eqns_6eq)
 
     end subroutine s_amr_usrc_ranges

@@ -55,13 +55,13 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   largest stable `dt`. With regrid on, start-up also aborts if `dt` would exceed that limit were the fastest cells
   refined to `amr_max_level`, so a run cannot fail on it later. Subcycled (`amr_subcycle = T`): each refined level takes `amr_ref_ratio` steps per parent step, with ghost
   cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
-- **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
+- **Refluxing and restriction.** Fine face fluxes (advective, viscous, capillary, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. A
   volume fraction's flux pairs with an \f$\alpha\,\nabla\cdot u\f$ source on the same faces, so the registers also hold
   the face velocity and the volume fractions' reflux corrects both: uniform \f$\alpha\f$ stays uniform, and a material
   interface on a block face keeps pressure and velocity equilibrium (HLLC, HLL with `hll_u_interface` and LF, with two or
   more fluids). The same correction covers the `alt_soundspeed` \f$K\,\nabla\cdot u\f$ term, the 6-equation internal
-  energies' \f$\alpha_k p\,\nabla\cdot u\f$, and HLL Method 1, whose per-fluid interface volume fractions the registers
+  energies' \f$\alpha_k p\,\nabla\cdot u\f$, the surface-tension colour function's \f$c\,\nabla\cdot u\f$, and HLL Method 1, whose per-fluid interface volume fractions the registers
   also hold. Each covered coarse cell is then set to the average of its fine children.
 
 ## Conservation and accuracy {#amr-conservation}
