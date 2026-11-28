@@ -149,7 +149,7 @@ for i, c in enumerate(centers):
     for name, x in zip("xyz", c):
         case[f"patch_ib({j})%{name}_centroid"] = x
 if args.moving:
-    case.update({"collision_model": 1, "coefficient_of_restitution": 0.9, "collision_time": 20.0 * args.cfl * dx / (u2 + a1), "ib_coefficient_of_friction": 0.1})
+    case.update({"collision_model": 1, "coefficient_of_restitution": 0.9, "collision_time": 20.0 * args.cfl * dx / (u2 + a1), "coefficient_of_friction": 0.1})
 if args.re_ps is not None:
     mu = rho2 * u2 * D / args.re_ps
     case.update({"fluid_pp(1)%Re(1)": 1.0 / mu, "fluid_pp(1)%Re(2)": 1.0 / (0.6 * mu)})

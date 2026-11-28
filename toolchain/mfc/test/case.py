@@ -660,6 +660,8 @@ def input_particles(self):
         subprocess.run([sys.executable, gen, self.get_dirpath()], check=True)
     elif "Wall Layer" in trace:
         create_input_wall_particles(self.get_dirpath())
+    elif "Four-way Coupling" in trace:
+        create_input_collision_particles(self.get_dirpath())
     else:
         create_input_particles(self.get_dirpath(), int(self.params["p"]) > 0)
 
@@ -709,6 +711,25 @@ def create_input_wall_particles(path_test: str):
     rp, v = 5.0e-3, 0.5
     rows = [((x, rp, 0.0), (0.0, -v, 0.0)) for x in (0.305, 0.309, 0.313)]
     rows += [((rp, y, 0.0), (-v, 0.0, 0.0)) for y in (0.5075, 0.5115, 0.5155)]
+    write_input_particles(path_test, rows, rp)
+
+
+# Number of particles create_input_collision_particles writes
+PARTICLE_COLLISION_TEST_COUNT = 5
+
+
+def create_input_collision_particles(path_test: str):
+    """Write PARTICLE_COLLISION_TEST_COUNT 2D particles for four-way coupling with periodic x and reflective y: a head-on
+    pair meeting on the x = 0.5 rank face, a fast particle wrapping across x = 0 into a slower one, and one hitting the
+    y = 0 wall. No particle starts on a cell face of the test grid."""
+    rp = 5.0e-3
+    rows = [
+        ((0.492, 0.5125, 0.0), (0.5, 0.0, 0.0)),
+        ((0.508, 0.5125, 0.0), (-0.5, 0.0, 0.0)),
+        ((0.992, 0.3125, 0.0), (1.0, 0.0, 0.0)),
+        ((0.008, 0.3125, 0.0), (0.4, 0.0, 0.0)),
+        ((0.71, 0.0105, 0.0), (0.0, -0.5, 0.0)),
+    ]
     write_input_particles(path_test, rows, rp)
 
 
