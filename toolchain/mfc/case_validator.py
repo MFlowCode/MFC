@@ -317,8 +317,8 @@ PHYSICS_DOCS = {
             "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_max_blocks >= amr_max_level; "
             "amr_prolong = 2 needs amr_ref_ratio = 2; static nesting with ib goes up to amr_max_level = 2. "
             "Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
-            "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
-            "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
+            "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Surface tension needs amr_max_level = 1. Incompatible with Euler-Euler "
+            "bubbles, QBMM, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
             "and CBC boundaries. Operator-split reaction and burn substeps also run on each block. No immersed body may have a "
             "reacting surface, thermal_bc = 2 or 3, or a thermal layer; the isothermal wall (thermal_bc = 1) is supported, with "
             "or without chemistry. Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 "
@@ -470,6 +470,7 @@ AMR_VETTED_FLAGS = (
     "viscous",
     "polytropic",
     "relax",
+    "surface_tension",
     *AMR_INERT_FLAGS,
 )
 
@@ -2285,16 +2286,20 @@ class CaseValidator:
         # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member:
         # QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
         # applies it at the slab ends only; bc = -4 without null_weights is fine, the fine frames skip its edge-state
-        # copy). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
-        # hypoelasticity, continuum damage, Lagrangian bubbles, chemistry, IGR, the 6-equation model and prescribed-motion
-        # immersed bodies are supported.
+        # copy). Euler bubbles have no AMR golden. MHD, relativity, hypoelasticity, continuum damage, Lagrangian bubbles,
+        # chemistry, IGR, the 6-equation model, surface tension and prescribed-motion immersed bodies are supported.
         self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
         self.prohibit(
             any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
             "amr requires a uniform grid (no stretching)",
         )
-        for k in ("qbmm", "bubbles_euler", "surface_tension"):
+        for k in ("qbmm", "bubbles_euler"):
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
+        # surface tension is validated on one refined level only (static, regrid, subcycled, multi-rank)
+        self.prohibit(
+            self.get("surface_tension", "F") == "T" and (self.get("amr_max_level") or 1) > 1,
+            "amr with surface_tension supports one refined level (amr_max_level = 1)",
+        )
         for d in ("x", "y", "z"):
             for e in ("beg", "end"):
                 bc = self.get(f"bc_{d}%{e}")

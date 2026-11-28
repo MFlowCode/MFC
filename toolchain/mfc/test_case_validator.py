@@ -669,6 +669,14 @@ class TestAmrDefaults(unittest.TestCase):
             validate_case_constraints({**ml, "amr_max_blocks": 2}, "simulation")
         self.assertIn("needs amr_max_blocks >= amr_max_level", str(ctx.exception))
 
+    def test_surface_tension_on_one_level(self):
+        st = {**self.AMR, "num_fluids": 2, "model_eqns": 3, "mpp_lim": "T", "riemann_solver": 2, "surface_tension": "T", "sigma": 1.0}
+        validate_case_constraints(st, "simulation")
+        ml = {**st, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_max_level": 2, "amr_max_blocks": 8}
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints(ml, "simulation")
+        self.assertIn("amr with surface_tension supports one refined level", str(ctx.exception))
+
     def test_tag_var(self):
         validate_case_constraints({**self.AMR, "amr_tag_var": 2}, "simulation")
         validate_case_constraints({**self.AMR, "amr_tag_var": 3, "amr_tag_abs": "T"}, "simulation")

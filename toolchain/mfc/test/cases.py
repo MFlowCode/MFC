@@ -6363,6 +6363,74 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # surface tension: a static capillary droplet (6-equation model, HLLC) in a periodic box. The block cuts the interface,
+        # so the capillary flux crosses its faces (refluxed without viscous) and the fine gradient reads the block's ghosts.
+        st_drop = {
+            "m": 47,
+            "n": 47,
+            "p": 0,
+            "dt": 3.0e-4,
+            "t_step_stop": 20,
+            "t_step_save": 20,
+            "num_patches": 2,
+            "num_fluids": 2,
+            "model_eqns": 3,
+            "mpp_lim": "T",
+            "mixture_err": "T",
+            "mapped_weno": "T",
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            **{f"bc_{d}%{e}": -1 for d in "xy" for e in ("beg", "end")},
+            "surface_tension": "T",
+            "sigma": 0.05,
+            "fluid_pp(1)%eos": "stiffened_gas",
+            "fluid_pp(1)%gamma": 1.0 / 1.1,
+            "fluid_pp(1)%pi_inf": 21.0 / 1.1,
+            "fluid_pp(2)%eos": "ideal_gas",
+            "fluid_pp(2)%gamma": 2.5,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%alpha_rho(1)": 1.0e-6,
+            "patch_icpp(1)%alpha_rho(2)": 0.1,
+            "patch_icpp(1)%alpha(1)": 1.0e-6,
+            "patch_icpp(1)%alpha(2)": 1.0 - 1.0e-6,
+            "patch_icpp(1)%cf_val": 0,
+            "patch_icpp(2)%geometry": 2,
+            "patch_icpp(2)%x_centroid": 0.5,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%radius": 0.2,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%smoothen": "T",
+            "patch_icpp(2)%smooth_patch_id": 1,
+            "patch_icpp(2)%smooth_coeff": 0.95,
+            "patch_icpp(2)%pres": 1.0,
+            "patch_icpp(2)%alpha_rho(1)": 1.0,
+            "patch_icpp(2)%alpha_rho(2)": 1.0e-7,
+            "patch_icpp(2)%alpha(1)": 1.0 - 1.0e-6,
+            "patch_icpp(2)%alpha(2)": 1.0e-6,
+            "patch_icpp(2)%cf_val": 1,
+            **{f"patch_icpp({i})%vel({d})": 0.0 for i in (1, 2) for d in (1, 2)},
+        }
+        st_blk = {"amr": "T", "amr_block_beg(1)": 24, "amr_block_end(1)": 41, "amr_block_beg(2)": 12, "amr_block_end(2)": 35}
+        stack.push("AMR -> 2D -> surface tension droplet", {**st_drop, **st_blk, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {}))
+        # pre_process rejects the 48-cell grid on two ranks; on 64 the block spans the rank seam (cell 32 either way)
+        cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 63, "n": 63}, ppn=2))
+        cases.append(define_case_d(stack, "regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.1, "amr_max_blocks": 16}))
+        cases.append(define_case_d(stack, "amr_subcycle", {"amr_subcycle": "T"}))
+        stack.pop()
+        # the block core's first step must match the fine grid's: a square drop with its edges on base-grid faces (so both
+        # start from the same state) inside the core of the default block (central half)
+        chk_st = {k: v for k, v in {**BASE_CFG, **st_drop}.items() if "smooth" not in k and k != "patch_icpp(2)%radius"}
+        chk_st.update({"m": 63, "n": 63, "patch_icpp(2)%geometry": 3, "patch_icpp(2)%length_x": 0.25, "patch_icpp(2)%length_y": 0.25})
+        spec = ConvergenceSpec(runner=run_amr_check, case_path="", expected_order=0.0, tol=1.0e-8, params=chk_st)
+        cases.append(define_convergence_case("Convergence -> amr_check -> 2D -> surface tension", spec))
+
         # static immersed boundary: a fixed circular body on a static fine block. Each fine block builds its own IB
         # markers/ghost points and applies the IB state correction. buff_size is floored to 10 by ib, so the 64x64 base
         # and the 24-cell block (20..43) satisfy the block guards.
