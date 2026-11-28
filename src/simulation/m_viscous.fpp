@@ -10,7 +10,7 @@
 #! gated for compile validity (num_dims <= 2) and runtime safety (p > 0).
 
 #! REF(D, base, off): cell index list with the direction-D entry shifted by off, for the finite differences in
-#! s_compact_ib_viscous_gradient
+#! s_compact_ib_viscous_gradients
 #:set SH = lambda v, o: v + (' %+d' % o if o else '')
 #:set REF = lambda D, B, o: ', '.join(SH(b, o) if i + 1 == D else b for i, b in enumerate(B))
 
@@ -41,6 +41,10 @@ module m_viscous
     !> Faces within this many cells of an immersed-boundary cell take the compact velocity gradient
     integer, parameter :: ib_visc_band = 2
 
+    !> ib_visc_compact: 1 at cells within ib_visc_band cells of a body cell, set once per RHS (s_compact_ib_viscous_gradients)
+    integer, allocatable, dimension(:,:,:) :: ib_near
+    $:GPU_DECLARE(create='[ib_near]')
+
 contains
 
     !> Initialize the viscous module
@@ -57,6 +61,9 @@ contains
         end do
         $:GPU_UPDATE(device='[Res_viscous, Re_idx, Re_size]')
         $:GPU_ENTER_DATA(copyin='[is1_viscous, is2_viscous, is3_viscous, iv]')
+        if (ib_visc_compact) then
+            @:ALLOCATE(ib_near(-1:m_alloc + 1, -min(n, 1):n_alloc + min(n, 1), -min(p, 1):p_alloc + min(p, 1)))
+        end if
 
     end subroutine s_initialize_viscous_module
 
@@ -1183,36 +1190,22 @@ contains
     !! kink at the wall), and the gradient stencil of weno_Re_flux, about five cells wide, carries that into the fluid faces next to
     !! the wall. The face j+1/2 is read by the viscous flux from dqR(j) and dqL(j+1), so both are set. On an AMR fine frame the
     !! markers (ib_markers_fine) hold the frame's interior only; cells outside it read as fluid (bodies sit inside their blocks).
+    !! The near-body cell mask ib_near is built at id = 1, the first direction of every RHS, and serves all directions and velocity
+    !! components. The differences are written out per direction so that a coordinate array that does not exist (z_cc in 2D) is
+    !! never touched.
     subroutine s_compact_ib_viscous_gradients(q_prim_vf, markers, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
 
-        type(scalar_field), dimension(sys_size), intent(in)                           :: q_prim_vf
-        type(integer_field), intent(in)                                               :: markers
-        integer, intent(in)                                                           :: id
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        type(integer_field), intent(in) :: markers
+        integer, intent(in) :: id
         type(scalar_field), dimension(eqn_idx%mom%beg:eqn_idx%mom%end), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
-        integer                                                                       :: i
-
-        do i = eqn_idx%mom%beg, eqn_idx%mom%end
-            call s_compact_ib_viscous_gradient(q_prim_vf(i), markers, id, dqL_x(i), dqR_x(i), dqL_y(i), dqR_y(i), dqL_z(i), &
-                                               & dqR_z(i))
-        end do
-
-    end subroutine s_compact_ib_viscous_gradients
-
-    !> One velocity component of s_compact_ib_viscous_gradients. The differences are written out per direction so that a coordinate
-    !! array that does not exist (z_cc in 2D) is never touched.
-    subroutine s_compact_ib_viscous_gradient(q, markers, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
-
-        type(scalar_field), intent(in)    :: q
-        type(integer_field), intent(in)   :: markers
-        integer, intent(in)               :: id
-        type(scalar_field), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
-        integer                           :: j, k, l, a, b, c, jn, kn, ln, ja, kb, lc, wz
-        integer                           :: mlo1, mlo2, mlo3, mhi1, mhi2, mhi3
-        logical                           :: near
-        real(wp)                          :: g, f1p, f1m, f2p, f2m
+        integer :: i, j, k, l, a, b, c, jn, kn, ln, ja, kb, lc, wy, wz
+        integer :: mlo1, mlo2, mlo3, mhi1, mhi2, mhi3
+        logical :: near
+        real(wp) :: g, f1p, f1m, f2p, f2m
 
         ja = merge(1, 0, id == 1); kb = merge(1, 0, id == 2); lc = merge(1, 0, id == 3)
-        wz = merge(ib_visc_band, 0, p > 0)
+        wz = merge(ib_visc_band, 0, p > 0); wy = merge(ib_visc_band, 0, n > 0)
         ! readable marker cells: the array's bounds, or the installed fine frame's interior (its markers have no ghost layers and
         ! cells past the frame hold another frame's markers)
         mlo1 = lbound(markers%sf, 1); mlo2 = lbound(markers%sf, 2); mlo3 = lbound(markers%sf, 3)
@@ -1221,46 +1214,62 @@ contains
             mlo1 = 0; mlo2 = 0; mlo3 = 0; mhi1 = m; mhi2 = n; mhi3 = p
         end if
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, jn, kn, ln, near, g, f1p, f1m, f2p, f2m]', copyin='[ja, kb, &
-                            & lc, wz, mlo1, mlo2, mlo3, mhi1, mhi2, mhi3]')
+        ! a face is near a body if either of its cells is: the union of the two cells' boxes is the face's box
+        if (id == 1) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, near]', &
+                                & copyin='[wz, wy, mlo1, mlo2, mlo3, mhi1, mhi2, mhi3]')
+            do l = -min(p, 1), p + min(p, 1)
+                do k = -min(n, 1), n + min(n, 1)
+                    do j = -1, m + 1
+                        near = .false.
+                        do c = max(-wz, mlo3 - l), min(wz, mhi3 - l)
+                            do b = max(-wy, mlo2 - k), min(wy, mhi2 - k)
+                                do a = max(-ib_visc_band, mlo1 - j), min(ib_visc_band, mhi1 - j)
+                                    if (markers%sf(j + a, k + b, l + c) /= 0) near = .true.
+                                end do
+                            end do
+                        end do
+                        ib_near(j, k, l) = merge(1, 0, near)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, g, f1p, f1m, f2p, f2m]', copyin='[ja, kb, lc]')
         do l = -lc, p
             do k = -kb, n
                 do j = -ja, m
                     jn = j + ja; kn = k + kb; ln = l + lc
-                    near = .false.
-                    do c = max(-wz, mlo3 - l), min(wz + lc*min(wz, 1), mhi3 - l)
-                        do b = max(-ib_visc_band*min(n, 1), mlo2 - k), min((ib_visc_band + kb)*min(n, 1), mhi2 - k)
-                            do a = max(-ib_visc_band, mlo1 - j), min(ib_visc_band + ja, mhi1 - j)
-                                if (markers%sf(j + a, k + b, l + c) /= 0) near = .true.
-                            end do
+                    if (ib_near(j, k, l) /= 0 .or. ib_near(jn, kn, ln) /= 0) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                            #:for DIR, X, CC in [(1, 'x', 'x_cc'), (2, 'y', 'y_cc'), (3, 'z', 'z_cc')]
+                                #:set C1 = ['j', 'k', 'l']
+                                #:set C2 = ['jn', 'kn', 'ln']
+                                if (num_dims >= ${DIR}$) then
+                                    ! forward and backward differences along ${X}$ at the cell below the face and the cell above it
+                                    f1p = (q_prim_vf(i)%sf(${REF(DIR, C1, 1)}$) - q_prim_vf(i)%sf(${REF(DIR, C1, 0)}$)) &
+                                           & /(${CC}$(${C1[DIR-1]}$ + 1) - ${CC}$(${C1[DIR-1]}$))
+                                    f1m = (q_prim_vf(i)%sf(${REF(DIR, C1, 0)}$) - q_prim_vf(i)%sf(${REF(DIR, C1, -1)}$)) &
+                                           & /(${CC}$(${C1[DIR-1]}$) - ${CC}$(${C1[DIR-1]}$ - 1))
+                                    f2p = (q_prim_vf(i)%sf(${REF(DIR, C2, 1)}$) - q_prim_vf(i)%sf(${REF(DIR, C2, 0)}$)) &
+                                           & /(${CC}$(${C2[DIR-1]}$ + 1) - ${CC}$(${C2[DIR-1]}$))
+                                    f2m = (q_prim_vf(i)%sf(${REF(DIR, C2, 0)}$) - q_prim_vf(i)%sf(${REF(DIR, C2, -1)}$)) &
+                                           & /(${CC}$(${C2[DIR-1]}$) - ${CC}$(${C2[DIR-1]}$ - 1))
+                                    g = merge(f1p, 0.25_wp*(f1p + f1m + f2p + f2m), id == ${DIR}$)
+                                    dqR_${X}$(i)%sf(j, k, l) = g
+                                    dqL_${X}$(i)%sf(jn, kn, ln) = g
+                                end if
+                            #:endfor
                         end do
-                    end do
-                    if (near) then
-                        #:for DIR, X, CC in [(1, 'x', 'x_cc'), (2, 'y', 'y_cc'), (3, 'z', 'z_cc')]
-                            #:set C1 = ['j', 'k', 'l']
-                            #:set C2 = ['jn', 'kn', 'ln']
-                            if (num_dims >= ${DIR}$) then
-                                ! forward and backward differences along ${X}$ at the cell below the face and the cell above it
-                                f1p = (q%sf(${REF(DIR, C1, 1)}$) - q%sf(${REF(DIR, C1, 0)}$))/(${CC}$(${C1[DIR-1]}$ + 1) &
-                                       & - ${CC}$(${C1[DIR-1]}$))
-                                f1m = (q%sf(${REF(DIR, C1, 0)}$) - q%sf(${REF(DIR, C1, -1)}$))/(${CC}$(${C1[DIR-1]}$) &
-                                       & - ${CC}$(${C1[DIR-1]}$ - 1))
-                                f2p = (q%sf(${REF(DIR, C2, 1)}$) - q%sf(${REF(DIR, C2, 0)}$))/(${CC}$(${C2[DIR-1]}$ + 1) &
-                                       & - ${CC}$(${C2[DIR-1]}$))
-                                f2m = (q%sf(${REF(DIR, C2, 0)}$) - q%sf(${REF(DIR, C2, -1)}$))/(${CC}$(${C2[DIR-1]}$) &
-                                       & - ${CC}$(${C2[DIR-1]}$ - 1))
-                                g = merge(f1p, 0.25_wp*(f1p + f1m + f2p + f2m), id == ${DIR}$)
-                                dqR_${X}$%sf(j, k, l) = g
-                                dqL_${X}$%sf(jn, kn, ln) = g
-                            end if
-                        #:endfor
                     end if
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_compact_ib_viscous_gradient
+    end subroutine s_compact_ib_viscous_gradients
 
     !> weno_Re_flux_compact: set the face-normal velocity gradient (direction id) on every face to the difference across the face.
     !! The WENO chain (face values, cell gradient, reconstructed gradient, face mean) has zero damping at the checkerboard
@@ -1312,6 +1321,9 @@ contains
     impure subroutine s_finalize_viscous_module()
 
         @:DEALLOCATE(Res_viscous)
+        if (allocated(ib_near)) then
+            @:DEALLOCATE(ib_near)
+        end if
 
     end subroutine s_finalize_viscous_module
 
