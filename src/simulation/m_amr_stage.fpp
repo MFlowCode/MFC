@@ -32,6 +32,11 @@ module m_amr_stage
     !> cell-local end-of-step operators of s_amr_fine_cell_op
     integer, parameter :: fine_op_relax = 1, fine_op_split = 2
 
+    !> Level-0 q_T_sf kept across a fine pass (chemistry): the fine frames write their temperatures into q_T_sf at block indices,
+    !! which would become the Newton guesses of unrelated level-0 cells
+    type(scalar_field) :: amr_T_keep
+    $:GPU_DECLARE(create='[amr_T_keep]')
+
     !> Whether patch_icpp was compared with the level-0 initial data, and reproduces it
     logical :: ic_checked = .false., ic_from_patches = .false.
 
@@ -76,7 +81,9 @@ contains
         call s_phase_toc(PH_HALO)
         amr_cons_ghosts_valid = .false.
         call s_amr_fill_levels(q_cons, 1, amr_num_levels)
+        call s_amr_keep_temperature(q_T_sf, .true.)
         call s_amr_fine_stage_advance_batched(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+        call s_amr_keep_temperature(q_T_sf, .false.)
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()
         call s_amr_apply_reflux(rhs_vf, q_cons)
@@ -106,8 +113,10 @@ contains
         dt0 = dt
         call s_amr_ib_pose_begin(t_step)
         call s_amr_igr_sigma(2, 0._wp)
+        call s_amr_keep_temperature(q_T_sf, .true.)
         call s_amr_subcycle_level(1, 0._wp, 1._wp, dt0/real(amr_ref_ratio, wp), q_new, coefs, q_T_sf, bc_type, pb_in, rhs_pb, &
                                   & mv_in, rhs_mv, t_step)
+        call s_amr_keep_temperature(q_T_sf, .false.)
         amr_adv_level = 0
         dt = dt0
         $:GPU_UPDATE(device='[dt]')
@@ -375,9 +384,43 @@ contains
 
         type(scalar_field), intent(inout) :: q_T_sf
 
-        if (f_split_chem() .or. f_split_burn()) call s_amr_fine_cell_op(fine_op_split, q_T_sf)
+        if (.not. (f_split_chem() .or. f_split_burn())) return
+        call s_amr_keep_temperature(q_T_sf, .true.)
+        call s_amr_fine_cell_op(fine_op_split, q_T_sf)
+        call s_amr_keep_temperature(q_T_sf, .false.)
 
     end subroutine s_amr_split_fine
+
+    !> Save (save = T) or restore the level-0 q_T_sf around a fine pass (chemistry only: elsewhere no Newton reads it)
+    impure subroutine s_amr_keep_temperature(q_T_sf, save)
+
+        type(scalar_field), intent(inout) :: q_T_sf
+        logical, intent(in)               :: save
+        integer                           :: j, k, l, lo1, hi1, lo2, hi2, lo3, hi3
+
+        if (.not. chemistry) return
+        lo1 = lbound(q_T_sf%sf, 1); hi1 = ubound(q_T_sf%sf, 1)
+        lo2 = lbound(q_T_sf%sf, 2); hi2 = ubound(q_T_sf%sf, 2)
+        lo3 = lbound(q_T_sf%sf, 3); hi3 = ubound(q_T_sf%sf, 3)
+        if (.not. associated(amr_T_keep%sf)) then
+            @:ALLOCATE(amr_T_keep%sf(lo1:hi1, lo2:hi2, lo3:hi3))
+            @:ACC_SETUP_SFs(amr_T_keep)
+        end if
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[lo1, hi1, lo2, hi2, lo3, hi3, save]')
+        do l = lo3, hi3
+            do k = lo2, hi2
+                do j = lo1, hi1
+                    if (save) then
+                        amr_T_keep%sf(j, k, l) = q_T_sf%sf(j, k, l)
+                    else
+                        q_T_sf%sf(j, k, l) = amr_T_keep%sf(j, k, l)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_keep_temperature
 
     logical function f_split_chem()
 
@@ -395,7 +438,7 @@ contains
     impure subroutine s_amr_fine_cell_op(op, q_T_sf)
 
         integer, intent(in)                         :: op
-        type(scalar_field), intent(inout), optional :: q_T_sf  !< fine_op_split: the chemistry Newton guess
+        type(scalar_field), intent(inout), optional :: q_T_sf  !< fine_op_split: the chemistry Newton guess (scratch)
         integer                                     :: kk, nb
 
         call s_amr_refresh_my_blocks()
