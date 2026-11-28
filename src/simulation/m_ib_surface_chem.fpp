@@ -365,11 +365,13 @@ contains
     !! dF/dT_s < 0 at T_IP, so its T_s step points away from the root, and a line search on max|R| rejects every step toward
     !! it, because |F| has to grow before it falls.
     !!
-    !! The walk takes steps of at most step_frac*T_s, shortened to twice the secant estimate of the root so that the steps
-    !! close in on it. Once F changes sign, Illinois regula falsi finishes, with a bisection step whenever two steps in a row
-    !! fail to halve the bracket. A kinetic root closer than one step to its unstable partner, that is within ~5% of the
-    !! ignition turning point, can be stepped over. No root before T_surface_min or T_surface_max is reported as not
-    !! converged.
+    !! The walk is a secant iteration on T_s, started with dF/dT_s at fixed composition and capped at step_frac*T_s while |F|
+    !! falls. While |F| grows, so the walk is moving away from F = 0, the cap doubles each step up to max_step_mult*step_frac*T_s;
+    !! it drops back to step_frac*T_s once |F| falls again, so the walk approaches a sign change in steps of at most 5%.
+    !! Once F changes sign, Illinois regula falsi finishes, with a bisection step whenever two steps in a row fail to halve
+    !! the bracket. A kinetic root closer than one 5% step to its unstable partner, that is near the ignition turning point,
+    !! can be stepped over. A root pair inside a stretch where |F| grows would need F to turn and cross zero twice within one
+    !! step of up to 20%. No root before T_surface_min or T_surface_max is reported as not converged.
     subroutine s_solve_surface_energy(pres, T_IP, d, Ys_IP, W_species, Ys_s, T_s, mdot_s, converged)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -379,20 +381,24 @@ contains
         real(wp), intent(out) :: Ys_s(num_species), T_s, mdot_s
         logical, intent(out)  :: converged
         integer, parameter    :: max_eval = 160
-        real(wp), parameter   :: step_frac = 0.05_wp
+        real(wp), parameter   :: step_frac = 0.05_wp, max_step_mult = 4._wp, fd_eps_T = 1.e-6_wp
         ! F inherits the species solve's error as noise of about tol*flux_scale/(diffusive flux). At a hot surface the
         ! image-point scale is ~1e4 times the diffusive flux, so species_tol would leave F with 1e-5 noise and stall the root
-        ! solve. The species residual is cheap to drive further, to where its own roundoff stops it.
+        ! solve. While walking only the sign of F is used, so species_tol suffices there; the bracket and the accepted state
+        ! drive the species residual further, to where its own roundoff stops it.
         real(wp), parameter :: nested_tol = 1.e-12_wp
         real(wp)            :: omega_s(num_species)
-        real(wp)            :: T_c, F_c, q_c, T_a, F_a, T_b, F_b, T_p, F_p, dir, step, dT_secant, width
-        logical             :: ok, bracketed
+        real(wp)            :: T_c, F_c, q_c, T_a, F_a, T_b, F_b, T_p, F_p, dir, step, step_mult, dT_secant, width
+        logical             :: ok, started, tight, bracketed
         integer             :: n, nslow
 
         converged = .false.
+        started = .false.
+        tight = .false.
         bracketed = .false.
         nslow = 0
         dir = 1._wp
+        step_mult = 1._wp
         T_a = 0._wp; F_a = 0._wp; T_b = 0._wp; F_b = 0._wp; T_p = 0._wp; F_p = 0._wp; width = 0._wp
         T_c = min(max(T_IP, T_surface_min), T_surface_max)
         Ys_s = Ys_IP
@@ -400,26 +406,38 @@ contains
 
         ! One species solve and energy residual per pass, at T_c, warm-started from the previous pass's composition
         do n = 1, max_eval
-            call s_solve_surface_species(pres, T_c, d, Ys_IP, W_species, nested_tol, Ys_s, omega_s, mdot_s, ok)
+            call s_solve_surface_species(pres, T_c, d, Ys_IP, W_species, merge(nested_tol, species_tol, tight), Ys_s, omega_s, &
+                                         & mdot_s, ok)
             if (.not. ok) return
             call s_surface_energy_residual(pres, T_IP, T_c, d, Ys_s, F_c, q_c)
             T_s = T_c
             if (abs(F_c) < energy_tol*max(abs(q_c), 1._wp)) then
-                converged = .true.
-                return
+                if (tight) then
+                    converged = .true.
+                    return
+                end if
+                ! Confirm on a tightly solved composition at the same T_c
+                tight = .true.
+                cycle
             end if
 
-            if (n == 1) then
-                ! Walk from T_IP toward -F(T_IP)
+            if (.not. started) then
+                ! Walk from T_IP toward -F(T_IP). The first step's slope is dF/dT_s at fixed composition.
+                started = .true.
                 dir = merge(1._wp, -1._wp, F_c < 0._wp)
-                T_a = T_c; F_a = F_c; T_p = T_c; F_p = F_c
+                T_a = T_c; F_a = F_c
+                T_p = T_c*(1._wp + fd_eps_T)
+                call s_surface_energy_residual(pres, T_IP, T_p, d, Ys_s, F_p, q_c)
             else if (.not. bracketed) then
                 if ((F_c < 0._wp) .neqv. (F_a < 0._wp)) then
                     bracketed = .true.
+                    tight = .true.
                     T_b = T_c; F_b = F_c
                     width = abs(T_b - T_a)
                 else
                     if (T_c == T_surface_min .or. T_c == T_surface_max) return
+                    ! Lengthen the step while |F| grows, i.e. while the walk moves away from F = 0
+                    step_mult = merge(min(2._wp*step_mult, max_step_mult), 1._wp, abs(F_c) >= abs(F_a))
                     T_p = T_a; F_p = F_a; T_a = T_c; F_a = F_c
                 end if
             else
@@ -438,12 +456,12 @@ contains
                 end if
             end if
 
-            ! Next trial temperature
+            ! Next trial temperature: a secant step toward the root when it points ahead, else step_mult*step_frac*T_s
             if (.not. bracketed) then
-                step = step_frac*T_a
+                step = step_mult*step_frac*T_a
                 if (F_a /= F_p) then
                     dT_secant = -F_a*(T_a - T_p)/(F_a - F_p)
-                    if (dT_secant*dir > 0._wp) step = min(step, 2._wp*abs(dT_secant))
+                    if (dT_secant*dir > 0._wp) step = min(step, abs(dT_secant))
                 end if
                 T_c = min(max(T_a + dir*step, T_surface_min), T_surface_max)
             else if (nslow < 2) then
