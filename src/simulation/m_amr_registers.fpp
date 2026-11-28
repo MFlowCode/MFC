@@ -9,9 +9,9 @@
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine block boundary. Depends only on m_derived_types and
 !! m_global_parameters so m_rhs (capture) and m_time_steppers (apply) can use it without cycles. creg is indexed 0-based relative to
 !! the rank's block intersection; freg 0-based local fine (children of coarse cell t are 2*t, 2*t+1). The slot dimension grows on
-!! demand (s_amr_reg_reserve). The captured flux is the advective flux of flux_rsx_vf plus the viscous, species-diffusion and
-!! conduction fluxes of flux_src_rsx_vf. With adv_src_mode_vel_iface a last channel (amr_reg_u) holds the interface velocity, so the
-!! volume fractions' reflux also corrects their alpha*div(u) source (s_amr_apply_reflux).
+!! demand (s_amr_reg_reserve). The captured flux is the advective flux of flux_rsx_vf plus the viscous, capillary, species-diffusion
+!! and conduction fluxes of flux_src_rsx_vf. With adv_src_mode_vel_iface a last channel (amr_reg_u) holds the interface velocity, so
+!! the volume fractions' reflux also corrects their alpha*div(u) source (s_amr_apply_reflux).
 module m_amr_registers
 
     use m_derived_types
@@ -430,8 +430,8 @@ contains
 
     end subroutine s_amr_capture_batch
 
-    !> Capture the filled slots (s_amr_capture_slot) into freg (fine) or creg: advective, viscous (mom..E), chemistry diffusion
-    !! (species, plus the energy flux only when not viscous, since the viscous pass already captured it), and the interface velocity
+    !> Capture the filled slots (s_amr_capture_slot) into freg (fine) or creg: advective, viscous and capillary (mom..E), chemistry
+    !! diffusion (species, plus the energy flux only when the mom..E pass did not already capture it), and the interface velocity
     !! into channel amr_reg_u. Coarse and fine share this routine so the reflux subtracts matching quantities. Set 0 is pushed here
     !! and cleared after.
     impure subroutine s_amr_capture_total(set, nb, id, fine, cf, acc)
@@ -459,10 +459,12 @@ contains
         ! corrects it with the flux
         if (amr_reg_u > 0) call s_amr_capture_batch(set, nb, id, fine, .false., cf, acc, m1, m2, eqn_idx%adv%beg, &
             & merge(eqn_idx%adv%end, eqn_idx%adv%beg, amr_reg_amode), amr_reg_u - eqn_idx%adv%beg)
-        if (viscous) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%mom%beg, eqn_idx%E, 0)
+        if (viscous .or. surface_tension) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, &
+            & eqn_idx%mom%beg, eqn_idx%E, 0)
         if (chemistry .and. chem_params%diffusion) then
             call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%species%beg, eqn_idx%species%end, 0)
-            if (.not. viscous) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, eqn_idx%E, eqn_idx%E, 0)
+            if (.not. (viscous .or. surface_tension)) call s_amr_capture_batch(set, nb, id, fine, .false., cf, .true., m1, m2, &
+                & eqn_idx%E, eqn_idx%E, 0)
         end if
         if (set == 0) then
             bcap(11,:,0) = 0; bmax(:,0) = 0
