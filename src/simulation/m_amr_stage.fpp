@@ -393,7 +393,8 @@ contains
 
     end subroutine s_amr_split_fine
 
-    !> Save (save = T) or restore the level-0 q_T_sf around a fine pass (chemistry only: elsewhere no Newton reads it)
+    !> Save (save = T) or restore the level-0 q_T_sf around a fine pass (chemistry only: elsewhere no Newton reads it; the coarse
+    !! mean_temp_wall source, which requires chemistry, reads it after the fine stage)
     impure subroutine s_amr_keep_temperature(q_T_sf, save)
 
         type(scalar_field), intent(inout) :: q_T_sf

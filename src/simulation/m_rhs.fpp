@@ -897,7 +897,7 @@ contains
         ! END: Dimensional Splitting Loop
 
         if (viscous .and. bodyForces .and. .not. igr) call s_remove_mts_dissipation(q_prim_qp%vf, q_T_sf, rhs_vf, &
-            & dq_prim_dx_qp(1)%vf, dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
+            & dq_prim_dx_qp(1)%vf, dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf, rhs_marks)
 
         ! RHS additions for hypoelasticity (interface-consistent path, after all sweeps)
         if (hypo_nc_mode == hypo_nc_mode_interface) then

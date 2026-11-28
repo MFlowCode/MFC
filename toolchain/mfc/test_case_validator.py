@@ -259,8 +259,8 @@ class TestMeanTemperatureSource(ConstraintTestCase):
     def test_allows_amr_with_ib(self):
         self.assertNotIn("do not support ib", self.errors_for({**self.PERIODIC, **CYLINDER, "amr": "T", "mean_qdot": 1.0e6}))
 
-    def test_rejects_amr_with_wall(self):
-        self.assertRejects({**self.WALL_CHANNEL, "amr": "T"}, "mean_temp_wall does not support amr")
+    def test_allows_amr_with_wall(self):
+        self.assertNotIn("mean_temp_wall does not support amr", self.errors_for({**self.WALL_CHANNEL, "amr": "T"}))
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")

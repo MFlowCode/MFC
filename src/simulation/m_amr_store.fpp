@@ -496,13 +496,15 @@ contains
 
     end subroutine s_amr_br_load_batch
 
-    !> Copy batch member ibm's primitive state from the slab scratch into the block-frame scratch over its buffered extent, for the
-    !! per-member IB correction.
-    impure subroutine s_amr_bat_member_prim(ibm, src, dst)
+    !> Copy batch member ibm's primitive state (and, given T_src, its temperature) from the slab scratch into the block-frame
+    !! scratch over its buffered extent, for the per-member hooks.
+    impure subroutine s_amr_bat_member_prim(ibm, src, dst, T_src, T_dst)
 
         integer, intent(in)                                    :: ibm
         type(scalar_field), dimension(sys_size), intent(in)    :: src
         type(scalar_field), dimension(sys_size), intent(inout) :: dst
+        type(scalar_field), intent(in), optional               :: T_src
+        type(scalar_field), intent(inout), optional            :: T_dst
         integer                                                :: i, j, k, l, h, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h
 
         h = amr_bat_blk(ibm)
@@ -517,6 +519,16 @@ contains
                     do j = b1l, b1h
                         dst(i)%sf(j, k, l) = src(i)%sf(j + o1, k + o2, l + o3)
                     end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        if (.not. present(T_src)) return
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h]')
+        do l = b3l, b3h
+            do k = b2l, b2h
+                do j = b1l, b1h
+                    T_dst%sf(j, k, l) = T_src%sf(j + o1, k + o2, l + o3)
                 end do
             end do
         end do
@@ -562,6 +574,10 @@ contains
                 @:DEALLOCATE(amr_scr_prim_blk(i)%sf)
             end do
             @:DEALLOCATE(amr_scr_prim_blk)
+        end if
+        if (associated(amr_T_blk%sf)) then
+            @:ACC_TEARDOWN_SFs(amr_T_blk)
+            @:DEALLOCATE(amr_T_blk%sf)
         end if
         amr_st_cap = 0
 

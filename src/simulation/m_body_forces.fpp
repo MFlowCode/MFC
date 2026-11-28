@@ -120,7 +120,8 @@ contains
         mts_sim = .not. f_is_default(mean_temp_wall)
         mts_beta = 0._wp
         if (mts_sim) then
-            @:ALLOCATE(mts_g1(0:m, 0:n, 0:p), mts_g2(0:m, 0:n, 0:p))
+            ! m_alloc: AMR fine frames evaluate them too
+            @:ALLOCATE(mts_g1(0:m_alloc, 0:n_alloc, 0:p_alloc), mts_g2(0:m_alloc, 0:n_alloc, 0:p_alloc))
         else
             @:ALLOCATE(mts_g1(0:0, 0:0, 0:0), mts_g2(0:0, 0:0, 0:0))
         end if
@@ -489,13 +490,14 @@ contains
     !! the energy of each fluid cell: the developed state T_s + psi exp(-beta x) excludes it (Patankar et al. 1977), and the
     !! controller would otherwise remove it through the mode, biasing Nu and cooling a fast core without bound (#2418). The shear
     !! viscosity is the one the viscous fluxes use: Cantera's mixture average at the cell's T and Y with chemistry.
-    subroutine s_remove_mts_dissipation(q_prim_vf, q_T_sf, rhs_vf, dqx_vf, dqy_vf, dqz_vf)
+    subroutine s_remove_mts_dissipation(q_prim_vf, q_T_sf, rhs_vf, dqx_vf, dqy_vf, dqz_vf, marks)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf, dqx_vf, dqy_vf, dqz_vf
         type(scalar_field), intent(in)                         :: q_T_sf
+        type(integer_field), intent(in)                        :: marks  !< the frame's IB markers
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         real(wp), dimension(3, 3)                              :: g
-        real(wp), dimension(2)                                 :: mu  !< shear and bulk viscosity
+        real(wp), dimension(2)                                 :: mu     !< shear and bulk viscosity
         real(wp), dimension(num_species)                       :: Ys
         real(wp)                                               :: dv, s2, T, mu_c
         integer                                                :: i, j, k, l, q, r
@@ -505,7 +507,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    if (f_is_fluid_cell(ib_markers, j, k, l)) then
+                    if (f_is_fluid_cell(marks, j, k, l)) then
                         g = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_dims
@@ -557,7 +559,7 @@ contains
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
         real(wp), intent(in)                                     :: ldt       !< local dt
         logical, intent(in)                                      :: on_block  !< a fine block: ib_markers_fine
-        type(scalar_field), intent(in), optional                 :: q_T_sf    !< absent on fine blocks (mean_temp_wall: no amr)
+        type(scalar_field), intent(in), optional                 :: q_T_sf    !< read with mean_temp_wall only
         integer                                                  :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")

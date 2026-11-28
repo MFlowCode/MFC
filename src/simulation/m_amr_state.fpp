@@ -72,6 +72,9 @@ module m_amr_state
     type(scalar_field), allocatable :: amr_scr_prim(:), amr_scr_rhs(:)
     !> block-frame prim scratch for the batched per-member IB correction (ib only); the slab prim stacks members along amr_bat_sd
     type(scalar_field), allocatable :: amr_scr_prim_blk(:)
+    !> block-frame temperature scratch for the per-member mean_temp_wall source (the slab's are in q_T_sf)
+    type(scalar_field) :: amr_T_blk
+    $:GPU_DECLARE(create='[amr_T_blk]')
     !> Blocks per batched s_compute_rhs call (amr_bat_max once initialized); bounded to avoid exhausting device memory.
     integer :: amr_br_batch = 1
     integer :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
@@ -578,7 +581,11 @@ contains
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
         end do
-        if (ib .or. synthetic_turbulence) then
+        if (mean_temp_wall > 0._wp) then
+            @:ALLOCATE(amr_T_blk%sf(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3)))
+            @:ACC_SETUP_SFs(amr_T_blk)
+        end if
+        if (ib .or. synthetic_turbulence .or. mean_temp_wall > 0._wp) then
             allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim_blk)
             $:GPU_ENTER_DATA(create='[amr_scr_prim_blk]')
             do i = 1, sys_size

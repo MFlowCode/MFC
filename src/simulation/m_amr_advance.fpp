@@ -270,7 +270,7 @@ contains
             h_merge_1_wp_dt_igr = merge(1._wp, dt, igr)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, h_coefs_1, h_coefs_2, h_coefs_3, h_coefs_4, h_merge_1_wp_dt_igr)
             if (ib .or. f_stage_hooks_pre_ib_on_block() .or. f_stage_hooks_post_ib()) then
-                call s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in)
+                call s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in, q_T_sf)
             end if
             call s_phase_toc(PH_RK)
         end do
@@ -333,12 +333,13 @@ contains
     end subroutine s_amr_bat_ib_tables
 
     !> Per-member post-RK hooks of the coarse stage (q_cons_ts(1), m_time_steppers).
-    impure subroutine s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in)
+    impure subroutine s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in, q_T_sf)
 
         real(wp), intent(in)                           :: coefs(4)
         real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
+        type(scalar_field), intent(in)                 :: q_T_sf  !< the slab's temperatures from this stage's RHS
         integer                                        :: ibm, nb
-        logical                                        :: pre, post
+        logical                                        :: pre, post, mtw
 
         ! the coarse stage's post-RK hooks (m_time_steppers) run here per member in its own frame, from the same lists
         ! (m_stage_hooks) around the same IB correction. Each reads only the member's cells, so member order is free.
@@ -346,16 +347,24 @@ contains
         ! need the member's extents.
 
         pre = f_stage_hooks_pre_ib_on_block(); post = f_stage_hooks_post_ib()
+        mtw = bodyForces .and. mean_temp_wall > 0._wp
         nb = amr_bat_n; amr_bat_n = 1
         do ibm = 1, nb
             call s_amr_select_slot(amr_bat_blk(ibm))
             if (pre .and. amr_rank_owns_block) then
-                ! same ldt as the coarse stage; the synthetic turbulence forcing reads the member's own primitive state
-                if (synthetic_turbulence) call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
+                ! same ldt as the coarse stage; the synthetic turbulence forcing reads the member's own primitive state, the
+                ! mean_temp_wall source its temperatures
+                if (mtw) then
+                    call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk, q_T_sf, amr_T_blk)
+                else if (synthetic_turbulence) then
+                    call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
+                end if
                 call s_amr_fine_enter()
                 ! the body forces zero the mean sources in the block's own solid cells
                 if (ib .and. bodyForces) call s_ibm_load_fine_markers(1, [amr_cur], reshape([m, n, p], [3, 1]), 1, 0)
-                if (synthetic_turbulence) then
+                if (mtw) then
+                    call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim_blk, amr_scr_rhs, coefs(3)*dt/coefs(4), .true., amr_T_blk)
+                else if (synthetic_turbulence) then
                     call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim_blk, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)
                 else
                     call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)

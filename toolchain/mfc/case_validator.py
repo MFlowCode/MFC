@@ -1871,8 +1871,6 @@ class CaseValidator:
             return
         self.prohibit(self.get("chemistry", "F") != "T", "mean_qdot/mean_temp require chemistry")
         self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
-        # mean_temp_wall's terms are built on the coarse grid and need q_T_sf, which the fine hook does not get
-        self.prohibit(self.get("amr", "F") == "T" and wall is not None, "mean_temp_wall does not support amr")
         dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
         for d, active in dims:
             # x is the streamwise (mixing-cup) direction; walls may bound the others

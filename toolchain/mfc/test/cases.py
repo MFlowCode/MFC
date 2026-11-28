@@ -5439,6 +5439,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # an NVHPC CPU build and an A100 agree to 2e-12.
     channel_mods = {"weno_order": 3, "mapped_weno": "F", "weno_eps": 1e-6, "t_step_stop": 100, "t_step_save": 100}
     cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=channel_mods, override_tol=1e-6))
+    # Under AMR (subcycled: the fine level needs half the step) on a 48 x 48 grid, a block a buff_size from the lower isothermal wall,
+    # alone and with an isothermal body in it: each block's source reads its own temperatures, the dissipation removal its own markers.
+    channel_amr = {**channel_mods, "t_step_stop": 20, "t_step_save": 20, "amr": "T", "amr_subcycle": "T", "amr_regrid_int": 0}
+    channel_amr.update({"amr_block_beg(1)": 12, "amr_block_end(1)": 35, "amr_block_beg(2)": 10, "amr_block_end(2)": 33})
+    cases.append(
+        define_case_f("2D -> Chemistry -> Thermal Channel -> Wall Temperature -> AMR", "examples/2D_thermal_channel/case.py", args=["--nx", "48", "--ny", "48"], mods=channel_amr, override_tol=1e-6)
+    )
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> Thermal Channel -> Wall Temperature -> AMR -> IBM",
+            "examples/2D_thermal_channel/case.py",
+            args=["--nx", "48", "--ny", "48", "--body"],
+            mods=channel_amr,
+            override_tol=1e-6,
+        )
+    )
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
