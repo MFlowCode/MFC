@@ -192,7 +192,7 @@ contains
         do i = 1, num_ibs
             pos = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
             if (num_dims == 3) pos(3) = patch_ib(i)%z_centroid
-            call s_detect_wall_overlaps(pos, patch_ib(i)%radius, wall_overlaps)
+            call s_detect_wall_overlaps(pos, patch_ib(i)%radius, .true., wall_overlaps)
             wall_overlap_distances(i,:) = wall_overlaps
             max_overlap = max(max_overlap, maxval(wall_overlaps))
         end do
@@ -327,7 +327,8 @@ contains
             pos = positions(i,:,2)
             if (num_dims == 2) pos(3) = 0._wp
             vel = velocities(i,:,2)
-            call s_detect_wall_overlaps(pos, radii(i), wall_overlaps)
+            ! reflective faces get mirror-image halo particles instead (s_build_halo_particles)
+            call s_detect_wall_overlaps(pos, radii(i), .false., wall_overlaps)
             max_overlap = max(max_overlap, maxval(wall_overlaps))
 
             force = 0._wp
@@ -456,7 +457,8 @@ contains
 
     end subroutine s_perform_soft_sphere_collision
 
-    !> Soft-sphere contact between one sphere or circle and every domain wall it overlaps
+    !> Soft-sphere contact between one sphere or circle and every domain wall it overlaps. A reflective face acts as the
+    !! mirror-image body, whose contact gives the same normal force and no tangential slip, so it is a frictionless wall.
     subroutine s_soft_sphere_wall_force(pos, vel, radius, mass, inv_mass_t, wall_overlaps, force, angular_vel, torque)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -468,7 +470,7 @@ contains
         real(wp), dimension(3), intent(out) :: force
         real(wp), dimension(3), intent(in), optional :: angular_vel
         real(wp), dimension(3), intent(out), optional :: torque
-        integer :: i
+        integer :: i, face_bc
         real(wp), dimension(3) :: normal_force, tangential_force, normal_vector, normal_velocity, tangential_vector, wall_torque, &
              & radial_vector, rotation_velocity, velocity
         real(wp) :: k, eta  ! the spring stiffness and damping coefficient for a specific
@@ -489,16 +491,22 @@ contains
             select case (i)
             case (1)  ! x domain left
                 normal_vector = [-1._wp, 0._wp, 0._wp]
+                face_bc = ib_bc_x%beg
             case (2)  ! x domain right
                 normal_vector = [1._wp, 0._wp, 0._wp]
+                face_bc = ib_bc_x%end
             case (3)  ! y domain bottom
                 normal_vector = [0._wp, -1._wp, 0._wp]
+                face_bc = ib_bc_y%beg
             case (4)  ! y domain top
                 normal_vector = [0._wp, 1._wp, 0._wp]
+                face_bc = ib_bc_y%end
             case (5)  ! z domain back
                 normal_vector = [0._wp, 0._wp, -1._wp]
+                face_bc = ib_bc_z%beg
             case (6)  ! z domain front
                 normal_vector = [0._wp, 0._wp, 1._wp]
+                face_bc = ib_bc_z%end
             end select
 
             velocity = vel
@@ -514,8 +522,11 @@ contains
             normal_velocity = dot_product(velocity, normal_vector)*normal_vector
             tangential_vector = velocity - normal_velocity
             normal_force = -k*wall_overlaps(i)*normal_vector - eta*normal_velocity
-            call s_friction_direction(tangential_vector, norm2(normal_force), inv_mass_t)
-            tangential_force = -coefficient_of_friction*norm2(normal_force)*tangential_vector
+            tangential_force = 0._wp
+            if (face_bc /= BC_REFLECTIVE) then
+                call s_friction_direction(tangential_vector, norm2(normal_force), inv_mass_t)
+                tangential_force = -coefficient_of_friction*norm2(normal_force)*tangential_vector
+            end if
             force = force + (normal_force + tangential_force)
 
             ! compute the torque if that is requested
@@ -684,22 +695,27 @@ contains
 
     end subroutine s_detect_el_collisions
 
-    !> Distance a sphere or circle extends past each slip or no-slip domain wall (1/2: x beg/end, 3/4: y, 5/6: z); 0 if none
-    subroutine s_detect_wall_overlaps(centroid, radius, wall_overlaps)
+    !> Distance a sphere or circle extends past each slip or no-slip domain wall, and each reflective face when reflective_walls
+    !! (1/2: x beg/end, 3/4: y, 5/6: z); 0 if none. ib_bc_* are the global faces, so interior rank faces are never walls.
+    subroutine s_detect_wall_overlaps(centroid, radius, reflective_walls, wall_overlaps)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(3), intent(in)  :: centroid
         real(wp), intent(in)                :: radius
+        logical, intent(in)                 :: reflective_walls
         real(wp), dimension(6), intent(out) :: wall_overlaps
 
         wall_overlaps = 0._wp
         #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
             if (num_dims >= ${DIR}$) then
-                if (ib_bc_${X}$%beg == BC_SLIP_WALL .or. ib_bc_${X}$%beg == BC_NO_SLIP_WALL) then
+                ! with cyl_coord, a reflective y beg is the axis, not a mirror plane
+                if (ib_bc_${X}$%beg == BC_SLIP_WALL .or. ib_bc_${X}$%beg == BC_NO_SLIP_WALL .or. (reflective_walls &
+                    & .and. ib_bc_${X}$%beg == BC_REFLECTIVE .and. .not. (cyl_coord .and. ${DIR}$ == 2))) then
                     wall_overlaps(${IDX}$) = max(0._wp, glb_bounds(${DIR}$)%beg - (centroid(${DIR}$) - radius))
                 end if
-                if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
+                if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL .or. (reflective_walls &
+                    & .and. ib_bc_${X}$%end == BC_REFLECTIVE)) then
                     wall_overlaps(${IDX}$ + 1) = max(0._wp, centroid(${DIR}$) + radius - glb_bounds(${DIR}$)%end)
                 end if
             end if

@@ -493,7 +493,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inelastic collisions while 1 is for perfectly elastic collisions.
 
-- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collision checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
+- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collision checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls. Walls are the slip and no-slip domain faces (`-15`, `-16`) and the reflective faces (`-2`). A reflective face is a symmetry plane: the body meets its mirror image, whose linear spring-dashpot contact gives the same normal force as the wall contact (half the effective mass, twice the overlap and twice the closing speed) and no tangential slip, so that face is frictionless (`coefficient_of_friction` and torque do not apply there). With `cyl_coord`, the reflective `bc_y%%beg` is the axis and is not a wall. Four-way Euler-Lagrange particles get mirror-image halo particles at reflective faces instead.
 
 - `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring constant used to apply collision forces.
 

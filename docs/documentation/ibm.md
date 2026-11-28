@@ -13,7 +13,7 @@ Enable the model with `ib = T` and `num_ibs`; each body is a `patch_ib(i)` entry
 | `moving_ibm = 0` | fixed body |
 | `moving_ibm = 1` | one-way coupling: the body moves at its prescribed rate and acts on the fluid, which does not act back |
 | `moving_ibm = 2` | two-way coupling: the body moves under pressure, viscous and body forces (`bf_x`, `bf_y`, `bf_z`) |
-| `collision_model = 1` | soft-sphere collisions between circles or spheres and with walls; `coefficient_of_restitution`, `collision_time`, `collision_temporal_resolution`, `coefficient_of_friction` |
+| `collision_model = 1` | soft-sphere collisions between circles or spheres and with walls (slip, no-slip, and reflective faces, which are frictionless mirror planes); `coefficient_of_restitution`, `collision_time`, `collision_temporal_resolution`, `coefficient_of_friction` |
 | `ib_friction_slip_eps` | regularises the friction direction at small slip speed, so contacts split across MPI ranks agree with a single rank |
 
 Moving-body kinematics and the restitution of a wall collision are checked in [Validation](@ref sec-validation-moving-kinematics).

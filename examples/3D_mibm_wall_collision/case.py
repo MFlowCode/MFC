@@ -12,6 +12,9 @@ sphere on a fixed wall is v_n' = -e v_n, and for the tangential speed, with fric
     ./mfc.sh run examples/3D_mibm_wall_collision/case.py -n 1 --gpu -- --angle 30 --mu 0.092
     python3 examples/3D_mibm_wall_collision/check_collision.py <case directory> --angle 30 --e 0.98 --mu 0.092
 
+--wall-bc -2 makes y = 0 a reflective (symmetry) face instead: the sphere then meets its mirror image, which is the same contact
+with no friction, so the rebound is v_n' = -e v_n and v_t' = v_t for any --mu.
+
 Defaults are a CI-sized run (16^3 cells, 30.5 lead steps, normal impact, e = 0.8, 20 steps per collision). The rebound error of e is first order
 in the steps per collision; --cells 40, --lead-steps 200 and --steps-per-collision 80 reproduce the table in the validation page to within the onset-phase effect noted there.
 The setup follows the verification cases of Di Maio and Di Renzo (linear frictional-elastic collision model).
@@ -31,6 +34,7 @@ parser.add_argument("--cells", type=int, default=16, help="Cells per direction."
 parser.add_argument("--steps-per-collision", type=float, default=20.0, help="collision_time / dt.")
 parser.add_argument("--lead-steps", type=float, default=30.5, help="Free-flight steps before (and after) the impact; a half step puts the contact onset mid-step.")
 parser.add_argument("--stride", type=int, default=10, help="ib_force_stride.")
+parser.add_argument("--wall-bc", type=int, default=-15, choices=[-15, -16, -2], help="bc_y of the walls: slip (-15), no-slip (-16) or reflective (-2).")
 parser.add_argument("--weno_order", type=int, default=1, help="Reconstruction order: 1 is well conditioned (default), 5 is WENO5.")
 args = parser.parse_args()
 
@@ -73,8 +77,8 @@ case = {
     "wave_speeds": 1,
     "bc_x%beg": -3,
     "bc_x%end": -3,
-    "bc_y%beg": -15,
-    "bc_y%end": -15,
+    "bc_y%beg": args.wall_bc,
+    "bc_y%end": args.wall_bc,
     "bc_z%beg": -3,
     "bc_z%end": -3,
     "ib": "T",
